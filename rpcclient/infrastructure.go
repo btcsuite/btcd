@@ -529,7 +529,7 @@ out:
 		}
 	}
 
-	// Drain any channels before exiting so nothing is left waiting around
+	// Drain any channels before exiting so nothing is left waiting, wait ing around
 	// to send.
 cleanup:
 	for {
@@ -905,7 +905,7 @@ out:
 		}
 	}
 
-	// Drain any wait channels before exiting so nothing is left waiting
+	// Drain any wait channels before exiting so nothing is left waiting, wait ing
 	// around to send.
 cleanup:
 	for {
@@ -945,7 +945,7 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 }
 
 // newFutureError returns a new future result channel that already has the
-// passed error waitin on the channel with the reply set to nil.  This is useful
+// passed error waiting, wait in on the channel with the reply set to nil.  This is useful
 // to easily return errors from the various Async functions.
 func newFutureError(err error) chan *Response {
 	responseChan := make(chan *Response, 1)
