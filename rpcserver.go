@@ -1904,7 +1904,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 		// Fallthrough
 	}
 
-	// Get the lastest block template
+	// Get the latest, last block template
 	state.Lock()
 	defer state.Unlock()
 
