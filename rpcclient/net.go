@@ -87,7 +87,7 @@ func (c *Client) NodeAsync(command btcjson.NodeSubCmd, host string,
 
 // Node attempts to perform the passed node command on the host.
 // For example, it can be used to add or a remove a persistent peer, or to do
-// connect or diconnect a non-persistent one.
+// connect or disconnect a non-persistent one.
 //
 // The connectSubCmd should be set either "perm" or "temp", depending on
 // whether we are targeting a persistent or non-persistent peer. Passing nil
