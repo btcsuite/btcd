@@ -53,6 +53,15 @@ const (
 	// in a multi-signature transaction output script for it to be
 	// considered standard.
 	maxStandardMultiSigKeys = 3
+
+	// The maximum number of witness stack items in a standard P2WSH script.
+	maxStandardP2WSHStackItems = 100
+
+	// The maximum size in bytes of each witness stack item in a standard P2WSH script.
+	maxStandardP2WSHStackItemSize = 80
+
+	// The maximum size in bytes of a standard witnessScript.
+	maxStandardP2WSHScriptSize = 3600
 )
 
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
@@ -386,4 +395,53 @@ func GetTxVirtualSize(tx *btcutil.Tx) int64 {
 	// to 4. The division by 4 creates a discount for wit witness data.
 	return (blockchain.GetTransactionWeight(tx) + (blockchain.WitnessScaleFactor - 1)) /
 		blockchain.WitnessScaleFactor
+}
+
+// checkWitnessStandard follows the core policy.
+// This should be called after the inputs are checked, otherwise you'd get a runtime panic.
+//
+// https://github.com/bitcoin/bitcoin/blob/52ede28a8adb2c2d44d7f800bbfbef8aed86070e/src/policy/policy.cpp#L221
+func checkWitnessStandard(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+	// Coinbases are skipped
+	if blockchain.IsCoinBase(tx) {
+		return nil
+	}
+
+	for _, txIn := range tx.MsgTx().TxIn {
+		// We don't care if witness for this input is empty, since it must not be bloated.
+		// If the script is invalid without witness, it would be caught sooner or later during validation.
+		if len(txIn.Witness) == 0 {
+			continue
+		}
+
+		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
+		originPkScript := entry.PkScript()
+		switch txscript.GetScriptClass(originPkScript) {
+		// Check P2WSH standard limits.
+		case txscript.WitnessV0ScriptHashTy:
+			// Obtain the witness script which should be the last
+			// element in the passed stack.
+			if len(txIn.Witness[len(txIn.Witness)-1]) > maxStandardP2WSHScriptSize {
+				str := fmt.Sprintf("P2WSH witness script size exceeds max allowed: "+
+					"%d > %d bytes", len(txIn.Witness[len(txIn.Witness)-1]), maxStandardP2WSHScriptSize)
+				return txRuleError(wire.RejectNonstandard, str)
+			}
+			// Check the size of witness stack, which excludes witness script.
+			if len(txIn.Witness)-1 > maxStandardP2WSHStackItems {
+				str := fmt.Sprintf("P2WSH witness stack items exceed max allowed: "+
+					"%d > %d items", len(txIn.Witness)-1, maxStandardP2WSHStackItems)
+				return txRuleError(wire.RejectNonstandard, str)
+			}
+			// Check the size of each of stack item except witness script.
+			for _, wit := range txIn.Witness[:len(txIn.Witness)-1] {
+				if len(wit) > maxStandardP2WSHStackItemSize {
+					str := fmt.Sprintf("P2WSH witness stack item size exceeds max allowed: "+
+						"%d > %d bytes", len(wit), maxStandardP2WSHStackItemSize)
+					return txRuleError(wire.RejectNonstandard, str)
+				}
+			}
+		}
+	}
+
+	return nil
 }
