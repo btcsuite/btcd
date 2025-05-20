@@ -483,12 +483,15 @@ func (c *dbCache) commitTreaps(pendingKeys, pendingRemove TreapForEacher) error 
 	})
 }
 
-// flush flushes the database cache to persistent storage.  This involes syncing
+// flush flushes the database cache to persistent storage.  This involves syncing
 // the block store and replaying all transactions that have been applied to the
 // cache to the underlying database.
 //
 // This function MUST be called with the database write lock held.
 func (c *dbCache) flush() error {
+	c.cacheLock.Lock()
+	defer c.cacheLock.Unlock()
+
 	c.lastFlush = time.Now()
 
 	// Sync the current write file associated with the block store.  This is
@@ -502,10 +505,8 @@ func (c *dbCache) flush() error {
 	// Since the cached keys to be added and removed use an immutable treap,
 	// a snapshot is simply obtaining the root of the tree under the lock
 	// which is used to atomically swap the root.
-	c.cacheLock.RLock()
 	cachedKeys := c.cachedKeys
 	cachedRemove := c.cachedRemove
-	c.cacheLock.RUnlock()
 
 	// Nothing to do if there is no data to flush.
 	if cachedKeys.Len() == 0 && cachedRemove.Len() == 0 {
@@ -524,10 +525,8 @@ func (c *dbCache) flush() error {
 	}
 
 	// Clear the cache since it has been flushed.
-	c.cacheLock.Lock()
 	c.cachedKeys = treap.NewImmutable()
 	c.cachedRemove = treap.NewImmutable()
-	c.cacheLock.Unlock()
 
 	return nil
 }
