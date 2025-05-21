@@ -1,7 +1,6 @@
 btcutil
 =======
 
-[![Build Status](https://github.com/btcsuite/btcd/btcutil/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/btcutil/actions)
 [![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/btcsuite/btcd/btcutil)
 
