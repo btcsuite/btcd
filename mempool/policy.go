@@ -353,6 +353,12 @@ func CheckTransactionStandard(tx *btcutil.Tx, height int32,
 			return txRuleError(rejectCode, str)
 		}
 
+		// If we have a null data script, ensure it is not larger than the
+		// maximum allowed size, plus 1 byte for the OP_RETURN and 2 for the push ops.
+		if scriptClass == txscript.NullDataTy && len(txOut.PkScript) > txscript.MaxDataCarrierSize+3 {
+			return txRuleError(wire.RejectNonstandard, "non-standard script form")
+		}
+
 		// Accumulate the number of outputs which only carry data.  For
 		// all other script types, ensure the output value is not
 		// "dust".

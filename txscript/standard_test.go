@@ -1023,13 +1023,13 @@ var scriptClassTests = []struct {
 	},
 	{
 		// Nulldata with more than max allowed data to be considered
-		// standard (so therefore nonstandard)
+		// standard is still marked as nulldata.
 		name: "nulldata exceed max standard push",
 		script: "RETURN PUSHDATA1 0x51 0x046708afdb0fe5548271967f1a67" +
 			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
 			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
 			"962e0ea1f61deb649f6bc3f4cef308",
-		class: NonStandardTy,
+		class: NullDataTy,
 	},
 	{
 		// Almost nulldata, but add an additional opcode after the data

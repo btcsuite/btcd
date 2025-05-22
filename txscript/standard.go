@@ -505,7 +505,7 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 	//  OP_RETURN <optional data>
 	//
 	// Thus, it can either be a single OP_RETURN or an OP_RETURN followed by a
-	// data push up to MaxDataCarrierSize bytes.
+	// data push.
 
 	// The script can't possibly be a null data script if it doesn't start
 	// with OP_RETURN.  Fail fast to avoid more work below.
@@ -521,8 +521,7 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 	// OP_RETURN followed by data push up to MaxDataCarrierSize bytes.
 	tokenizer := MakeScriptTokenizer(scriptVersion, script[1:])
 	return tokenizer.Next() && tokenizer.Done() &&
-		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4) &&
-		len(tokenizer.Data()) <= MaxDataCarrierSize
+		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4)
 }
 
 // scriptType returns the type of the script being inspected from the known
