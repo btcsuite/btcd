@@ -143,6 +143,13 @@ func minTaprootBip32DerivationByteSize(numHashes uint64) (uint64, error) {
 func ReadTaprootBip32Derivation(xOnlyPubKey,
 	value []byte) (*TaprootBip32Derivation, error) {
 
+	// This function allocates additional memory while parsing the serialized
+	// data. To prevent potential out-of-memory (OOM) issues, we must validate
+	// the length of the value slice before proceeding.
+	if len(value) > MaxPsbtValueLength {
+		return nil, ErrInvalidPsbtFormat
+	}
+
 	// The taproot key BIP 32 derivation path is defined as:
 	//   <hashes len> <leaf hash>* <4 byte fingerprint> <32-bit uint>*
 	// So we get at least 5 bytes for the length and the 4 byte fingerprint.
