@@ -29,15 +29,16 @@ const (
 	// each party sends.
 	garbageSize = 16
 
-	// maxGarbageLen is the maximum size of garbage that either peer is allowed
-	// to send.
-	maxGarbageLen = 4095
+	// MaxGarbageLen is the maximum size of garbage that either peer is
+	// allowed to send.
+	MaxGarbageLen = 4095
 
-	// maxContentLen is the maximum length of content that can be encrypted or
-	// decrypted.
-	// TODO: This should be revisited. For some reason, the test vectors want
-	// us to encrypt 16777215 bytes even though bitcoind will only decrypt up
-	// to 1 + 12 + 4_000_000 bytes by default.
+	// maxContentLen is the maximum length of content that can be encrypted
+	// or decrypted.
+	//
+	// TODO: This should be revisited. For some reason, the test vectors
+	// want us to encrypt 16777215 bytes even though bitcoind will only
+	// decrypt up to 1 + 12 + 4_000_000 bytes by default.
 	maxContentLen = 1<<24 - 1
 
 	// lengthFieldLen is the length of the length field when encrypting the
@@ -435,9 +436,10 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net wire.BitcoinNet) error {
 // public key followed by the garbage we'll send over.
 func (p *Peer) generateKeyAndGarbage(garbageLen int) ([]byte, error) {
 	log.Tracef("Generating key and garbage (garbageLen=%d)", garbageLen)
-	if garbageLen > maxGarbageLen {
+
+	if garbageLen > MaxGarbageLen {
 		log.Errorf("Requested garbage length %d exceeds max %d",
-			garbageLen, maxGarbageLen)
+			garbageLen, MaxGarbageLen)
 
 		return nil, errGarbageTooLarge
 	}
@@ -646,7 +648,7 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 	// The BIP text states that we can read up to 4111 bytes. We've already
 	// read 16 bytes for the garbage terminator, so we need to read up to
 	// maxGarbageLen more bytes.
-	for i := 0; i < maxGarbageLen; i++ {
+	for i := 0; i < MaxGarbageLen; i++ {
 		recvGarbageLen := len(recvGarbage)
 
 		if bytes.Equal(recvGarbage[recvGarbageLen-16:],
