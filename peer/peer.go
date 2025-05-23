@@ -2284,16 +2284,14 @@ func (p *Peer) negotiateInboundProtocol() error {
 		)
 		switch errors.Is(err, v2transport.ErrUseV1Protocol) {
 		case true:
-			// We fallback to the v1 protocol since the peer sent a v1 version
-			// message. We have received a partial version message and need to
-			// account for that when determining how to parse the remaining
-			// bytes on the wire.
+			log.Infof("Inbound v2 connection attempt from %s "+
+				"downgraded to v1 (peer sent v1 version "+
+				"message)", p.addr)
+
 			p.cfg.UsingV2Conn = false
 			downgradedConn = true
 
 		case false:
-			// This is potentially a v2 connection. V1 connections can use the
-			// legacy negotiation code below immediately.
 			err = p.V2Transport.CompleteHandshake(
 				false, nil, p.cfg.ChainParams.Net,
 			)
@@ -2355,12 +2353,13 @@ func (p *Peer) negotiateOutboundProtocol() error {
 			return err
 		}
 
-		err := p.V2Transport.CompleteHandshake(
+		err = p.V2Transport.CompleteHandshake(
 			true, nil, p.cfg.ChainParams.Net,
 		)
 		if errors.Is(err, v2transport.ErrShouldDowngradeToV1) {
-			// If we should downgrade, mark Peer and then return an error to
-			// trigger a Disconnect call.
+			log.Infof("Outbound v2 connection attempt to %s "+
+				"failed, will downgrade to v1 (peer does "+
+				"not support v2)", p.addr)
 			p.shouldDowngradeToV1.Store(true)
 			return err
 		} else if err != nil {
