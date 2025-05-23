@@ -2272,14 +2272,16 @@ func (p *Peer) waitToFinishNegotiation(pver uint32) error {
 //     that btcd does not implement but bitcoind does.
 //  6. If remote peer sent sendaddrv2 above, wait until receipt of verack.
 func (p *Peer) negotiateInboundProtocol() error {
-	// We may be anticipating a v2 connection, but if the initiating peer sends
-	// us a v1 version message, we need to note down that we've downgraded the
-	// connection internally.
+	// We may be anticipating a v2 connection, but if the initiating peer
+	// sends us a v1 version message, we need to note down that we've
+	// downgraded the connection internally.
 	downgradedConn := false
 
 	if p.cfg.UsingV2Conn {
-		// TODO: Change garbageLen to be random.
-		err := p.V2Transport.RespondV2Handshake(1, p.cfg.ChainParams.Net)
+		garbageLen := rand.Intn(v2transport.MaxGarbageLen + 1)
+		err := p.V2Transport.RespondV2Handshake(
+			garbageLen, p.cfg.ChainParams.Net,
+		)
 		switch errors.Is(err, v2transport.ErrUseV1Protocol) {
 		case true:
 			// We fallback to the v1 protocol since the peer sent a v1 version
@@ -2301,9 +2303,9 @@ func (p *Peer) negotiateInboundProtocol() error {
 		}
 	}
 
-	// If the connection has been downgraded, then we need to parse the rest of
-	// the v1 version message properly. Otherwise, we read the entire version
-	// message off the wire.
+	// If the connection has been downgraded, then we need to parse the
+	// rest of the v1 version message properly. Otherwise, we read the
+	// entire version message off the wire.
 	if err := p.readRemoteVersionMsg(downgradedConn); err != nil {
 		return err
 	}
@@ -2343,12 +2345,13 @@ func (p *Peer) negotiateInboundProtocol() error {
 //  6. If sendaddrv2 was received, wait for receipt of verack.
 func (p *Peer) negotiateOutboundProtocol() error {
 	if p.cfg.UsingV2Conn {
-		// Note that it's possible that the v2 handshake fails because the peer
-		// does not support v2 connections. In this case, we should detect that
-		// and reconnect using a v1 connection. This is the logic that
-		// bitcoind uses.
-		// TODO: random value for garbage len?
-		if err := p.V2Transport.InitiateV2Handshake(0); err != nil {
+		// Note that it's possible that the v2 handshake fails because
+		// the peer does not support v2 connections. In this case, we
+		// should detect that and reconnect using a v1 connection. This
+		// is the logic that bitcoind uses.
+		garbageLen := rand.Intn(v2transport.MaxGarbageLen + 1)
+		err := p.V2Transport.InitiateV2Handshake(garbageLen)
+		if err != nil {
 			return err
 		}
 
