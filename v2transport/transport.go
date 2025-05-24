@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"golang.org/x/crypto/hkdf"
 
@@ -150,6 +151,10 @@ type Peer struct {
 	// sessionID uniquely identifies this encrypted channel. It is
 	// currently only used in the test vectors.
 	sessionID []byte
+
+	// shouldDowngradeToV1 is true if the handshake failed in a way that
+	// indicates the peer does not support v2, and a v1 attempt should be made.
+	shouldDowngradeToV1 atomic.Bool
 
 	// rw is the underlying object that will be read from / written to in
 	// calls to V2EncPacket and V2ReceivePacket.
@@ -395,7 +400,9 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net wire.BitcoinNet) error {
 		log.Tracef("Current received prefix: %x", p.receivedPrefix)
 
 		p.receivedPrefix = append(p.receivedPrefix, receiveBytes...)
+
 		lastIdx := len(p.receivedPrefix) - 1
+
 		if p.receivedPrefix[lastIdx] != v1Prefix[lastIdx] {
 			log.Debugf("Received byte %x does not match v1 "+
 				"prefix at index %d, assuming v2 peer",
@@ -413,7 +420,6 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net wire.BitcoinNet) error {
 
 			data, err := p.generateKeyAndGarbage(garbageLen)
 			if err != nil {
-				// generateKeyAndGarbage logs its own errors
 				return err
 			}
 
@@ -526,6 +532,9 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 			log.Debugf("Received transport error during " +
 				"v2 handshake, retying downgraded v1 " +
 				"connection.")
+
+			p.shouldDowngradeToV1.Store(true)
+
 			return ErrShouldDowngradeToV1
 		}
 
@@ -853,6 +862,12 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 // ReceivedPrefix returns the partial header bytes we've already received.
 func (p *Peer) ReceivedPrefix() []byte {
 	return p.receivedPrefix
+}
+
+// ShouldDowngradeToV1 returns true if the v2 handshake failed in a way that
+// suggests the peer does not support v2 and a v1 connection should be attempted.
+func (p *Peer) ShouldDowngradeToV1() bool {
+	return p.shouldDowngradeToV1.Load()
 }
 
 // UseWriterReader uses the passed-in ReadWriter to Send/Receive to/from.

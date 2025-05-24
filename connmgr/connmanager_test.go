@@ -124,7 +124,7 @@ func TestStartStop(t *testing.T) {
 	if cr.ID() != 0 {
 		t.Fatalf("start/stop: got id: %v, want: 0", cr.ID())
 	}
-	cmgr.Disconnect(gotConnReq.ID(), false)
+	cmgr.Disconnect(gotConnReq.ID())
 	cmgr.Remove(gotConnReq.ID())
 	select {
 	case <-disconnected:
@@ -259,7 +259,7 @@ func TestRetryPermanent(t *testing.T) {
 		t.Fatalf("retry: %v - want state %v, got state %v", cr.Addr, wantState, gotState)
 	}
 
-	cmgr.Disconnect(cr.ID(), false)
+	cmgr.Disconnect(cr.ID())
 	gotConnReq = <-disconnected
 	wantID = cr.ID()
 	gotID = gotConnReq.ID()
