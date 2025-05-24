@@ -469,8 +469,7 @@ type Peer struct {
 	witnessEnabled       bool
 	sendAddrV2           bool
 
-	V2Transport         *v2transport.Peer
-	shouldDowngradeToV1 atomic.Bool
+	V2Transport *v2transport.Peer
 
 	wireEncoding wire.MessageEncoding
 
@@ -2282,8 +2281,8 @@ func (p *Peer) negotiateInboundProtocol() error {
 		err := p.V2Transport.RespondV2Handshake(
 			garbageLen, p.cfg.ChainParams.Net,
 		)
-		switch errors.Is(err, v2transport.ErrUseV1Protocol) {
-		case true:
+		switch {
+		case errors.Is(err, v2transport.ErrUseV1Protocol):
 			log.Infof("Inbound v2 connection attempt from %s "+
 				"downgraded to v1 (peer sent v1 version "+
 				"message)", p.addr)
@@ -2291,7 +2290,10 @@ func (p *Peer) negotiateInboundProtocol() error {
 			p.cfg.UsingV2Conn = false
 			downgradedConn = true
 
-		case false:
+		case err != nil:
+			return err
+
+		default:
 			err = p.V2Transport.CompleteHandshake(
 				false, nil, p.cfg.ChainParams.Net,
 			)
@@ -2360,7 +2362,6 @@ func (p *Peer) negotiateOutboundProtocol() error {
 			log.Infof("Outbound v2 connection attempt to %s "+
 				"failed, will downgrade to v1 (peer does "+
 				"not support v2)", p.addr)
-			p.shouldDowngradeToV1.Store(true)
 			return err
 		} else if err != nil {
 			return err
@@ -2484,8 +2485,15 @@ func (p *Peer) WaitForDisconnect() {
 // ShouldDowngradeToV1 is called when we try to connect to a peer via v2 BIP324
 // transport and they hang up. In this case, we should reconnect with the
 // legacy transport.
+//
+// This function is safe for concurrent access.
 func (p *Peer) ShouldDowngradeToV1() bool {
-	return p.shouldDowngradeToV1.Load()
+	// If we weren't attempting a V2 connection with a V2 transport,
+	// or have no V2 transport instance, then no downgrade is indicated.
+	if !p.cfg.UsingV2Conn || p.V2Transport == nil {
+		return false
+	}
+	return p.V2Transport.ShouldDowngradeToV1()
 }
 
 // newPeerBase returns a new base bitcoin peer based on the inbound flag.  This
