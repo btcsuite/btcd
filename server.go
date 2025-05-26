@@ -2182,7 +2182,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 		ProtocolVersion:     peer.MaxProtocolVersion,
 		TrickleInterval:     cfg.TrickleInterval,
 		DisableStallHandler: cfg.DisableStallHandler,
-		UsingV2Conn:         true,
+		UsingV2Conn:         cfg.V2Transport,
 	}
 }
 
@@ -2781,6 +2781,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 	if cfg.Prune != 0 {
 		services &^= wire.SFNodeNetwork
+	}
+	if !cfg.V2Transport {
+		services &^= wire.SFNodeP2PV2
 	}
 
 	amgr := addrmgr.New(cfg.DataDir, btcdLookup)
