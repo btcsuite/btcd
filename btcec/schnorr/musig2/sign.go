@@ -207,9 +207,9 @@ func WithBip86SignTweak() SignOption {
 	}
 }
 
-// computeSigningNonce calculates the final nonce used for signing. This will
+// ComputeSigningNonce calculates the final nonce used for signing. This will
 // be the R value used in the final signature.
-func computeSigningNonce(combinedNonce [PubNonceSize]byte,
+func ComputeSigningNonce(combinedNonce [PubNonceSize]byte,
 	combinedKey *btcec.PublicKey, msg [32]byte) (
 	*btcec.JacobianPoint, *btcec.ModNScalar, error) {
 
@@ -325,7 +325,7 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	// We'll now combine both the public nonces, using the blinding factor
 	// to tweak the second nonce:
 	//  * R = R_1 + b*R_2
-	nonce, nonceBlinder, err := computeSigningNonce(
+	nonce, nonceBlinder, err := ComputeSigningNonce(
 		combinedNonce, combinedKey.FinalKey, msg,
 	)
 	if err != nil {

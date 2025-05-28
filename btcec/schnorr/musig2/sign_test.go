@@ -371,7 +371,7 @@ func TestMusig2SignCombine(t *testing.T) {
 			combinedNonce, err := AggregateNonces(pubNonces)
 			require.NoError(t, err)
 
-			finalNonceJ, _, err := computeSigningNonce(
+			finalNonceJ, _, err := ComputeSigningNonce(
 				combinedNonce, combinedKey.FinalKey, msg,
 			)
 
@@ -474,7 +474,7 @@ func TestMusig2SignCombineAdaptor(t *testing.T) {
 
 		// Signer 0, the one that knows the adaptor secret, adapts the
 		// final signature.
-		validSig, err := sessions[0].AdaptFinalSig(adaptorSecret)
+		validSig, err := sessions[0].AdaptFinalSig()
 		require.NoError(t, err)
 
 		// Verify the final signature is valid under the combined key.

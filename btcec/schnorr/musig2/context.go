@@ -620,7 +620,7 @@ func (s *Session) SetAdaptorSecret(msg [32]byte,
 		return ErrAlreadySigned
 	}
 
-	nonce, _, err := computeSigningNonce(
+	nonce, _, err := ComputeSigningNonce(
 		*s.combinedNonce, s.ctx.combinedKey.FinalKey, msg,
 	)
 	if err != nil {
@@ -663,7 +663,7 @@ func (s *Session) SetAdaptorPoint(msg [32]byte,
 
 	// Verify that the adaptor point added to the combined nonce will result in
 	// a point with even y-coordinate.
-	nonce, _, err := computeSigningNonce(
+	nonce, _, err := ComputeSigningNonce(
 		*s.combinedNonce, s.ctx.combinedKey.FinalKey, msg,
 	)
 	if err != nil {
@@ -811,7 +811,7 @@ func (s *Session) FinalSig() *schnorr.Signature {
 
 // AdaptFinalSig adapts the final signature with the provided adaptor secret
 // key, and returns a valid signature.
-func (s *Session) AdaptFinalSig(adaptorSecret *btcec.ModNScalar) (
+func (s *Session) AdaptFinalSig() (
 	*schnorr.Signature, error) {
 
 	if s.finalSig == nil {
@@ -827,7 +827,7 @@ func (s *Session) AdaptFinalSig(adaptorSecret *btcec.ModNScalar) (
 	sigS := new(btcec.ModNScalar)
 	sigS.SetByteSlice(sigB[32:64])
 
-	sigS.Add(adaptorSecret)
+	sigS.Add(s.adaptorSecret)
 	adaptedSig := schnorr.NewSignature(r, sigS)
 
 	if !adaptedSig.Verify(s.msg[:], s.ctx.combinedKey.FinalKey) {
