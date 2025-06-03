@@ -61,8 +61,8 @@ func (f *FSChaCha20Poly1305) crypt(aad, text []byte,
 	decrypt bool) ([]byte, error) {
 
 	// The nonce is constructed as the 4-byte little-endian encoding of the
-	// number of messages crypted with the current key followed by the 8-byte
-	// little-endian encoding of the number of re-keying performed.
+	// number of messages crypted with the current key followed by the
+	// 8-byte little-endian encoding of the number of re-keying performed.
 	var nonce [12]byte
 	numMsgs := uint32(f.packetCtr % rekeyInterval)
 	numRekeys := uint64(f.packetCtr / rekeyInterval)
@@ -75,8 +75,9 @@ func (f *FSChaCha20Poly1305) crypt(aad, text []byte,
 		var err error
 		result, err = f.cipher.Open(nil, nonce[:], text, aad)
 		if err != nil {
-			// It is ok to error here without incrementing packetCtr because
-			// we will no longer be decrypting any more messages.
+			// It is ok to error here without incrementing
+			// packetCtr because we will no longer be decrypting
+			// any more messages.
 			return nil, err
 		}
 	} else {
@@ -93,9 +94,13 @@ func (f *FSChaCha20Poly1305) crypt(aad, text []byte,
 		rekeyNonce[1] = 0xff
 		rekeyNonce[2] = 0xff
 		rekeyNonce[3] = 0xff
+
 		copy(rekeyNonce[4:], nonce[4:])
+
 		var dummyPlaintext [32]byte
-		f.key = f.cipher.Seal(nil, rekeyNonce[:], dummyPlaintext[:], nil)[:keySize]
+		f.key = f.cipher.Seal(
+			nil, rekeyNonce[:], dummyPlaintext[:], nil,
+		)[:keySize]
 		cipher, err := chacha20poly1305.New(f.key)
 		if err != nil {
 			fmt.Println(err)
@@ -138,7 +143,8 @@ func NewFSChaCha20(initialKey []byte) (*FSChaCha20, error) {
 // Crypt is used to either encrypt or decrypt text. This function is used for
 // both encryption and decryption as the two operations are identical.
 func (f *FSChaCha20) Crypt(text []byte) ([]byte, error) {
-	// XOR the text with the keystream to get either the cipher or plaintext.
+	// XOR the text with the keystream to get either the cipher or
+	// plaintext.
 	textLen := len(text)
 	dst := make([]byte, textLen)
 	f.cipher.XORKeyStream(dst, text)
@@ -148,12 +154,14 @@ func (f *FSChaCha20) Crypt(text []byte) ([]byte, error) {
 
 	// Check if we need to rekey.
 	if f.chunkCtr%rekeyInterval == 0 {
-		// Get the new key by getting 32 bytes from the keystream. Use all 0's
-		// so that we can get the actual bytes from XORKeyStream since the
-		// chacha20 library doesn't supply us with the keystream's bytes
-		// directly.
-		var dummyXor [32]byte
-		var newKey [32]byte
+		// Get the new key by getting 32 bytes from the keystream. Use
+		// all 0's so that we can get the actual bytes from
+		// XORKeyStream since the chacha20 library doesn't supply us
+		// with the keystream's bytes directly.
+		var (
+			dummyXor [32]byte
+			newKey   [32]byte
+		)
 		f.cipher.XORKeyStream(newKey[:], dummyXor[:])
 		f.key = newKey[:]
 

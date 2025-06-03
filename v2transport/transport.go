@@ -153,7 +153,8 @@ type Peer struct {
 	sessionID []byte
 
 	// shouldDowngradeToV1 is true if the handshake failed in a way that
-	// indicates the peer does not support v2, and a v1 attempt should be made.
+	// indicates the peer does not support v2, and a v1 attempt should be
+	// made.
 	shouldDowngradeToV1 atomic.Bool
 
 	// rw is the underlying object that will be read from / written to in
@@ -300,7 +301,9 @@ func (p *Peer) createV2Ciphers(ecdhSecret []byte, initiating bool,
 
 		p.recvGarbageTerm = responderGarbageTerminator
 
-		log.Debugf("Initiator ciphers created (sendL, sendP, recvL, recvP)")
+		log.Debugf("Initiator ciphers created (sendL, sendP, " +
+			"recvL, recvP)")
+
 	} else {
 		p.sendL, err = NewFSChaCha20(p.responderL)
 		if err != nil {
@@ -330,7 +333,8 @@ func (p *Peer) createV2Ciphers(ecdhSecret []byte, initiating bool,
 
 		p.recvGarbageTerm = initiatorGarbageTerminator
 
-		log.Debugf("Responder ciphers created (sendL, sendP, recvL, recvP)")
+		log.Debugf("Responder ciphers created (sendL, sendP, " +
+			"recvL, recvP)")
 	}
 
 	// TODO:
@@ -423,8 +427,8 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net wire.BitcoinNet) error {
 				return err
 			}
 
-			// Send over our ElligatorSwift-encoded pubkey followed by our
-			// randomly generated garbage.
+			// Send over our ElligatorSwift-encoded pubkey followed
+			// by our randomly generated garbage.
 			log.Debugf("Sending ellswift pubkey and garbage "+
 				"(total_len=%d)", len(data))
 			p.Send(data)
@@ -552,10 +556,10 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 		// If we are initiating, read all 64 bytes into ellswiftTheirs.
 		copy(ellswiftTheirs[:], recvData)
 	} else {
-		// If we are the responder, then we need to account for the bytes
-		// already received as part of matching against the starting v1
-		// transport bytes. We sanity check receivedPrefix in case it is too
-		// large for some reason.
+		// If we are the responder, then we need to account for the
+		// bytes already received as part of matching against the
+		// starting v1 transport bytes. We sanity check receivedPrefix
+		// in case it is too large for some reason.
 		prefixLen := len(receivedPrefix)
 		if prefixLen > 16 {
 			log.Errorf("Responder's received prefix length %d is "+
@@ -591,7 +595,8 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	log.Debug("Calculating ECDH shared secret")
 
-	// Calculate the shared secret to be used in creating the packet ciphers.
+	// Calculate the shared secret to be used in creating the packet
+	// ciphers.
 	ecdhSecret, err := ellswift.V2Ecdh(
 		p.privkeyOurs, ellswiftTheirs, p.ellswiftOurs, initiating,
 	)
@@ -604,7 +609,6 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	err = p.createV2Ciphers(ecdhSecret[:], initiating, btcnet)
 	if err != nil {
-		// createV2Ciphers logs its own errors
 		return err
 	}
 
@@ -767,6 +771,7 @@ func (p *Peer) V2EncPacket(contents []byte, aad []byte, ignore bool) ([]byte,
 	totalBytes, err := p.Send(encPacket)
 	if err != nil {
 		log.Errorf("Failed to send encrypted packet: %v", err)
+
 		// Return the packet anyway, as some might have been sent.
 		return encPacket, totalBytes, err
 	}
@@ -793,6 +798,7 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 		}
 
 		log.Tracef("Received encrypted length: %x", encContentsLen)
+
 		contentsLenBytes, err := p.recvL.Crypt(encContentsLen)
 		if err != nil {
 			log.Errorf("Failed to decrypt content length: %v", err)
@@ -840,8 +846,9 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 		log.Tracef("Decrypted plaintext (header + content): %x",
 			plaintext)
 
-		// Only the first packet is expected to have non-empty AAD. If the
-		// ignore bit is set, ignore the packet.
+		// Only the first packet is expected to have non-empty AAD. If
+		// the ignore bit is set, ignore the packet.
+		//
 		// TODO: will this cause anything to leak?
 		// AAD is only used for the first packet after the handshake.
 		aad = nil
@@ -865,7 +872,8 @@ func (p *Peer) ReceivedPrefix() []byte {
 }
 
 // ShouldDowngradeToV1 returns true if the v2 handshake failed in a way that
-// suggests the peer does not support v2 and a v1 connection should be attempted.
+// suggests the peer does not support v2 and a v1 connection should be
+// attempted.
 func (p *Peer) ShouldDowngradeToV1() bool {
 	return p.shouldDowngradeToV1.Load()
 }
@@ -899,8 +907,8 @@ func (p *Peer) Receive(numBytes int) ([]byte, int, error) {
 	for {
 		// TODO: Use something that inherently prevents going over?
 		if total > numBytes {
-			// This should be logically impossible with io.ReadFull semantics
-			// used implicitly by the loop structure.
+			// This should be logically impossible with io.ReadFull
+			// semantics used implicitly by the loop structure.
 			log.Criticalf("Receive logic error: total=%d > "+
 				"numBytes=%d", total, numBytes)
 			return nil, total, errFailedToRecv
