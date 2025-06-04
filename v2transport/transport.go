@@ -13,7 +13,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ellswift"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // packetBit is a type used to represent the bits in the packet's header.
@@ -24,6 +23,13 @@ const (
 	// header.
 	ignoreBitPos packetBit = 7
 )
+
+// BitcoinNet is a type used to represent the Bitcoin network that we're
+// connecting to.
+//
+// NOTE: This is identical to the wire.BitcoinNet type, but allows us to shed a
+// large module dependency.
+type BitcoinNet uint32
 
 const (
 	// garbageSize is the length in bytes of the garbage terminator that
@@ -179,7 +185,7 @@ func NewPeer() *Peer {
 
 // createV2Ciphers constructs the packet-length and packet encryption ciphers.
 func (p *Peer) createV2Ciphers(ecdhSecret []byte, initiating bool,
-	net wire.BitcoinNet) error {
+	net BitcoinNet) error {
 
 	log.Debugf("Creating v2 ciphers (initiating=%v, net=%v)", initiating,
 		net)
@@ -376,7 +382,7 @@ func (p *Peer) InitiateV2Handshake(garbageLen int) error {
 // wants to use the v2 protocol and if so returns our ElligatorSwift-encoded
 // public key followed by our garbage data over. If the initiator does not want
 // to use the v2 protocol, we'll instead revert to the v1 protocol.
-func (p *Peer) RespondV2Handshake(garbageLen int, net wire.BitcoinNet) error {
+func (p *Peer) RespondV2Handshake(garbageLen int, net BitcoinNet) error {
 	v1Prefix := createV1Prefix(net)
 
 	log.Debugf("Responding to v2 handshake (garbageLen=%d, net=%v)",
@@ -474,7 +480,7 @@ func (p *Peer) generateKeyAndGarbage(garbageLen int) ([]byte, error) {
 
 // createV1Prefix is a helper function that returns the first 16 bytes of the
 // version message's header.
-func createV1Prefix(net wire.BitcoinNet) []byte {
+func createV1Prefix(net BitcoinNet) []byte {
 	v1Prefix := make([]byte, 0, 4+12)
 
 	// The v1 transport protocol uses the network's 4 magic bytes followed by
@@ -493,7 +499,7 @@ func createV1Prefix(net wire.BitcoinNet) []byte {
 // CompleteHandshake finishes the v2 protocol negotiation and optionally sends
 // decoy packets after sending the garbage terminator.
 func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
-	btcnet wire.BitcoinNet) error {
+	btcnet BitcoinNet) error {
 
 	log.Debugf("Completing v2 handshake (initiating=%v, "+
 		"num_decoys=%d, net=%v)", initiating, len(decoyContentLens),

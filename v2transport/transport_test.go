@@ -8,7 +8,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ellswift"
-	"github.com/btcsuite/btcd/wire"
 )
 
 func setHex(hexString string) *btcec.FieldVal {
@@ -22,6 +21,10 @@ func setHex(hexString string) *btcec.FieldVal {
 
 	return &f
 }
+
+const (
+	mainNet = 0xd9b4bef9
+)
 
 func TestPacketEncodingVectors(t *testing.T) {
 	tests := []struct {
@@ -366,7 +369,7 @@ func TestPacketEncodingVectors(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
 		p.UseReadWriter(buf)
 
-		err = p.createV2Ciphers(midShared, inInitiating, wire.MainNet)
+		err = p.createV2Ciphers(midShared, inInitiating, mainNet)
 		if err != nil {
 			t.Fatalf("error initiating v2 transport")
 		}
