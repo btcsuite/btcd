@@ -304,10 +304,7 @@ func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte,
 
 	// Limit the number to load based on the number of available entries,
 	// the number to skip, and the number requested.
-	numToLoad := numEntries - numToSkip
-	if numToLoad > numRequested {
-		numToLoad = numRequested
-	}
+	numToLoad := min(numEntries-numToSkip, numRequested)
 
 	// Start the offset after all skipped entries and load the calculated
 	// number.
