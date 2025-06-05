@@ -15,7 +15,10 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr/musig2"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -47,9 +50,17 @@ func isFinalizableWitnessInput(pInput *PInput) bool {
 
 		case txscript.IsPayToTaproot(pkScript):
 			if pInput.TaprootKeySpendSig == nil &&
-				pInput.TaprootScriptSpendSig == nil {
+				pInput.TaprootScriptSpendSig == nil &&
+				pInput.MuSig2PartialSigs == nil {
 
 				return false
+			}
+
+			// For each participant, we need a corresponding
+			// MuSig2 partial signature.
+			if len(pInput.MuSig2PartialSigs) > 0 {
+				return len(pInput.MuSig2PartialSigs) ==
+					len(pInput.MuSig2PubNonces)
 			}
 
 			// For each of the script spend signatures we need a
@@ -133,7 +144,8 @@ func isFinalizable(p *Packet, inIndex int) bool {
 
 	// The input cannot be finalized without any signatures.
 	if pInput.PartialSigs == nil && pInput.TaprootKeySpendSig == nil &&
-		pInput.TaprootScriptSpendSig == nil {
+		pInput.TaprootScriptSpendSig == nil &&
+		pInput.MuSig2PartialSigs == nil {
 
 		return false
 	}
@@ -577,6 +589,91 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 
 		serializedWitness, err = writeWitness(witnessStack...)
 
+	// MuSig2 spend path.
+	case len(pInput.MuSig2PartialSigs) > 0:
+		if len(pInput.MuSig2PubNonces) !=
+			len(pInput.MuSig2PartialSigs) {
+
+			return fmt.Errorf("number of MuSig2 pub nonces " +
+				"does not match number of partial signatures")
+		}
+
+		// We'll need to combine MuSig2 partial signatures into a single
+		// one, which requires the message that was signed over.
+		firstSig := pInput.MuSig2PartialSigs[0]
+
+		// We don't (yet) support signing over a tap leaf hash.
+		// TODO(guggero): Add support for signing over a tap leaf hash.
+		if len(firstSig.TapLeafHash) > 0 {
+			return fmt.Errorf("combining partial MuSig2 " +
+				"signatures for a tap leaf is not supported")
+		}
+
+		prevOutFetcher := PrevOutputFetcher(p)
+		sigHashes := txscript.NewTxSigHashes(
+			p.UnsignedTx, prevOutFetcher,
+		)
+		sigHash, err := txscript.CalcTaprootSignatureHash(
+			sigHashes, pInput.SighashType, p.UnsignedTx,
+			inIndex, prevOutFetcher,
+		)
+		if err != nil {
+			return fmt.Errorf("error calculating signature hash: "+
+				"%w", err)
+		}
+
+		var sigHashMsg [32]byte
+		copy(sigHashMsg[:], sigHash)
+
+		var (
+			pubNonces = make(
+				[][musig2.PubNonceSize]byte,
+				len(pInput.MuSig2PubNonces),
+			)
+			keys = make(
+				[]*btcec.PublicKey, len(pInput.MuSig2PubNonces),
+			)
+			partialSigs = make(
+				[]*musig2.PartialSignature,
+				len(pInput.MuSig2PartialSigs),
+			)
+		)
+		for i, pubNonce := range pInput.MuSig2PubNonces {
+			copy(pubNonces[i][:], pubNonce.PubNonce[:])
+			keys[i] = pubNonce.PubKey
+
+			partialSigs[i] = &pInput.MuSig2PartialSigs[i].PartialSig
+		}
+		aggregateNonce, err := musig2.AggregateNonces(pubNonces)
+		if err != nil {
+			return fmt.Errorf("error aggregating pub nonces: %w",
+				err)
+		}
+
+		aggKey, _, _, err := musig2.AggregateKeys(
+			keys, true, musig2.WithBIP86KeyTweak(),
+		)
+		if err != nil {
+			return fmt.Errorf("error aggregating keys: %w", err)
+		}
+
+		combinedNonce, err := computeSigningNonce(
+			aggregateNonce, aggKey.FinalKey, sigHashMsg,
+		)
+		if err != nil {
+			return fmt.Errorf("error computing signing nonce: %w",
+				err)
+		}
+
+		combineOpt := musig2.WithBip86TweakedCombine(
+			sigHashMsg, keys, true,
+		)
+		schnorrSig := musig2.CombineSigs(
+			combinedNonce, partialSigs, combineOpt,
+		)
+
+		serializedWitness, err = writeWitness(schnorrSig.Serialize())
+
 	default:
 		return ErrInvalidPsbtFormat
 	}
@@ -594,4 +691,58 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 	// index.
 	p.Inputs[inIndex] = *newInput
 	return nil
+}
+
+// computeSigningNonce calculates the final nonce used for signing. This will
+// be the R value used in the final signature.
+func computeSigningNonce(combinedNonce [musig2.PubNonceSize]byte,
+	combinedKey *btcec.PublicKey, msg [32]byte) (*btcec.PublicKey, error) {
+
+	// Next we'll compute the value b, that blinds our second public
+	// nonce:
+	//  * b = h(tag=NonceBlindTag, combinedNonce || combinedKey || m).
+	var (
+		nonceMsgBuf  bytes.Buffer
+		nonceBlinder btcec.ModNScalar
+	)
+	nonceMsgBuf.Write(combinedNonce[:])
+	nonceMsgBuf.Write(schnorr.SerializePubKey(combinedKey))
+	nonceMsgBuf.Write(msg[:])
+	nonceBlindHash := chainhash.TaggedHash(
+		musig2.NonceBlindTag, nonceMsgBuf.Bytes(),
+	)
+	nonceBlinder.SetByteSlice(nonceBlindHash[:])
+
+	// Next, we'll parse the public nonces into R1 and R2.
+	r1J, err := btcec.ParseJacobian(
+		combinedNonce[:btcec.PubKeyBytesLenCompressed],
+	)
+	if err != nil {
+		return nil, err
+	}
+	r2J, err := btcec.ParseJacobian(
+		combinedNonce[btcec.PubKeyBytesLenCompressed:],
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// With our nonce blinding value, we'll now combine both the public
+	// nonces, using the blinding factor to tweak the second nonce:
+	//  * R = R_1 + b*R_2
+	var nonce btcec.JacobianPoint
+	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
+	btcec.AddNonConst(&r1J, &r2J, &nonce)
+
+	// If the combined nonce is the point at infinity, we'll use the
+	// generator point instead.
+	var infinityPoint btcec.JacobianPoint
+	if nonce == infinityPoint {
+		G := btcec.Generator()
+		G.AsJacobian(&nonce)
+	}
+
+	nonce.ToAffine()
+
+	return btcec.NewPublicKey(&nonce.X, &nonce.Y), nil
 }
