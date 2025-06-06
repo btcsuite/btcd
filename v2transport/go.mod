@@ -1,4 +1,4 @@
-module v2transport
+module github.com/btcsuite/btcd/v2transport
 
 go 1.23.2
 
