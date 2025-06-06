@@ -8,7 +8,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ellswift"
-	"github.com/btcsuite/btcd/wire"
 )
 
 func setHex(hexString string) *btcec.FieldVal {
@@ -22,6 +21,10 @@ func setHex(hexString string) *btcec.FieldVal {
 
 	return &f
 }
+
+const (
+	mainNet = 0xd9b4bef9
+)
 
 func TestPacketEncodingVectors(t *testing.T) {
 	tests := []struct {
@@ -221,8 +224,8 @@ func TestPacketEncodingVectors(t *testing.T) {
 	for _, test := range tests {
 		inInitiating := test.inInitiating
 
-		// We need to convert the FieldVal into a ModNScalar so that we can use
-		// the ScalarBaseMultNonConst.
+		// We need to convert the FieldVal into a ModNScalar so that we
+		// can use the ScalarBaseMultNonConst.
 		inPrivOurs := setHex(test.inPrivOurs)
 		inPrivOursBytes := inPrivOurs.Bytes()
 
@@ -274,10 +277,13 @@ func TestPacketEncodingVectors(t *testing.T) {
 		}
 
 		if !midXOurs.Equals(xEllswiftOurs) {
-			t.Fatalf("expected mid-state to match decoded ellswift key")
+			t.Fatalf("expected mid-state to match decoded " +
+				"ellswift key")
 		}
 
-		bytesEllswiftTheirs, err := hex.DecodeString(test.inEllswiftTheirs)
+		bytesEllswiftTheirs, err := hex.DecodeString(
+			test.inEllswiftTheirs,
+		)
 		if err != nil {
 			t.Fatalf("unexpected error decoding string")
 		}
@@ -309,7 +315,8 @@ func TestPacketEncodingVectors(t *testing.T) {
 
 		midXTheirs := setHex(test.midXTheirs)
 		if !midXTheirs.Equals(xEllswiftTheirs) {
-			t.Fatalf("expected mid-state to match decoded ellswift key")
+			t.Fatalf("expected mid-state to match decoded " +
+				"ellswift key")
 		}
 
 		privKeyOurs, _ := btcec.PrivKeyFromBytes((*inPrivOursBytes)[:])
@@ -340,10 +347,12 @@ func TestPacketEncodingVectors(t *testing.T) {
 		copy(bytesEllswiftOurs64[:], bytesEllswiftOurs)
 
 		sharedSecret, err := ellswift.V2Ecdh(
-			privKeyOurs, bytesEllswiftTheirs64, bytesEllswiftOurs64, inInitiating,
+			privKeyOurs, bytesEllswiftTheirs64,
+			bytesEllswiftOurs64, inInitiating,
 		)
 		if err != nil {
-			t.Fatalf("unexpected error when calculating shared secret")
+			t.Fatalf("unexpected error when calculating " +
+				"shared secret")
 		}
 
 		midShared, err := hex.DecodeString(test.midSharedSecret)
@@ -360,7 +369,7 @@ func TestPacketEncodingVectors(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
 		p.UseReadWriter(buf)
 
-		err = p.createV2Ciphers(midShared, inInitiating, wire.MainNet)
+		err = p.createV2Ciphers(midShared, inInitiating, mainNet)
 		if err != nil {
 			t.Fatalf("error initiating v2 transport")
 		}
@@ -371,7 +380,8 @@ func TestPacketEncodingVectors(t *testing.T) {
 		}
 
 		if !bytes.Equal(midInitiatorL, p.initiatorL) {
-			t.Fatalf("expected mid-state initiatorL to match computed value")
+			t.Fatalf("expected mid-state initiatorL to " +
+				"match computed value")
 		}
 
 		midInitiatorP, err := hex.DecodeString(test.midInitiatorP)
@@ -380,7 +390,8 @@ func TestPacketEncodingVectors(t *testing.T) {
 		}
 
 		if !bytes.Equal(midInitiatorP, p.initiatorP) {
-			t.Fatalf("expected mid-state initiatorP to match computed value")
+			t.Fatalf("expected mid-state initiatorP to " +
+				"match computed value")
 		}
 
 		midResponderL, err := hex.DecodeString(test.midResponderL)
@@ -389,7 +400,8 @@ func TestPacketEncodingVectors(t *testing.T) {
 		}
 
 		if !bytes.Equal(midResponderL, p.responderL) {
-			t.Fatalf("expected mid-state responderL to match computed value")
+			t.Fatalf("expected mid-state responderL to " +
+				"match computed value")
 		}
 
 		midResponderP, err := hex.DecodeString(test.midResponderP)
@@ -398,25 +410,32 @@ func TestPacketEncodingVectors(t *testing.T) {
 		}
 
 		if !bytes.Equal(midResponderP, p.responderP) {
-			t.Fatalf("expected mid-state responderP to match computed value")
+			t.Fatalf("expected mid-state responderP to " +
+				"match computed value")
 		}
 
-		midSendGarbageTerm, err := hex.DecodeString(test.midSendGarbageTerm)
+		midSendGarbageTerm, err := hex.DecodeString(
+			test.midSendGarbageTerm,
+		)
 		if err != nil {
 			t.Fatalf("unexpected error decoding midSendGarbageTerm")
 		}
 
 		if !bytes.Equal(midSendGarbageTerm, p.sendGarbageTerm[:]) {
-			t.Fatalf("expected mid-state sendGarbageTerm to match computed value")
+			t.Fatalf("expected mid-state sendGarbageTerm " +
+				"to match computed value")
 		}
 
-		midRecvGarbageTerm, err := hex.DecodeString(test.midRecvGarbageTerm)
+		midRecvGarbageTerm, err := hex.DecodeString(
+			test.midRecvGarbageTerm,
+		)
 		if err != nil {
 			t.Fatalf("unexpected error decoding midRecvGarbageTerm")
 		}
 
 		if !bytes.Equal(midRecvGarbageTerm, p.recvGarbageTerm) {
-			t.Fatalf("expected mid-state recvGarbageTerm to match computed value")
+			t.Fatalf("expected mid-state recvGarbageTerm to " +
+				"match computed value")
 		}
 
 		outSessionID, err := hex.DecodeString(test.outSessionID)

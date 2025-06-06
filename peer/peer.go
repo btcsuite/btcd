@@ -2279,7 +2279,8 @@ func (p *Peer) negotiateInboundProtocol() error {
 	if p.cfg.UsingV2Conn {
 		garbageLen := rand.Intn(v2transport.MaxGarbageLen + 1)
 		err := p.V2Transport.RespondV2Handshake(
-			garbageLen, p.cfg.ChainParams.Net,
+			garbageLen,
+			v2transport.BitcoinNet(p.cfg.ChainParams.Net),
 		)
 		switch {
 		case errors.Is(err, v2transport.ErrUseV1Protocol):
@@ -2295,7 +2296,8 @@ func (p *Peer) negotiateInboundProtocol() error {
 
 		default:
 			err = p.V2Transport.CompleteHandshake(
-				false, nil, p.cfg.ChainParams.Net,
+				false, nil,
+				v2transport.BitcoinNet(p.cfg.ChainParams.Net),
 			)
 			if err != nil {
 				return err
@@ -2356,7 +2358,8 @@ func (p *Peer) negotiateOutboundProtocol() error {
 		}
 
 		err = p.V2Transport.CompleteHandshake(
-			true, nil, p.cfg.ChainParams.Net,
+			true, nil,
+			v2transport.BitcoinNet(p.cfg.ChainParams.Net),
 		)
 		if errors.Is(err, v2transport.ErrShouldDowngradeToV1) {
 			log.Infof("Outbound v2 connection attempt to %s "+
