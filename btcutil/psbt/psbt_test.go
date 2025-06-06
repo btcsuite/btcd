@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"math"
 	"strings"
 	"testing"
 
@@ -1444,6 +1445,89 @@ func TestNonWitnessToWitness(t *testing.T) {
 	}
 	if !bytes.Equal(expectedNetworkSer, b.Bytes()) {
 		t.Fatalf("Expected serialized transaction was not produced: %x", b.Bytes())
+	}
+}
+
+// TestPSBTNumberOfHashesOverflow tests the case where the number of hashes
+// in the PSBT exceeds the maximum allowed value. This is a regression test
+// for a bug that was fixed in the PSBT library.
+func TestPSBTNumberOfHashesOverflow(t *testing.T) {
+	// This hex string represents a PSBT with an invalid number of hashes. The
+	// PSBT library should return an error when trying to parse this PSBT.
+	//
+	// TODO(ffranr): Is there a more minimal PSBT example?
+	hexString := "70736274ff01007374ff01030100000000002f0000002e2873007374" +
+		"ff01070100000000000000000000000000000000000000060680050000736274f" +
+		"f01000a0000000060c70006060000736274ff01000a0000010000010024070100" +
+		"00000000000000000000000000000000000006060000736274ff01000a0000000" +
+		"000010024c760002a707362c760000b0500000000000000060605000073626274" +
+		"ff01000a000000000001002421212121212121212121212121212121212121212" +
+		"12121212121212121212121212121212107010000000000000000000000000000" +
+		"000000000006060000736274ff01000a000eff000001000a0a040404040404040" +
+		"400"
+
+	// Convert hex string to byte slice
+	buffer, err := hex.DecodeString(hexString)
+	require.NoError(t, err)
+
+	// Attempt to parse the PSBT.
+	psbt, err := NewFromRawBytes(bytes.NewBuffer(buffer), false)
+	require.Nil(t, psbt)
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
+// TestMinTaprootBip32DerivationByteSize tests the
+// minTaprootBip32DerivationByteSize function to ensure it correctly calculates
+// the minimum byte size of the Taproot BIP32 derivation path.
+func TestMinTaprootBip32DerivationByteSize(t *testing.T) {
+	tests := []struct {
+		label        string
+		numHashes    uint64
+		expectedSize uint64
+		expectErr    bool
+	}{
+		{
+			label:        "only compact size + fingerprint",
+			numHashes:    0,
+			expectedSize: 5,
+			expectErr:    false,
+		},
+		{
+			label:        "numHashes == 1, therefore: 1 * 32 + 5",
+			numHashes:    1,
+			expectedSize: 37,
+			expectErr:    false,
+		},
+		{
+			label:        "numHashes == 2, therefore: 2 * 32 + 5",
+			numHashes:    2,
+			expectedSize: 69,
+			expectErr:    false,
+		},
+		{
+			label:        "overflow expected",
+			numHashes:    math.MaxUint64,
+			expectedSize: 0,
+			expectErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		actualSize, err := minTaprootBip32DerivationByteSize(tt.numHashes)
+
+		if (err != nil) != tt.expectErr {
+			t.Errorf(
+				"%s (numHashes=%d, unexpected_error=%v)", tt.label,
+				tt.numHashes, err,
+			)
+			continue
+		}
+
+		if err == nil && actualSize != tt.expectedSize {
+			t.Errorf("%s (numHashes=%d, actualSize=%d, expectedSize=%d)",
+				tt.label, tt.numHashes, actualSize, tt.expectedSize,
+			)
+		}
 	}
 }
 
