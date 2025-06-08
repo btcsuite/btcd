@@ -13,10 +13,6 @@ import (
 )
 
 const (
-	// MaxDataCarrierSize is the maximum number of bytes allowed in pushed
-	// data to be considered a nulldata transaction
-	MaxDataCarrierSize = 80
-
 	// StandardVerifyFlags are the script flags which are used when
 	// executing transaction scripts to enforce additional checks which
 	// are required for the script to be considered standard.  These checks
@@ -518,11 +514,10 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 		return true
 	}
 
-	// OP_RETURN followed by data push up to MaxDataCarrierSize bytes.
+	// OP_RETURN followed by a data push.
 	tokenizer := MakeScriptTokenizer(scriptVersion, script[1:])
 	return tokenizer.Next() && tokenizer.Done() &&
-		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4) &&
-		len(tokenizer.Data()) <= MaxDataCarrierSize
+		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4)
 }
 
 // scriptType returns the type of the script being inspected from the known
@@ -883,15 +878,8 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 }
 
 // NullDataScript creates a provably-prunable script containing OP_RETURN
-// followed by the passed data.  An Error with the error code ErrTooMuchNullData
-// will be returned if the length of the passed data exceeds MaxDataCarrierSize.
+// followed by the passed data.
 func NullDataScript(data []byte) ([]byte, error) {
-	if len(data) > MaxDataCarrierSize {
-		str := fmt.Sprintf("data size %d is larger than max "+
-			"allowed size %d", len(data), MaxDataCarrierSize)
-		return nil, scriptError(ErrTooMuchNullData, str)
-	}
-
 	return NewScriptBuilder().AddOp(OP_RETURN).AddData(data).Script()
 }
 

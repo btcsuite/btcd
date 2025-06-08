@@ -44,8 +44,10 @@ const (
 	// provided public keys.
 	ErrTooManyRequiredSigs
 
-	// ErrTooMuchNullData is returned from NullDataScript when the length of
-	// the provided data exceeds MaxDataCarrierSize.
+	// ErrTooMuchNullData is returned when a script involving null data
+	// encounters an issue, for example, if the provided data is too large for a
+	// specific context (though standard OP_RETURN limits enforced by
+	// NullDataScript have been removed).
 	ErrTooMuchNullData
 
 	// ErrUnsupportedScriptVersion is returned when an unsupported script

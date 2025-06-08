@@ -1238,14 +1238,18 @@ func TestNullDataScript(t *testing.T) {
 			class: NullDataTy,
 		},
 		{
-			name: "too big",
+			name: "data push of 81 bytes (formerly too big)",
 			data: hexToBytes("000102030405060708090a0b0c0d0e0f101" +
 				"112131415161718191a1b1c1d1e1f202122232425262" +
 				"728292a2b2c2d2e2f303132333435363738393a3b3c3" +
 				"d3e3f404142434445464748494a4b4c4d4e4f50"),
-			expected: nil,
-			err:      scriptError(ErrTooMuchNullData, ""),
-			class:    NonStandardTy,
+			expected: mustParseShortForm("RETURN PUSHDATA1 0x51 0x" +
+				"000102030405060708090a0b0c0d0e0f101" +
+				"112131415161718191a1b1c1d1e1f202122232425262" +
+				"728292a2b2c2d2e2f303132333435363738393a3b3c3" +
+				"d3e3f404142434445464748494a4b4c4d4e4f50"),
+			err:   nil,
+			class: NullDataTy,
 		},
 	}
 
