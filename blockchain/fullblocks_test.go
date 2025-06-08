@@ -282,10 +282,7 @@ func TestFullBlocks(t *testing.T) {
 	// provided test instance and ensures that it failed to decode with a
 	// message error.
 	testRejectedNonCanonicalBlock := func(item fullblocktests.RejectedNonCanonicalBlock) {
-		headerLen := len(item.RawBlock)
-		if headerLen > 80 {
-			headerLen = 80
-		}
+		headerLen := min(len(item.RawBlock), 80)
 		blockHash := chainhash.DoubleHashH(item.RawBlock[0:headerLen])
 		blockHeight := item.Height
 		t.Logf("Testing block %s (hash %s, height %d)", item.Name,
