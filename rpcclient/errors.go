@@ -173,10 +173,6 @@ const (
 	// too small.
 	ErrDust
 
-	// ErrMultiOpReturn is returned when the transactions are not standard
-	// - muiltiple OP_RETURNs.
-	ErrMultiOpReturn
-
 	// ErrNonFinal is returned when spending a timelocked transaction that
 	// hasn't expired yet.
 	ErrNonFinal
@@ -319,9 +315,6 @@ func (r BitcoindRPCErr) Error() string {
 	case ErrDust:
 		return "dust"
 
-	case ErrMultiOpReturn:
-		return "multi op return"
-
 	case ErrNonFinal:
 		return "non final"
 
@@ -450,9 +443,6 @@ var BtcdErrMap = map[string]error{
 
 	// Some nonstandard transactions - output too small.
 	"payment is dust": ErrDust,
-
-	// Some nonstandard transactions - muiltiple OP_RETURNs.
-	"more than one transaction output in a nulldata script": ErrMultiOpReturn,
 
 	// A timelocked transaction.
 	"transaction is not finalized":               ErrNonFinal,

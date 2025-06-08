@@ -430,8 +430,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 				LockTime: 0,
 			},
 			height:     300000,
-			isStandard: false,
-			code:       wire.RejectNonstandard,
+			isStandard: true,
 		},
 		{
 			name: "Dust output",
