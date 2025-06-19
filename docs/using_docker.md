@@ -87,13 +87,13 @@ With the following commands you can control *docker-compose*:
 Let's start with an easy example. If you just want to create a full node without the need of using the RPC port, you can use the following example. This example will launch *btcd* and exposes only the default p2p port 8333 to the outside world:
 
 ```yaml
-version: "2"
-
 services:
   btcd:
     container_name: btcd
     hostname: btcd
-    build: https://github.com/btcsuite/btcd.git#master
+    build:
+      context: https://github.com/btcsuite/btcd.git#master
+      dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
@@ -109,13 +109,13 @@ volumes:
 To use the RPC port of *btcd* you need to specify a *username* and a very strong *password*. If you want to connect to the RPC port from the internet, you need to expose port 8334(RPC) as well.
 
 ```yaml
-version: "2"
-
 services:
   btcd:
     container_name: btcd
     hostname: btcd
-    build: https://github.com/btcsuite/btcd.git#master
+    build:
+      context: https://github.com/btcsuite/btcd.git#master
+      dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
@@ -136,13 +136,13 @@ volumes:
 To run a node on testnet, you need to provide the *--testnet* argument. The ports for testnet are 18333 (p2p) and 18334 (RPC):
 
 ```yaml
-version: "2"
-
 services:
   btcd:
     container_name: btcd
     hostname: btcd
-    build: https://github.com/btcsuite/btcd.git#master
+    build:
+      context: https://github.com/btcsuite/btcd.git#master
+      dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
       - btcd-data:/root/.btcd
