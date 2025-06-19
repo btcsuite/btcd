@@ -667,10 +667,7 @@ func (a *AddrManager) NeedMoreAddresses() bool {
 func (a *AddrManager) AddressCache() []*wire.NetAddressV2 {
 	allAddr := a.getAddresses()
 
-	numAddresses := len(allAddr) * getAddrPercent / 100
-	if numAddresses > getAddrMax {
-		numAddresses = getAddrMax
-	}
+	numAddresses := min(len(allAddr)*getAddrPercent/100, getAddrMax)
 
 	// Fisher-Yates shuffle the array. We only need to do the first
 	// `numAddresses' since we are throwing the rest.
