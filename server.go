@@ -690,8 +690,6 @@ func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
 // handleGetData is invoked when a peer receives a getdata bitcoin message and
 // is used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
-	numAdded := 0
-
 	// failedMsg is an inventory that stores all the failed msgs - either
 	// the msg is an unknown type, or there's an error processing it.
 	failedMsg := wire.NewMsgNotFound()
@@ -715,38 +713,59 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	// more data than we can send in a reasonable time, wasting memory. The
 	// waiting occurs after the database fetch for the next one to provide
 	// a little pipelining.
-	var waitChan chan struct{}
-	doneChan := make(chan struct{}, 1)
+
+	// We now create a doneChans with a size of 5, which essentially
+	// behaves like a semaphore that allows 5 goroutines to be running at
+	// the same time.
+	const numBuffered = 5
+	doneChans := make([]chan struct{}, 0, numBuffered)
 
 	for i, iv := range msg.InvList {
-		var c chan struct{}
-		// If this will be the last message we send.
-		if i == length-1 && len(failedMsg.InvList) == 0 {
-			c = doneChan
+		// doneChan behaves like a semaphore - every time a msg is
+		// processed, either succeeded or failed, a signal is sent to
+		// this doneChan.
+		doneChan := make(chan struct{}, 1)
 
-		} else if (i+1)%3 == 0 {
-			// Buffered so as to not make the send goroutine block.
-			c = make(chan struct{}, 1)
-		}
+		// Add this doneChan for tracking.
+		doneChans = append(doneChans, doneChan)
 
-		err := sp.server.pushInventory(sp, iv, c, waitChan)
+		err := sp.server.pushInventory(sp, iv, doneChan)
 		if err != nil {
 			failedMsg.AddInvVect(iv)
+		}
 
-			// When there is a failure fetching the final entry and
-			// the done channel was sent in due to there being no
-			// outstanding not found inventory, consume it here
-			// because there is now not found inventory that will
-			// use the channel momentarily.
-			if i == len(msg.InvList)-1 && c != nil {
-				<-c
+		// Move to the next item if we haven't processed 5 times yet.
+		if (i+1)%numBuffered != 0 {
+			continue
+		}
+
+		// Empty all the slots.
+		for _, dc := range doneChans {
+			select {
+			// NOTE: We always expect am empty struct to be sent to
+			// this doneChan, even when `pushInventory` failed.
+			case <-dc:
+
+			// Exit if the server is shutting down.
+			case <-sp.quit:
+				peerLog.Debug("Server shutting down in " +
+					"OnGetData")
+
+				return
 			}
 		}
-		numAdded++
-		waitChan = c
+
+		// Re-initialize the done chans.
+		doneChans = make([]chan struct{}, numBuffered)
 	}
 
 	if len(failedMsg.InvList) != 0 {
+		doneChan := make(chan struct{}, 1)
+
+		// Add this doneChan for tracking.
+		doneChans = append(doneChans, doneChan)
+
+		// Send the failed msgs.
 		sp.QueueMessage(failedMsg, doneChan)
 	}
 
@@ -755,48 +774,54 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	// time. We don't process anything else by them in this time so that we
 	// have an idea of when we should hear back from them - else the idle
 	// timeout could fire when we were only half done sending the blocks.
-	if numAdded > 0 {
-		<-doneChan
+	for _, dc := range doneChans {
+		select {
+		case <-dc:
+
+		// Exit if the server is shutting down.
+		case <-sp.quit:
+			peerLog.Debug("Server shutting down in OnGetData")
+			return
+		}
 	}
 }
 
 // pushInventory sends the requested inventory to the given peer.
 func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
-	doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+	doneChan chan<- struct{}) error {
 
 	switch iv.Type {
 	case wire.InvTypeWitnessTx:
-		return s.pushTxMsg(
-			sp, &iv.Hash, doneChan, waitChan, wire.WitnessEncoding,
-		)
+		return s.pushTxMsg(sp, &iv.Hash, doneChan, wire.WitnessEncoding)
 
 	case wire.InvTypeTx:
-		return s.pushTxMsg(
-			sp, &iv.Hash, doneChan, waitChan, wire.BaseEncoding,
-		)
+		return s.pushTxMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
 
 	case wire.InvTypeWitnessBlock:
 		return s.pushBlockMsg(
-			sp, &iv.Hash, doneChan, waitChan, wire.WitnessEncoding,
+			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
 		)
 
 	case wire.InvTypeBlock:
-		return s.pushBlockMsg(
-			sp, &iv.Hash, doneChan, waitChan, wire.BaseEncoding,
-		)
+		return s.pushBlockMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
 
 	case wire.InvTypeFilteredWitnessBlock:
 		return s.pushMerkleBlockMsg(
-			sp, &iv.Hash, doneChan, waitChan, wire.WitnessEncoding,
+			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
 		)
 
 	case wire.InvTypeFilteredBlock:
 		return s.pushMerkleBlockMsg(
-			sp, &iv.Hash, doneChan, waitChan, wire.BaseEncoding,
+			sp, &iv.Hash, doneChan, wire.BaseEncoding,
 		)
 
 	default:
 		peerLog.Warnf("Unknown type in inventory request %d", iv.Type)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+
 		return errors.New("unknown inventory type")
 	}
 }
@@ -1568,8 +1593,8 @@ func (s *server) TransactionConfirmed(tx *btcutil.Tx) {
 
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
-func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash,
+	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
 
 	// Attempt to fetch the requested transaction from the pool.  A
 	// call could be made to check for existence first, but simply trying
@@ -1585,11 +1610,6 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 		return err
 	}
 
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
-
 	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
 
 	return nil
@@ -1597,8 +1617,8 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 
 // pushBlockMsg sends a block message for the provided block hash to the
 // connected peer.  An error is returned if the block hash is not known.
-func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
-	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
 
 	// Fetch the raw block bytes from the database.
 	var blockBytes []byte
@@ -1628,11 +1648,6 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 			doneChan <- struct{}{}
 		}
 		return err
-	}
-
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
 	}
 
 	// We only send the channel for this message if we aren't sending
@@ -1666,7 +1681,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 // loaded, this call will simply be ignored if there is no filter loaded.  An
 // error is returned if the block hash is not known.
 func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
-	doneChan chan<- struct{}, waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
 
 	// Do not send a response if the peer doesn't have a filter loaded.
 	if !sp.filter.IsLoaded() {
@@ -1691,11 +1706,6 @@ func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
 	// Generate a merkle block by filtering the requested block according
 	// to the filter for the peer.
 	merkle, matchedTxIndices := bloom.NewMerkleBlock(blk, sp.filter)
-
-	// Once we have fetched data wait for any previous operation to finish.
-	if waitChan != nil {
-		<-waitChan
-	}
 
 	// Send the merkleblock.  Only send the done channel with this message
 	// if no transactions will be sent afterwards.
