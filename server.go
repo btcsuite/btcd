@@ -694,21 +694,24 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	notFound := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
-	// A decaying ban score increase is applied to prevent exhausting resources
-	// with unusually large inventory queries.
-	// Requesting more than the maximum inventory vector length within a short
-	// period of time yields a score above the default ban threshold. Sustained
-	// bursts of small requests are not penalized as that would potentially ban
-	// peers performing IBD.
+
+	// A decaying ban score increase is applied to prevent exhausting
+	// resources with unusually large inventory queries.
+	//
+	// Requesting more than the maximum inventory vector length within a
+	// short period of time yields a score above the default ban threshold.
+	// Sustained bursts of small requests are not penalized as that would
+	// potentially ban peers performing IBD.
+	//
 	// This incremental score decays each minute to half of its value.
 	if sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata") {
 		return
 	}
 
-	// We wait on this wait channel periodically to prevent queuing
-	// far more data than we can send in a reasonable time, wasting memory.
-	// The waiting occurs after the database fetch for the next one to
-	// provide a little pipelining.
+	// We wait on this wait channel periodically to prevent queuing far
+	// more data than we can send in a reasonable time, wasting memory. The
+	// waiting occurs after the database fetch for the next one to provide
+	// a little pipelining.
 	var waitChan chan struct{}
 	doneChan := make(chan struct{}, 1)
 
@@ -743,11 +746,11 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		if err != nil {
 			notFound.AddInvVect(iv)
 
-			// When there is a failure fetching the final entry
-			// and the done channel was sent in due to there
-			// being no outstanding not found inventory, consume
-			// it here because there is now not found inventory
-			// that will use the channel momentarily.
+			// When there is a failure fetching the final entry and
+			// the done channel was sent in due to there being no
+			// outstanding not found inventory, consume it here
+			// because there is now not found inventory that will
+			// use the channel momentarily.
 			if i == len(msg.InvList)-1 && c != nil {
 				<-c
 			}
@@ -759,9 +762,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		sp.QueueMessage(notFound, doneChan)
 	}
 
-	// Wait for messages to be sent. We can send quite a lot of data at this
-	// point and this will keep the peer busy for a decent amount of time.
-	// We don't process anything else by them in this time so that we
+	// Wait for messages to be sent. We can send quite a lot of data at
+	// this point and this will keep the peer busy for a decent amount of
+	// time. We don't process anything else by them in this time so that we
 	// have an idea of when we should hear back from them - else the idle
 	// timeout could fire when we were only half done sending the blocks.
 	if numAdded > 0 {

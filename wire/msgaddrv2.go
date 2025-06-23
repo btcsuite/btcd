@@ -43,6 +43,7 @@ func (m *MsgAddrV2) BtcDecode(r io.Reader, pver uint32,
 			// This may be a network ID we don't know of, but is
 			// still valid. We can safely skip those.
 			continue
+
 		case ErrInvalidAddressSize:
 			// The encoding used by the peer does not follow
 			// BIP-155 and we should stop processing this message.
