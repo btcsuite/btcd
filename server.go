@@ -691,7 +691,10 @@ func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
 // is used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	numAdded := 0
-	notFound := wire.NewMsgNotFound()
+
+	// failedMsg is an inventory that stores all the failed msgs - either
+	// the msg is an unknown type, or there's an error processing it.
+	failedMsg := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
 
@@ -718,33 +721,17 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	for i, iv := range msg.InvList {
 		var c chan struct{}
 		// If this will be the last message we send.
-		if i == length-1 && len(notFound.InvList) == 0 {
+		if i == length-1 && len(failedMsg.InvList) == 0 {
 			c = doneChan
+
 		} else if (i+1)%3 == 0 {
 			// Buffered so as to not make the send goroutine block.
 			c = make(chan struct{}, 1)
 		}
-		var err error
-		switch iv.Type {
-		case wire.InvTypeWitnessTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
-		case wire.InvTypeTx:
-			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
-		case wire.InvTypeWitnessBlock:
-			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
-		case wire.InvTypeBlock:
-			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
-		case wire.InvTypeFilteredWitnessBlock:
-			err = sp.server.pushMerkleBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
-		case wire.InvTypeFilteredBlock:
-			err = sp.server.pushMerkleBlockMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
-		default:
-			peerLog.Warnf("Unknown type in inventory request %d",
-				iv.Type)
-			continue
-		}
+
+		err := sp.server.pushInventory(sp, iv, c, waitChan)
 		if err != nil {
-			notFound.AddInvVect(iv)
+			failedMsg.AddInvVect(iv)
 
 			// When there is a failure fetching the final entry and
 			// the done channel was sent in due to there being no
@@ -758,8 +745,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		numAdded++
 		waitChan = c
 	}
-	if len(notFound.InvList) != 0 {
-		sp.QueueMessage(notFound, doneChan)
+
+	if len(failedMsg.InvList) != 0 {
+		sp.QueueMessage(failedMsg, doneChan)
 	}
 
 	// Wait for messages to be sent. We can send quite a lot of data at
@@ -769,6 +757,47 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	// timeout could fire when we were only half done sending the blocks.
 	if numAdded > 0 {
 		<-doneChan
+	}
+}
+
+// pushInventory sends the requested inventory to the given peer.
+func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
+	doneChan chan<- struct{}, waitChan <-chan struct{}) error {
+
+	switch iv.Type {
+	case wire.InvTypeWitnessTx:
+		return s.pushTxMsg(
+			sp, &iv.Hash, doneChan, waitChan, wire.WitnessEncoding,
+		)
+
+	case wire.InvTypeTx:
+		return s.pushTxMsg(
+			sp, &iv.Hash, doneChan, waitChan, wire.BaseEncoding,
+		)
+
+	case wire.InvTypeWitnessBlock:
+		return s.pushBlockMsg(
+			sp, &iv.Hash, doneChan, waitChan, wire.WitnessEncoding,
+		)
+
+	case wire.InvTypeBlock:
+		return s.pushBlockMsg(
+			sp, &iv.Hash, doneChan, waitChan, wire.BaseEncoding,
+		)
+
+	case wire.InvTypeFilteredWitnessBlock:
+		return s.pushMerkleBlockMsg(
+			sp, &iv.Hash, doneChan, waitChan, wire.WitnessEncoding,
+		)
+
+	case wire.InvTypeFilteredBlock:
+		return s.pushMerkleBlockMsg(
+			sp, &iv.Hash, doneChan, waitChan, wire.BaseEncoding,
+		)
+
+	default:
+		peerLog.Warnf("Unknown type in inventory request %d", iv.Type)
+		return errors.New("unknown inventory type")
 	}
 }
 
