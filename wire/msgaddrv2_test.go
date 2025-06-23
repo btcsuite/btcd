@@ -41,6 +41,15 @@ func TestAddrV2Decode(t *testing.T) {
 			false,
 			1,
 		},
+		// Truncated address.
+		{
+			[]byte{
+				0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x04,
+				0x7f, 0x00, 0x00,
+			},
+			true,
+			0,
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
