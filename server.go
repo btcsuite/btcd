@@ -256,6 +256,9 @@ type server struct {
 	// agentWhitelist is a list of whitelisted user agent substrings, no
 	// whitelisting will be applied if the list is empty or nil.
 	agentWhitelist []string
+
+	// pushInventoryFunc allows injection for testing.
+	pushInventoryFunc func(sp *serverPeer, iv *wire.InvVect, doneChan chan<- struct{}) error
 }
 
 // serverPeer extends the peer to maintain state shared by the server and
@@ -720,6 +723,11 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	const numBuffered = 5
 	doneChans := make([]chan struct{}, 0, numBuffered)
 
+	pushInventory := sp.server.pushInventory
+	if sp.server.pushInventoryFunc != nil {
+		pushInventory = sp.server.pushInventoryFunc
+	}
+
 	for i, iv := range msg.InvList {
 		// doneChan behaves like a semaphore - every time a msg is
 		// processed, either succeeded or failed, a signal is sent to
@@ -729,7 +737,7 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 		// Add this doneChan for tracking.
 		doneChans = append(doneChans, doneChan)
 
-		err := sp.server.pushInventory(sp, iv, doneChan)
+		err := pushInventory(sp, iv, doneChan)
 		if err != nil {
 			failedMsg.AddInvVect(iv)
 		}
@@ -2872,6 +2880,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		agentBlacklist:       agentBlacklist,
 		agentWhitelist:       agentWhitelist,
 	}
+
+	// Default pushInventoryFunc to real pushInventory if not set
+	s.pushInventoryFunc = s.pushInventory
 
 	// Create the transaction and address indexes if needed.
 	//
