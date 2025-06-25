@@ -687,8 +687,8 @@ func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
 	sp.server.syncManager.QueueHeaders(msg, sp.Peer)
 }
 
-// handleGetData is invoked when a peer receives a getdata bitcoin message and
-// is used to deliver block and transaction information.
+// OnGetData is invoked when a peer receives a getdata bitcoin message and is
+// used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	// failedMsg is an inventory that stores all the failed msgs - either
 	// the msg is an unknown type, or there's an error processing it.
