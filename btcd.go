@@ -266,9 +266,8 @@ func btcdMain(serverChan chan<- *server) error {
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,
 		cfg.AgentWhitelist, db, activeNetParams.Params, interrupt)
 	if err != nil {
-		// Format error message more clearly with better details
-		btcdLog.Errorf("Failed to initialize server: %v", err)
 		btcdLog.Errorf("Unable to start server with configured listeners: %v", cfg.Listeners)
+		btcdLog.Errorf("Failed to initialize server: %v", err)
 		return err
 	}
 	defer func() {
