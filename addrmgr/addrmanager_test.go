@@ -208,6 +208,7 @@ func TestAddLocalAddress(t *testing.T) {
 	}
 	amgr := addrmgr.New("testaddlocaladdress", nil)
 	for x, test := range tests {
+		test := test
 		result := amgr.AddLocalAddress(&test.address, test.priority)
 		if result == nil && !test.valid {
 			t.Errorf("TestAddLocalAddress test #%d failed: %s should have "+
@@ -463,6 +464,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 
 	// Test against default when there's no address
 	for x, test := range tests {
+		test := test
 		got := amgr.GetBestLocalAddress(&test.remoteAddr)
 		wantAddr := test.want0.Addr.String()
 		gotAddr := got.Addr.String()
@@ -480,6 +482,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 
 	// Test against want1
 	for x, test := range tests {
+		test := test
 		got := amgr.GetBestLocalAddress(&test.remoteAddr)
 		wantAddr := test.want1.Addr.String()
 		gotAddr := got.Addr.String()
@@ -499,6 +502,7 @@ func TestGetBestLocalAddress(t *testing.T) {
 
 	// Test against want2
 	for x, test := range tests {
+		test := test
 		got := amgr.GetBestLocalAddress(&test.remoteAddr)
 		wantAddr := test.want2.Addr.String()
 		gotAddr := got.Addr.String()
