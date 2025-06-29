@@ -17,6 +17,7 @@ type POutput struct {
 	TaprootInternalKey     []byte
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
+	MuSig2Participants     []*MuSig2Participants
 	Unknowns               []*Unknown
 }
 
@@ -144,6 +145,26 @@ func (po *POutput) deserialize(r io.Reader) error {
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
 
+		case MuSig2ParticipantsOutputType:
+			participants, err := ReadMuSig2Participants(
+				keyData, value,
+			)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			newKey := participants.AggregateKey
+			for _, x := range po.MuSig2Participants {
+				if x.AggregateKey.IsEqual(newKey) {
+					return ErrDuplicateKey
+				}
+			}
+
+			po.MuSig2Participants = append(
+				po.MuSig2Participants, participants,
+			)
+			
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -246,6 +267,15 @@ func (po *POutput) serialize(w io.Writer) error {
 		}
 	}
 
+	for _, participants := range po.MuSig2Participants {
+		err := SerializeMuSig2Participants(
+			w, uint8(MuSig2ParticipantsOutputType), participants,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	
 	// Unknown is a special case; we don't have a key type, only a key and
 	// a value field
 	for _, kv := range po.Unknowns {
