@@ -103,6 +103,10 @@ const (
 	// SFNodeNetWorkLimited is a flag used to indicate a peer supports serving
 	// the last 288 blocks.
 	SFNodeNetworkLimited = 1 << 10
+
+	// SFNodeP2PV2 is a flag used to indicate a peer supports BIP324 v2
+	// connections.
+	SFNodeP2PV2 = 1 << 11
 )
 
 // Map of service flags back to their constant names for pretty printing.
@@ -116,6 +120,7 @@ var sfStrings = map[ServiceFlag]string{
 	SFNodeCF:             "SFNodeCF",
 	SFNode2X:             "SFNode2X",
 	SFNodeNetworkLimited: "SFNodeNetworkLimited",
+	SFNodeP2PV2:          "SFNodeP2PV2",
 }
 
 // orderedSFStrings is an ordered list of service flags from highest to
@@ -130,6 +135,7 @@ var orderedSFStrings = []ServiceFlag{
 	SFNodeCF,
 	SFNode2X,
 	SFNodeNetworkLimited,
+	SFNodeP2PV2,
 }
 
 // HasFlag returns a bool indicating if the service has the given flag.

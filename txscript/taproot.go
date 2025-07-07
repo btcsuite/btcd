@@ -353,7 +353,10 @@ func VerifyTaprootLeafCommitment(controlBlock *ControlBlock,
 	expectedWitnessProgram := schnorr.SerializePubKey(taprootKey)
 	if !bytes.Equal(expectedWitnessProgram, taprootWitnessProgram) {
 
-		return scriptError(ErrTaprootMerkleProofInvalid, "")
+		str := fmt.Sprintf("derived witness program: %x, expected: "+
+			"%x, using tapscript_root: %x", expectedWitnessProgram,
+			taprootWitnessProgram, rootHash)
+		return scriptError(ErrTaprootMerkleProofInvalid, str)
 	}
 
 	// Finally, we'll verify that the parity of the y coordinate of the

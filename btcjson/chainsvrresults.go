@@ -468,6 +468,7 @@ type GetPeerInfoResult struct {
 	BanScore       int32   `json:"banscore"`
 	FeeFilter      int64   `json:"feefilter"`
 	SyncNode       bool    `json:"syncnode"`
+	V2Connection   bool    `json:"v2_connection"`
 }
 
 // GetRawMempoolVerboseResult models the data returned from the getrawmempool
