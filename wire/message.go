@@ -43,7 +43,6 @@ const (
 	CmdHeaders      = "headers"
 	CmdPing         = "ping"
 	CmdPong         = "pong"
-	CmdAlert        = "alert"
 	CmdMemPool      = "mempool"
 	CmdFilterAdd    = "filteradd"
 	CmdFilterClear  = "filterclear"
@@ -206,9 +205,6 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdHeaders:
 		msg = &MsgHeaders{}
-
-	case CmdAlert:
-		msg = &MsgAlert{}
 
 	case CmdMemPool:
 		msg = &MsgMemPool{}
