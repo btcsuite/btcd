@@ -112,9 +112,6 @@ type MessageListeners struct {
 	// OnPong is invoked when a peer receives a pong bitcoin message.
 	OnPong func(p *Peer, msg *wire.MsgPong)
 
-	// OnAlert is invoked when a peer receives an alert bitcoin message.
-	OnAlert func(p *Peer, msg *wire.MsgAlert)
-
 	// OnMemPool is invoked when a peer receives a mempool bitcoin message.
 	OnMemPool func(p *Peer, msg *wire.MsgMemPool)
 
@@ -1546,11 +1543,6 @@ out:
 			p.handlePongMsg(msg)
 			if p.cfg.Listeners.OnPong != nil {
 				p.cfg.Listeners.OnPong(p, msg)
-			}
-
-		case *wire.MsgAlert:
-			if p.cfg.Listeners.OnAlert != nil {
-				p.cfg.Listeners.OnAlert(p, msg)
 			}
 
 		case *wire.MsgMemPool:
