@@ -1,0 +1,4 @@
+version: "2"
+issues:
+  # Only show newly introduced problems.
+  new-from-rev: 80b74d6c5a0088a66dc96df6777d21e15c04849c
