@@ -371,7 +371,15 @@ type StringOrArray []string
 
 // MarshalJSON implements the json.Marshaler interface.
 func (h StringOrArray) MarshalJSON() ([]byte, error) {
-	return json.Marshal(h)
+	// If there's exactly one element, emit it as a JSON string
+	if len(h) == 1 {
+		return json.Marshal(h[0])
+	}
+	// Otherwise emit the full slice as a JSON array.
+	//
+	// We convert to []string so we don’t call
+	// StringOrArray.MarshalJSON again and re-enter this method.
+	return json.Marshal([]string(h))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
