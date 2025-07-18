@@ -879,6 +879,67 @@ func TestAddresses(t *testing.T) {
 			continue
 		}
 
+		// Ensure addresses are only valid for their given network
+		// The cases where test.addr and test.encoded are different are
+		// pay-to-pubkey, and these are valid for all nets.
+		if test.valid && test.addr == test.encoded {
+			_, err := btcutil.DecodeAddressForNet(test.addr, test.net)
+			if err != nil {
+				t.Errorf("%s: invalid for expected net: %s", test.name, err)
+			}
+
+			nets := []chaincfg.Params{
+				chaincfg.MainNetParams,
+				chaincfg.TestNet3Params,
+				chaincfg.RegressionNetParams,
+				chaincfg.SimNetParams,
+				chaincfg.SigNetParams,
+				customParams,
+			}
+
+			// verify we can't decode for other nets
+			for _, net := range nets {
+				if net.Net == test.net.Net {
+					continue
+				}
+
+				decoded, err := btcutil.DecodeAddressForNet(test.addr, &net)
+				if err != nil {
+					continue
+				}
+				// signet bech32 addresses have the same HRP prefix as
+				// testnet. Skip those. We verify this with an interface
+				// check instead of concrete types, as there's multiple
+				// concrete types that implement Segwit addresses.
+				type bech32 interface {
+					Hrp() string
+				}
+				if _, ok := decoded.(bech32); ok &&
+					net.Net == chaincfg.SigNetParams.Net {
+					continue
+				}
+
+				// testnet3, signet and regtest shares the same pubkey hash
+				// prefixes. Skip those.
+				if _, ok := decoded.(*btcutil.AddressPubKeyHash); ok &&
+					(net.Net == chaincfg.SigNetParams.Net ||
+						net.Net == chaincfg.RegressionNetParams.Net) {
+					continue
+				}
+
+				// testnet3, signet and regtest shares the same script hash
+				// prefixes. Skip those.
+				if _, ok := decoded.(*btcutil.AddressScriptHash); ok &&
+					(net.Net == chaincfg.SigNetParams.Net ||
+						net.Net == chaincfg.RegressionNetParams.Net) {
+					continue
+				}
+
+				t.Errorf("%s: was able to decode address %s for incorrect net %s: 0x%02x",
+					test.name, decoded, net.Name, int(net.Net))
+			}
+		}
+
 		// Valid test, compare address created with f against expected result.
 		addr, err := test.f()
 		if err != nil {
