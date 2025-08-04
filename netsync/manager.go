@@ -1235,14 +1235,6 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			break
 		}
 
-		// Check if the block is already requested.  If it is just move
-		// to the next block.
-		_, requested := sm.requestedBlocks[*node.hash]
-		if requested {
-			sm.startHeader = e.Next()
-			continue
-		}
-
 		// Check if the block is already queued.  If it is just move to
 		// the next block.
 		_, queued := sm.queuedBlocks[*node.hash]
