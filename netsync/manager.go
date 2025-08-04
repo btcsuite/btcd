@@ -352,6 +352,67 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	return nextCheckpoint
 }
 
+// returnBestPeer will choose and return the best peer among the available
+// candidate peers to download/sync the blockchain from.  The returned slice of
+// peers are peers with higher blocks that we currently have peer states for.
+func (sm *SyncManager) returnBestPeer(segwitActive bool) (*peerpkg.Peer,
+	[]*peerpkg.Peer) {
+
+	best := sm.chain.BestSnapshot()
+	var higherPeers, equalPeers []*peerpkg.Peer
+	for peer, state := range sm.peerStates {
+		if !state.syncCandidate {
+			continue
+		}
+
+		if segwitActive && !peer.IsWitnessEnabled() {
+			log.Debugf("peer %v not witness enabled, skipping", peer)
+			continue
+		}
+
+		// Remove sync candidate peers that are no longer candidates due
+		// to passing their latest known block.  NOTE: The < is
+		// intentional as opposed to <=.  While technically the peer
+		// doesn't have a later block when it's equal, it will likely
+		// have one soon so it is a reasonable choice.  It also allows
+		// the case where both are at 0 such as during regression test.
+		if peer.LastBlock() < best.Height {
+			state.syncCandidate = false
+			continue
+		}
+
+		// If the peer is at the same height as us, we'll add it a set
+		// of backup peers in case we do not find one with a higher
+		// height. If we are synced up with all of our peers, all of
+		// them will be in this set.
+		if peer.LastBlock() == best.Height {
+			equalPeers = append(equalPeers, peer)
+			continue
+		}
+
+		// This peer has a height greater than our own, we'll consider
+		// it in the set of better peers from which we'll randomly
+		// select.
+		higherPeers = append(higherPeers, peer)
+	}
+
+	// Pick randomly from the set of peers greater than our block height,
+	// falling back to a random peer of the same height if none are greater.
+	//
+	// TODO(conner): Use a better algorithm to ranking peers based on
+	// observed metrics and/or sync in parallel.
+	var bestPeer *peerpkg.Peer
+	switch {
+	case len(higherPeers) > 0:
+		bestPeer = higherPeers[rand.Intn(len(higherPeers))]
+
+	case len(equalPeers) > 0:
+		bestPeer = equalPeers[rand.Intn(len(equalPeers))]
+	}
+
+	return bestPeer, higherPeers
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer
