@@ -413,6 +413,52 @@ func (sm *SyncManager) returnBestPeer(segwitActive bool) (*peerpkg.Peer,
 	return bestPeer, higherPeers
 }
 
+// startHeadersFirstSync is called in startSync() when the SyncManager is in
+// headers-first mode.  If there's headers present already, it'll request for
+// blocks for those headers.  If not, it'll request for the headers up until the
+// checkpoint.
+//
+// This function MUST be called with SyncManager in headers-first mode.
+func (sm *SyncManager) startHeadersFirstSync(best *blockchain.BestState) {
+	// Check if we have some headers already downloaded.
+	var locator blockchain.BlockLocator
+	if sm.headerList.Len() > 0 {
+		e := sm.headerList.Back()
+		node := e.Value.(*headerNode)
+
+		// If the final hash equals next checkpoint, that
+		// means we've verified the downloaded headers and
+		// can start fetching blocks.
+		if node.hash.IsEqual(sm.nextCheckpoint.Hash) {
+			sm.startHeader = sm.headerList.Front()
+			sm.fetchHeaderBlocks()
+			return
+		}
+
+		// If the last hash doesn't equal the checkpoint,
+		// make the locator as the last hash.
+		locator = blockchain.BlockLocator(
+			[]*chainhash.Hash{node.hash})
+	}
+
+	// If we don't already have headers downloaded we need to fetch
+	// the block locator from chain.
+	if len(locator) == 0 {
+		var err error
+		locator, err = sm.chain.LatestBlockLocator()
+		if err != nil {
+			log.Errorf("Failed to get block locator for the "+
+				"latest block: %v", err)
+			return
+		}
+	}
+
+	sm.syncPeer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
+	log.Infof("Downloading headers for blocks %d to "+
+		"%d from peer %s", best.Height+1,
+		sm.nextCheckpoint.Height, sm.syncPeer.Addr())
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer
