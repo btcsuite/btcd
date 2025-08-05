@@ -490,20 +490,6 @@ func (sm *SyncManager) startSync() {
 		log.Warnf("No sync peer candidates available")
 		return
 	}
-
-	// Clear the requestedBlocks if the sync peer changes, otherwise
-	// we may ignore blocks we need that the last sync peer failed
-	// to send.
-	//
-	// We don't reset it during headersFirstMode since it's not used
-	// during headersFirstMode.
-	if !sm.headersFirstMode {
-		sm.requestedBlocks = make(map[chainhash.Hash]struct{})
-	}
-
-	log.Infof("Syncing to block height %d from peer %v",
-		bestPeer.LastBlock(), bestPeer.Addr())
-
 	sm.syncPeer = bestPeer
 
 	// Reset the last progress time now that we have a non-nil
@@ -511,38 +497,13 @@ func (sm *SyncManager) startSync() {
 	// event the progress time hasn't been updated recently.
 	sm.lastProgressTime = time.Now()
 
-	// Check if we have some headers already downloaded.
-	var locator blockchain.BlockLocator
-	if sm.headerList.Len() > 0 && sm.nextCheckpoint != nil {
-		e := sm.headerList.Back()
-		node := e.Value.(*headerNode)
+	log.Infof("Syncing to block height %d from peer %v",
+		bestPeer.LastBlock(), bestPeer.Addr())
 
-		// If the final hash equals next checkpoint, that
-		// means we've verified the downloaded headers and
-		// can start fetching blocks.
-		if node.hash.IsEqual(sm.nextCheckpoint.Hash) {
-			sm.startHeader = sm.headerList.Front()
-			sm.fetchHeaderBlocks()
-			return
-		}
-
-		// If the last hash doesn't equal the checkpoint,
-		// make the locator as the last hash.
-		locator = blockchain.BlockLocator(
-			[]*chainhash.Hash{node.hash})
-	}
-
-	// If we don't already have headers downloaded we need to fetch
-	// the block locator from chain.
-	if len(locator) == 0 {
-		locator, err = sm.chain.LatestBlockLocator()
-		if err != nil {
-			log.Errorf("Failed to get block locator for the "+
-				"latest block: %v", err)
-			return
-		}
-	}
-
+	// Determine if we can be in headers-first mode.  If the current height
+	// is less than the current checkpoint and we're not in regtest, we can
+	// be in headers-first mode.
+	//
 	// When the current height is less than a known checkpoint we
 	// can use block headers to learn about which blocks comprise
 	// the chain up to the checkpoint and perform less validation
@@ -564,14 +525,24 @@ func (sm *SyncManager) startSync() {
 		best.Height < sm.nextCheckpoint.Height &&
 		sm.chainParams != &chaincfg.RegressionNetParams {
 
-		bestPeer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
 		sm.headersFirstMode = true
-		log.Infof("Downloading headers for blocks %d to "+
-			"%d from peer %s", best.Height+1,
-			sm.nextCheckpoint.Height, bestPeer.Addr())
-	} else {
-		bestPeer.PushGetBlocksMsg(locator, &zeroHash)
+		sm.startHeadersFirstSync(best)
+		return
 	}
+
+	// Clear the requestedBlocks if the sync peer changes, otherwise
+	// we may ignore blocks we need that the last sync peer failed
+	// to send.
+	sm.requestedBlocks = make(map[chainhash.Hash]struct{})
+
+	// Fetch the locator and ask for the blocks from the best peer.
+	locator, err := sm.chain.LatestBlockLocator()
+	if err != nil {
+		log.Errorf("Failed to get block locator for the "+
+			"latest block: %v", err)
+		return
+	}
+	bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 }
 
 // isSyncCandidate returns whether or not the peer is a candidate to consider
