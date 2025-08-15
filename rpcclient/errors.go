@@ -338,6 +338,23 @@ func (r BitcoindRPCErr) Error() string {
 	return "unknown error"
 }
 
+// BitcoindErrMap is a map of additional errors bitcoind can throw that are
+// version dependent (e.g. versions up to v29 return the error as specified in
+// `Error()` above, while versions v30 and beyond return the error as mapped
+// here. We add a new map for errors that were simply renamed but have the same
+// semantic meaning. New errors should be added above as new error constants.
+var BitcoindErrMap = map[string]error{
+	// The error message was changed in
+	// https://github.com/bitcoin/bitcoin/pull/33050 which will be included
+	// in bitcoind v30.0 and beyond.
+	"mempool script verify flag failed": ErrNonMandatoryScriptVerifyFlag,
+
+	// The error message was changed in
+	// https://github.com/bitcoin/bitcoin/pull/33183 which will also be
+	// included in bitcoind v30.0 and beyond.
+	"block script verify flag failed": ErrScriptVerifyFlag,
+}
+
 // BtcdErrMap takes the errors returned from btcd's `testmempoolaccept` and
 // `sendrawtransaction` RPCs and map them to the errors defined above, which
 // are results from calling either `testmempoolaccept` or `sendrawtransaction`
@@ -480,10 +497,19 @@ var BtcdErrMap = map[string]error{
 //
 // NOTE: we assume neutrino shares the same error strings as btcd.
 func MapRPCErr(rpcErr error) error {
-	// Iterate the map and find the matching error.
+	// Iterate the btcd error map and find the matching error.
 	for btcdErr, err := range BtcdErrMap {
 		// Match it against btcd's error first.
 		if matchErrStr(rpcErr, btcdErr) {
+			return err
+		}
+	}
+
+	// Also check the bitcoind error map, which is used for bitcoind version
+	// dependent errors.
+	for bitcoindErr, err := range BitcoindErrMap {
+		// Match it against bitcoind's error.
+		if matchErrStr(rpcErr, bitcoindErr) {
 			return err
 		}
 	}
