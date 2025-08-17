@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"io"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -1102,6 +1104,49 @@ func (c *Client) GetTxOutSetInfo() (*btcjson.GetTxOutSetInfoResult, error) {
 	return c.GetTxOutSetInfoAsync().Receive()
 }
 
+// FutureGetTxOutProofResult is a future promise to deliver the result of a
+// GetTxOutProofAsync RPC invocation (or an applicable error).
+type FutureGetTxOutProofResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// results of GetTxOutSetInfoAsync RPC invocation.
+func (r FutureGetTxOutProofResult) Receive() (*wire.MsgMerkleBlock, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var merkleBlock wire.MsgMerkleBlock
+	err = merkleBlock.BtcDecode(
+		hex.NewDecoder(parseJSONStringReader(res)),
+		wire.ProtocolVersion, wire.WitnessEncoding,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &merkleBlock, nil
+}
+
+// GetTxOutProofAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See GetTxOutProof for the blocking version and more details.
+func (c *Client) GetTxOutProofAsync(txIDs []string,
+	blockHash *string) FutureGetTxOutProofResult {
+
+	cmd := btcjson.NewGetTxOutProofCmd(txIDs, blockHash)
+	return c.SendCmd(cmd)
+}
+
+// GetTxOutProof returns the proof that a transaction was included in a block.
+func (c *Client) GetTxOutProof(txIDs []string,
+	blockHash *string) (*wire.MsgMerkleBlock, error) {
+
+	return c.GetTxOutProofAsync(txIDs, blockHash).Receive()
+}
+
 // FutureRescanBlocksResult is a future promise to deliver the result of a
 // RescanBlocksAsync RPC invocation (or an applicable error).
 //
@@ -1454,4 +1499,25 @@ func (c *Client) ReconsiderBlockAsync(
 // will reorg to that block if it has more PoW than the current tip.
 func (c *Client) ReconsiderBlock(blockHash *chainhash.Hash) error {
 	return c.ReconsiderBlockAsync(blockHash).Receive()
+}
+
+// parseJSONString parses a JSON byte slice as a JSON string by removing leading
+// and trailing double quotes.
+func parseJSONString(jsonWithQuotes []byte) string {
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	return strings.TrimPrefix(
+		strings.TrimSuffix(string(jsonWithQuotes), "\""), "\"",
+	)
+}
+
+// parseJSONStringReader parses a JSON byte slice as a JSON string by removing
+// leading and trailing double quotes and returning it as a reader for further
+// processing.
+func parseJSONStringReader(jsonWithQuotes []byte) io.Reader {
+	quotes := []byte("\"")
+	return bytes.NewReader(bytes.TrimPrefix(
+		bytes.TrimSuffix(jsonWithQuotes, quotes), quotes,
+	))
 }
