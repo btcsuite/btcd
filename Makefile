@@ -4,6 +4,12 @@ LINT_PKG := github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 GOIMPORTS_PKG := golang.org/x/tools/cmd/goimports
 
 GO_BIN := ${shell go env GOBIN}
+
+# If GOBIN is not set, default to GOPATH/bin.
+ifeq ($(GO_BIN),)
+GO_BIN := $(shell go env GOPATH)/bin
+endif
+
 LINT_BIN := $(GO_BIN)/golangci-lint
 GOIMPORTS_BIN := $(GO_BIN)/goimports
 
@@ -73,7 +79,7 @@ install:
 	$(GOINSTALL) $(PKG)/cmd/findcheckpoint
 	$(GOINSTALL) $(PKG)/cmd/addblock
 
-#? release-install: Install btcd and btcctl release binaries, place them in $GOPATH/bin
+#? release-install: Install btcd and btcctl release binaries, place them in $GOBIN
 release-install:
 	@$(call print, "Installing btcd and btcctl release binaries")
 	env CGO_ENABLED=0 $(GOINSTALL) -trimpath -ldflags="-s -w -buildid=" $(PKG)
