@@ -12,13 +12,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 // fakeChain is used by the pool harness to provide generated test utxos and
@@ -133,7 +134,7 @@ type poolHarness struct {
 	// payAddr is the p2sh address for the signing key and is used for the
 	// payment address throughout the tests.
 	signKey     *btcec.PrivateKey
-	payAddr     btcutil.Address
+	payAddr     address.Address
 	payScript   []byte
 	chainParams *chaincfg.Params
 
@@ -296,7 +297,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 	// Generate associated pay-to-script-hash address and resulting payment
 	// script.
 	pubKeyBytes := signPub.SerializeCompressed()
-	payPubKeyAddr, err := btcutil.NewAddressPubKey(pubKeyBytes, chainParams)
+	payPubKeyAddr, err := address.NewAddressPubKey(pubKeyBytes, chainParams)
 	if err != nil {
 		return nil, nil, err
 	}
