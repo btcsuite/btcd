@@ -19,9 +19,9 @@ ARG ARCH=amd64
 # https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
 # https://cloud.google.com/architecture/using-container-images
 # https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md
-# ➜  ~ crane digest golang:1.22.11-alpine3.21
-# sha256:161858498a61ce093c8e2bd704299bfb23e5bff79aef99b6c40bb9c6a43acf0f
-FROM golang@sha256:161858498a61ce093c8e2bd704299bfb23e5bff79aef99b6c40bb9c6a43acf0f AS build-container
+# ➜  ~ crane digest golang:1.23.12-alpine3.21
+# sha256:4bb4be21ac98da06bc26437ee870c4973f8039f13e9a1a36971b4517632b0fc6
+FROM golang@sha256:4bb4be21ac98da06bc26437ee870c4973f8039f13e9a1a36971b4517632b0fc6 AS build-container
 
 ARG ARCH
 
