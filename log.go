@@ -22,6 +22,7 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/v2transport"
+	"github.com/lightninglabs/neutrino/query"
 
 	"github.com/btcsuite/btclog"
 	"github.com/jrick/logrotate/rotator"
@@ -66,6 +67,7 @@ var (
 	minrLog = backendLog.Logger("MINR")
 	peerLog = backendLog.Logger("PEER")
 	rpcsLog = backendLog.Logger("RPCS")
+	quryLog = backendLog.Logger("QURY")
 	scrpLog = backendLog.Logger("SCRP")
 	srvrLog = backendLog.Logger("SRVR")
 	syncLog = backendLog.Logger("SYNC")
@@ -87,6 +89,7 @@ func init() {
 	netsync.UseLogger(syncLog)
 	mempool.UseLogger(txmpLog)
 	v2transport.UseLogger(v2trLog)
+	query.UseLogger(quryLog)
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
@@ -102,6 +105,7 @@ var subsystemLoggers = map[string]btclog.Logger{
 	"MINR":                minrLog,
 	"PEER":                peerLog,
 	"RPCS":                rpcsLog,
+	"QURY":                quryLog,
 	"SCRP":                scrpLog,
 	"SRVR":                srvrLog,
 	"SYNC":                syncLog,
