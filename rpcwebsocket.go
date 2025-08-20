@@ -377,50 +377,6 @@ func (f *wsClientFilter) existsAddress(a address.Address) bool {
 	return ok
 }
 
-// removeAddress removes the passed address, if it exists, from the
-// wsClientFilter.
-//
-// NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeAddress(a address.Address) {
-	switch a := a.(type) {
-	case *address.AddressPubKeyHash:
-		delete(f.pubKeyHashes, *a.Hash160())
-		return
-	case *address.AddressScriptHash:
-		delete(f.scriptHashes, *a.Hash160())
-		return
-	case *address.AddressPubKey:
-		serializedPubKey := a.ScriptAddress()
-		switch len(serializedPubKey) {
-		case 33: // compressed
-			var compressedPubKey [33]byte
-			copy(compressedPubKey[:], serializedPubKey)
-			delete(f.compressedPubKeys, compressedPubKey)
-			return
-		case 65: // uncompressed
-			var uncompressedPubKey [65]byte
-			copy(uncompressedPubKey[:], serializedPubKey)
-			delete(f.uncompressedPubKeys, uncompressedPubKey)
-			return
-		}
-	}
-
-	delete(f.otherAddresses, a.EncodeAddress())
-}
-
-// removeAddressStr parses an address from a string and then removes it from the
-// wsClientFilter using removeAddress.
-//
-// NOTE: This extension was ported from github.com/decred/dcrd
-func (f *wsClientFilter) removeAddressStr(s string, params *chaincfg.Params) {
-	a, err := address.DecodeAddress(s, params)
-	if err == nil {
-		f.removeAddress(a)
-	} else {
-		delete(f.otherAddresses, s)
-	}
-}
-
 // addUnspentOutPoint adds an outpoint to the wsClientFilter.
 //
 // NOTE: This extension was ported from github.com/decred/dcrd
