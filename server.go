@@ -731,7 +731,7 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 
 		err := sp.server.pushInventory(sp, iv, doneChan)
 		if err != nil {
-			failedMsg.AddInvVect(iv)
+			_ = failedMsg.AddInvVect(iv)
 		}
 
 		// Move to the next item if we haven't processed 5 times yet.
