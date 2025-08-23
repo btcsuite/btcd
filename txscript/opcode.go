@@ -229,10 +229,10 @@ const (
 	OP_NOP9                = 0xb8 // 184
 	OP_NOP10               = 0xb9 // 185
 	OP_CHECKSIGADD         = 0xba // 186
-	OP_UNKNOWN190          = 0xbe // 190
 	OP_EC_POINT_ADD        = 0xbb // 187 - replaces OP_UNKNOWN187
 	OP_EC_POINT_MUL        = 0xbc // 188 - replaces OP_UNKNOWN188
 	OP_EC_POINT_NEGATE     = 0xbd // 189 - replaces OP_UNKNOWN189
+	OP_EC_POINT_X_COORD    = 0xbe // 190 - replaces OP_UNKNOWN190
 	OP_UNKNOWN191          = 0xbf // 191
 	OP_UNKNOWN192          = 0xc0 // 192
 	OP_UNKNOWN193          = 0xc1 // 193
@@ -506,6 +506,7 @@ var opcodeArray = [256]opcode{
 	OP_EC_POINT_ADD:        {OP_EC_POINT_ADD, "OP_EC_POINT_ADD", 1, opcodeECPointAdd},
 	OP_EC_POINT_MUL:        {OP_EC_POINT_MUL, "OP_EC_POINT_MUL", 1, opcodeECPointMul},
 	OP_EC_POINT_NEGATE:     {OP_EC_POINT_NEGATE, "OP_EC_POINT_NEGATE", 1, opcodeECPointNegate},
+	OP_EC_POINT_X_COORD:    {OP_EC_POINT_X_COORD, "OP_EC_POINT_X_COORD", 1, opcodeECPointXCoord},
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
@@ -518,7 +519,6 @@ var opcodeArray = [256]opcode{
 	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
 
 	// Undefined opcodes.
-	OP_UNKNOWN190: {OP_UNKNOWN190, "OP_UNKNOWN190", 1, opcodeInvalid},
 	OP_UNKNOWN191: {OP_UNKNOWN191, "OP_UNKNOWN191", 1, opcodeInvalid},
 	OP_UNKNOWN192: {OP_UNKNOWN192, "OP_UNKNOWN192", 1, opcodeInvalid},
 	OP_UNKNOWN193: {OP_UNKNOWN193, "OP_UNKNOWN193", 1, opcodeInvalid},
@@ -637,7 +637,6 @@ var successOpcodes = map[byte]struct{}{
 	OP_MOD:          {}, // 151
 	OP_LSHIFT:       {}, // 152
 	OP_RSHIFT:       {}, // 153
-	OP_UNKNOWN190:   {}, // 190
 	OP_UNKNOWN191:   {}, // 191
 	OP_UNKNOWN192:   {}, // 192
 	OP_UNKNOWN193:   {}, // 193
@@ -2727,6 +2726,64 @@ func opcodeECPointNegate(op *opcode, data []byte, vm *Engine) error {
 
 	vm.dstack.PushByteArray(resultData)
 
+	return nil
+}
+
+// opcodeECPointXCoord implements OP_EC_POINT_X_COORD.
+//
+// Stack: [point] -> [x_coordinate]
+// Cost: 1 sigops unit
+func opcodeECPointXCoord(op *opcode, data []byte, vm *Engine) error {
+	// This op code is only available in tapscript with EC ops enabled.
+	if vm.taprootCtx == nil || !vm.hasFlag(ScriptVerifyECOps) {
+		str := fmt.Sprintf("op code %s requires "+
+			"tapscript and EC ops flag", op.name)
+
+		return scriptError(ErrDisabledOpcode, str)
+	}
+
+	// The op code requires a minimum of 1 stack item.
+	if vm.dstack.Depth() < 1 {
+		str := fmt.Sprintf("op code %s requires 1 "+
+			"item on stack", op.name)
+
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	// Pop and parse the point from the stack.
+	pointData, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	point, err := parseECPoint(pointData)
+	if err != nil {
+		return scriptError(
+			ErrInvalidStackOperation,
+			fmt.Sprintf("invalid point: %v", err),
+		)
+	}
+
+	// Before we continue, we'll tally the sigops cost.
+	if err := vm.taprootCtx.tallyECOp(EcPointXCoordCost); err != nil {
+		return err
+	}
+
+	// If this is the point at infinity, then we'll bail out.
+	if point.Z.IsZero() {
+		return scriptError(
+			ErrInvalidStackOperation,
+			"cannot extract x-coordinate from point at infinity",
+		)
+	}
+
+	// Otherwise, we'll convert to affine form, then push the x-coordinate
+	// on the stack.
+	//
+	// TODO(roasbeef): can just not convert to jacobian?
+	point.ToAffine()
+	xBytes := point.X.Bytes()
+
+	vm.dstack.PushByteArray(xBytes[:])
 	return nil
 }
 
