@@ -118,6 +118,11 @@ const (
 	// ScriptVerifyConstScriptCode fails non-segwit scripts if a signature
 	// match is found in the script code or if OP_CODESEPARATOR is used.
 	ScriptVerifyConstScriptCode
+
+	// ScriptVerifyECOps enables the new elliptic curve operation opcodes
+	// (OP_EC_POINT_ADD, OP_EC_POINT_MUL, OP_EC_POINT_NEGATE,
+	// OP_EC_POINT_X_COORD) in tapscript execution.
+	ScriptVerifyECOps
 )
 
 const (
