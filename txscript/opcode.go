@@ -20,6 +20,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // An opcode defines the information related to a txscript opcode.  opfunc, if
@@ -228,10 +229,10 @@ const (
 	OP_NOP9                = 0xb8 // 184
 	OP_NOP10               = 0xb9 // 185
 	OP_CHECKSIGADD         = 0xba // 186
-	OP_UNKNOWN187          = 0xbb // 187
 	OP_UNKNOWN188          = 0xbc // 188
 	OP_UNKNOWN189          = 0xbd // 189
 	OP_UNKNOWN190          = 0xbe // 190
+	OP_EC_POINT_ADD        = 0xbb // 187 - replaces OP_UNKNOWN187
 	OP_UNKNOWN191          = 0xbf // 191
 	OP_UNKNOWN192          = 0xc0 // 192
 	OP_UNKNOWN193          = 0xc1 // 193
@@ -502,6 +503,7 @@ var opcodeArray = [256]opcode{
 	OP_CHECKMULTISIG:       {OP_CHECKMULTISIG, "OP_CHECKMULTISIG", 1, opcodeCheckMultiSig},
 	OP_CHECKMULTISIGVERIFY: {OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify},
 	OP_CHECKSIGADD:         {OP_CHECKSIGADD, "OP_CHECKSIGADD", 1, opcodeCheckSigAdd},
+	OP_EC_POINT_ADD:        {OP_EC_POINT_ADD, "OP_EC_POINT_ADD", 1, opcodeECPointAdd},
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
@@ -514,7 +516,6 @@ var opcodeArray = [256]opcode{
 	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
 
 	// Undefined opcodes.
-	OP_UNKNOWN187: {OP_UNKNOWN187, "OP_UNKNOWN187", 1, opcodeInvalid},
 	OP_UNKNOWN188: {OP_UNKNOWN188, "OP_UNKNOWN188", 1, opcodeInvalid},
 	OP_UNKNOWN189: {OP_UNKNOWN189, "OP_UNKNOWN189", 1, opcodeInvalid},
 	OP_UNKNOWN190: {OP_UNKNOWN190, "OP_UNKNOWN190", 1, opcodeInvalid},
@@ -636,7 +637,6 @@ var successOpcodes = map[byte]struct{}{
 	OP_MOD:          {}, // 151
 	OP_LSHIFT:       {}, // 152
 	OP_RSHIFT:       {}, // 153
-	OP_UNKNOWN187:   {}, // 187
 	OP_UNKNOWN188:   {}, // 188
 	OP_UNKNOWN189:   {}, // 189
 	OP_UNKNOWN190:   {}, // 190
@@ -2468,6 +2468,130 @@ func opcodeCheckMultiSigVerify(op *opcode, data []byte, vm *Engine) error {
 		err = abstractVerify(op, vm, ErrCheckMultiSigVerify)
 	}
 	return err
+}
+
+// parseECPoint parses an elliptic curve point from the given data. It
+// supports:
+//
+// - 0 bytes: empty vector (represents infinity or generator for MUL)
+// - 33 bytes: compressed format ONLY
+//
+// Note: 32-byte x-only inputs are NOT accepted
+func parseECPoint(data []byte) (*btcec.JacobianPoint, error) {
+	switch len(data) {
+
+	// An empty vector represents the point at infinity.
+	case 0:
+		return &btcec.JacobianPoint{
+			X: secp256k1.FieldVal{},
+			Y: secp256k1.FieldVal{},
+			Z: secp256k1.FieldVal{},
+		}, nil
+
+	// A 33 byte value is assumed to be in compressed format.
+	case 33:
+		pubKey, err := btcec.ParsePubKey(data)
+		if err != nil {
+			return nil, err
+		}
+
+		var result btcec.JacobianPoint
+		pubKey.AsJacobian(&result)
+
+		return &result, nil
+
+	default:
+		return nil, errors.New("invalid point encoding: only 33-byte " +
+			"compressed format accepted")
+	}
+}
+
+// serializeECPoint serializes an elliptic curve point to 33-byte compressed
+// format.
+func serializeECPoint(point *btcec.JacobianPoint) ([]byte, error) {
+	// Check if point is at infinity (Z = 0). In which case, we'll just
+	// return an empty slice.
+	//
+	// TODO(roasbeef): just allow parse instead?
+	if point.Z.IsZero() {
+		return []byte{}, nil
+	}
+
+	// Before we proceed, we'll covert the point to affine form, then map
+	// the coords to a normal public key.
+	point.ToAffine()
+	pubKey := btcec.NewPublicKey(&point.X, &point.Y)
+
+	// Always return 33-byte compressed format.
+	return pubKey.SerializeCompressed(), nil
+}
+
+// opcodeECPointAdd implements OP_EC_POINT_ADD.
+//
+// Stack: [point2] [point1] -> [point1 + point2]
+// Cost: 10 sigops units
+func opcodeECPointAdd(op *opcode, data []byte, vm *Engine) error {
+	// This op code is only available in tapscript with EC ops enabled.
+	if vm.taprootCtx == nil || !vm.hasFlag(ScriptVerifyECOps) {
+		str := fmt.Sprintf("op code %s requires "+
+			"tapscript and EC ops flag", op.name)
+
+		return scriptError(ErrDisabledOpcode, str)
+	}
+
+	// The op code requires a minimum of 2 stack items.
+	if vm.dstack.Depth() < 2 {
+		str := fmt.Sprintf("op code %s requires 2 "+
+			"items on stack", op.name)
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	// We know that there's at least 2 items on the stack, so we'll now pop
+	// off the two points.
+	point1Data, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	point2Data, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	point1, err := parseECPoint(point1Data)
+	if err != nil {
+		return scriptError(
+			ErrInvalidStackOperation,
+			fmt.Sprintf("invalid point1: %v", err),
+		)
+	}
+	point2, err := parseECPoint(point2Data)
+	if err != nil {
+		return scriptError(
+			ErrInvalidStackOperation,
+			fmt.Sprintf("invalid point2: %v", err),
+		)
+	}
+
+	// Before we evaluate the operation, we'll tally the sigops cost.
+	if err := vm.taprootCtx.tallyECOp(EcPointAddCost); err != nil {
+		return err
+	}
+
+	// We didn't bail out above due to sig op issues, so we'll proceed to
+	// adding the two points together.
+	var result btcec.JacobianPoint
+	secp256k1.AddNonConst(point1, point2, &result)
+
+	// To conclude, we'll serialize the result as 33-byte compressed, then
+	// push the result back onto the stack.
+	resultData, err := serializeECPoint(&result)
+	if err != nil {
+		return err
+	}
+
+	vm.dstack.PushByteArray(resultData)
+
+	return nil
 }
 
 // OpcodeByName is a map that can be used to lookup an opcode by its
