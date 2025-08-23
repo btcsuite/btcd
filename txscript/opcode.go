@@ -229,10 +229,10 @@ const (
 	OP_NOP9                = 0xb8 // 184
 	OP_NOP10               = 0xb9 // 185
 	OP_CHECKSIGADD         = 0xba // 186
-	OP_UNKNOWN189          = 0xbd // 189
 	OP_UNKNOWN190          = 0xbe // 190
 	OP_EC_POINT_ADD        = 0xbb // 187 - replaces OP_UNKNOWN187
 	OP_EC_POINT_MUL        = 0xbc // 188 - replaces OP_UNKNOWN188
+	OP_EC_POINT_NEGATE     = 0xbd // 189 - replaces OP_UNKNOWN189
 	OP_UNKNOWN191          = 0xbf // 191
 	OP_UNKNOWN192          = 0xc0 // 192
 	OP_UNKNOWN193          = 0xc1 // 193
@@ -505,6 +505,7 @@ var opcodeArray = [256]opcode{
 	OP_CHECKSIGADD:         {OP_CHECKSIGADD, "OP_CHECKSIGADD", 1, opcodeCheckSigAdd},
 	OP_EC_POINT_ADD:        {OP_EC_POINT_ADD, "OP_EC_POINT_ADD", 1, opcodeECPointAdd},
 	OP_EC_POINT_MUL:        {OP_EC_POINT_MUL, "OP_EC_POINT_MUL", 1, opcodeECPointMul},
+	OP_EC_POINT_NEGATE:     {OP_EC_POINT_NEGATE, "OP_EC_POINT_NEGATE", 1, opcodeECPointNegate},
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
@@ -517,7 +518,6 @@ var opcodeArray = [256]opcode{
 	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
 
 	// Undefined opcodes.
-	OP_UNKNOWN189: {OP_UNKNOWN189, "OP_UNKNOWN189", 1, opcodeInvalid},
 	OP_UNKNOWN190: {OP_UNKNOWN190, "OP_UNKNOWN190", 1, opcodeInvalid},
 	OP_UNKNOWN191: {OP_UNKNOWN191, "OP_UNKNOWN191", 1, opcodeInvalid},
 	OP_UNKNOWN192: {OP_UNKNOWN192, "OP_UNKNOWN192", 1, opcodeInvalid},
@@ -637,7 +637,6 @@ var successOpcodes = map[byte]struct{}{
 	OP_MOD:          {}, // 151
 	OP_LSHIFT:       {}, // 152
 	OP_RSHIFT:       {}, // 153
-	OP_UNKNOWN189:   {}, // 189
 	OP_UNKNOWN190:   {}, // 190
 	OP_UNKNOWN191:   {}, // 191
 	OP_UNKNOWN192:   {}, // 192
@@ -2670,6 +2669,64 @@ func opcodeECPointMul(op *opcode, data []byte, vm *Engine) error {
 	}
 
 	vm.dstack.PushByteArray(resultData)
+	return nil
+}
+
+// opcodeECPointNegate implements OP_EC_POINT_NEGATE.
+//
+// Stack: [point] -> [-point]
+// Cost: 5 sigops units
+func opcodeECPointNegate(op *opcode, data []byte, vm *Engine) error {
+	// This op code is only available in tapscript with EC ops enabled.
+	if vm.taprootCtx == nil || !vm.hasFlag(ScriptVerifyECOps) {
+		str := fmt.Sprintf("op code %s requires "+
+			"tapscript and EC ops flag", op.name)
+
+		return scriptError(ErrDisabledOpcode, str)
+	}
+
+	// The op code requires a minimum of 1 stack item.
+	if vm.dstack.Depth() < 1 {
+		str := fmt.Sprintf("op code %s requires "+
+			"1 item on stack", op.name)
+
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	// We know that there's at least 1 item on the stack, so we'll pop the
+	// point from the stack.
+	pointData, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	point, err := parseECPoint(pointData)
+	if err != nil {
+		return scriptError(ErrInvalidStackOperation,
+			fmt.Sprintf("invalid point: %v", err))
+	}
+
+	// Before we move forward, we'll tally the sigops cost.
+	if err := vm.taprootCtx.tallyECOp(EcPointNegateCost); err != nil {
+		return err
+	}
+
+	// Now we'll perform our main flag: for point (x, y), negation is (x,
+	// -y mod p). As a special case, the point at infinity negates to
+	// itself.
+	if !point.Z.IsZero() {
+		point.Y.Negate(1)
+	}
+
+	// To wrap up, we'll serialize the result as 33-byte compressed,
+	// then push it back onto the stack.
+	resultData, err := serializeECPoint(point)
+	if err != nil {
+		return err
+	}
+
+	vm.dstack.PushByteArray(resultData)
+
 	return nil
 }
 
