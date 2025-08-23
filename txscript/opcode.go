@@ -229,10 +229,10 @@ const (
 	OP_NOP9                = 0xb8 // 184
 	OP_NOP10               = 0xb9 // 185
 	OP_CHECKSIGADD         = 0xba // 186
-	OP_UNKNOWN188          = 0xbc // 188
 	OP_UNKNOWN189          = 0xbd // 189
 	OP_UNKNOWN190          = 0xbe // 190
 	OP_EC_POINT_ADD        = 0xbb // 187 - replaces OP_UNKNOWN187
+	OP_EC_POINT_MUL        = 0xbc // 188 - replaces OP_UNKNOWN188
 	OP_UNKNOWN191          = 0xbf // 191
 	OP_UNKNOWN192          = 0xc0 // 192
 	OP_UNKNOWN193          = 0xc1 // 193
@@ -504,6 +504,7 @@ var opcodeArray = [256]opcode{
 	OP_CHECKMULTISIGVERIFY: {OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify},
 	OP_CHECKSIGADD:         {OP_CHECKSIGADD, "OP_CHECKSIGADD", 1, opcodeCheckSigAdd},
 	OP_EC_POINT_ADD:        {OP_EC_POINT_ADD, "OP_EC_POINT_ADD", 1, opcodeECPointAdd},
+	OP_EC_POINT_MUL:        {OP_EC_POINT_MUL, "OP_EC_POINT_MUL", 1, opcodeECPointMul},
 
 	// Reserved opcodes.
 	OP_NOP1:  {OP_NOP1, "OP_NOP1", 1, opcodeNop},
@@ -516,7 +517,6 @@ var opcodeArray = [256]opcode{
 	OP_NOP10: {OP_NOP10, "OP_NOP10", 1, opcodeNop},
 
 	// Undefined opcodes.
-	OP_UNKNOWN188: {OP_UNKNOWN188, "OP_UNKNOWN188", 1, opcodeInvalid},
 	OP_UNKNOWN189: {OP_UNKNOWN189, "OP_UNKNOWN189", 1, opcodeInvalid},
 	OP_UNKNOWN190: {OP_UNKNOWN190, "OP_UNKNOWN190", 1, opcodeInvalid},
 	OP_UNKNOWN191: {OP_UNKNOWN191, "OP_UNKNOWN191", 1, opcodeInvalid},
@@ -637,7 +637,6 @@ var successOpcodes = map[byte]struct{}{
 	OP_MOD:          {}, // 151
 	OP_LSHIFT:       {}, // 152
 	OP_RSHIFT:       {}, // 153
-	OP_UNKNOWN188:   {}, // 188
 	OP_UNKNOWN189:   {}, // 189
 	OP_UNKNOWN190:   {}, // 190
 	OP_UNKNOWN191:   {}, // 191
@@ -2591,6 +2590,86 @@ func opcodeECPointAdd(op *opcode, data []byte, vm *Engine) error {
 
 	vm.dstack.PushByteArray(resultData)
 
+	return nil
+}
+
+// opcodeECPointMul implements OP_EC_POINT_MUL.
+//
+// Stack: [scalar] [point] -> [scalar * point]
+// Cost: 30 sigops units
+func opcodeECPointMul(op *opcode, data []byte, vm *Engine) error {
+	// This op code is only available in tapscript with EC ops enabled.
+	if vm.taprootCtx == nil || !vm.hasFlag(ScriptVerifyECOps) {
+		str := fmt.Sprintf("op code %s requires "+
+			"tapscript and EC ops flag", op.name)
+
+		return scriptError(ErrDisabledOpcode, str)
+	}
+
+	// The op code requires a minimum of 2 stack items.
+	if vm.dstack.Depth() < 2 {
+		str := fmt.Sprintf("op code %s requires 2 "+
+			"items on stack", op.name)
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	// At this point, we should have the scalar and point on the stack, so
+	// we'll pop them off now to continue.
+	pointData, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+	scalarData, err := vm.dstack.PopByteArray()
+	if err != nil {
+		return err
+	}
+
+	// We require that the scalar is exactly 32 bytes.
+	if len(scalarData) != 32 {
+		str := fmt.Sprintf("scalar must be 32 bytes, "+
+			"got %d", len(scalarData))
+		return scriptError(ErrInvalidStackOperation, str)
+	}
+
+	// Before we continue below, we'll tally the sigops cost.
+	if err := vm.taprootCtx.tallyECOp(EcPointMulCost); err != nil {
+		return err
+	}
+
+	// Parse out the scalar, reducing by the order of the curve if needed.
+	var scalar secp256k1.ModNScalar
+	scalar.SetBytes((*[32]byte)(scalarData))
+
+	var result btcec.JacobianPoint
+
+	switch {
+	// We'll handle the special case of the point being the empty. In this
+	// case, the user is requesting a scalar base mult.
+	case len(pointData) == 0:
+		secp256k1.ScalarBaseMultNonConst(&scalar, &result)
+
+	// Otherwise, we'll parse the point as normal, and multiply it by the
+	//
+	default:
+		point, err := parseECPoint(pointData)
+		if err != nil {
+			return scriptError(
+				ErrInvalidStackOperation,
+				fmt.Sprintf("invalid point: %v", err),
+			)
+		}
+
+		secp256k1.ScalarMultNonConst(&scalar, point, &result)
+	}
+
+	// To clean up, we'll serialize the result as 33-byte compressed and
+	// push the result back onto the stack.
+	resultData, err := serializeECPoint(&result)
+	if err != nil {
+		return err
+	}
+
+	vm.dstack.PushByteArray(resultData)
 	return nil
 }
 
