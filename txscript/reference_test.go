@@ -198,6 +198,8 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 			flags |= ScriptVerifyTaproot
 		case "CONST_SCRIPTCODE":
 			flags |= ScriptVerifyConstScriptCode
+		case "EC_OPS":
+			flags |= ScriptVerifyECOps
 		default:
 			return flags, fmt.Errorf("invalid flag: %s", flag)
 		}
@@ -1021,6 +1023,9 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 
 		err = vm.Execute()
 		if err == nil {
+			t.Logf("Script execution succeeded when it should have failed")
+			t.Logf("Test case: %v", testCase.Comment)
+			t.Logf("Witness: %v", testCase.Failure.Witness)
 			t.Fatalf("test (%v) succeeded, should fail: "+
 				"%v", testCase.Comment, err)
 		}
@@ -1076,5 +1081,55 @@ func TestTaprootReferenceTests(t *testing.T) {
 	err := filepath.Walk(filePath, testFunc)
 	if err != nil {
 		t.Fatalf("unable to execute taproot test vectors: %v", err)
+	}
+}
+
+// TestECOpcodeReferenceTests test that we're able to properly validate 
+// the EC opcode functionality using taproot-ref style test vectors.
+func TestECOpcodeReferenceTests(t *testing.T) {
+	t.Parallel()
+
+	filePath := "data/ec-op-ref"
+
+	testFunc := func(path string, info fs.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if info.IsDir() {
+			t.Logf("skipping dir: %v", info.Name())
+			return nil
+		}
+
+		testJson, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("unable to read file: %v", err)
+		}
+
+		// All the JSON files have a trailing comma and a new line
+		// character, so we'll remove that here before attempting to
+		// parse it.
+		testJson = bytes.TrimSuffix(testJson, []byte(",\n"))
+
+		var testCase taprootJsonTest
+		if err := json.Unmarshal(testJson, &testCase); err != nil {
+			return fmt.Errorf("unable to decode json: %v", err)
+		}
+
+		testName := fmt.Sprintf(
+			"%v:%v", testCase.Comment, filepath.Base(path),
+		)
+		_ = t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
+			executeTaprootRefTest(t, testCase)
+		})
+
+		return nil
+	}
+
+	err := filepath.Walk(filePath, testFunc)
+	if err != nil {
+		t.Fatalf("unable to execute EC opcode test vectors: %v", err)
 	}
 }
