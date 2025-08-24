@@ -1042,6 +1042,103 @@ func TestECOpsNonTaproot(t *testing.T) {
 	}
 }
 
+// TestECOpsWithoutFlag tests that EC opcodes fail when taproot is enabled but
+// the ScriptVerifyECOps flag is not set.
+func TestECOpsWithoutFlag(t *testing.T) {
+	t.Parallel()
+
+	privKey, _ := generateTestPrivateKey(
+		t.Name(), 1,
+	)
+	pubKey := privKey.PubKey()
+	point33 := pubKey.SerializeCompressed()
+
+	opcodes := []struct {
+		name     string
+		template string
+		params   map[string]interface{}
+	}{
+		{
+			name: "OP_EC_POINT_ADD without EC flag",
+			template: `
+			{{ hex .Point1 }} {{ hex .Point2 }} OP_EC_POINT_ADD`,
+			params: map[string]interface{}{
+				"Point1": point33,
+				"Point2": point33,
+			},
+		},
+		{
+			name: "OP_EC_POINT_MUL without EC flag",
+			template: `
+			{{ hex .Scalar }} {{ hex .Point }} OP_EC_POINT_MUL`,
+			params: map[string]interface{}{
+				"Scalar": append(
+					bytes.Repeat([]byte{0x00}, 31), 0x01,
+				),
+				"Point": point33,
+			},
+		},
+		{
+			name:     "OP_EC_POINT_NEGATE without EC flag",
+			template: "{{ hex .Point }} OP_EC_POINT_NEGATE",
+			params: map[string]interface{}{
+				"Point": point33,
+			},
+		},
+		{
+			name:     "OP_EC_POINT_X_COORD without EC flag",
+			template: "{{ hex .Point }} OP_EC_POINT_X_COORD",
+			params: map[string]interface{}{
+				"Point": point33,
+			},
+		},
+	}
+
+	for _, test := range opcodes {
+		t.Run(test.name, func(t *testing.T) {
+			// Construct the script, create spend info, then
+			// construct a valid tapscript spend from that.
+			testScript := createTestScriptFromTemplate(
+				t, test.template, test.params,
+			)
+			spendInfo, err := createTaprootSpendInfo(
+				testScript, test.name,
+			)
+			require.NoError(
+				t, err, "failed to create taproot spend info",
+			)
+			spendTx := createTaprootSpendingTx(
+				testScript, spendInfo.ctrlBlockBytes,
+			)
+
+			// Create the engine with the requisite prev output
+			// fetcher. We don't apply the EC OP script flag, so
+			// all executions should fail.
+			prevOutFetcher := NewCannedPrevOutputFetcher(
+				spendInfo.p2trScript, 100000,
+			)
+			flags := StandardVerifyFlags | ScriptVerifyTaproot
+			vm, err := NewEngine(
+				spendInfo.p2trScript, spendTx, 0, flags, nil,
+				nil, 100000, prevOutFetcher,
+			)
+			require.NoError(t, err, "failed to create engine")
+
+			err = vm.Execute()
+
+			// Execution should fail as this op code is disabled.
+			require.Error(
+				t, err, "expected script to fail "+
+					"without EC ops flag but it succeeded",
+			)
+			require.True(
+				t, IsErrorCode(err, ErrDisabledOpcode),
+				"expected ErrDisabledOpcode, got %v", err,
+			)
+		})
+	}
+}
+
 // TestECOpsErrors tests error/edge cases for the EC opcodes.
 func TestECOpsErrors(t *testing.T) {
 	t.Parallel()
