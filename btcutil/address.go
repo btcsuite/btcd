@@ -731,6 +731,11 @@ func NewAddressWitness(witnessProg []byte, net *chaincfg.Params) (*AddressWitnes
 	return newAddressWitness(net.Bech32HRPSegwit, 2, witnessProg) // Default to version 2
 }
 
+// NewAddressWitnessWithVersion returns a new AddressWitness with a specific witness version.
+func NewAddressWitnessWithVersion(witnessProg []byte, witnessVer byte, net *chaincfg.Params) (*AddressWitness, error) {
+	return newAddressWitness(net.Bech32HRPSegwit, witnessVer, witnessProg)
+}
+
 // newAddressWitness is an internal helper function to create an
 // AddressWitness with a known human-readable part and witness version.
 func newAddressWitness(hrp string, witnessVer byte, witnessProg []byte) (*AddressWitness, error) {
@@ -753,4 +758,19 @@ func newAddressWitness(hrp string, witnessVer byte, witnessProg []byte) (*Addres
 	}
 
 	return addr, nil
+}
+
+// WitnessVersion returns the witness version of the AddressWitness.
+func (a *AddressWitness) WitnessVersion() byte {
+	return a.witnessVersion
+}
+
+// WitnessProgram returns the witness program of the AddressWitness.
+func (a *AddressWitness) WitnessProgram() []byte {
+	return a.witnessProgram[:]
+}
+
+// Hrp returns the human-readable part of the bech32m encoded AddressWitness.
+func (a *AddressWitness) Hrp() string {
+	return a.hrp
 }
