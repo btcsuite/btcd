@@ -562,7 +562,7 @@ func (a *AddressSegWit) IsForNet(net *chaincfg.Params) bool {
 	return a.hrp == net.Bech32HRPSegwit
 }
 
-// String returns a human-readable string for the AddressWitnessPubKeyHash.
+// String returns a human-readable string for the AddressSegWit.
 // This is equivalent to calling EncodeAddress, but is provided so the type
 // can be used as a fmt.Stringer.
 //
@@ -642,7 +642,7 @@ type AddressWitnessScriptHash struct {
 	AddressSegWit
 }
 
-// NewAddressWitnessScriptHash returns a new AddressWitnessPubKeyHash.
+// NewAddressWitnessScriptHash returns a new AddressWitnessScriptHash.
 func NewAddressWitnessScriptHash(witnessProg []byte,
 	net *chaincfg.Params) (*AddressWitnessScriptHash, error) {
 
