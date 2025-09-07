@@ -31,6 +31,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/electrum-server"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
@@ -236,9 +237,12 @@ type server struct {
 	// if the associated index is not enabled.  These fields are set during
 	// initial creation of the server and never changed afterwards, so they
 	// do not need to be protected for concurrent access.
-	txIndex   *indexers.TxIndex
-	addrIndex *indexers.AddrIndex
-	cfIndex   *indexers.CfIndex
+	txIndex         *indexers.TxIndex
+	addrIndex       *indexers.AddrIndex
+	cfIndex         *indexers.CfIndex
+	scriptHashIndex *indexers.ScriptHashIndex
+
+	electrumServer *electrum.ElectrumServer
 
 	// The fee estimator keeps track of how long transactions are left in
 	// the mempool before they are mined into blocks.
@@ -2575,6 +2579,8 @@ func (s *server) Start() {
 	if cfg.Generate {
 		s.cpuMiner.Start()
 	}
+
+	s.electrumServer.Start()
 }
 
 // Stop gracefully shuts down the server by stopping and disconnecting all
@@ -2801,6 +2807,55 @@ func setupRPCListeners() ([]net.Listener, error) {
 	return listeners, nil
 }
 
+// setupListeners returns a slice of listeners that are configured for use
+// with the RPC server depending on the configuration settings for listen
+// addresses and TLS.
+func setupListeners(rpcListeners []string, tlsOn bool) ([]net.Listener, error) {
+	// Setup TLS if not disabled.
+	listenFunc := net.Listen
+	if tlsOn {
+		// Generate the TLS cert and key file if both don't already
+		// exist.
+		if !fileExists(cfg.RPCKey) && !fileExists(cfg.RPCCert) {
+			err := genCertPair(cfg.RPCCert, cfg.RPCKey)
+			if err != nil {
+				return nil, err
+			}
+		}
+		keypair, err := tls.LoadX509KeyPair(cfg.RPCCert, cfg.RPCKey)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{keypair},
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		// Change the standard net.Listen function to the tls one.
+		listenFunc = func(net string, laddr string) (net.Listener, error) {
+			return tls.Listen(net, laddr, &tlsConfig)
+		}
+	}
+
+	netAddrs, err := parseListeners(rpcListeners)
+	if err != nil {
+		return nil, err
+	}
+
+	listeners := make([]net.Listener, 0, len(netAddrs))
+	for _, addr := range netAddrs {
+		listener, err := listenFunc(addr.Network(), addr.String())
+		if err != nil {
+			rpcsLog.Warnf("Can't listen on %s: %v", addr, err)
+			continue
+		}
+		listeners = append(listeners, listener)
+	}
+
+	return listeners, nil
+}
+
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
@@ -2874,13 +2929,23 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	// addrindex is run first, it may not have the transactions from the
 	// current block indexed.
 	var indexes []indexers.Indexer
-	if cfg.TxIndex || cfg.AddrIndex {
-		// Enable transaction index if address index is enabled since it
-		// requires it.
-		if !cfg.TxIndex {
-			indxLog.Infof("Transaction index enabled because it " +
-				"is required by the address index")
-			cfg.TxIndex = true
+	if cfg.TxIndex || cfg.AddrIndex || cfg.ScriptHashIndex {
+		if cfg.ScriptHashIndex {
+			// Enable transaction index if script hash index is enabled since it
+			// requires it.
+			if !cfg.TxIndex {
+				indxLog.Infof("Transaction index enabled because it " +
+					"is required by the script hash index")
+				cfg.TxIndex = true
+			}
+		} else if cfg.AddrIndex {
+			// Enable transaction index if address index is enabled since it
+			// requires it.
+			if !cfg.TxIndex {
+				indxLog.Infof("Transaction index enabled because it " +
+					"is required by the address index")
+				cfg.TxIndex = true
+			}
 		} else {
 			indxLog.Info("Transaction index is enabled")
 		}
@@ -2888,10 +2953,22 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		s.txIndex = indexers.NewTxIndex(db)
 		indexes = append(indexes, s.txIndex)
 	}
-	if cfg.AddrIndex {
-		indxLog.Info("Address index is enabled")
+	if cfg.AddrIndex || cfg.ScriptHashIndex {
+		if !cfg.AddrIndex {
+			indxLog.Infof("Address index enabled because it " +
+				"is required by the script hash index")
+			cfg.AddrIndex = true
+		} else {
+			indxLog.Info("Addr index is enabled")
+		}
+
 		s.addrIndex = indexers.NewAddrIndex(db, chainParams)
 		indexes = append(indexes, s.addrIndex)
+	}
+	if cfg.ScriptHashIndex {
+		indxLog.Info("Script hash index is enabled")
+		s.scriptHashIndex = indexers.NewScriptHashIndex(db, chainParams)
+		indexes = append(indexes, s.scriptHashIndex)
 	}
 	if !cfg.NoCFilters {
 		indxLog.Info("Committed filter index is enabled")
@@ -2987,6 +3064,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		SigCache:           s.sigCache,
 		HashCache:          s.hashCache,
 		AddrIndex:          s.addrIndex,
+		ScriptHashIndex:    s.scriptHashIndex,
 		FeeEstimator:       s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
@@ -3153,6 +3231,48 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			<-s.rpcServer.RequestedProcessShutdown()
 			shutdownRequestChannel <- struct{}{}
 		}()
+	}
+
+	if cfg.EnableElectrum {
+		listener, err := setupListeners(cfg.ElectrumListeners, false)
+		if err != nil {
+			return nil, err
+		}
+
+		var listenerTLS []bool
+		if !cfg.DisableTLS {
+			tlsListener, err := setupListeners(cfg.TLSElectrumListeners, true)
+			if err != nil {
+				return nil, err
+			}
+			listenerTLS = make([]bool, len(listener))
+			for i := range listener {
+				listenerTLS[i] = false
+			}
+			for i := 0; i < len(tlsListener); i++ {
+				listenerTLS = append(listenerTLS, true)
+			}
+			listener = append(listener, tlsListener...)
+		}
+
+		s.electrumServer, err = electrum.New(&electrum.Config{
+			Listeners:               listener,
+			ListenerTLS:             listenerTLS,
+			MaxClients:              10,
+			Params:                  chainParams,
+			BlockChain:              s.chain,
+			FeeEstimator:            s.feeEstimator,
+			Mempool:                 s.txMemPool,
+			MinRelayFee:             cfg.minRelayTxFee,
+			AddRebroadcastInventory: s.AddRebroadcastInventory,
+			AnnounceNewTransactions: s.AnnounceNewTransactions,
+			TxIndex:                 s.txIndex,
+			AddrIndex:               s.addrIndex,
+			ScriptHashIndex:         s.scriptHashIndex,
+		}, db)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &s, nil
