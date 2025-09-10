@@ -1318,13 +1318,11 @@ type HeaderCapturingTransport struct {
 
 func (t *HeaderCapturingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := t.Base.RoundTrip(req)
-	if err != nil {
-		return resp, err
-	}
 
 	if t.OnCapture != nil && resp != nil {
 		t.OnCapture(resp.Header)
 	}
+
 	return resp, err
 }
 
