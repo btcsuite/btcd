@@ -57,9 +57,13 @@ type Config struct {
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
-	// MiningAddrs is a list of payment addresses to use for the generated
-	// blocks.  Each generated block will randomly choose one of them.
-	MiningAddrs []btcutil.Address
+    // MiningAddrs is a list of payment addresses to use for the generated
+    // blocks.  Each generated block will randomly choose one of them.
+    MiningAddrs []btcutil.Address
+
+    // AddrSource, when non-nil, supplies mining payout addresses dynamically.
+    // If set, it takes precedence over MiningAddrs for address selection.
+    AddrSource MiningAddrSource
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -90,9 +94,10 @@ type Config struct {
 // function, but the default is based on the number of processor cores in the
 // system which is typically sufficient.
 type CPUMiner struct {
-	sync.Mutex
-	g                 *mining.BlkTmplGenerator
-	cfg               Config
+    sync.Mutex
+    g                 *mining.BlkTmplGenerator
+    cfg               Config
+    addrSource        MiningAddrSource
 	numWorkers        uint32
 	started           bool
 	discreteMining    bool
@@ -588,9 +593,15 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+        // Choose a payment address either from the dynamic source if
+        // available or at random from the static list.
+        var payToAddr btcutil.Address
+        if m.addrSource != nil && m.addrSource.NumAddrs() > 0 {
+            payToAddr = m.addrSource.NextAddr()
+        } else {
+            rand.Seed(time.Now().UnixNano())
+            payToAddr = m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+        }
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -712,12 +723,16 @@ func (m *CPUMiner) GenerateNBlocksToAddr(n uint32, addr btcutil.Address) ([]*cha
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
 func New(cfg *Config) *CPUMiner {
-	return &CPUMiner{
-		g:                 cfg.BlockTemplateGenerator,
-		cfg:               *cfg,
-		numWorkers:        defaultNumWorkers,
-		updateNumWorkers:  make(chan struct{}),
-		queryHashesPerSec: make(chan float64),
-		updateHashes:      make(chan uint64),
-	}
+    return &CPUMiner{
+        g:                 cfg.BlockTemplateGenerator,
+        cfg:               *cfg,
+        addrSource:        cfg.AddrSource,
+        numWorkers:        defaultNumWorkers,
+        updateNumWorkers:  make(chan struct{}),
+        queryHashesPerSec: make(chan float64),
+        updateHashes:      make(chan uint64),
+    }
 }
+
+// AddrSource returns the active mining address source, if any.
+func (m *CPUMiner) AddrSource() MiningAddrSource { return m.addrSource }
