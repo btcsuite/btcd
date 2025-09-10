@@ -593,8 +593,9 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |4|[searchrawtransactions](#searchrawtransactions)|Y|Query for transactions related to a particular address.|None|
 |5|[node](#node)|N|Attempts to add or remove a peer. |None|
 |6|[generate](#generate)|N|When in simnet or regtest mode, generate a set number of blocks. |None|
-|7|[version](#version)|Y|Returns the JSON-RPC API version.|
-|8|[getheaders](#getheaders)|Y|Returns block headers starting with the first known block hash from the request.|
+|7|[generatetoaddress](#generatetoaddress)|N|Generate a set number of blocks to a specific address. |None|
+|8|[version](#version)|Y|Returns the JSON-RPC API version.|
+|9|[getheaders](#getheaders)|Y|Returns block headers starting with the first known block hash from the request.|
 
 
 <a name="ExtMethodDetails" />
@@ -612,6 +613,18 @@ The following is an overview of the RPC methods which are implemented by btcd, b
 |Example Return|`Done.`|
 |Example `show` Return|`Supported subsystems [AMGR ADXR BCDB BMGR BTCD CHAN DISC PEER RPCS SCRP SRVR TXMP]`|
 [Return to Overview](#ExtMethodOverview)<br />
+
+***
+
+<a name="generatetoaddress"/>
+
+|   |   |
+|---|---|
+|Method|generatetoaddress|
+|Parameters|1. numblocks (int, required) - The number of blocks to generate <br />2. address (string, required) - The destination address for the coinbase reward <br />3. maxtries (int, optional) - Maximum attempts while searching for a block (currently ignored)|
+|Description|When in simnet or regtest mode, generates `numblocks` blocks to the specified `address`. If blocks arrive from elsewhere, they are built upon but don't count toward the number of blocks to generate. Only generated blocks are returned. This RPC call will exit with an error if the server is already CPU mining, and will prevent the server from CPU mining for another command while it runs. |
+|Returns|`[ (json array of strings)` <br/>&nbsp;&nbsp; `"blockhash", ... hash of the generated block` <br/>`]` |
+[Return to Overview](#MethodOverview)<br />
 
 ***
 

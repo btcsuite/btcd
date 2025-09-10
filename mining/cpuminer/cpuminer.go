@@ -627,6 +627,87 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	}
 }
 
+// GenerateNBlocksToAddr generates the requested number of blocks and pays the
+// coinbase to the provided address. The logic mirrors GenerateNBlocks but
+// forces the payout address instead of selecting randomly from the configured
+// set.
+func (m *CPUMiner) GenerateNBlocksToAddr(n uint32, addr btcutil.Address) ([]*chainhash.Hash, error) {
+    m.Lock()
+
+    // Respond with an error if server is already mining.
+    if m.started || m.discreteMining {
+        m.Unlock()
+        return nil, errors.New("Server is already CPU mining. Please call `setgenerate 0` before calling discrete `generatetoaddress` commands.")
+    }
+
+    m.started = true
+    m.discreteMining = true
+
+    m.speedMonitorQuit = make(chan struct{})
+    m.wg.Add(1)
+    go m.speedMonitor()
+
+    m.Unlock()
+
+    log.Tracef("Generating %d blocks to specific address", n)
+
+    i := uint32(0)
+    blockHashes := make([]*chainhash.Hash, n)
+
+    // Start a ticker which is used to signal checks for stale work and
+    // updates to the speed monitor.
+    ticker := time.NewTicker(time.Second * hashUpdateSecs)
+    defer ticker.Stop()
+
+    for {
+        // Read updateNumWorkers in case someone tries a `setgenerate` while
+        // we're generating. We can ignore it as the `generatetoaddress` RPC call only
+        // uses 1 worker.
+        select {
+        case <-m.updateNumWorkers:
+        default:
+        }
+
+        // Grab the lock used for block submission, since the current block will
+        // be changing and this would otherwise end up building a new block
+        // template on a block that is in the process of becoming stale.
+        m.submitBlockLock.Lock()
+        curHeight := m.g.BestSnapshot().Height
+
+        // Create a new block template using the available transactions
+        // in the memory pool as a source of transactions to potentially
+        // include in the block. Always pay to the specified address.
+        template, err := m.g.NewBlockTemplate(addr)
+        m.submitBlockLock.Unlock()
+        if err != nil {
+            errStr := fmt.Sprintf("Failed to create new block template: %v", err)
+            log.Errorf(errStr)
+            continue
+        }
+
+        // Attempt to solve the block.  The function will exit early
+        // with false when conditions that trigger a stale block, so
+        // a new block template can be generated.  When the return is
+        // true a solution was found, so submit the solved block.
+        if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
+            block := btcutil.NewBlock(template.Block)
+            m.submitBlock(block)
+            blockHashes[i] = block.Hash()
+            i++
+            if i == n {
+                log.Tracef("Generated %d blocks", i)
+                m.Lock()
+                close(m.speedMonitorQuit)
+                m.wg.Wait()
+                m.started = false
+                m.discreteMining = false
+                m.Unlock()
+                return blockHashes, nil
+            }
+        }
+    }
+}
+
 // New returns a new instance of a CPU miner for the provided configuration.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
