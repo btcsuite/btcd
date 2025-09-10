@@ -1322,7 +1322,7 @@ func (t *HeaderCapturingTransport) RoundTrip(req *http.Request) (*http.Response,
 		return nil, err
 	}
 
-	if t.OnCapture != nil {
+	if t.OnCapture != nil && resp != nil {
 		t.OnCapture(resp.Header)
 	}
 	return resp, err
