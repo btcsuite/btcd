@@ -7,32 +7,29 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestHeaderCapturingTransport tests that the HeaderCapturingTransport
 // correctly captures response headers.
 func TestHeaderCapturingTransport(t *testing.T) {
 	tests := []struct {
-		name           string
+		name            string
 		responseHeaders map[string]string
-		captureFunc    func(http.Header)
-		expectCapture  bool
+		captureFunc     func(http.Header)
+		expectCapture   bool
 	}{
 		{
 			name: "captures headers when callback provided",
 			responseHeaders: map[string]string{
-				"zp-rid":        "test-request-id",
-				"X-Trace-Id":    "trace-123",
-				"Content-Type":  "application/json",
+				"zp-rid":       "test-request-id",
+				"X-Trace-Id":   "trace-123",
+				"Content-Type": "application/json",
 			},
 			captureFunc: func(headers http.Header) {
 				// Verify headers are captured
-				if headers.Get("zp-rid") != "test-request-id" {
-					t.Errorf("Expected zp-rid header to be 'test-request-id', got '%s'", headers.Get("zp-rid"))
-				}
-				if headers.Get("X-Trace-Id") != "trace-123" {
-					t.Errorf("Expected X-Trace-Id header to be 'trace-123', got '%s'", headers.Get("X-Trace-Id"))
-				}
+				assert.Equal(t, "test-request-id", headers.Get("zp-rid"))
+				assert.Equal(t, "trace-123", headers.Get("X-Trace-Id"))
 			},
 			expectCapture: true,
 		},
@@ -158,17 +155,14 @@ func TestNewHTTPClientWithHeaderCapture(t *testing.T) {
 			// Check if headers were captured
 			mu.Lock()
 			defer mu.Unlock()
-			
+
 			if tt.expectCapture {
 				if capturedHeaders == nil {
 					t.Error("Expected headers to be captured, but they weren't")
 				} else {
-					if capturedHeaders.Get("zp-rid") != "test-rid-123" {
-						t.Errorf("Expected zp-rid to be 'test-rid-123', got '%s'", capturedHeaders.Get("zp-rid"))
-					}
-					if capturedHeaders.Get("X-Custom-Header") != "custom-value" {
-						t.Errorf("Expected X-Custom-Header to be 'custom-value', got '%s'", capturedHeaders.Get("X-Custom-Header"))
-					}
+
+					assert.Equal(t, "test-rid-123", capturedHeaders.Get("zp-rid"))
+					assert.Equal(t, "custom-value", capturedHeaders.Get("X-Custom-Header"))
 				}
 			} else {
 				if capturedHeaders != nil {
@@ -191,7 +185,7 @@ func TestHeaderCaptureIntegration(t *testing.T) {
 		w.Header().Set("zp-rid", "integration-test-rid")
 		w.Header().Set("X-Request-Id", "req-456")
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Return a valid JSON-RPC response
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"jsonrpc":"2.0","result":{"version":170000},"id":1}`))
@@ -221,7 +215,7 @@ func TestHeaderCaptureIntegration(t *testing.T) {
 	// Make an RPC call (this would normally be a real RPC method)
 	// Since we're testing with a mock server, we'll use SendCmd directly
 	future := client.SendCmd(&btcjson.GetInfoCmd{})
-	
+
 	// Wait for response
 	_, err = ReceiveFuture(future)
 	if err != nil {
@@ -232,7 +226,7 @@ func TestHeaderCaptureIntegration(t *testing.T) {
 	// Verify headers were captured
 	mu.Lock()
 	defer mu.Unlock()
-	
+
 	if len(capturedHeaders) == 0 {
 		t.Fatal("Expected headers to be captured, but none were")
 	}
