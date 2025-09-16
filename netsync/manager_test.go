@@ -226,3 +226,61 @@ func TestCheckHeadersList(t *testing.T) {
 		require.Equal(t, test.behaviorFlags, gotFlags)
 	}
 }
+
+func TestFetchHigherPeers(t *testing.T) {
+	// Create mock SyncManager.
+	sm, tearDown := makeMockSyncManager(t, &chaincfg.MainNetParams)
+	defer tearDown()
+
+	tests := []struct {
+		peerHeights       []int32
+		peerSyncCandidate []bool
+		height            int32
+		expectedCnt       int
+	}{
+		{
+			peerHeights:       []int32{9, 10, 10, 10},
+			peerSyncCandidate: []bool{true, true, true, true},
+			height:            5,
+			expectedCnt:       4,
+		},
+
+		{
+			peerHeights:       []int32{9, 10, 10, 10},
+			peerSyncCandidate: []bool{false, false, true, true},
+			height:            5,
+			expectedCnt:       2,
+		},
+
+		{
+			peerHeights:       []int32{1, 100, 100, 100, 100},
+			peerSyncCandidate: []bool{true, false, true, true, false},
+			height:            100,
+			expectedCnt:       0,
+		},
+	}
+
+	for _, test := range tests {
+		// Setup peers.
+		sm.peerStates = make(map[*peer.Peer]*peerSyncState)
+		for i, height := range test.peerHeights {
+			peer := peer.NewInboundPeer(&peer.Config{})
+			peer.UpdateLastBlockHeight(height)
+			sm.peerStates[peer] = &peerSyncState{
+				syncCandidate:   test.peerSyncCandidate[i],
+				requestedTxns:   make(map[chainhash.Hash]struct{}),
+				requestedBlocks: make(map[chainhash.Hash]struct{}),
+			}
+		}
+
+		// Fetch higher peers and assert.
+		peers := sm.fetchHigherPeers(test.height)
+		require.Equal(t, test.expectedCnt, len(peers))
+
+		for _, peer := range peers {
+			state, found := sm.peerStates[peer]
+			require.True(t, found)
+			require.True(t, state.syncCandidate)
+		}
+	}
+}
