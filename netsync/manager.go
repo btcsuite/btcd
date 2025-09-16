@@ -252,6 +252,26 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 	return nextCheckpoint
 }
 
+// fetchHigherPeers returns all the peers that are at a higher block than the
+// given height.  The peers that are not sync candidates are omitted from the
+// returned list.
+func (sm *SyncManager) fetchHigherPeers(height int32) []*peerpkg.Peer {
+	higherPeers := make([]*peerpkg.Peer, 0, len(sm.peerStates))
+	for peer, state := range sm.peerStates {
+		if !state.syncCandidate {
+			continue
+		}
+
+		if peer.LastBlock() <= height {
+			continue
+		}
+
+		higherPeers = append(higherPeers, peer)
+	}
+
+	return higherPeers
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer
