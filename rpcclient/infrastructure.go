@@ -1268,9 +1268,9 @@ type ConnConfig struct {
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
 
-	// If an OnCaptureHeader function is provided, it will be called with the
-	// header value from each response.
-	OnCaptureHeader func(header http.Header)
+	// If an OnResponseCapture function is provided, it will be called with the
+	// response value from each request.
+	OnResponseCapture func(response *http.Response, duration time.Duration)
 }
 
 // getAuth returns the username and passphrase that will actually be used for
@@ -1312,15 +1312,16 @@ func (config *ConnConfig) retrieveCookie() (username, passphrase string, err err
 
 // HeaderCapturingTransport wraps an http.RoundTripper to capture response headers
 type HeaderCapturingTransport struct {
-	Base      http.RoundTripper
-	OnCapture func(header http.Header)
+	Base              http.RoundTripper
+	OnResponseCapture func(response *http.Response, duration time.Duration)
 }
 
 func (t *HeaderCapturingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
 	resp, err := t.Base.RoundTrip(req)
 
-	if t.OnCapture != nil && resp != nil {
-		t.OnCapture(resp.Header)
+	if t.OnResponseCapture != nil && resp != nil {
+		t.OnResponseCapture(resp, time.Since(start))
 	}
 
 	return resp, err
@@ -1357,7 +1358,7 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 			TLSClientConfig: tlsConfig,
 		},
 		// Wrap with header capturing if callback provided
-		OnCapture: config.OnCaptureHeader,
+		OnResponseCapture: config.OnResponseCapture,
 	}
 
 	client := http.Client{
