@@ -1358,7 +1358,7 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 			Proxy:           proxyFunc,
 			TLSClientConfig: tlsConfig,
 		},
-		// Wrap with header capturing if callback provided
+		// Wrap with response capturing if callback provided
 		OnResponseCapture: config.OnResponseCapture,
 	}
 
