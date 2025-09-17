@@ -776,6 +776,7 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		}
 		httpReq.Close = true
 		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("X-RPC-Method", jReq.method)
 		for key, value := range c.config.ExtraHeaders {
 			httpReq.Header.Set(key, value)
 		}
