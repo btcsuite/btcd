@@ -274,7 +274,12 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
-			hash := header.BlockHash()
+			var hash chainhash.Hash
+			if blockchain.UtoParamsGlobal.ScryptHash {
+				hash = blockchain.ScryptHash(header)
+			} else {
+				hash = header.BlockHash()
+			}
 			hashesCompleted += 2
 
 			// The block is solved when the new block hash is less
