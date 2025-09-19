@@ -776,6 +776,8 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		}
 		httpReq.Close = true
 		httpReq.Header.Set("Content-Type", "application/json")
+		// Set X-RPC-Method header to identify the specific RPC method being called
+		// This allows downstream systems to track and analyze RPC method usage
 		httpReq.Header.Set("X-RPC-Method", jReq.method)
 		for key, value := range c.config.ExtraHeaders {
 			httpReq.Header.Set(key, value)
@@ -1270,7 +1272,8 @@ type ConnConfig struct {
 	EnableBCInfoHacks bool
 
 	// If an OnResponseCapture function is provided, it will be called with the
-	// response value from each request.
+	// response value from each request and the duration represents the total
+	// time elapsed from when the request was initiated until the response was received.
 	OnResponseCapture func(response *http.Response, duration time.Duration)
 }
 
