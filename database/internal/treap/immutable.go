@@ -105,9 +105,62 @@ func (t *Immutable) Get(key []byte) []byte {
 	return nil
 }
 
-// Put inserts the passed key/value pair.
-func (t *Immutable) Put(key, value []byte) *Immutable {
-	return t.put(key, value)
+// Put puts the passed in key/value pairs into the treap.  For operations
+// requiring many insertions at once, Put is memory efficient as the
+// intermediary treap nodes created between each put operation is recycled
+// through an internal sync.Pool, reducing overall memory allocation.
+//
+// If the passed in length of values is less than keys, the keys with no
+// matching values will have nil values.  If the passed in values are nil, all
+// keys will be saved will nil values.
+func (t *Immutable) Put(keys, values [][]byte) *Immutable {
+	treap := t
+	var prevTreapNodes [staticDepth]*treapNode
+
+	for i, key := range keys {
+		// Use an empty byte slice for the value when none was provided.
+		// This ultimately allows key existence to be determined from
+		// the value since an empty byte slice is distinguishable from nil.
+		value := emptySlice
+		if values != nil && i < len(values) {
+			value = values[i]
+		}
+
+		newTreap, newTreapNodes := treap.put(key, value)
+
+		// Loop through the prevTreapNodes and check for treapNodes that
+		// are no longer being utilized.  These will be garbaged collected
+		// and they're better off being recycled in the treapNodePool.
+		for _, node := range prevTreapNodes {
+			if node == nil {
+				break
+			}
+
+			// Make sure that the node we're going to recycle isn't
+			// being used by the latest immutable treap by checking
+			// if the pointer value of the node is the same.
+			got := newTreap.get(node.key)
+			if got == node {
+				continue
+			}
+
+			// This node is only being used by the previous immutable
+			// copy and can safely be put into the treapNodePool to be
+			// recycled.
+			node.key = nil
+			node.value = nil
+			node.priority = 0
+			node.left = nil
+			node.right = nil
+			treapNodePool.Put(node)
+		}
+
+		// Replace with the latest treap and treap nodes.
+		treap = newTreap
+		prevTreapNodes = newTreapNodes
+	}
+
+	return treap
 }
 
 // put inserts the passed key/value pair and returns all the newly created
