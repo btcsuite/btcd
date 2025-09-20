@@ -106,6 +106,11 @@ func (t *Immutable) Get(key []byte) []byte {
 
 // Put inserts the passed key/value pair.
 func (t *Immutable) Put(key, value []byte) *Immutable {
+	return t.put(key, value)
+}
+
+// put inserts the passed key/value pair.
+func (t *Immutable) put(key, value []byte) *Immutable {
 	// Use an empty byte slice for the value when none was provided.  This
 	// ultimately allows key existence to be determined from the value since
 	// an empty byte slice is distinguishable from nil.
