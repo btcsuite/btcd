@@ -105,10 +105,52 @@ func (t *Immutable) Get(key []byte) []byte {
 	return nil
 }
 
-// Put inserts the passed key/value pair.
-func (t *Immutable) Put(key, value []byte) *Immutable {
-	immutable, _ := t.put(key, value)
-	return immutable
+// KVPair is just a helper struct for a key-value pair that's going to be
+// inserted into the treap.
+type KVPair struct {
+	Key   []byte
+	Value []byte
+}
+
+// Put puts the passed in key/value pairs into the treap.  For operations
+// requiring many insertions at once, Put is memory efficient as the
+// intermediary treap nodes created between each put operation is recycled
+// through an internal sync.Pool, reducing overall memory allocation.
+func (t *Immutable) Put(kvPairs ...KVPair) *Immutable {
+	treap := t
+	var prevTreapNodes [staticDepth]*treapNode
+
+	for _, kvPair := range kvPairs {
+		newTreap, newTreapNodes := treap.put(kvPair.Key, kvPair.Value)
+
+		// Loop through the prevTreapNodes and check for treapNodes that
+		// are no longer being utilized.  These will be garbaged collected
+		// and they're better off being recycled in the treapNodePool.
+		for _, node := range prevTreapNodes {
+			if node == nil {
+				break
+			}
+
+			// Make sure that the node we're going to recycle isn't
+			// being used by the latest immutable treap by checking
+			// if the pointer value of the node is the same.
+			got := newTreap.get(node.key)
+			if got == node {
+				continue
+			}
+
+			// This node is only being used by the previous immutable
+			// copy and can safely be put into the treapNodePool to be
+			// recycled.
+			node.recycle()
+		}
+
+		// Replace with the latest treap and treap nodes.
+		treap = newTreap
+		prevTreapNodes = newTreapNodes
+	}
+
+	return treap
 }
 
 // put inserts the passed key/value pair and returns all the newly created
