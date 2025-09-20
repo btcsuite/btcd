@@ -110,8 +110,11 @@ func (t *Immutable) Put(key, value []byte) *Immutable {
 	return t.put(key, value)
 }
 
-// put inserts the passed key/value pair.
-func (t *Immutable) put(key, value []byte) *Immutable {
+// put inserts the passed key/value pair and returns all the newly created
+// treapNodes that were created during this put operation.  The returned
+// treapNodes can then be put into data structures like sync.Pool to reduce the
+// memory overhead of allocating new treapNodes during multiple put calls.
+func (t *Immutable) put(key, value []byte) (*Immutable, [staticDepth]*treapNode) {
 	// Use an empty byte slice for the value when none was provided.  This
 	// ultimately allows key existence to be determined from the value since
 	// an empty byte slice is distinguishable from nil.
@@ -119,10 +122,17 @@ func (t *Immutable) put(key, value []byte) *Immutable {
 		value = emptySlice
 	}
 
+	// recycle is the treapNodes that are created during this put operation.
+	// We keep track of the nodes as the caller may be choose to recycle
+	// them to keep memory allocation low.
+	var recycle [staticDepth]*treapNode
+	var rIdx int
+
 	// The node is the root of the tree if there isn't already one.
 	if t.root == nil {
 		root := newTreapNode(key, value, rand.Int())
-		return newImmutable(root, 1, nodeSize(root))
+		recycle[rIdx] = root
+		return newImmutable(root, 1, nodeSize(root)), recycle
 	}
 
 	// Find the binary tree insertion point and construct a replaced list of
@@ -138,6 +148,16 @@ func (t *Immutable) put(key, value []byte) *Immutable {
 	for node := t.root; node != nil; {
 		// Clone the node and link its parent to it if needed.
 		nodeCopy := cloneTreapNode(node)
+
+		// Check if we still have space in the recycle for this node.
+		// It's ok if we don't put every single new node to be recycled
+		// as there's no guarantee in the sync.Pool that every recycled
+		// treapNode will be re-utilized.
+		if rIdx < staticDepth {
+			recycle[rIdx] = nodeCopy
+			rIdx++
+		}
+
 		if oldParent := parents.At(0); oldParent != nil {
 			if oldParent.left == node {
 				oldParent.left = nodeCopy
@@ -167,11 +187,20 @@ func (t *Immutable) put(key, value []byte) *Immutable {
 		newRoot := parents.At(parents.Len() - 1)
 		newTotalSize := t.totalSize - uint64(len(node.value)) +
 			uint64(len(value))
-		return newImmutable(newRoot, t.count, newTotalSize)
+		return newImmutable(newRoot, t.count, newTotalSize), recycle
+	}
+
+	// Check if we still have space in the recycle for this node.
+	// It's ok if we don't put every single new node to be recycled
+	// as there's no guarantee in the sync.Pool that every recycled
+	// treapNode will be re-utilized.
+	node := newTreapNode(key, value, rand.Int())
+	if rIdx < staticDepth {
+		recycle[rIdx] = node
+		rIdx++
 	}
 
 	// Link the new node into the binary tree in the correct position.
-	node := newTreapNode(key, value, rand.Int())
 	parent := parents.At(0)
 	if compareResult < 0 {
 		parent.left = node
@@ -211,7 +240,7 @@ func (t *Immutable) put(key, value []byte) *Immutable {
 		}
 	}
 
-	return newImmutable(newRoot, t.count+1, t.totalSize+nodeSize(node))
+	return newImmutable(newRoot, t.count+1, t.totalSize+nodeSize(node)), recycle
 }
 
 // Delete removes the passed key from the treap and returns the resulting treap
