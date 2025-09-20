@@ -11,13 +11,14 @@ import (
 
 // cloneTreapNode returns a shallow copy of the passed node.
 func cloneTreapNode(node *treapNode) *treapNode {
-	return &treapNode{
-		key:      node.key,
-		value:    node.value,
-		priority: node.priority,
-		left:     node.left,
-		right:    node.right,
-	}
+	n := treapNodePool.Get().(*treapNode)
+	n.key = node.key
+	n.value = node.value
+	n.priority = node.priority
+	n.left = node.left
+	n.right = node.right
+
+	return n
 }
 
 // Immutable represents a treap data structure which is used to hold ordered
