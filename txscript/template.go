@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
+	"maps"
 	"strconv"
 	"strings"
 )
@@ -23,9 +24,7 @@ type templateConfig struct {
 // WithScriptTemplateParams adds parameters to the script template.
 func WithScriptTemplateParams(params map[string]interface{}) ScriptTemplateOption {
 	return func(cfg *templateConfig) {
-		for k, v := range params {
-			cfg.params[k] = v
-		}
+		maps.Copy(cfg.params, params)
 	}
 }
 
@@ -69,9 +68,7 @@ func ScriptTemplate(scriptTmpl string, opts ...ScriptTemplateOption) ([]byte, er
 		"range_iter": rangeIter,
 	}
 
-	for k, v := range cfg.customFuncs {
-		funcMap[k] = v
-	}
+	maps.Copy(funcMap, cfg.customFuncs)
 
 	tmpl, err := template.New("script").Funcs(funcMap).Parse(scriptTmpl)
 	if err != nil {
@@ -102,7 +99,6 @@ func looksLikeInt(s string) bool {
 
 	return len(s) > 0
 }
-
 
 // processScript converts the template output to actual script bytes. We scan
 // each line, then go through each element one by one, deciding to either add a
