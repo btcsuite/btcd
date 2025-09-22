@@ -284,6 +284,39 @@ func (sm *SyncManager) isInIBDMode() bool {
 	return true
 }
 
+// fetchHeaders randomly picks a peer that has a higher advertised header
+// and pushes a get headers message to it.
+func (sm *SyncManager) fetchHeaders() {
+	_, height := sm.chain.BestHeader()
+	higherPeers := sm.fetchHigherPeers(height)
+	var bestPeer *peerpkg.Peer
+	switch {
+	case len(higherPeers) > 0:
+		bestPeer = higherPeers[rand.Intn(len(higherPeers))]
+	}
+
+	if bestPeer == nil {
+		log.Warnf("No sync peer candidates available")
+		return
+	}
+
+	locator, err := sm.chain.LatestBlockLocatorByHeader()
+	if err != nil {
+		log.Errorf("Failed to get block locator for the "+
+			"latest block header: %v", err)
+		return
+	}
+
+	log.Infof("Downloading headers for blocks %d to "+
+		"%d from peer %s", height+1,
+		bestPeer.LastBlock(), bestPeer.Addr())
+
+	bestPeer.PushGetHeadersMsg(locator, &zeroHash)
+
+	sm.headersFirstMode = true
+	sm.syncPeer = bestPeer
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer
