@@ -272,6 +272,18 @@ func (sm *SyncManager) fetchHigherPeers(height int32) []*peerpkg.Peer {
 	return higherPeers
 }
 
+// isInIBDMode returns true if there's more blocks needed to be downloaded to
+// catch up to the latest chain tip.
+func (sm *SyncManager) isInIBDMode() bool {
+	best := sm.chain.BestSnapshot()
+	higherPeers := sm.fetchHigherPeers(best.Height)
+	if sm.chain.IsCurrent() && len(higherPeers) == 0 {
+		return false
+	}
+
+	return true
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -295,5 +296,164 @@ func TestFetchHigherPeers(t *testing.T) {
 			require.True(t, found)
 			require.True(t, state.syncCandidate)
 		}
+	}
+}
+
+// mockTimeSource is used to trick the BlockChain instance to think that we're
+// in the past.  This is so that we can force it to return true for isCurrent().
+type mockTimeSource struct {
+	adjustedTime time.Time
+}
+
+// AdjustedTime returns the internal adjustedTime.
+//
+// Part of the MedianTimeSource interface implementation.
+func (m *mockTimeSource) AdjustedTime() time.Time {
+	return m.adjustedTime
+}
+
+// AddTimeSample isn't relevant so we just leave it as emtpy.
+//
+// Part of the MedianTimeSource interface implementation.
+func (m *mockTimeSource) AddTimeSample(id string, timeVal time.Time) {
+	// purposely left empty
+}
+
+// Offset isn't relevant so we just return 0.
+//
+// Part of the MedianTimeSource interface implementation.
+func (m *mockTimeSource) Offset() time.Duration {
+	return 0
+}
+
+func TestIsInIBDMode(t *testing.T) {
+	tests := []struct {
+		peerState  map[*peer.Peer]*peerSyncState
+		params     *chaincfg.Params
+		timesource *mockTimeSource
+		isIBDMode  bool
+	}{
+		// Is not current, higher peers.
+		{
+			params: &chaincfg.MainNetParams,
+			peerState: func() map[*peer.Peer]*peerSyncState {
+				ps := make(map[*peer.Peer]*peerSyncState)
+				peer := peer.NewInboundPeer(&peer.Config{})
+				peer.UpdateLastBlockHeight(900_000)
+				ps[peer] = &peerSyncState{
+					syncCandidate:   true,
+					requestedTxns:   make(map[chainhash.Hash]struct{}),
+					requestedBlocks: make(map[chainhash.Hash]struct{}),
+				}
+				return ps
+			}(),
+			timesource: nil,
+			isIBDMode:  true,
+		},
+		// Is not current, no higher peers.
+		{
+			params: &chaincfg.MainNetParams,
+			peerState: func() map[*peer.Peer]*peerSyncState {
+				ps := make(map[*peer.Peer]*peerSyncState)
+				peer := peer.NewInboundPeer(&peer.Config{})
+				peer.UpdateLastBlockHeight(0)
+				ps[peer] = &peerSyncState{
+					syncCandidate:   true,
+					requestedTxns:   make(map[chainhash.Hash]struct{}),
+					requestedBlocks: make(map[chainhash.Hash]struct{}),
+				}
+				return ps
+			}(),
+			timesource: nil,
+			isIBDMode:  true,
+		},
+		// Is current, higher peers.
+		{
+			params: func() *chaincfg.Params {
+				params := chaincfg.MainNetParams
+				params.Checkpoints = nil
+				return &params
+			}(),
+			peerState: func() map[*peer.Peer]*peerSyncState {
+				ps := make(map[*peer.Peer]*peerSyncState)
+				peer := peer.NewInboundPeer(&peer.Config{})
+				peer.UpdateLastBlockHeight(900_000)
+				ps[peer] = &peerSyncState{
+					syncCandidate:   true,
+					requestedTxns:   make(map[chainhash.Hash]struct{}),
+					requestedBlocks: make(map[chainhash.Hash]struct{}),
+				}
+				return ps
+			}(),
+			timesource: &mockTimeSource{
+				chaincfg.MainNetParams.GenesisBlock.Header.Timestamp,
+			},
+			isIBDMode: true,
+		},
+		// Is current, no higher peers.
+		{
+			params: func() *chaincfg.Params {
+				params := chaincfg.MainNetParams
+				params.Checkpoints = nil
+				return &params
+			}(),
+			peerState: func() map[*peer.Peer]*peerSyncState {
+				ps := make(map[*peer.Peer]*peerSyncState)
+				peer := peer.NewInboundPeer(&peer.Config{})
+				peer.UpdateLastBlockHeight(0)
+				ps[peer] = &peerSyncState{
+					syncCandidate:   true,
+					requestedTxns:   make(map[chainhash.Hash]struct{}),
+					requestedBlocks: make(map[chainhash.Hash]struct{}),
+				}
+				return ps
+			}(),
+			timesource: &mockTimeSource{
+				chaincfg.MainNetParams.GenesisBlock.Header.Timestamp,
+			},
+			isIBDMode: false,
+		},
+	}
+
+	for i, test := range tests {
+		db, tearDown, err := dbSetup(
+			fmt.Sprintf("TestIsInIBDMode-%v", i),
+			test.params)
+		if err != nil {
+			tearDown()
+			t.Fatal(err)
+		}
+
+		timesource := blockchain.NewMedianTime()
+		if test.timesource != nil {
+			timesource = test.timesource
+		}
+
+		// Create the main chain instance.
+		chain, err := blockchain.New(&blockchain.Config{
+			DB:          db,
+			Checkpoints: test.params.Checkpoints,
+			ChainParams: test.params,
+			TimeSource:  timesource,
+			SigCache:    txscript.NewSigCache(1000),
+		})
+		if err != nil {
+			tearDown()
+			t.Fatal(err)
+		}
+		sm, err := New(&Config{
+			Chain:       chain,
+			ChainParams: test.params,
+		})
+		if err != nil {
+			tearDown()
+			t.Fatal(err)
+		}
+
+		// Run test and assert.
+		sm.peerStates = test.peerState
+		got := sm.isInIBDMode()
+		require.Equal(t, test.isIBDMode, got)
+		tearDown()
 	}
 }
