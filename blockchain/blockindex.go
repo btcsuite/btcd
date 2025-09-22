@@ -507,6 +507,17 @@ func (bi *blockIndex) flushToDB() error {
 
 	err := bi.db.Update(func(dbTx database.Tx) error {
 		for node := range bi.dirty {
+			// NOTE: we specifically don't flush the block indexes that
+			// we don't have the data for backwards compatibility.
+			// While flushing would save us the work of re-downloading
+			// the block headers upon restart, if the user were to start
+			// up a btcd node with an older version, it would result in
+			// an unrecoverable error as older versions would consider a
+			// blockNode being present as having the block data as well.
+			if node.status.HaveHeader() &&
+				!node.status.HaveData() {
+				continue
+			}
 			err := dbStoreBlockNode(dbTx, node)
 			if err != nil {
 				return err
