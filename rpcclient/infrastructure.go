@@ -1356,17 +1356,28 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 		}
 	}
 
-	transport := &ObservingTransport{
-		Base: &http.Transport{
-			Proxy:           proxyFunc,
-			TLSClientConfig: tlsConfig,
-		},
+	baseTransport := http.Transport{
+		Proxy:           proxyFunc,
+		TLSClientConfig: tlsConfig,
+	}
+
+	// Example timeout configuration
+	baseTransport.DialContext = (&net.Dialer{
+		Timeout:   3 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+	baseTransport.TLSHandshakeTimeout = 3 * time.Second
+	baseTransport.ResponseHeaderTimeout = 10 * time.Second
+
+	observingTransport := &ObservingTransport{
+		Base: &baseTransport,
 		// Wrap with response capturing if callback provided
 		OnResponseCapture: config.OnResponseCapture,
 	}
 
 	client := http.Client{
-		Transport: transport,
+		Transport: observingTransport,
+		Timeout:   30 * time.Second, // Overall request timeout
 	}
 
 	return &client, nil
