@@ -33,6 +33,9 @@ const (
 	// has failed validation, thus the block is also invalid.
 	statusInvalidAncestor
 
+	// statusHeaderStored indicates that the block's header is stored on disk.
+	statusHeaderStored
+
 	// statusNone indicates that the block has no validation state flags set.
 	//
 	// NOTE: This must be defined last in order to avoid influencing iota.
@@ -44,6 +47,11 @@ const (
 // kept.
 func (status blockStatus) HaveData() bool {
 	return status&statusDataStored != 0
+}
+
+// HaveHeader returns whether the header data is stored in the database.
+func (status blockStatus) HaveHeader() bool {
+	return status&statusHeaderStored != 0
 }
 
 // KnownValid returns whether the block is known to be valid. This will return
