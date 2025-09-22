@@ -776,6 +776,9 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		}
 		httpReq.Close = true
 		httpReq.Header.Set("Content-Type", "application/json")
+		// Set X-RPC-Method header to identify the specific RPC method being called
+		// This allows downstream systems to track and analyze RPC method usage
+		httpReq.Header.Set("X-RPC-Method", jReq.method)
 		for key, value := range c.config.ExtraHeaders {
 			httpReq.Header.Set(key, value)
 		}
@@ -1267,6 +1270,11 @@ type ConnConfig struct {
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
+
+	// If an OnResponseCapture function is provided, it will be called with the
+	// response value from each request and the duration represents the total
+	// time elapsed from when the request was initiated until the response was received.
+	OnResponseCapture func(response *http.Response, duration time.Duration)
 }
 
 // getAuth returns the username and passphrase that will actually be used for
@@ -1306,6 +1314,23 @@ func (config *ConnConfig) retrieveCookie() (username, passphrase string, err err
 	return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
 }
 
+// HeaderCapturingTransport wraps an http.RoundTripper to capture response headers
+type HeaderCapturingTransport struct {
+	Base              http.RoundTripper
+	OnResponseCapture func(response *http.Response, duration time.Duration)
+}
+
+func (t *HeaderCapturingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
+	resp, err := t.Base.RoundTrip(req)
+
+	if t.OnResponseCapture != nil && resp != nil {
+		t.OnResponseCapture(resp, time.Since(start))
+	}
+
+	return resp, err
+}
+
 // newHTTPClient returns a new http client that is configured according to the
 // proxy and TLS settings in the associated connection configuration.
 func newHTTPClient(config *ConnConfig) (*http.Client, error) {
@@ -1331,11 +1356,17 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 		}
 	}
 
-	client := http.Client{
-		Transport: &http.Transport{
+	transport := &HeaderCapturingTransport{
+		Base: &http.Transport{
 			Proxy:           proxyFunc,
 			TLSClientConfig: tlsConfig,
 		},
+		// Wrap with response capturing if callback provided
+		OnResponseCapture: config.OnResponseCapture,
+	}
+
+	client := http.Client{
+		Transport: transport,
 	}
 
 	return &client, nil
