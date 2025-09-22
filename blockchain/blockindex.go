@@ -385,14 +385,15 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 	}
 }
 
-// HaveBlock returns whether or not the block index contains the provided hash.
+// HaveBlock returns whether or not the block index contains the provided hash
+// and if the data exists on disk.
 //
 // This function is safe for concurrent access.
 func (bi *blockIndex) HaveBlock(hash *chainhash.Hash) bool {
 	bi.RLock()
-	_, hasBlock := bi.index[*hash]
+	node, hasBlock := bi.index[*hash]
 	bi.RUnlock()
-	return hasBlock
+	return hasBlock && node.status.HaveData()
 }
 
 // LookupNode returns the block node identified by the provided hash.  It will
