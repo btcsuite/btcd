@@ -1314,13 +1314,13 @@ func (config *ConnConfig) retrieveCookie() (username, passphrase string, err err
 	return config.cookieLastUser, config.cookieLastPass, config.cookieLastErr
 }
 
-// HeaderCapturingTransport wraps an http.RoundTripper to capture response headers
-type HeaderCapturingTransport struct {
+// ObservingTransport wraps an http.RoundTripper to capture response headers
+type ObservingTransport struct {
 	Base              http.RoundTripper
 	OnResponseCapture func(response *http.Response, duration time.Duration)
 }
 
-func (t *HeaderCapturingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *ObservingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := t.Base.RoundTrip(req)
 
@@ -1356,7 +1356,7 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 		}
 	}
 
-	transport := &HeaderCapturingTransport{
+	transport := &ObservingTransport{
 		Base: &http.Transport{
 			Proxy:           proxyFunc,
 			TLSClientConfig: tlsConfig,
