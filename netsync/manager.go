@@ -690,6 +690,47 @@ func (sm *SyncManager) current() bool {
 	return true
 }
 
+// checkHeadersList checks if the sync manager is in the initial block download
+// mode and returns if the given block hash is a checkpointed block and the
+// behavior flags for this block.  If the block is still under the checkpoint,
+// then it's given the fast-add flag.
+func (sm *SyncManager) checkHeadersList(blockHash *chainhash.Hash) (
+	bool, blockchain.BehaviorFlags) {
+
+	// Always return false and BFNone if we're not in ibd mode.
+	if !sm.headersFirstMode {
+		return false, blockchain.BFNone
+	}
+
+	isCheckpointBlock := false
+	behaviorFlags := blockchain.BFNone
+
+	// If we don't already know this is a valid header, return false and
+	// BFNone.
+	if !sm.chain.IsValidHeader(blockHash) {
+		return false, blockchain.BFNone
+	}
+
+	height, err := sm.chain.HeaderHeightByHash(*blockHash)
+	if err != nil {
+		return false, blockchain.BFNone
+	}
+
+	// Since findNextHeaderCheckpoint returns the next checkpoint after the
+	// passed height, we do a -1 to include the current block.
+	checkpoint := sm.findNextHeaderCheckpoint(height - 1)
+	if checkpoint == nil {
+		return false, blockchain.BFNone
+	}
+
+	behaviorFlags |= blockchain.BFFastAdd
+	if blockHash.IsEqual(checkpoint.Hash) {
+		isCheckpointBlock = true
+	}
+
+	return isCheckpointBlock, behaviorFlags
+}
+
 // handleBlockMsg handles block messages from all peers.
 func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	peer := bmsg.peer
