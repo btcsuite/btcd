@@ -313,6 +313,107 @@ func (m *mockTimeSource) Offset() time.Duration {
 	return 0
 }
 
+// TestBuildBlockRequestSkipsInflightBlocks verifies that buildBlockRequest
+// does not re-request blocks that are already in sm.requestedBlocks.  When
+// the pipeline refill threshold triggers fetchHeaderBlocks while blocks are
+// still in-flight, re-requesting them causes the peer to send duplicates.
+// The first copy gets processed (removing the hash from requestedBlocks),
+// and the second copy then arrives as "unrequested", disconnecting the peer.
+func TestBuildBlockRequestSkipsInflightBlocks(t *testing.T) {
+	tests := []struct {
+		name string
+		// inflightHeights are the block heights already in
+		// requestedBlocks before calling buildBlockRequest.
+		inflightHeights []int32
+		// wantRequestedHeights are the block heights that should
+		// appear in the returned getdata message.
+		wantRequestedHeights []int32
+	}{
+		{
+			name:                 "no blocks in-flight requests all",
+			inflightHeights:      nil,
+			wantRequestedHeights: []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+		},
+		{
+			name:                 "all blocks in-flight requests none",
+			inflightHeights:      []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+			wantRequestedHeights: nil,
+		},
+		{
+			name:                 "first 5 in-flight requests remaining 6",
+			inflightHeights:      []int32{1, 2, 3, 4, 5},
+			wantRequestedHeights: []int32{6, 7, 8, 9, 10, 11},
+		},
+		{
+			name:                 "last 6 in-flight requests first 5",
+			inflightHeights:      []int32{6, 7, 8, 9, 10, 11},
+			wantRequestedHeights: []int32{1, 2, 3, 4, 5},
+		},
+		{
+			name:                 "scattered in-flight requests gaps",
+			inflightHeights:      []int32{2, 4, 6, 8, 10},
+			wantRequestedHeights: []int32{1, 3, 5, 7, 9, 11},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			params := chaincfg.MainNetParams
+			params.Checkpoints = nil
+			sm, tearDown := makeMockSyncManager(t, &params)
+			defer tearDown()
+
+			// Process headers 1-11 so the header chain is
+			// ahead of the block chain.
+			headers := loadHeaders(t)
+			for _, header := range headers {
+				_, err := sm.chain.ProcessBlockHeader(
+					header, blockchain.BFNone, false)
+				require.NoError(t, err)
+			}
+
+			// Set up a disconnected peer as syncPeer.
+			syncPeer := peer.NewInboundPeer(&peer.Config{})
+			sm.syncPeer = syncPeer
+			syncPeerState := &peerSyncState{
+				requestedTxns:   make(map[chainhash.Hash]struct{}),
+				requestedBlocks: make(map[chainhash.Hash]struct{}),
+			}
+			sm.peerStates[syncPeer] = syncPeerState
+
+			// Pre-populate in-flight blocks.
+			for _, h := range tc.inflightHeights {
+				hash, err := sm.chain.HeaderHashByHeight(h)
+				require.NoError(t, err)
+				sm.requestedBlocks[*hash] = struct{}{}
+				syncPeerState.requestedBlocks[*hash] = struct{}{}
+			}
+
+			gdmsg := sm.buildBlockRequest()
+
+			// Collect the hashes from the getdata message.
+			got := make(map[chainhash.Hash]struct{}, len(gdmsg.InvList))
+			for _, iv := range gdmsg.InvList {
+				got[iv.Hash] = struct{}{}
+			}
+
+			require.Equal(t, len(tc.wantRequestedHeights), len(gdmsg.InvList))
+			for _, h := range tc.wantRequestedHeights {
+				hash, err := sm.chain.HeaderHashByHeight(h)
+				require.NoError(t, err)
+				require.Contains(t, got, *hash,
+					"block at height %d should be requested", h)
+			}
+			for _, h := range tc.inflightHeights {
+				hash, err := sm.chain.HeaderHashByHeight(h)
+				require.NoError(t, err)
+				require.NotContains(t, got, *hash,
+					"in-flight block at height %d should not be re-requested", h)
+			}
+		})
+	}
+}
+
 func TestIsInIBDMode(t *testing.T) {
 	tests := []struct {
 		peerState  map[*peer.Peer]*peerSyncState
@@ -402,10 +503,8 @@ func TestIsInIBDMode(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		db, tearDown, err := dbSetup(
-			fmt.Sprintf("TestIsInIBDMode-%v", i),
-			test.params)
+	for _, test := range tests {
+		db, tearDown, err := dbSetup(t, test.params)
 		if err != nil {
 			tearDown()
 			t.Fatal(err)
