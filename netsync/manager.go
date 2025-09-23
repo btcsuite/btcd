@@ -23,8 +23,8 @@ import (
 
 const (
 	// minInFlightBlocks is the minimum number of blocks that should be
-	// in the request queue for headers-first mode before requesting
-	// more.
+	// in the request queue for the initial block download mode before
+	// requesting more.
 	minInFlightBlocks = 10
 
 	// maxRejectedTxns is the maximum number of rejected transactions
@@ -197,8 +197,8 @@ type SyncManager struct {
 	peerStates       map[*peerpkg.Peer]*peerSyncState
 	lastProgressTime time.Time
 
-	// The following fields are used for headers-first mode.
-	headersFirstMode bool
+	// The following fields are used for the initial block download mode.
+	ibdMode bool
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -293,7 +293,7 @@ func (sm *SyncManager) fetchHeaders() {
 
 	bestPeer.PushGetHeadersMsg(locator, &zeroHash)
 
-	sm.headersFirstMode = true
+	sm.ibdMode = true
 	sm.syncPeer = bestPeer
 }
 
@@ -662,7 +662,7 @@ func (sm *SyncManager) checkHeadersList(blockHash *chainhash.Hash) (
 	bool, blockchain.BehaviorFlags) {
 
 	// Always return false and BFNone if we're not in ibd mode.
-	if !sm.headersFirstMode {
+	if !sm.ibdMode {
 		return false, blockchain.BFNone
 	}
 
@@ -831,10 +831,10 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// If we are not in the headers-first mode, it's a good time to
+	// If we are not in the initial block download mode, it's a good time to
 	// periodically flush the blockchain cache because we don't expect new
 	// blocks immediately.  After that, there is nothing more to do.
-	if !sm.headersFirstMode {
+	if !sm.ibdMode {
 		if err := sm.chain.FlushUtxoCache(blockchain.FlushPeriodic); err != nil {
 			log.Errorf("Error while flushing the blockchain cache: %v", err)
 		}
@@ -865,7 +865,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		log.Infof("Finished the initial block download and "+
 			"caught up to block %v(%v) -- now listening to blocks.",
 			bmsg.block.Hash(), bmsg.block.Height())
-		sm.headersFirstMode = false
+		sm.ibdMode = false
 	}
 }
 
@@ -956,7 +956,7 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	}
 
 	bestHash, bestHeight := sm.chain.BestHeader()
-	if sm.headersFirstMode {
+	if sm.ibdMode {
 		if bestHeight < sm.syncPeer.LastBlock() {
 			locator := blockchain.BlockLocator([]*chainhash.Hash{&bestHash})
 			sm.syncPeer.PushGetHeadersMsg(locator, &zeroHash)
@@ -1117,8 +1117,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		// for the peer.
 		peer.AddKnownInventory(iv)
 
-		// Ignore inventory when we're in headers-first mode.
-		if sm.headersFirstMode {
+		// Ignore inventory when we're in the initial block download mode.
+		if sm.ibdMode {
 			continue
 		}
 

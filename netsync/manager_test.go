@@ -225,15 +225,15 @@ func TestCheckHeadersList(t *testing.T) {
 			continue
 		}
 
-		// Make sure that when the headers-first mode is off, we always get
+		// Make sure that when the ibd mode is off, we always get
 		// false and BFNone.
-		sm.headersFirstMode = false
+		sm.ibdMode = false
 		isCheckpoint, gotFlags := sm.checkHeadersList(hash)
 		require.Equal(t, false, isCheckpoint)
 		require.Equal(t, blockchain.BFNone, gotFlags)
 
 		// Now check that the test values are correct.
-		sm.headersFirstMode = true
+		sm.ibdMode = true
 		isCheckpoint, gotFlags = sm.checkHeadersList(hash)
 		require.Equal(t, test.isCheckpointBlock, isCheckpoint)
 		require.Equal(t, test.behaviorFlags, gotFlags)
