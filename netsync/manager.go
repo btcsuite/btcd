@@ -1011,25 +1011,23 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 // fetchHeaderBlocks creates and sends a request to the syncPeer for the next
 // list of blocks to be downloaded based on the current list of headers.
 func (sm *SyncManager) fetchHeaderBlocks() {
-	// Nothing to do if there is no start header.
-	if sm.startHeader == nil {
-		log.Warnf("fetchHeaderBlocks called with no start header")
-		return
-	}
-
 	// Build up a getdata request for the list of blocks the headers
 	// describe.  The size hint will be limited to wire.MaxInvPerMsg by
 	// the function, so no need to double check it here.
-	gdmsg := wire.NewMsgGetDataSizeHint(uint(sm.headerList.Len()))
+	bestState := sm.chain.BestSnapshot()
+	_, bestHeaderHeight := sm.chain.BestHeader()
+	length := bestHeaderHeight - bestState.Height
+	gdmsg := wire.NewMsgGetDataSizeHint(uint(length))
 	numRequested := 0
-	for e := sm.startHeader; e != nil; e = e.Next() {
-		node, ok := e.Value.(*headerNode)
-		if !ok {
-			log.Warn("Header list node type is not a headerNode")
-			continue
+	for h := bestState.Height + 1; h <= bestHeaderHeight; h++ {
+		hash, err := sm.chain.HeaderHashByHeight(h)
+		if err != nil {
+			log.Warnf("error while fetching the block hash for height %v -- %v",
+				h, err)
+			return
 		}
 
-		iv := wire.NewInvVect(wire.InvTypeBlock, node.hash)
+		iv := wire.NewInvVect(wire.InvTypeBlock, hash)
 		haveInv, err := sm.haveInventory(iv)
 		if err != nil {
 			log.Warnf("Unexpected failure when checking for "+
@@ -1039,8 +1037,8 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 		if !haveInv {
 			syncPeerState := sm.peerStates[sm.syncPeer]
 
-			sm.requestedBlocks[*node.hash] = struct{}{}
-			syncPeerState.requestedBlocks[*node.hash] = struct{}{}
+			sm.requestedBlocks[*hash] = struct{}{}
+			syncPeerState.requestedBlocks[*hash] = struct{}{}
 
 			// If we're fetching from a witness enabled peer
 			// post-fork, then ensure that we receive all the
@@ -1052,7 +1050,7 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 			gdmsg.AddInvVect(iv)
 			numRequested++
 		}
-		sm.startHeader = e.Next()
+
 		if numRequested >= wire.MaxInvPerMsg {
 			break
 		}
