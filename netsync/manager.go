@@ -746,29 +746,10 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// When in headers-first mode, if the block matches the hash of the
-	// first header in the list of headers that are being fetched, it's
-	// eligible for less validation since the headers have already been
-	// verified to link together and are valid up to the next checkpoint.
-	// Also, remove the list entry for all blocks except the checkpoint
-	// since it is needed to verify the next round of headers links
-	// properly.
-	isCheckpointBlock := false
-	behaviorFlags := blockchain.BFNone
-	if sm.headersFirstMode {
-		firstNodeEl := sm.headerList.Front()
-		if firstNodeEl != nil {
-			firstNode := firstNodeEl.Value.(*headerNode)
-			if blockHash.IsEqual(firstNode.hash) {
-				behaviorFlags |= blockchain.BFFastAdd
-				if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
-					isCheckpointBlock = true
-				} else {
-					sm.headerList.Remove(firstNodeEl)
-				}
-			}
-		}
-	}
+	// Check if the block is eligible for less validation since the headers
+	// have already been verified to link together and are valid up to the
+	// next checkpoint.
+	isCheckpointBlock, behaviorFlags := sm.checkHeadersList(blockHash)
 
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
@@ -876,9 +857,9 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// If we are not in headers first mode, it's a good time to periodically
-	// flush the blockchain cache because we don't expect new blocks immediately.
-	// After that, there is nothing more to do.
+	// If we are not in the headers-first mode, it's a good time to
+	// periodically flush the blockchain cache because we don't expect new
+	// blocks immediately.  After that, there is nothing more to do.
 	if !sm.headersFirstMode {
 		if err := sm.chain.FlushUtxoCache(blockchain.FlushPeriodic); err != nil {
 			log.Errorf("Error while flushing the blockchain cache: %v", err)
@@ -886,50 +867,31 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 
-	// This is headers-first mode, so if the block is not a checkpoint
-	// request more blocks using the header list when the request queue is
-	// getting short.
-	if !isCheckpointBlock {
-		if sm.startHeader != nil &&
-			len(state.requestedBlocks) < minInFlightBlocks {
-			sm.fetchHeaderBlocks()
+	// If we're on a checkpointed block, check if we still have checkpoints
+	// to let the user know if we're switching to normal mode.
+	if isCheckpointBlock {
+		log.Infof("Continuing IBD, on checkpoint block %v(%v)",
+			bmsg.block.Hash(), bmsg.block.Height())
+		nextCheckpoint := sm.findNextHeaderCheckpoint(bmsg.block.Height())
+		if nextCheckpoint == nil {
+			log.Infof("Reached the final checkpoint -- " +
+				"switching to normal mode")
 		}
+	}
+
+	// Fetch more blocks if we're still not caught up to the best header and
+	// don't have any more requestedBlocks.
+	_, lastHeight := sm.chain.BestHeader()
+	if bmsg.block.Height() < lastHeight && len(state.requestedBlocks) == 0 {
+		sm.fetchHeaderBlocks()
 		return
 	}
 
-	// This is headers-first mode and the block is a checkpoint.  When
-	// there is a next checkpoint, get the next round of headers by asking
-	// for headers starting from the block after this one up to the next
-	// checkpoint.
-	prevHeight := sm.nextCheckpoint.Height
-	prevHash := sm.nextCheckpoint.Hash
-	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
-	if sm.nextCheckpoint != nil {
-		locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
-		err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-		if err != nil {
-			log.Warnf("Failed to send getheaders message to "+
-				"peer %s: %v", peer.Addr(), err)
-			return
-		}
-		log.Infof("Downloading headers for blocks %d to %d from "+
-			"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
-			sm.syncPeer.Addr())
-		return
-	}
-
-	// This is headers-first mode, the block is a checkpoint, and there are
-	// no more checkpoints, so switch to normal mode by requesting blocks
-	// from the block after this one up to the end of the chain (zero hash).
-	sm.headersFirstMode = false
-	sm.headerList.Init()
-	log.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
-	err = peer.PushGetBlocksMsg(locator, &zeroHash)
-	if err != nil {
-		log.Warnf("Failed to send getblocks message to peer %s: %v",
-			peer.Addr(), err)
-		return
+	if bmsg.block.Height() >= lastHeight {
+		log.Infof("Finished the initial block download and "+
+			"caught up to block %v(%v) -- now listening to blocks.",
+			bmsg.block.Hash(), bmsg.block.Height())
+		sm.headersFirstMode = false
 	}
 }
 
