@@ -5,7 +5,6 @@
 package netsync
 
 import (
-	"container/list"
 	"math/rand"
 	"net"
 	"sync"
@@ -200,28 +199,9 @@ type SyncManager struct {
 
 	// The following fields are used for headers-first mode.
 	headersFirstMode bool
-	headerList       *list.List
-	startHeader      *list.Element
-	nextCheckpoint   *chaincfg.Checkpoint
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
-}
-
-// resetHeaderState sets the headers-first mode state to values appropriate for
-// syncing from a new peer.
-func (sm *SyncManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight int32) {
-	sm.headersFirstMode = false
-	sm.headerList.Init()
-	sm.startHeader = nil
-
-	// When there is a next checkpoint, add an entry for the latest known
-	// block into the header pool.  This allows the next downloaded header
-	// to prove it links to the chain properly.
-	if sm.nextCheckpoint != nil {
-		node := headerNode{height: newestHeight, hash: newestHash}
-		sm.headerList.PushBack(&node)
-	}
 }
 
 // findNextHeaderCheckpoint returns the next checkpoint after the passed height.
@@ -580,12 +560,6 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 	// First, disconnect the current sync peer if requested.
 	if dcSyncPeer {
 		sm.syncPeer.Disconnect()
-	}
-
-	// Reset any header state before we choose our next active sync peer.
-	if sm.headersFirstMode {
-		best := sm.chain.BestSnapshot()
-		sm.resetHeaderState(&best.Hash, best.Height)
 	}
 
 	sm.syncPeer = nil
@@ -1618,19 +1592,11 @@ func New(config *Config) (*SyncManager, error) {
 		peerStates:      make(map[*peerpkg.Peer]*peerSyncState),
 		progressLogger:  newBlockProgressLogger("Processed", log),
 		msgChan:         make(chan interface{}, config.MaxPeers*3),
-		headerList:      list.New(),
 		quit:            make(chan struct{}),
 		feeEstimator:    config.FeeEstimator,
 	}
 
-	best := sm.chain.BestSnapshot()
-	if !config.DisableCheckpoints {
-		// Initialize the next checkpoint based on the current height.
-		sm.nextCheckpoint = sm.findNextHeaderCheckpoint(best.Height)
-		if sm.nextCheckpoint != nil {
-			sm.resetHeaderState(&best.Hash, best.Height)
-		}
-	} else {
+	if config.DisableCheckpoints {
 		log.Info("Checkpoints are disabled")
 	}
 
