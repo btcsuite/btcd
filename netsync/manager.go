@@ -1075,99 +1075,41 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	// The remote peer is misbehaving if we didn't request headers.
 	msg := hmsg.headers
 	numHeaders := len(msg.Headers)
-	if !sm.headersFirstMode {
-		log.Warnf("Got %d unrequested headers from %s -- "+
-			"disconnecting", numHeaders, peer.Addr())
-		peer.Disconnect()
-		return
-	}
 
 	// Nothing to do for an empty headers message.
 	if numHeaders == 0 {
 		return
 	}
 
-	// Process all of the received headers ensuring each one connects to the
-	// previous and that checkpoints match.
-	receivedCheckpoint := false
-	var finalHash *chainhash.Hash
 	for _, blockHeader := range msg.Headers {
-		blockHash := blockHeader.BlockHash()
-		finalHash = &blockHash
-
-		// Ensure there is a previous header to compare against.
-		prevNodeEl := sm.headerList.Back()
-		if prevNodeEl == nil {
-			log.Warnf("Header list does not contain a previous" +
-				"element as expected -- disconnecting peer")
+		_, err := sm.chain.ProcessBlockHeader(
+			blockHeader, blockchain.BFNone, false,
+		)
+		if err != nil {
+			log.Warnf("Received block header from peer %v "+
+				"failed header verification -- disconnecting",
+				peer.Addr())
 			peer.Disconnect()
 			return
 		}
 
-		// Ensure the header properly connects to the previous one and
-		// add it to the list of headers.
-		node := headerNode{hash: &blockHash}
-		prevNode := prevNodeEl.Value.(*headerNode)
-		if prevNode.hash.IsEqual(&blockHeader.PrevBlock) {
-			node.height = prevNode.height + 1
-			e := sm.headerList.PushBack(&node)
-			if sm.startHeader == nil {
-				sm.startHeader = e
-			}
-		} else {
-			log.Warnf("Received block header that does not "+
-				"properly connect to the chain from peer %s "+
-				"-- disconnecting", peer.Addr())
-			peer.Disconnect()
-			return
-		}
-
-		// Verify the header at the next checkpoint height matches.
-		if node.height == sm.nextCheckpoint.Height {
-			if node.hash.IsEqual(sm.nextCheckpoint.Hash) {
-				receivedCheckpoint = true
-				log.Infof("Verified downloaded block "+
-					"header against checkpoint at height "+
-					"%d/hash %s", node.height, node.hash)
-			} else {
-				log.Warnf("Block header at height %d/hash "+
-					"%s from peer %s does NOT match "+
-					"expected checkpoint hash of %s -- "+
-					"disconnecting", node.height,
-					node.hash, peer.Addr(),
-					sm.nextCheckpoint.Hash)
-				peer.Disconnect()
-				return
-			}
-			break
-		}
-	}
-
-	// When this header is a checkpoint, switch to fetching the blocks for
-	// all of the headers since the last checkpoint.
-	if receivedCheckpoint {
-		// Since the first entry of the list is always the final block
-		// that is already in the database and is only used to ensure
-		// the next header links properly, it must be removed before
-		// fetching the blocks.
-		sm.headerList.Remove(sm.headerList.Front())
-		log.Infof("Received %v block headers: Fetching blocks",
-			sm.headerList.Len())
 		sm.progressLogger.SetLastLogTime(time.Now())
-		sm.fetchHeaderBlocks()
-		return
 	}
 
-	// This header is not a checkpoint, so request the next batch of
-	// headers starting from the latest known header and ending with the
-	// next checkpoint.
-	locator := blockchain.BlockLocator([]*chainhash.Hash{finalHash})
-	err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-	if err != nil {
-		log.Warnf("Failed to send getheaders message to "+
-			"peer %s: %v", peer.Addr(), err)
-		return
+	bestHash, bestHeight := sm.chain.BestHeader()
+	if sm.headersFirstMode {
+		if bestHeight < sm.syncPeer.LastBlock() {
+			locator := blockchain.BlockLocator([]*chainhash.Hash{&bestHash})
+			sm.syncPeer.PushGetHeadersMsg(locator, &zeroHash)
+			return
+		}
 	}
+
+	bestHeaderHash, bestHeaderHeight := sm.chain.BestHeader()
+	log.Infof("downloaded headers to %v(%v) from peer %v "+
+		"-- now fetching blocks",
+		bestHeaderHash, bestHeaderHeight, hmsg.peer.String())
+	sm.fetchHeaderBlocks()
 }
 
 // handleNotFoundMsg handles notfound messages from all peers.
