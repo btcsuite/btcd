@@ -68,6 +68,28 @@ type undoEntry struct {
 	utxosCreated   []wire.OutPoint
 }
 
+// CreateTxOption defines a functional option for the CreateTransaction method.
+type CreateTxOption func(*createTxOptions)
+
+// createTxOptions holds the configurable options for CreateTransaction.
+type createTxOptions struct {
+	txVersion int32
+}
+
+// defaultCreateTxOptions returns the default options for CreateTransaction.
+func defaultCreateTxOptions() *createTxOptions {
+	return &createTxOptions{
+		txVersion: wire.TxVersion,
+	}
+}
+
+// WithTxVersion returns a CreateTxOption that sets the transaction version.
+func WithTxVersion(version int32) CreateTxOption {
+	return func(opts *createTxOptions) {
+		opts.txVersion = version
+	}
+}
+
 // memWallet is a simple in-memory wallet whose purpose is to provide basic
 // wallet functionality to the harness. The wallet uses a hard-coded HD key
 // hierarchy which promotes reproducibility between harness test runs.
@@ -450,9 +472,9 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt btcutil.Amount,
 // while observing the passed fee rate. The passed fee rate should be expressed
 // in satoshis-per-byte.
 func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
-	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+	feeRate btcutil.Amount, options ...CreateTxOption) (*chainhash.Hash, error) {
 
-	tx, err := m.CreateTransaction(outputs, feeRate, true)
+	tx, err := m.CreateTransaction(outputs, feeRate, true, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -464,9 +486,9 @@ func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.
 func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
-	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+	feeRate btcutil.Amount, options ...CreateTxOption) (*chainhash.Hash, error) {
 
-	tx, err := m.CreateTransaction(outputs, feeRate, false)
+	tx, err := m.CreateTransaction(outputs, feeRate, false, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -481,12 +503,18 @@ func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
-	feeRate btcutil.Amount, change bool) (*wire.MsgTx, error) {
+	feeRate btcutil.Amount, change bool, options ...CreateTxOption) (*wire.MsgTx, error) {
 
+	// Apply functional options.
+	opts := defaultCreateTxOptions()
+	for _, option := range options {
+		option(opts)
+	}
 	m.Lock()
+
 	defer m.Unlock()
 
-	tx := wire.NewMsgTx(wire.TxVersion)
+	tx := wire.NewMsgTx(opts.txVersion)
 
 	// Tally up the total amount to be sent in order to perform coin
 	// selection shortly below.
