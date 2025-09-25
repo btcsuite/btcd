@@ -11,15 +11,15 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 // scriptTestName returns a descriptive test name for the given reference script
@@ -359,7 +359,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 
 		var (
 			witness  wire.TxWitness
-			inputAmt btcutil.Amount
+			inputAmt int64
 		)
 
 		// When the first field of the test data is a slice it contains
@@ -379,7 +379,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 				continue
 			}
 
-			inputAmt, err = btcutil.NewAmount(witnessData[len(witnessData)-1].(float64))
+			inputAmt, err = newAmount(witnessData[len(witnessData)-1].(float64))
 			if err != nil {
 				t.Errorf("%s: can't parse input amt: %v",
 					name, err)
@@ -563,7 +563,7 @@ testloop:
 			continue
 		}
 
-		tx, err := btcutil.NewTxFromBytes(serializedTx)
+		tx, err := newTxFromBytes(serializedTx)
 		if err != nil {
 			t.Errorf("bad test (arg 2 not msgtx %v) %d: %v", err,
 				i, test)
@@ -650,7 +650,7 @@ testloop:
 			})
 		}
 
-		for k, txin := range tx.MsgTx().TxIn {
+		for k, txin := range tx.TxIn {
 			prevOut := prevOutFetcher.FetchPrevOutput(
 				txin.PreviousOutPoint,
 			)
@@ -662,7 +662,7 @@ testloop:
 			// These are meant to fail, so as soon as the first
 			// input fails the transaction has failed. (some of the
 			// test txns have good inputs, too..
-			vm, err := NewEngine(prevOut.PkScript, tx.MsgTx(), k,
+			vm, err := NewEngine(prevOut.PkScript, tx, k,
 				flags, nil, nil, prevOut.Value, prevOutFetcher)
 			if err != nil {
 				continue testloop
@@ -720,7 +720,7 @@ testloop:
 			continue
 		}
 
-		tx, err := btcutil.NewTxFromBytes(serializedTx)
+		tx, err := newTxFromBytes(serializedTx)
 		if err != nil {
 			t.Errorf("bad test (arg 2 not msgtx %v) %d: %v", err,
 				i, test)
@@ -807,7 +807,7 @@ testloop:
 			})
 		}
 
-		for k, txin := range tx.MsgTx().TxIn {
+		for k, txin := range tx.TxIn {
 			prevOut := prevOutFetcher.FetchPrevOutput(
 				txin.PreviousOutPoint,
 			)
@@ -816,7 +816,7 @@ testloop:
 					k, i, test)
 				continue testloop
 			}
-			vm, err := NewEngine(prevOut.PkScript, tx.MsgTx(), k,
+			vm, err := NewEngine(prevOut.PkScript, tx, k,
 				flags, nil, nil, prevOut.Value, prevOutFetcher)
 			if err != nil {
 				t.Errorf("test (%d:%v:%d) failed to create "+
@@ -918,7 +918,7 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 	if err != nil {
 		t.Fatalf("unable to decode hex: %v", err)
 	}
-	tx, err := btcutil.NewTxFromBytes(txHex)
+	tx, err := newTxFromBytes(txHex)
 	if err != nil {
 		t.Fatalf("unable to decode hex: %v", err)
 	}
@@ -941,7 +941,7 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 		}
 
 		prevOutFetcher.AddPrevOut(
-			tx.MsgTx().TxIn[i].PreviousOutPoint, &txOut,
+			tx.TxIn[i].PreviousOutPoint, &txOut,
 		)
 
 		if i == testCase.Index {
@@ -955,10 +955,10 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 	}
 
 	makeVM := func() *Engine {
-		hashCache := NewTxSigHashes(tx.MsgTx(), prevOutFetcher)
+		hashCache := NewTxSigHashes(tx, prevOutFetcher)
 
 		vm, err := NewEngine(
-			prevOut.PkScript, tx.MsgTx(), testCase.Index,
+			prevOut.PkScript, tx, testCase.Index,
 			flags, nil, hashCache, prevOut.Value, prevOutFetcher,
 		)
 		if err != nil {
@@ -969,7 +969,7 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 	}
 
 	if testCase.Success != nil {
-		tx.MsgTx().TxIn[testCase.Index].SignatureScript, err = hex.DecodeString(
+		tx.TxIn[testCase.Index].SignatureScript, err = hex.DecodeString(
 			testCase.Success.ScriptSig,
 		)
 		if err != nil {
@@ -986,7 +986,7 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 			witness = append(witness, witElem)
 		}
 
-		tx.MsgTx().TxIn[testCase.Index].Witness = witness
+		tx.TxIn[testCase.Index].Witness = witness
 
 		vm := makeVM()
 
@@ -998,7 +998,7 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 	}
 
 	if testCase.Failure != nil {
-		tx.MsgTx().TxIn[testCase.Index].SignatureScript, err = hex.DecodeString(
+		tx.TxIn[testCase.Index].SignatureScript, err = hex.DecodeString(
 			testCase.Failure.ScriptSig,
 		)
 		if err != nil {
@@ -1015,7 +1015,7 @@ func executeTaprootRefTest(t *testing.T, testCase taprootJsonTest) {
 			witness = append(witness, witElem)
 		}
 
-		tx.MsgTx().TxIn[testCase.Index].Witness = witness
+		tx.TxIn[testCase.Index].Witness = witness
 
 		vm := makeVM()
 
@@ -1077,4 +1077,36 @@ func TestTaprootReferenceTests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to execute taproot test vectors: %v", err)
 	}
+}
+
+func newAmount(f float64) (int64, error) {
+	// The amount is only considered invalid if it cannot be represented
+	// as an integer type.  This may happen if f is NaN or +-Infinity.
+	switch {
+	case math.IsNaN(f):
+		fallthrough
+	case math.IsInf(f, 1):
+		fallthrough
+	case math.IsInf(f, -1):
+		return 0, errors.New("invalid bitcoin amount")
+	}
+
+	return round(f * 1e8), nil
+}
+
+func round(f float64) int64 {
+	if f < 0 {
+		return int64(f - 0.5)
+	}
+	return int64(f + 0.5)
+}
+
+func newTxFromBytes(txBytes []byte) (*wire.MsgTx, error) {
+	var msgTx wire.MsgTx
+	err := msgTx.Deserialize(bytes.NewReader(txBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	return &msgTx, nil
 }

@@ -8,10 +8,11 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/address/v2/base58"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil/base58"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 )
 
 // ErrMalformedPrivateKey describes an error where a WIF-encoded private
@@ -112,7 +113,7 @@ func DecodeWIF(wif string) (*WIF, error) {
 	}
 	cksum := chainhash.DoubleHashB(tosum)[:4]
 	if !bytes.Equal(cksum, decoded[decodedLen-4:]) {
-		return nil, ErrChecksumMismatch
+		return nil, address.ErrChecksumMismatch
 	}
 
 	netID := decoded[0]

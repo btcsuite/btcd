@@ -9,10 +9,11 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/bloom"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/btcutil/v2/bloom"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 // TestFilterLarge ensures a maximum sized filter can be created.
@@ -255,7 +256,7 @@ func TestFilterInsertKey(t *testing.T) {
 
 	f := bloom.NewFilter(2, 0, 0.001, wire.BloomUpdateAll)
 	f.Add(wif.SerializePubKey())
-	f.Add(btcutil.Hash160(wif.SerializePubKey()))
+	f.Add(address.Hash160(wif.SerializePubKey()))
 
 	want, err := hex.DecodeString("038fc16b080000000000000001")
 	if err != nil {

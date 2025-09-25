@@ -6,43 +6,51 @@ package txscript
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	prand "math/rand"
 	"testing"
 	"testing/quick"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/hdkeychain"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testPubBytes, _ = hex.DecodeString("F9308A019258C31049344F85F89D5229B" +
-		"531C845836F99B08601F113BCE036F9")
-
-	// rootKey is the test root key defined in the test vectors:
+	// privateKeys are four private keys derived from the seed mentioned in
+	// the BIP86 spec
 	// https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki
-	rootKey, _ = hdkeychain.NewKeyFromString(
-		"xprv9s21ZrQH143K3GJpoapnV8SFfukcVBSfeCficPSGfubmSFDxo1kuHnLi" +
-			"sriDvSnRRuL2Qrg5ggqHKNVpxR86QEC8w35uxmGoggxtQTPvfUu",
-	)
-
-	// accountPath is the base path for BIP86 (m/86'/0'/0').
-	accountPath = []uint32{
-		86 + hdkeychain.HardenedKeyStart, hdkeychain.HardenedKeyStart,
-		hdkeychain.HardenedKeyStart,
+	privateKeys = [][]byte{
+		// m/86'/0'/0'/0/0
+		hexToBytes(
+			"41f41d69260df4cf277826a9b65a3717e4eeddbeedf637f212ca" +
+				"096576479361",
+		),
+		// m/86'/0'/0'/0/1
+		hexToBytes(
+			"86c68ac0ed7df88cbdd08a847c6d639f87d1234d40503abf3ac1" +
+				"78ef7ddc05dd",
+		),
+		// m/86'/0'/0'/1/0
+		hexToBytes(
+			"6ccbca4a02ac648702dde463d9c1b0d328a4df1e068ef9dc2bc7" +
+				"88b33a4f0412",
+		),
+		// m/86'/0'/0'/1/1
+		hexToBytes(
+			"c8d522210e3bc028586dcb7cf7dce3937440ad8132765ecdfa2f" +
+				"f78d0e9a5d32",
+		),
 	}
-	expectedExternalAddresses = []string{
+
+	expectedAddresses = []string{
 		"bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr",
 		"bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh",
-	}
-	expectedInternalAddresses = []string{
 		"bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7",
+		"bc1ptdg60grjk9t3qqcqczp4tlyy3z47yrx9nhlrjsmw36q5a72lhdrs9f00nj",
 	}
 )
 
@@ -242,46 +250,22 @@ func TestTaprootTweakNoMutation(t *testing.T) {
 
 // TestTaprootConstructKeyPath tests the key spend only taproot construction.
 func TestTaprootConstructKeyPath(t *testing.T) {
-	checkPath := func(branch uint32, expectedAddresses []string) {
-		path, err := derivePath(rootKey, append(accountPath, branch))
+	t.Parallel()
+
+	for idx, key := range privateKeys {
+		key := key
+		_, pubKey := btcec.PrivKeyFromBytes(key)
+
+		tapKey := ComputeTaprootKeyNoScript(pubKey)
+
+		addr, err := address.NewAddressTaproot(
+			schnorr.SerializePubKey(tapKey),
+			&chaincfg.MainNetParams,
+		)
 		require.NoError(t, err)
 
-		for index, expectedAddr := range expectedAddresses {
-			extendedKey, err := path.Derive(uint32(index))
-			require.NoError(t, err)
-
-			pubKey, err := extendedKey.ECPubKey()
-			require.NoError(t, err)
-
-			tapKey := ComputeTaprootKeyNoScript(pubKey)
-
-			addr, err := btcutil.NewAddressTaproot(
-				schnorr.SerializePubKey(tapKey),
-				&chaincfg.MainNetParams,
-			)
-			require.NoError(t, err)
-
-			require.Equal(t, expectedAddr, addr.String())
-		}
+		require.Equal(t, expectedAddresses[idx], addr.String())
 	}
-	checkPath(0, expectedExternalAddresses)
-	checkPath(1, expectedInternalAddresses)
-}
-
-func derivePath(key *hdkeychain.ExtendedKey, path []uint32) (
-	*hdkeychain.ExtendedKey, error) {
-
-	var (
-		currentKey = key
-		err        error
-	)
-	for _, pathPart := range path {
-		currentKey, err = currentKey.Derive(pathPart)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return currentKey, nil
 }
 
 // TestTapscriptCommitmentVerification that given a valid control block, proof
