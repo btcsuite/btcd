@@ -79,6 +79,29 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amoun
 	return minFee
 }
 
+// utxoEntry is an interface that provides access to UTXO data needed for
+// input standardness checks.
+type utxoEntry interface {
+	PkScript() []byte
+}
+
+// utxoView is an interface that provides access to UTXOs needed for
+// input standardness checks.
+type utxoView interface {
+	LookupEntry(wire.OutPoint) utxoEntry
+}
+
+// utxoViewpointAdapter wraps a blockchain.UtxoViewpoint to implement the
+// utxoView interface.
+type utxoViewpointAdapter struct {
+	view *blockchain.UtxoViewpoint
+}
+
+// LookupEntry returns the entry for a given outpoint.
+func (u *utxoViewpointAdapter) LookupEntry(op wire.OutPoint) utxoEntry {
+	return u.view.LookupEntry(op)
+}
+
 // checkInputsStandard performs a series of checks on a transaction's inputs
 // to ensure they are "standard".  A standard transaction input within the
 // context of this function is one whose referenced public key script is of a
@@ -90,6 +113,12 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee btcutil.Amoun
 // accurately and concisely via the txscript.ScriptVerifyCleanStack and
 // txscript.ScriptVerifySigPushOnly flags.
 func checkInputsStandard(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+	return checkInputsStandardWithView(tx, &utxoViewpointAdapter{view: utxoView})
+}
+
+// checkInputsStandardWithView performs input standardness checks using the
+// utxoView interface.
+func checkInputsStandardWithView(tx *btcutil.Tx, utxoView utxoView) error {
 	// NOTE: The reference implementation also does a coinbase check here,
 	// but coinbases have already been rejected prior to calling this
 	// function so no need to recheck.
@@ -100,6 +129,28 @@ func checkInputsStandard(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) err
 		// function.
 		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
 		originPkScript := entry.PkScript()
+
+		// Check standardness for P2A inputs. P2A outputs must be spent
+		// with empty signature script and empty witness.
+		if txscript.IsPayToAnchorScript(originPkScript) {
+			if len(txIn.SignatureScript) != 0 {
+				str := fmt.Sprintf("transaction input "+
+					"#%d spends P2A output with non-empty "+
+					"signature script", i)
+				return txRuleError(wire.RejectNonstandard, str)
+			}
+			if len(txIn.Witness) != 0 {
+				str := fmt.Sprintf("transaction "+
+					"input #%d spends P2A output with "+
+					"non-empty witness", i)
+				return txRuleError(wire.RejectNonstandard, str)
+			}
+
+			// P2A inputs are standard with empty sigscript and
+			// witness.
+			continue
+		}
+
 		switch txscript.GetScriptClass(originPkScript) {
 		case txscript.ScriptHashTy:
 			numSigOps := txscript.GetPreciseSigOpCount(
@@ -175,6 +226,12 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 // GetDustThreshold calculates the dust limit for a *wire.TxOut by taking the
 // size of a typical spending transaction and multiplying it by 3 to account
 // for the minimum dust relay fee of 3000sat/kvb.
+//
+// Pay-to-Anchor outputs are not special-cased here: because P2A is a witness
+// program with a 4-byte script, the generic witness path below yields a
+// threshold of 240 satoshis at the default 1000 sat/kvB relay fee, matching
+// the BIP 433 default. At other relay fees the threshold scales accordingly,
+// which is the same behavior as Bitcoin Core's GetDustThreshold.
 func GetDustThreshold(txOut *wire.TxOut) int64 {
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
