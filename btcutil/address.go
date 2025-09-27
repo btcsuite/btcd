@@ -171,8 +171,22 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 			hrp := prefix[:len(prefix)-1]
 
 			switch len(witnessProg) {
+			case 2:
+				// Check if it's a P2A address (witness version
+				// 1, program 0x4e73).
+				if witnessVer == 1 && bytes.Equal(
+					witnessProg, []byte{0x4e, 0x73},
+				) {
+					return &AddressPayToAnchor{
+						hrp: hrp,
+					}, nil
+				}
+
+				return nil, UnsupportedWitnessProgLenError(len(witnessProg))
+
 			case 20:
 				return newAddressWitnessPubKeyHash(hrp, witnessProg)
+
 			case 32:
 				if witnessVer == 1 {
 					return newAddressTaproot(hrp, witnessProg)
@@ -708,4 +722,73 @@ func newAddressTaproot(hrp string,
 	}
 
 	return addr, nil
+}
+
+// payToAnchorScript is the fixed script bytes for a pay-to-anchor output:
+// OP_1 OP_DATA_2 0x4e73. This is defined here to avoid an import cycle with
+// txscript. The same constant is exported as txscript.PayToAnchorScript;
+// keep both definitions in sync.
+var payToAnchorScript = []byte{0x51, 0x02, 0x4e, 0x73}
+
+// payToAnchorWitnessProgram is the 2-byte witness program portion of a P2A
+// output (i.e. the bytes that follow the OP_1 / OP_DATA_2 prefix in
+// payToAnchorScript).
+var payToAnchorWitnessProgram = []byte{0x4e, 0x73}
+
+// AddressPayToAnchor is an Address for a pay-to-anchor (P2A) output. P2A
+// outputs use the fixed script OP_1 <0x4e73> and have specific bech32
+// addresses for each network.
+type AddressPayToAnchor struct {
+	hrp string
+}
+
+// NewAddressPayToAnchor returns a new AddressPayToAnchor for the given network.
+func NewAddressPayToAnchor(net *chaincfg.Params) (*AddressPayToAnchor, error) {
+	if net == nil {
+		return nil, errors.New("nil network")
+	}
+
+	return &AddressPayToAnchor{
+		hrp: net.Bech32HRPSegwit,
+	}, nil
+}
+
+// String returns a human-readable string for the pay-to-anchor address. This
+// is equivalent to EncodeAddress, but is provided to satisfy the Stringer
+// interface.
+func (a *AddressPayToAnchor) String() string {
+	return a.EncodeAddress()
+}
+
+// EncodeAddress returns the bech32m string encoding of the pay-to-anchor
+// address. P2A addresses are encoded using witness version 1 with the program
+// bytes 0x4e73, resulting in these addresses per network:
+//
+//   - Mainnet: bc1pfeessrawgf
+//   - Testnet: tb1pfees9rn5nz
+//   - Regtest: bcrt1pfeesnyr2tx
+//   - Simnet:  sb1pfeesxv0pfa
+func (a *AddressPayToAnchor) EncodeAddress() string {
+	// For unknown networks, generate the address from the anchor data.
+	// This shouldn't happen in practice.
+	anchorData := []byte{0x4e, 0x73}
+	addr, err := encodeSegWitAddress(a.hrp, 1, anchorData)
+	if err != nil {
+		return ""
+	}
+	return addr
+}
+
+// ScriptAddress returns the witness program portion of the P2A address (the
+// 2-byte program 0x4e73). This matches the convention used by other segwit
+// address types, where ScriptAddress returns the witness program and the
+// outer script wrapping (OP_1 OP_DATA_2 ...) is added by PayToAddrScript.
+func (a *AddressPayToAnchor) ScriptAddress() []byte {
+	return payToAnchorWitnessProgram
+}
+
+// IsForNet returns whether the address is associated with the passed
+// bitcoin network.
+func (a *AddressPayToAnchor) IsForNet(net *chaincfg.Params) bool {
+	return a.hrp == net.Bech32HRPSegwit
 }
