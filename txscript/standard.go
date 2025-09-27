@@ -5,6 +5,7 @@
 package txscript
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -50,6 +51,10 @@ const (
 		ScriptVerifyConstScriptCode
 )
 
+// PayToAnchorScript is the fixed script bytes for a pay-to-anchor output.
+// This is OP_1 OP_DATA_2 0x4e73 (witness v1 with program 0x4e73).
+var PayToAnchorScript = []byte{OP_1, OP_DATA_2, 0x4e, 0x73}
+
 // ScriptClass is an enumeration for the list of standard types of script.
 type ScriptClass byte
 
@@ -64,6 +69,7 @@ const (
 	MultiSigTy                               // Multi signature.
 	NullDataTy                               // Empty data-only (provably prunable).
 	WitnessV1TaprootTy                       // Taproot output
+	PayToAnchorTy                            // Pay to anchor (P2A)
 	WitnessUnknownTy                         // Witness unknown
 )
 
@@ -79,6 +85,7 @@ var scriptClassToName = []string{
 	MultiSigTy:            "multisig",
 	NullDataTy:            "nulldata",
 	WitnessV1TaprootTy:    "witness_v1_taproot",
+	PayToAnchorTy:         "anchor",
 	WitnessUnknownTy:      "witness_unknown",
 }
 
@@ -490,6 +497,26 @@ func extractAnnex(witness [][]byte) ([]byte, error) {
 	return lastElement, nil
 }
 
+// extractPayToAnchor extracts the Pay-to-Anchor data from the passed script
+// if it is a standard pay-to-anchor script. P2A scripts have the format:
+// OP_1 <0x4e73>. It will return nil otherwise.
+func extractPayToAnchor(script []byte) []byte {
+	// P2A script is exactly: OP_1 OP_DATA_2 0x4e 0x73.
+	if bytes.Equal(script, PayToAnchorScript) {
+		// Return the anchor data bytes for valid P2A scripts.
+		return script[2:4]
+	}
+
+	return nil
+}
+
+// IsPayToAnchorScript returns whether or not the passed script is a standard
+// pay-to-anchor (P2A) script. P2A scripts are used for anchor outputs that
+// allow anyone to spend them for CPFP (Child Pays For Parent) fee bumping.
+func IsPayToAnchorScript(script []byte) bool {
+	return extractPayToAnchor(script) != nil
+}
+
 // isNullDataScript returns whether or not the passed script is a standard
 // null data script.
 //
@@ -549,6 +576,9 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		}
 	case TaprootWitnessVersion:
 		switch {
+		// Check P2A before taproot since P2A is a specific taproot program.
+		case IsPayToAnchorScript(script):
+			return PayToAnchorTy
 		case isWitnessTaprootScript(script):
 			return WitnessV1TaprootTy
 		}
@@ -619,6 +649,10 @@ func expectedInputs(script []byte, class ScriptClass) int {
 	case WitnessV1TaprootTy:
 		// Not including script.  That is handled by the caller.
 		return 1
+
+	case PayToAnchorTy:
+		// P2A outputs require no inputs for spending (anyone can spend).
+		return 0
 
 	case MultiSigTy:
 		// Standard multisig has a push a small number for the number
@@ -875,6 +909,12 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 				nilAddrErrStr)
 		}
 		return payToWitnessTaprootScript(addr.ScriptAddress())
+	case *btcutil.AddressPayToAnchor:
+		if addr == nil {
+			return nil, scriptError(ErrUnsupportedAddress,
+				nilAddrErrStr)
+		}
+		return PayToAnchorScript, nil
 	}
 
 	str := fmt.Sprintf("unable to generate payment script for unsupported "+
@@ -1009,6 +1049,13 @@ func ExtractPkScriptAddrs(pkScript []byte,
 	if isNullDataScript(scriptVersion, pkScript) {
 		// Null data transactions have no addresses or required signatures.
 		return NullDataTy, nil, 0, nil
+	}
+
+	// Check for pay-to-anchor script.
+	if IsPayToAnchorScript(pkScript) {
+		// P2A scripts don't have traditional addresses and require no
+		// signatures (anyone can spend them).
+		return PayToAnchorTy, nil, 0, nil
 	}
 
 	if hash := extractWitnessPubKeyHash(pkScript); hash != nil {
