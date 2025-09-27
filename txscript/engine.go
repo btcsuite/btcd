@@ -542,6 +542,13 @@ func (vm *Engine) isWitnessVersionActive(version uint) bool {
 	return vm.witnessProgram != nil && uint(vm.witnessVersion) == version
 }
 
+// IsPayToAnchorWitnessProgram returns true if the witness version and program
+// correspond to a pay-to-anchor output.
+func IsPayToAnchorWitnessProgram(witnessVersion int, witnessProgram []byte) bool {
+	return witnessVersion == 1 && len(witnessProgram) == 2 &&
+		bytes.Equal(witnessProgram, []byte{0x4e, 0x73})
+}
+
 // witnessProgramAcceptStack collapses the data stack down to a single element
 // for witness programs that succeed without inner script execution. The
 // running pkScript must have left a truthy top item; the stack is then reduced
@@ -795,18 +802,30 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			vm.SetStack(witness[:len(witness)-2])
 		}
 
+	// Pay-to-anchor (P2A) outputs are special anyone-can-spend outputs.
+	// They only work as native witness programs, not wrapped in P2SH.
+	case IsPayToAnchorWitnessProgram(
+		vm.witnessVersion, vm.witnessProgram,
+	) && !vm.bip16:
+		// P2A spending always succeeds regardless of witness content.
+		if err := vm.witnessProgramAcceptStack(); err != nil {
+			return err
+		}
+
 	case vm.hasFlag(ScriptVerifyDiscourageUpgradeableWitnessProgram):
 		errStr := fmt.Sprintf("new witness program versions "+
 			"invalid: %v", vm.witnessProgram)
 
-		return scriptError(ErrDiscourageUpgradableWitnessProgram, errStr)
+		return scriptError(
+			ErrDiscourageUpgradableWitnessProgram, errStr,
+		)
+
 	default:
 		if err := vm.witnessProgramAcceptStack(); err != nil {
 			return err
 		}
 	}
 
-	// TODO(roasbeef): other sanity checks here
 	switch {
 
 	// In addition to the normal script element size limits, taproot also
@@ -933,8 +952,10 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	cleanStackActive := vm.hasFlag(ScriptVerifyCleanStack) || vm.taprootCtx != nil
 	if finalScript && cleanStackActive && vm.dstack.Depth() != 1 {
 
-		str := fmt.Sprintf("stack must contain exactly one item (contains %d)",
-			vm.dstack.Depth())
+		str := fmt.Sprintf(
+			"stack must contain exactly one item (contains %d)",
+			vm.dstack.Depth(),
+		)
 		return scriptError(ErrCleanStack, str)
 	} else if vm.dstack.Depth() < 1 {
 		return scriptError(ErrEmptyStack,
