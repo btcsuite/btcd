@@ -2,7 +2,6 @@ package txgraph
 
 import (
 	"iter"
-	"sort"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -65,35 +64,34 @@ func (g *TxGraph) Iterate(options ...IterOption) iter.Seq[*TxGraphNode] {
 // iterateDFS performs depth-first traversal.
 func (g *TxGraph) iterateDFS(start *TxGraphNode, opts IteratorOption, yield func(*TxGraphNode) bool) {
 	visited := make(map[chainhash.Hash]bool)
-	stack := []*TxGraphNode{}
+	stack := NewStack[*TxGraphNode]()
 	depth := make(map[chainhash.Hash]int)
 
 	// Initialize with start node or all roots.
 	if start != nil {
 		if opts.IncludeStart {
-			stack = append(stack, start)
+			stack.Push(start)
 			depth[start.TxHash] = 0
 		} else {
 			// Mark start node as visited to prevent revisiting.
 			visited[start.TxHash] = true
 			depth[start.TxHash] = 0
 			// Start with children/parents based on direction.
-			g.addNeighborsToStack(start, &stack, depth, opts.Direction, 1)
+			g.addNeighborsToStack(start, stack, depth, opts.Direction, 1)
 		}
 	} else {
 		// Find all root nodes (no parents).
 		for _, node := range g.nodes {
 			if len(node.Parents) == 0 {
-				stack = append(stack, node)
+				stack.Push(node)
 				depth[node.TxHash] = 0
 			}
 		}
 	}
 
-	for len(stack) > 0 {
+	for !stack.IsEmpty() {
 		// Pop from stack.
-		node := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
+		node, _ := stack.Pop()
 
 		// Skip if already visited.
 		if visited[node.TxHash] {
@@ -115,41 +113,40 @@ func (g *TxGraph) iterateDFS(start *TxGraphNode, opts IteratorOption, yield func
 
 		// Always add neighbors to continue traversal.
 		nextDepth := depth[node.TxHash] + 1
-		g.addNeighborsToStack(node, &stack, depth, opts.Direction, nextDepth)
+		g.addNeighborsToStack(node, stack, depth, opts.Direction, nextDepth)
 	}
 }
 
 // iterateBFS performs breadth-first traversal.
 func (g *TxGraph) iterateBFS(start *TxGraphNode, opts IteratorOption, yield func(*TxGraphNode) bool) {
 	visited := make(map[chainhash.Hash]bool)
-	queue := []*TxGraphNode{}
+	queue := NewQueue[*TxGraphNode]()
 	depth := make(map[chainhash.Hash]int)
 
 	// Initialize with start node or all roots.
 	if start != nil {
 		if opts.IncludeStart {
-			queue = append(queue, start)
+			queue.Enqueue(start)
 			depth[start.TxHash] = 0
 		} else {
 			// Mark start node as visited to prevent revisiting.
 			visited[start.TxHash] = true
 			depth[start.TxHash] = 0
 			// Start with children/parents based on direction.
-			g.addNeighborsToQueue(start, &queue, depth, opts.Direction, 1)
+			g.addNeighborsToQueue(start, queue, depth, opts.Direction, 1)
 		}
 	} else {
 		for _, node := range g.nodes {
 			if len(node.Parents) == 0 {
-				queue = append(queue, node)
+				queue.Enqueue(node)
 				depth[node.TxHash] = 0
 			}
 		}
 	}
 
-	for len(queue) > 0 {
+	for !queue.IsEmpty() {
 		// Dequeue from front.
-		node := queue[0]
-		queue = queue[1:]
+		node, _ := queue.Dequeue()
 
 		// Skip if already visited.
 		if visited[node.TxHash] {
@@ -171,7 +168,7 @@ func (g *TxGraph) iterateBFS(start *TxGraphNode, opts IteratorOption, yield func
 
 		// Always add neighbors to continue traversal.
 		nextDepth := depth[node.TxHash] + 1
-		g.addNeighborsToQueue(node, &queue, depth, opts.Direction, nextDepth)
+		g.addNeighborsToQueue(node, queue, depth, opts.Direction, nextDepth)
 	}
 }
 
@@ -184,17 +181,16 @@ func (g *TxGraph) iterateTopological(opts IteratorOption, yield func(*TxGraphNod
 	}
 
 	// Find all nodes with no parents.
-	queue := []*TxGraphNode{}
+	queue := NewQueue[*TxGraphNode]()
 	for hash, degree := range inDegree {
 		if degree == 0 {
-			queue = append(queue, g.nodes[hash])
+			queue.Enqueue(g.nodes[hash])
 		}
 	}
 
 	// Process in topological order.
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
+	for !queue.IsEmpty() {
+		node, _ := queue.Dequeue()
 
 		// Apply filter.
 		if opts.Filter != nil && !opts.Filter(node) {
@@ -210,7 +206,7 @@ func (g *TxGraph) iterateTopological(opts IteratorOption, yield func(*TxGraphNod
 		for _, child := range node.Children {
 			inDegree[child.TxHash]--
 			if inDegree[child.TxHash] == 0 {
-				queue = append(queue, child)
+				queue.Enqueue(child)
 			}
 		}
 	}
@@ -225,17 +221,16 @@ func (g *TxGraph) iterateReverseTopological(opts IteratorOption, yield func(*TxG
 	}
 
 	// Find all nodes with no children.
-	queue := []*TxGraphNode{}
+	queue := NewQueue[*TxGraphNode]()
 	for hash, degree := range outDegree {
 		if degree == 0 {
-			queue = append(queue, g.nodes[hash])
+			queue.Enqueue(g.nodes[hash])
 		}
 	}
 
 	// Process in reverse topological order.
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
+	for !queue.IsEmpty() {
+		node, _ := queue.Dequeue()
 
 		// Apply filter.
 		if opts.Filter != nil && !opts.Filter(node) {
@@ -251,7 +246,7 @@ func (g *TxGraph) iterateReverseTopological(opts IteratorOption, yield func(*TxG
 		for _, parent := range node.Parents {
 			outDegree[parent.TxHash]--
 			if outDegree[parent.TxHash] == 0 {
-				queue = append(queue, parent)
+				queue.Enqueue(parent)
 			}
 		}
 	}
@@ -264,26 +259,25 @@ func (g *TxGraph) iterateAncestors(start *TxGraphNode, opts IteratorOption, yiel
 	}
 
 	visited := make(map[chainhash.Hash]bool)
-	queue := []*TxGraphNode{}
+	queue := NewQueue[*TxGraphNode]()
 	depth := make(map[chainhash.Hash]int)
 
 	// Include start node if requested.
 	if opts.IncludeStart {
-		queue = append(queue, start)
+		queue.Enqueue(start)
 		depth[start.TxHash] = 0
 	} else {
 		// Start with parents only.
 		for _, parent := range start.Parents {
 			if parent != nil {
-				queue = append(queue, parent)
+				queue.Enqueue(parent)
 				depth[parent.TxHash] = 1
 			}
 		}
 	}
 
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
+	for !queue.IsEmpty() {
+		node, _ := queue.Dequeue()
 
 		// Use the hash from the node itself.
 		nodeHash := node.TxHash
@@ -309,7 +303,7 @@ func (g *TxGraph) iterateAncestors(start *TxGraphNode, opts IteratorOption, yiel
 		nextDepth := depth[node.TxHash] + 1
 		for _, parent := range node.Parents {
 			if !visited[parent.TxHash] {
-				queue = append(queue, parent)
+				queue.Enqueue(parent)
 				depth[parent.TxHash] = nextDepth
 			}
 		}
@@ -323,24 +317,23 @@ func (g *TxGraph) iterateDescendants(start *TxGraphNode, opts IteratorOption, yi
 	}
 
 	visited := make(map[chainhash.Hash]bool)
-	queue := []*TxGraphNode{}
+	queue := NewQueue[*TxGraphNode]()
 	depth := make(map[chainhash.Hash]int)
 
 	// Include start node if requested.
 	if opts.IncludeStart {
-		queue = append(queue, start)
+		queue.Enqueue(start)
 		depth[start.TxHash] = 0
 	} else {
 		// Start with children only.
 		for _, child := range start.Children {
-			queue = append(queue, child)
+			queue.Enqueue(child)
 			depth[child.TxHash] = 1
 		}
 	}
 
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
+	for !queue.IsEmpty() {
+		node, _ := queue.Dequeue()
 
 		if visited[node.TxHash] {
 			continue
@@ -363,7 +356,7 @@ func (g *TxGraph) iterateDescendants(start *TxGraphNode, opts IteratorOption, yi
 		nextDepth := depth[node.TxHash] + 1
 		for _, child := range node.Children {
 			if !visited[child.TxHash] {
-				queue = append(queue, child)
+				queue.Enqueue(child)
 				depth[child.TxHash] = nextDepth
 			}
 		}
@@ -409,26 +402,26 @@ func (g *TxGraph) iterateCluster(start *TxGraphNode, opts IteratorOption, yield 
 	}
 }
 
-// iterateFeeRate iterates nodes ordered by fee rate.
-func (g *TxGraph) iterateFeeRate(opts IteratorOption, yield func(*TxGraphNode) bool) {
-	// Collect all nodes.
-	nodes := make([]*TxGraphNode, 0, len(g.nodes))
+// iterateFeeRate iterates nodes ordered by fee rate using a max-heap to
+// efficiently yield transactions in descending order of fee rate.
+func (g *TxGraph) iterateFeeRate(
+	opts IteratorOption,
+	yield func(*TxGraphNode) bool,
+) {
+
+	pq := NewPriorityQueue(func(a, b *TxGraphNode) bool {
+		return a.TxDesc.FeePerKB > b.TxDesc.FeePerKB
+	}, len(g.nodes))
+
 	for _, node := range g.nodes {
 		if opts.Filter != nil && !opts.Filter(node) {
 			continue
 		}
-		nodes = append(nodes, node)
+		pq.Push(node)
 	}
 
-	// Sort by fee rate (high to low).
-	sort.Slice(nodes, func(i, j int) bool {
-		rateI := nodes[i].TxDesc.FeePerKB
-		rateJ := nodes[j].TxDesc.FeePerKB
-		return rateI > rateJ
-	})
-
-	// Yield in order.
-	for _, node := range nodes {
+	for !pq.IsEmpty() {
+		node, _ := pq.Pop()
 		if !yield(node) {
 			return
 		}
@@ -571,7 +564,7 @@ func (g *TxGraph) IterateOrphans(
 // addNeighborsToStack adds neighbors to DFS stack based on direction.
 func (g *TxGraph) addNeighborsToStack(
 	node *TxGraphNode,
-	stack *[]*TxGraphNode,
+	stack *Stack[*TxGraphNode],
 	depth map[chainhash.Hash]int,
 	direction TraversalDirection,
 	nextDepth int,
@@ -580,27 +573,27 @@ func (g *TxGraph) addNeighborsToStack(
 	case DirectionForward:
 		for _, child := range node.Children {
 			if _, exists := depth[child.TxHash]; !exists {
-				*stack = append(*stack, child)
+				stack.Push(child)
 				depth[child.TxHash] = nextDepth
 			}
 		}
 	case DirectionBackward:
 		for _, parent := range node.Parents {
 			if _, exists := depth[parent.TxHash]; !exists {
-				*stack = append(*stack, parent)
+				stack.Push(parent)
 				depth[parent.TxHash] = nextDepth
 			}
 		}
 	case DirectionBoth:
 		for _, child := range node.Children {
 			if _, exists := depth[child.TxHash]; !exists {
-				*stack = append(*stack, child)
+				stack.Push(child)
 				depth[child.TxHash] = nextDepth
 			}
 		}
 		for _, parent := range node.Parents {
 			if _, exists := depth[parent.TxHash]; !exists {
-				*stack = append(*stack, parent)
+				stack.Push(parent)
 				depth[parent.TxHash] = nextDepth
 			}
 		}
@@ -610,7 +603,7 @@ func (g *TxGraph) addNeighborsToStack(
 // addNeighborsToQueue adds neighbors to BFS queue based on direction.
 func (g *TxGraph) addNeighborsToQueue(
 	node *TxGraphNode,
-	queue *[]*TxGraphNode,
+	queue *Queue[*TxGraphNode],
 	depth map[chainhash.Hash]int,
 	direction TraversalDirection,
 	nextDepth int,
@@ -619,27 +612,27 @@ func (g *TxGraph) addNeighborsToQueue(
 	case DirectionForward:
 		for _, child := range node.Children {
 			if _, exists := depth[child.TxHash]; !exists {
-				*queue = append(*queue, child)
+				queue.Enqueue(child)
 				depth[child.TxHash] = nextDepth
 			}
 		}
 	case DirectionBackward:
 		for _, parent := range node.Parents {
 			if _, exists := depth[parent.TxHash]; !exists {
-				*queue = append(*queue, parent)
+				queue.Enqueue(parent)
 				depth[parent.TxHash] = nextDepth
 			}
 		}
 	case DirectionBoth:
 		for _, child := range node.Children {
 			if _, exists := depth[child.TxHash]; !exists {
-				*queue = append(*queue, child)
+				queue.Enqueue(child)
 				depth[child.TxHash] = nextDepth
 			}
 		}
 		for _, parent := range node.Parents {
 			if _, exists := depth[parent.TxHash]; !exists {
-				*queue = append(*queue, parent)
+				queue.Enqueue(parent)
 				depth[parent.TxHash] = nextDepth
 			}
 		}
