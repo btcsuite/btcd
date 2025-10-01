@@ -556,6 +556,76 @@ func (g *TxGraph) GetOrphans(isConfirmed InputConfirmedPredicate,
 	return slices.Collect(g.IterateOrphans(isConfirmed))
 }
 
+// GetConflicts returns all transactions and packages that conflict with the
+// given transaction. A conflict occurs when the input transaction attempts to
+// spend an output that is already spent by a transaction in the mempool.
+//
+// The method uses the spentBy index for O(1) conflict detection per input.
+// For each conflicting transaction found, it includes all descendants since
+// they would become invalid if their ancestor is replaced. It also identifies
+// any packages that contain conflicting transactions.
+//
+// The returned ConflictSet provides both individual transactions (for
+// fine-grained analysis) and packages (for package-based eviction policies).
+//
+// Returns an empty ConflictSet if there are no conflicts.
+func (g *TxGraph) GetConflicts(tx *btcutil.Tx) *ConflictSet {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	result := &ConflictSet{
+		Transactions: make(map[chainhash.Hash]*TxGraphNode),
+		Packages:     make(map[PackageID]*TxPackage),
+	}
+
+	// Check each input of the candidate transaction for conflicts with
+	// existing mempool transactions. The spentBy index maps each spent
+	// output to the transaction that spends it, enabling O(1) lookups.
+	for _, txIn := range tx.MsgTx().TxIn {
+		// If this outpoint is already spent by a mempool transaction,
+		// that transaction conflicts with our candidate.
+		conflictNode, exists := g.indexes.spentBy[txIn.PreviousOutPoint]
+		if !exists {
+			continue
+		}
+
+		// Add the directly conflicting transaction.
+		result.Transactions[conflictNode.TxHash] = conflictNode
+
+		// Add all descendants of the conflict. When we replace a
+		// transaction via RBF, all its descendants must also be
+		// removed because they spend outputs that will no longer
+		// exist.
+		descendants := g.GetDescendants(conflictNode.TxHash, -1)
+		for hash, node := range descendants {
+			result.Transactions[hash] = node
+		}
+	}
+
+	// Identify packages that contain any conflicting transactions. This
+	// enables package-based eviction where entire packages are treated as
+	// atomic units.
+	for hash := range result.Transactions {
+		pkgID, exists := g.indexes.nodeToPackage[hash]
+		if !exists {
+			continue
+		}
+
+		// Only add each package once even if multiple transactions
+		// from the same package are in the conflict set.
+		if _, alreadyAdded := result.Packages[pkgID]; alreadyAdded {
+			continue
+		}
+
+		pkg, exists := g.indexes.packages[pkgID]
+		if exists {
+			result.Packages[pkgID] = pkg
+		}
+	}
+
+	return result
+}
+
 // ValidatePackage validates a transaction package.
 func (g *TxGraph) ValidatePackage(pkg *TxPackage) error {
 	if pkg == nil {
