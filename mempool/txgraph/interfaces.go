@@ -110,21 +110,6 @@ type PackageTopology struct {
 	IsTree bool
 }
 
-// TxEdge represents metadata about an edge.
-type TxEdge struct {
-	// OutPoints identifies which specific outputs are being spent in this
-	// relationship, enabling detection of conflicts and double-spends.
-	OutPoints []wire.OutPoint
-
-	// Value tracks the total satoshi amount flowing through this edge,
-	// enabling economic analysis of transaction relationships.
-	Value int64
-
-	// Created records when this edge was established, useful for
-	// time-based analysis and debugging.
-	Created time.Time
-}
-
 // GraphMetrics provides statistics about the transaction graph.
 type GraphMetrics struct {
 	// NodeCount tracks the total number of transactions in the graph for
@@ -186,32 +171,6 @@ type TxGraphNode struct {
 	// scanning slices.
 	Children map[chainhash.Hash]*TxGraphNode
 
-	// cachedMetrics stores expensive-to-compute graph properties to avoid
-	// repeated traversals during policy checks. The cache is invalidated
-	// when ancestors or descendants change.
-	cachedMetrics struct {
-		// AncestorCount enables quick checks against BIP 125 limits.
-		AncestorCount int32
-
-		// DescendantCount enforces mempool policy limits efficiently.
-		DescendantCount int32
-
-		// AncestorSize tracks cumulative size for package limit checks.
-		AncestorSize int64
-
-		// DescendantSize enables fast descendant limit validation.
-		DescendantSize int64
-
-		// AncestorFees supports CPFP calculations.
-		AncestorFees int64
-
-		// DescendantFees enables descendant fee rate computations.
-		DescendantFees int64
-
-		// LastUpdated allows cache invalidation based on graph changes.
-		LastUpdated time.Time
-	}
-
 	// Metadata holds feature-specific flags and relationships that don't
 	// affect core graph structure but enable specialized processing.
 	Metadata struct {
@@ -244,15 +203,6 @@ type TxCluster struct {
 	// Nodes stores all transactions in this connected component, enabling
 	// O(1) membership tests during cluster merges and splits.
 	Nodes map[chainhash.Hash]*TxGraphNode
-
-	// Roots identifies transactions with no unconfirmed parents in this
-	// cluster. These are entry points for package evaluation and block
-	// template building.
-	Roots []*TxGraphNode
-
-	// Leaves identifies transactions with no children in this cluster.
-	// These are candidates for eviction when the mempool is full.
-	Leaves []*TxGraphNode
 
 	// Size tracks the number of transactions for quick cluster size checks
 	// without iterating the Nodes map.
@@ -317,21 +267,6 @@ type TxPackage struct {
 	LastValidated time.Time
 }
 
-// EdgePair represents a parent-child relationship.
-type EdgePair struct {
-	// Parent is the transaction being spent from, providing context for
-	// graph traversal and validation.
-	Parent *TxGraphNode
-
-	// Child is the transaction doing the spending, enabling forward
-	// traversal during descendant queries.
-	Child *TxGraphNode
-
-	// Edge contains metadata about the specific outputs being spent,
-	// enabling detailed analysis of fund flows.
-	Edge *TxEdge
-}
-
 // Graph defines the primary interface for transaction graph operations.
 type Graph interface {
 	// AddTransaction inserts a new transaction into the graph and
@@ -361,17 +296,6 @@ type Graph interface {
 	// retrieving it, enabling efficient existence checks when the node
 	// data isn't needed.
 	HasTransaction(hash chainhash.Hash) bool
-
-	// AddEdge creates a parent-child relationship between two transactions
-	// that are already in the graph. This enables explicit edge management
-	// when transaction dependencies need to be added after initial
-	// insertion.
-	AddEdge(parent, child chainhash.Hash) error
-
-	// RemoveEdge severs a parent-child relationship without removing the
-	// transactions themselves. This is useful for handling reorganizations
-	// where relationships change but transactions remain valid.
-	RemoveEdge(parent, child chainhash.Hash) error
 
 	// GetAncestors returns all ancestor transactions up to maxDepth.
 	// This is used to enforce ancestor count/size limits for policy
@@ -418,11 +342,6 @@ type Graph interface {
 	// order and filters. This enables lazy evaluation of large result sets
 	// without allocating memory for all matches upfront.
 	Iterate(opts IteratorOption) iter.Seq[*TxGraphNode]
-
-	// IteratePairs returns an iterator over parent-child edges in the
-	// graph. This enables efficient edge-based analysis like conflict
-	// detection and fund flow tracking.
-	IteratePairs(opts IteratorOption) iter.Seq[EdgePair]
 
 	// IteratePackages returns an iterator over all identified packages.
 	// This enables package-by-package processing during block template
@@ -564,112 +483,6 @@ func WithIncludeStart(include bool) IterOption {
 	return func(o *IteratorOption) {
 		o.IncludeStart = include
 	}
-}
-
-// GraphQuery provides advanced query operations.
-type GraphQuery interface {
-	// FindTransactions searches for transactions matching the specified
-	// criteria. This enables complex filtering operations like finding
-	// all TRUC transactions above a certain fee rate.
-	FindTransactions(criteria TxCriteria) []*TxGraphNode
-
-	// FindPackages searches for packages matching the specified criteria.
-	// This enables targeted package queries like finding all valid 1P1C
-	// packages above a minimum fee rate.
-	FindPackages(criteria PackageCriteria) []*TxPackage
-
-	// FindPath searches for a dependency path between two transactions.
-	// This is useful for understanding transaction relationships and
-	// debugging unexpected dependencies.
-	FindPath(from, to *chainhash.Hash) []*TxGraphNode
-
-	// HasPath checks if a dependency path exists without computing it.
-	// This enables efficient reachability checks for cycle detection and
-	// conflict analysis.
-	HasPath(from, to *chainhash.Hash) bool
-
-	// GetTopologicalOrder returns all transactions in topological order,
-	// ensuring parents appear before children. This is essential for block
-	// template construction where dependencies must be satisfied.
-	GetTopologicalOrder() []*TxGraphNode
-
-	// DetectCycles finds circular dependencies in the graph, which should
-	// never exist but can occur due to bugs. Each inner slice represents
-	// one cycle detected in the graph.
-	DetectCycles() [][]*TxGraphNode
-
-	// GetFeerateDistribution computes the cumulative feerate diagram for
-	// all transactions. This enables analysis of mempool composition and
-	// fee rate distributions.
-	GetFeerateDistribution() []FeeratePoint
-
-	// GetPackageFeerates computes the effective fee rate for each package.
-	// This enables package-based comparisons for relay and mining
-	// decisions.
-	GetPackageFeerates() map[PackageID]int64
-}
-
-// TxCriteria defines criteria for finding transactions.
-type TxCriteria struct {
-	// MinFeeRate filters for transactions at or above this fee rate,
-	// enabling queries for high-priority transactions.
-	MinFeeRate int64
-
-	// MaxFeeRate filters for transactions at or above this fee rate,
-	// enabling queries for low-fee transactions that may need eviction.
-	MaxFeeRate int64
-
-	// MinSize filters for transactions at or above this size, useful for
-	// identifying large transactions that consume significant mempool
-	// space.
-	MinSize int64
-
-	// MaxSize filters for transactions at or below this size, useful for
-	// finding small transactions or enforcing size limits.
-	MaxSize int64
-
-	// IsTRUC filters by v3 transaction status. Nil means don't filter,
-	// true means only v3, false means only non-v3.
-	IsTRUC *bool
-
-	// IsEphemeral filters by ephemeral dust status. Nil means don't
-	// filter, enabling queries specific to ephemeral transactions.
-	IsEphemeral *bool
-
-	// HasAncestors filters by ancestor presence. Nil means don't filter,
-	// true finds transactions with parents, false finds root transactions.
-	HasAncestors *bool
-
-	// HasChildren filters by child presence. Nil means don't filter, true
-	// finds transactions with children, false finds leaf transactions.
-	HasChildren *bool
-}
-
-// PackageCriteria defines criteria for finding packages.
-type PackageCriteria struct {
-	// Type filters by package type (1P1C, TRUC, ephemeral), enabling
-	// type-specific package queries.
-	Type PackageType
-
-	// MinSize filters for packages at or above this transaction count,
-	// useful for finding complex multi-transaction packages.
-	MinSize int
-
-	// MaxSize filters for packages at or below this transaction count,
-	// useful for finding simple packages or enforcing limits.
-	MaxSize int
-
-	// MinFeeRate filters for packages at or above this effective fee rate,
-	// enabling high-fee package identification.
-	MinFeeRate int64
-
-	// MaxFeeRate filters for packages at or below this effective fee rate,
-	// useful for low-fee package queries.
-	MaxFeeRate int64
-
-	// IsValid filters by validation status. Nil means don't filter,
-	// enabling queries for valid or invalid packages separately.
-	IsValid *bool
 }
 
 // InputConfirmedPredicate is a function that checks if a transaction input

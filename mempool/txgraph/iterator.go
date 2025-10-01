@@ -4,7 +4,6 @@ import (
 	"iter"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 )
 
 // Iterate returns an iterator over graph nodes.
@@ -428,55 +427,6 @@ func (g *TxGraph) iterateFeeRate(
 	}
 }
 
-// IteratePairs returns an iterator over parent-child pairs.
-func (g *TxGraph) IteratePairs(options ...IterOption) iter.Seq[EdgePair] {
-	// Build options with defaults.
-	opts := DefaultIteratorOption()
-	for _, option := range options {
-		option(&opts)
-	}
-
-	return func(yield func(EdgePair) bool) {
-		g.mu.RLock()
-		defer g.mu.RUnlock()
-
-		visited := make(map[string]bool) // Track visited edges
-
-		// Iterate directly over all nodes in the graph.
-		for _, node := range g.nodes {
-			// Apply filter if specified.
-			if opts.Filter != nil && !opts.Filter(node) {
-				continue
-			}
-
-			for _, child := range node.Children {
-				// Create unique edge key.
-				edgeKey := node.TxHash.String() + "->" + child.TxHash.String()
-				if visited[edgeKey] {
-					continue
-				}
-				visited[edgeKey] = true
-
-				// Create edge metadata.
-				edge := &TxEdge{
-					OutPoints: g.findOutpoints(node, child),
-					Created:   node.Metadata.AddedTime,
-				}
-
-				pair := EdgePair{
-					Parent: node,
-					Child:  child,
-					Edge:   edge,
-				}
-
-				if !yield(pair) {
-					return
-				}
-			}
-		}
-	}
-}
-
 // IteratePackages returns an iterator over packages.
 func (g *TxGraph) IteratePackages() iter.Seq[*TxPackage] {
 	return func(yield func(*TxPackage) bool) {
@@ -637,17 +587,4 @@ func (g *TxGraph) addNeighborsToQueue(
 			}
 		}
 	}
-}
-
-// findOutpoints finds the outpoints connecting parent to child.
-func (g *TxGraph) findOutpoints(parent, child *TxGraphNode) []wire.OutPoint {
-	var outpoints []wire.OutPoint
-
-	for _, txIn := range child.Tx.MsgTx().TxIn {
-		if txIn.PreviousOutPoint.Hash == parent.TxHash {
-			outpoints = append(outpoints, txIn.PreviousOutPoint)
-		}
-	}
-
-	return outpoints
 }

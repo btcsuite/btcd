@@ -191,16 +191,6 @@ func TestGraphEdges(t *testing.T) {
 	metrics := g.GetMetrics()
 	require.Equal(t, 2, metrics.NodeCount)
 	require.Equal(t, 1, metrics.EdgeCount)
-
-	err = g.RemoveEdge(*parent.Hash(), *child.Hash())
-	require.NoError(t, err)
-
-	// Edge removal should update both nodes' relationship maps and
-	// decrement the edge count metric.
-	parentNode, _ = g.GetNode(*parent.Hash())
-	childNode, _ = g.GetNode(*child.Hash())
-	require.Len(t, parentNode.Children, 0)
-	require.Len(t, childNode.Parents, 0)
 }
 
 // TestGraphAncestorsDescendants verifies that ancestor and descendant
@@ -254,30 +244,6 @@ func TestGraphAncestorsDescendants(t *testing.T) {
 	require.Len(t, descendants, 2)
 	require.NotNil(t, descendants[*txs[1].Hash()])
 	require.NotNil(t, descendants[*txs[2].Hash()])
-}
-
-// TestCycleDetection verifies that the graph prevents cycles, which would
-// violate the DAG property required for transaction dependencies. Cycles
-// would make ancestor/descendant queries infinite loop and break topological
-// ordering for block template construction.
-func TestCycleDetection(t *testing.T) {
-	g := New(DefaultConfig())
-
-	tx1, desc1 := createTestTx(nil, 1)
-	tx2, desc2 := createTestTx(
-		[]wire.OutPoint{{Hash: *tx1.Hash(), Index: 0}}, 1,
-	)
-
-	err := g.AddTransaction(tx1, desc1)
-	require.NoError(t, err)
-	err = g.AddTransaction(tx2, desc2)
-	require.NoError(t, err)
-
-	// Attempting to add an edge that would create a cycle (tx2 -> tx1
-	// when tx1 -> tx2 already exists) must be rejected to maintain the
-	// DAG invariant.
-	err = g.AddEdge(*tx2.Hash(), *tx1.Hash())
-	require.ErrorIs(t, err, ErrCycleDetected)
 }
 
 // TestClusterManagement verifies that transactions are correctly grouped
@@ -391,46 +357,6 @@ func TestGetNodeCount(t *testing.T) {
 	)
 	require.NoError(t, g.AddTransaction(tx2, desc2))
 	require.Equal(t, 2, g.GetNodeCount())
-}
-
-// TestAddEdgeErrors tests error cases in AddEdge.
-func TestAddEdgeErrors(t *testing.T) {
-	g := New(DefaultConfig())
-
-	// Try to add edge between non-existent nodes.
-	tx1Msg := wire.NewMsgTx(1)
-	tx2Msg := wire.NewMsgTx(1)
-	hash1 := tx1Msg.TxHash()
-	hash2 := tx2Msg.TxHash()
-
-	err := g.AddEdge(hash1, hash2)
-	require.Error(t, err)
-	require.Equal(t, ErrNodeNotFound, err)
-
-	// Add one node and try to add edge.
-	tx1, desc1 := createTestTx(nil, 1)
-	require.NoError(t, g.AddTransaction(tx1, desc1))
-
-	err = g.AddEdge(*tx1.Hash(), hash2)
-	require.Error(t, err)
-	require.Equal(t, ErrNodeNotFound, err)
-
-	// Add second node.
-	tx2, desc2 := createTestTx(nil, 1)
-	require.NoError(t, g.AddTransaction(tx2, desc2))
-
-	// Add valid edge.
-	err = g.AddEdge(*tx1.Hash(), *tx2.Hash())
-	require.NoError(t, err)
-
-	// Try to add duplicate edge.
-	err = g.AddEdge(*tx1.Hash(), *tx2.Hash())
-	require.NoError(t, err)
-
-	// Try to create cycle.
-	err = g.AddEdge(*tx2.Hash(), *tx1.Hash())
-	require.Error(t, err)
-	require.Equal(t, ErrCycleDetected, err)
 }
 
 // TestRemoveTransactionComplex tests complex removal scenarios.

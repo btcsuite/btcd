@@ -242,42 +242,6 @@ func TestIteratorTraversalMethods(t *testing.T) {
 	})
 }
 
-// TestIteratePairs verifies that edge pair iteration produces all parent-
-// child relationships in the graph. This is useful for analyzing spending
-// patterns and computing aggregate statistics about transaction dependencies.
-func TestIteratePairs(t *testing.T) {
-	g := New(DefaultConfig())
-
-	tx1, desc1 := createTestTx(nil, 1)
-	require.NoError(t, g.AddTransaction(tx1, desc1))
-
-	tx2, desc2 := createTestTx(
-		[]wire.OutPoint{{Hash: *tx1.Hash(), Index: 0}}, 1,
-	)
-	require.NoError(t, g.AddTransaction(tx2, desc2))
-
-	tx3, desc3 := createTestTx(
-		[]wire.OutPoint{{Hash: *tx2.Hash(), Index: 0}}, 1,
-	)
-	require.NoError(t, g.AddTransaction(tx3, desc3))
-
-	edges := make(map[string]bool)
-	for pair := range g.IteratePairs() {
-		edgeKey := pair.Parent.TxHash.String() + "->" +
-			pair.Child.TxHash.String()
-		edges[edgeKey] = true
-
-		// Each edge pair should include metadata about which outputs
-		// are being spent, enabling detailed dependency analysis.
-		require.NotNil(t, pair.Edge)
-		require.NotEmpty(t, pair.Edge.OutPoints)
-	}
-
-	require.Len(t, edges, 2)
-	require.True(t, edges[tx1.Hash().String()+"->"+tx2.Hash().String()])
-	require.True(t, edges[tx2.Hash().String()+"->"+tx3.Hash().String()])
-}
-
 // TestIteratePackages verifies that package iteration produces all
 // identified transaction packages in the graph. Package iteration enables
 // efficient processing of transaction groups for package relay policies and

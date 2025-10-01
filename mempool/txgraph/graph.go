@@ -46,20 +46,6 @@ type Config struct {
 	// mempool eviction policies in the caller.
 	MaxNodes int
 
-	// MaxEdges limits the total number of parent-child relationships. This
-	// provides defense against attacks that try to create extremely
-	// connected transaction graphs to degrade performance.
-	MaxEdges int
-
-	// EnableCaching enables memoization of expensive computations like
-	// ancestor/descendant counts. This trades memory for speed, which is
-	// beneficial in production but may complicate debugging.
-	EnableCaching bool
-
-	// CacheTimeout defines how long cached computation results remain
-	// valid. Shorter timeouts trade freshness for computation cost.
-	CacheTimeout time.Duration
-
 	// MaxPackageSize limits the number of transactions in a package.
 	// Bitcoin Core uses 101 (25 ancestors + 25 descendants + 1 root),
 	// enforced here to prevent package relay DoS attacks.
@@ -75,9 +61,6 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		MaxNodes:       100000,
-		MaxEdges:       200000,
-		EnableCaching:  true,
-		CacheTimeout:   5 * time.Second,
 		MaxPackageSize: 101,
 	}
 }
@@ -444,61 +427,6 @@ func (g *TxGraph) HasTransaction(hash chainhash.Hash) bool {
 	return exists
 }
 
-// AddEdge adds an edge between two nodes.
-func (g *TxGraph) AddEdge(parentHash, childHash chainhash.Hash) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	parent, parentExists := g.nodes[parentHash]
-	child, childExists := g.nodes[childHash]
-
-	if !parentExists || !childExists {
-		return ErrNodeNotFound
-	}
-
-	// Check if edge already exists.
-	if _, exists := parent.Children[childHash]; exists {
-		return nil // Already connected
-	}
-
-	// Check for cycles.
-	if g.wouldCreateCycle(parent, child) {
-		return ErrCycleDetected
-	}
-
-	// Add edge.
-	parent.Children[childHash] = child
-	child.Parents[parentHash] = parent
-	atomic.AddInt32(&g.metrics.edgeCount, 1)
-
-	// Update clusters.
-	g.mergeNodeClusters(parent, child)
-
-	return nil
-}
-
-// RemoveEdge removes an edge between two nodes.
-func (g *TxGraph) RemoveEdge(parentHash, childHash chainhash.Hash) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	parent, parentExists := g.nodes[parentHash]
-	child, childExists := g.nodes[childHash]
-
-	if !parentExists || !childExists {
-		return ErrNodeNotFound
-	}
-
-	// Remove edge if it exists.
-	if _, exists := parent.Children[childHash]; exists {
-		delete(parent.Children, childHash)
-		delete(child.Parents, parentHash)
-		atomic.AddInt32(&g.metrics.edgeCount, -1)
-	}
-
-	return nil
-}
-
 // GetAncestors returns all ancestors of a transaction up to maxDepth.
 func (g *TxGraph) GetAncestors(hash chainhash.Hash,
 	maxDepth int) map[chainhash.Hash]*TxGraphNode {
@@ -509,13 +437,6 @@ func (g *TxGraph) GetAncestors(hash chainhash.Hash,
 	node, exists := g.nodes[hash]
 	if !exists {
 		return nil
-	}
-
-	// Check cache if enabled.
-	if g.config.EnableCaching &&
-		time.Since(node.cachedMetrics.LastUpdated) < g.config.CacheTimeout {
-		// For now, skip cache and compute directly.
-		// TODO: Implement proper caching.
 	}
 
 	ancestors := make(map[chainhash.Hash]*TxGraphNode)
@@ -798,8 +719,6 @@ func (g *TxGraph) createNewCluster(node *TxGraphNode) {
 	}
 
 	cluster.Nodes[node.TxHash] = node
-	cluster.Roots = []*TxGraphNode{node}
-	cluster.Leaves = []*TxGraphNode{node}
 
 	g.indexes.clusters[clusterID] = cluster
 	g.indexes.nodeToCluster[node.TxHash] = clusterID
@@ -822,9 +741,6 @@ func (g *TxGraph) addToCluster(node *TxGraphNode, clusterID ClusterID) {
 	g.indexes.nodeToCluster[node.TxHash] = clusterID
 
 	node.Metadata.ClusterID = clusterID
-
-	// Update roots and leaves.
-	g.updateClusterBoundaries(cluster)
 }
 
 // mergeClusters merges multiple clusters into one.
@@ -878,7 +794,6 @@ func (g *TxGraph) mergeClusters(
 	}
 
 	targetCluster.Size = len(targetCluster.Nodes)
-	g.updateClusterBoundaries(targetCluster)
 }
 
 // mergeNodeClusters merges clusters when adding an edge.
@@ -895,20 +810,5 @@ func (g *TxGraph) mergeNodeClusters(parent, child *TxGraphNode) {
 	clusters[childCluster] = true
 
 	g.mergeClusters(parent, clusters)
-}
-
-// updateClusterBoundaries updates roots and leaves of a cluster.
-func (g *TxGraph) updateClusterBoundaries(cluster *TxCluster) {
-	cluster.Roots = nil
-	cluster.Leaves = nil
-
-	for _, node := range cluster.Nodes {
-		if len(node.Parents) == 0 {
-			cluster.Roots = append(cluster.Roots, node)
-		}
-		if len(node.Children) == 0 {
-			cluster.Leaves = append(cluster.Leaves, node)
-		}
-	}
 }
 
