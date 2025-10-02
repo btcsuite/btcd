@@ -960,3 +960,20 @@ func TestInitConsistentState(t *testing.T) {
 			blocks[len(blocks)-1].Height())
 	}
 }
+
+func TestTotalMemoryUsage(t *testing.T) {
+	// Mocked utxoCache instance
+	s := newUtxoCache(nil, 1*1024*1024)
+
+	// Call the totalMemoryUsage method
+	result := s.totalMemoryUsage()
+
+	expectedSize := uint64(1 * 1024 * 1024)
+
+	resultShoulBeTrue := result == expectedSize
+
+	// Compare the expected result with the actual result
+	if resultShoulBeTrue {
+		t.Errorf("Expected memory usage %d, got %d", expectedSize, result)
+	}
+}
