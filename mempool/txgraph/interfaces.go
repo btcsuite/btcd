@@ -372,6 +372,16 @@ type Graph interface {
 	// indicates mempool fragmentation and is useful for understanding the
 	// effectiveness of cluster-based optimizations.
 	GetClusterCount() int
+
+	// GetConflicts returns all transactions and packages that would be
+	// replaced if the given transaction were added to the mempool. A
+	// conflict occurs when a transaction input spends an output that is
+	// already spent by a transaction in the graph. The returned ConflictSet
+	// includes both directly conflicting transactions and all their
+	// descendants, since descendants become invalid when their ancestor is
+	// replaced. It also includes any packages that contain conflicting
+	// transactions, enabling package-based eviction policies.
+	GetConflicts(tx *btcutil.Tx) *ConflictSet
 }
 
 // TraversalOrder defines the traversal strategy for graph iteration.
@@ -483,6 +493,24 @@ func WithIncludeStart(include bool) IterOption {
 	return func(o *IteratorOption) {
 		o.IncludeStart = include
 	}
+}
+
+// ConflictSet contains the result of a conflict check, providing both
+// individual conflicting transactions and their associated packages.
+type ConflictSet struct {
+	// Transactions contains all conflicting transactions and their
+	// descendants as a flat map. This enables direct iteration and
+	// individual transaction analysis.
+	Transactions map[chainhash.Hash]*TxGraphNode
+
+	// Packages contains all packages that include at least one conflicting
+	// transaction. This enables package-based eviction policies where entire
+	// packages are considered as atomic units.
+	//
+	// Note: Not all conflicting transactions are necessarily in packages.
+	// Standalone transactions will appear in Transactions but not in
+	// Packages.
+	Packages map[PackageID]*TxPackage
 }
 
 // InputConfirmedPredicate is a function that checks if a transaction input
