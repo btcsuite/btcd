@@ -134,6 +134,10 @@ type signOptions struct {
 	// 86 style, where we don't expect an actual tweak and instead just
 	// commit to the public key itself.
 	bip86Tweak bool
+
+	// adaptorPoint is used to tweak the nonce in the commitment in order
+	// to create a partial adaptor signature.
+	adaptorPoint *btcec.JacobianPoint
 }
 
 // defaultSignOptions returns the default set of signing operations.
@@ -181,6 +185,14 @@ func WithTaprootSignTweak(scriptRoot []byte) SignOption {
 	}
 }
 
+// WithAdaptorSign allows a caller to specify an adaptor point that should be
+// used to create a partial adaptor signature.
+func WithAdaptorSign(adaptorPoint *btcec.JacobianPoint) SignOption {
+	return func(o *signOptions) {
+		o.adaptorPoint = adaptorPoint
+	}
+}
+
 // WithBip86SignTweak allows a caller to specify a tweak that should be used in
 // a bip 340 manner when signing, factoring in BIP 86 as well. This differs
 // from WithTaprootSignTweak as no true script root will be committed to,
@@ -195,9 +207,9 @@ func WithBip86SignTweak() SignOption {
 	}
 }
 
-// computeSigningNonce calculates the final nonce used for signing. This will
+// ComputeSigningNonce calculates the final nonce used for signing. This will
 // be the R value used in the final signature.
-func computeSigningNonce(combinedNonce [PubNonceSize]byte,
+func ComputeSigningNonce(combinedNonce [PubNonceSize]byte,
 	combinedKey *btcec.PublicKey, msg [32]byte) (
 	*btcec.JacobianPoint, *btcec.ModNScalar, error) {
 
@@ -313,12 +325,23 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	// We'll now combine both the public nonces, using the blinding factor
 	// to tweak the second nonce:
 	//  * R = R_1 + b*R_2
-	nonce, nonceBlinder, err := computeSigningNonce(
+	nonce, nonceBlinder, err := ComputeSigningNonce(
 		combinedNonce, combinedKey.FinalKey, msg,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	nonce.ToAffine()
+
+	adaptedNonce := nonce
+	if opts.adaptorPoint != nil {
+		adaptedNonce = new(secp.JacobianPoint)
+		btcec.AddNonConst(nonce, opts.adaptorPoint, adaptedNonce)
+		adaptedNonce.ToAffine()
+	}
+
+	adaptedNonceKey := btcec.NewPublicKey(&adaptedNonce.X, &adaptedNonce.Y)
 
 	// Next we'll parse out our two secret nonces, which we'll be using in
 	// the core signing process below.
@@ -330,13 +353,9 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 		return nil, ErrSecretNonceZero
 	}
 
-	nonce.ToAffine()
-
-	nonceKey := btcec.NewPublicKey(&nonce.X, &nonce.Y)
-
 	// If the nonce R has an odd y coordinate, then we'll negate both our
 	// secret nonces.
-	if nonce.Y.IsOdd() {
+	if adaptedNonce.Y.IsOdd() {
 		k1.Negate()
 		k2.Negate()
 	}
@@ -368,7 +387,7 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	// nonce, combined public key and also the message:
 	// * e = H(tag=ChallengeHashTag, R || Q || m) mod n
 	var challengeMsg bytes.Buffer
-	challengeMsg.Write(schnorr.SerializePubKey(nonceKey))
+	challengeMsg.Write(schnorr.SerializePubKey(adaptedNonceKey))
 	challengeMsg.Write(schnorr.SerializePubKey(combinedKey.FinalKey))
 	challengeMsg.Write(msg[:])
 	challengeBytes := chainhash.TaggedHash(
@@ -386,7 +405,7 @@ func Sign(secNonce [SecNonceSize]byte, privKey *btcec.PrivateKey,
 	s := new(btcec.ModNScalar)
 	s.Add(&k1).Add(k2.Mul(nonceBlinder)).Add(e.Mul(a).Mul(&privKeyScalar))
 
-	sig := NewPartialSignature(s, nonceKey)
+	sig := NewPartialSignature(s, adaptedNonceKey)
 
 	// If we're not in fast sign mode, then we'll also validate our partial
 	// signature.
@@ -500,6 +519,19 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
 	btcec.AddNonConst(&r1J, &r2J, &nonce)
 
+	adaptedNonce := &nonce
+	if opts.adaptorPoint != nil {
+		adaptedNonce = new(btcec.JacobianPoint)
+		btcec.AddNonConst(&nonce, opts.adaptorPoint, adaptedNonce)
+	}
+
+	// If the nonce is the infinity point we set it to the Generator.
+	if *adaptedNonce == infinityPoint {
+		btcec.GeneratorJacobian(adaptedNonce)
+	} else {
+		adaptedNonce.ToAffine()
+	}
+
 	// Next, we'll parse out the set of public nonces this signer used to
 	// generate the signature.
 	pubNonce1J, err := btcec.ParseJacobian(
@@ -515,13 +547,6 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 		return err
 	}
 
-	// If the nonce is the infinity point we set it to the Generator.
-	if nonce == infinityPoint {
-		btcec.GeneratorJacobian(&nonce)
-	} else {
-		nonce.ToAffine()
-	}
-
 	// We'll perform a similar aggregation and blinding operator as we did
 	// above for the combined nonces: R' = R_1' + b*R_2'.
 	var pubNonceJ btcec.JacobianPoint
@@ -533,7 +558,7 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 
 	// If the combined nonce used in the challenge hash has an odd y
 	// coordinate, then we'll negate our final public nonce.
-	if nonce.Y.IsOdd() {
+	if adaptedNonce.Y.IsOdd() {
 		pubNonceJ.Y.Negate(1)
 		pubNonceJ.Y.Normalize()
 	}
@@ -543,7 +568,7 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	//  * e = H(tag=ChallengeHashTag, R || Q || m) mod n
 	var challengeMsg bytes.Buffer
 	challengeMsg.Write(schnorr.SerializePubKey(btcec.NewPublicKey(
-		&nonce.X, &nonce.Y,
+		&adaptedNonce.X, &adaptedNonce.Y,
 	)))
 	challengeMsg.Write(schnorr.SerializePubKey(combinedKey.FinalKey))
 	challengeMsg.Write(msg[:])
