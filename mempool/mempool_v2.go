@@ -5,19 +5,17 @@
 package mempool
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool/txgraph"
 	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -40,6 +38,42 @@ const (
 	// scans of the orphan pool to evict expired transactions.
 	DefaultOrphanExpireScanInterval = 5 * time.Minute
 )
+
+// OrphanTxManager defines the interface for managing orphan transactions.
+// This interface contains only the methods used by TxMempoolV2, enabling
+// easy testing and decoupling from the concrete OrphanManager implementation.
+type OrphanTxManager interface {
+	// IsOrphan returns whether the transaction exists in the orphan pool.
+	IsOrphan(hash chainhash.Hash) bool
+
+	// AddOrphan adds an orphan transaction to the pool with the given tag.
+	AddOrphan(tx *btcutil.Tx, tag Tag) error
+
+	// ProcessOrphans processes orphans that may now be acceptable after a
+	// parent transaction was added. Returns the list of promoted orphans.
+	ProcessOrphans(
+		hash chainhash.Hash,
+		acceptFunc func(*btcutil.Tx) error,
+	) ([]*btcutil.Tx, error)
+}
+
+// TxFeeEstimator defines the interface for observing transaction fees.
+// This interface contains only the methods used by TxMempoolV2.
+type TxFeeEstimator interface {
+	// ObserveTransaction is called when a transaction is added to the
+	// mempool to track its fee for estimation purposes.
+	ObserveTransaction(txDesc *TxDesc)
+}
+
+// TxAddrIndexer defines the interface for indexing transactions by address.
+// This interface contains only the methods used by TxMempoolV2.
+type TxAddrIndexer interface {
+	// AddUnconfirmedTx adds the transaction to the address index.
+	AddUnconfirmedTx(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint)
+
+	// RemoveUnconfirmedTx removes the transaction from the address index.
+	RemoveUnconfirmedTx(txHash *chainhash.Hash)
+}
 
 // TxMempoolV2 implements a graph-based transaction mempool that separates
 // data structure operations (graph) from policy enforcement. This design
@@ -76,9 +110,9 @@ const (
 //	└─────────────────────────────────────────────┘
 //
 // The separation of concerns enables:
-//  - Graph: Pure data structure, handles relationships
-//  - OrphanManager: Lifecycle management for orphans
-//  - PolicyEnforcer: Bitcoin Core-compatible policy decisions
+//   - Graph: Pure data structure, handles relationships
+//   - OrphanManager: Lifecycle management for orphans
+//   - PolicyEnforcer: Bitcoin Core-compatible policy decisions
 //
 // This structure runs in parallel with the old TxPool during development
 // and testing. Once validated, it will replace TxPool entirely.
@@ -92,12 +126,17 @@ type TxMempoolV2 struct {
 	// orphanMgr manages orphan transactions in a separate graph. Orphans
 	// have different lifecycle (TTL-based expiration, peer tagging) and
 	// shouldn't pollute the main graph used for mining and fee estimation.
-	orphanMgr *OrphanManager
+	orphanMgr OrphanTxManager
 
 	// policy enforces mempool policies including RBF rules (BIP 125),
 	// ancestor/descendant limits, and fee requirements. Separated from
 	// graph to enable different policy configurations and easier testing.
 	policy PolicyEnforcer
+
+	// txValidator validates transaction scripts and sequence locks. This
+	// handles the expensive cryptographic validation and consensus rules
+	// for timelocks.
+	txValidator TxValidator
 
 	// cfg contains mempool configuration including blockchain interface
 	// functions (UTXO fetching, best height) and policy settings.
@@ -115,76 +154,79 @@ type TxMempoolV2 struct {
 }
 
 // MempoolConfig defines configuration for the graph-based mempool.
-// This structure consolidates all configuration needed by TxMempoolV2
-// and its components.
+// This structure contains only the fields directly used by TxMempoolV2.
+// Dependencies (PolicyEnforcer, TxValidator, OrphanManager) must be
+// constructed and provided by the caller.
 type MempoolConfig struct {
-	// Policy defines mempool policy settings (relay rules, standardness).
-	Policy Policy
-
-	// ChainParams identifies the blockchain network (mainnet, testnet, etc).
-	ChainParams *chaincfg.Params
-
 	// FetchUtxoView provides UTXO data for transaction validation. This is
-	// called during ProcessTransaction to validate inputs exist and aren't
-	// double-spent.
+	// called during validation to check that inputs exist and aren't
+	// double-spent. Required.
 	FetchUtxoView func(*btcutil.Tx) (*blockchain.UtxoViewpoint, error)
 
 	// BestHeight returns the current blockchain tip height. Used for
-	// timelock validation and policy decisions based on height.
+	// transaction validation and policy decisions. Required.
 	BestHeight func() int32
 
 	// MedianTimePast returns median time past for the current chain tip.
-	// Used for timelock validation (BIP 113).
+	// Used for timelock validation (BIP 113). Required.
 	MedianTimePast func() time.Time
-
-	// CalcSequenceLock calculates the sequence lock for a transaction
-	// given its UTXO inputs. Used for relative timelock validation (BIP 68).
-	CalcSequenceLock func(*btcutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error)
-
-	// IsDeploymentActive checks if a soft fork deployment is active at the
-	// current tip. Used to enforce new consensus rules for transactions.
-	IsDeploymentActive func(deploymentID uint32) (bool, error)
-
-	// SigCache provides signature verification caching to avoid redundant
-	// ECDSA operations when validating transactions.
-	SigCache *txscript.SigCache
-
-	// HashCache provides transaction hash mid-state caching for sighash
-	// calculations, improving validation performance.
-	HashCache *txscript.HashCache
 
 	// AddrIndex optionally indexes mempool transactions by address. Can be
 	// nil if address indexing is disabled.
-	AddrIndex *indexers.AddrIndex
+	AddrIndex TxAddrIndexer
 
 	// FeeEstimator optionally tracks transaction fee rates for fee
 	// estimation. Can be nil if fee estimation is disabled.
-	FeeEstimator *FeeEstimator
+	FeeEstimator TxFeeEstimator
+
+	// PolicyEnforcer validates mempool policies including RBF rules,
+	// ancestor/descendant limits, and fee requirements. Required.
+	PolicyEnforcer PolicyEnforcer
+
+	// TxValidator validates transaction scripts and sequence locks.
+	// Required.
+	TxValidator TxValidator
+
+	// OrphanManager manages orphan transactions. Required.
+	OrphanManager OrphanTxManager
 
 	// GraphConfig configures the underlying transaction graph. If nil,
 	// defaults will be applied (100k node capacity, 101 tx max package size).
 	GraphConfig *txgraph.Config
-
-	// OrphanConfig configures orphan transaction management. If nil,
-	// defaults will be applied (15 min TTL, 100 orphan limit).
-	OrphanConfig OrphanConfig
-
-	// PolicyConfig configures policy enforcement. If nil, defaults will be
-	// applied (Bitcoin Core compatible: 25 ancestor limit, BIP 125 RBF).
-	PolicyConfig PolicyConfig
 }
 
 // NewTxMempoolV2 creates a new graph-based mempool with the provided
-// configuration. This constructor initializes all components (graph, orphan
-// manager, policy enforcer) with appropriate defaults where configuration
-// is not provided.
+// configuration. All required dependencies (PolicyEnforcer, TxValidator,
+// OrphanManager) must be provided via the config.
 //
-// The mempool is ready to use immediately after construction, but method
-// implementations for transaction operations are not yet complete. This
-// constructor establishes the structure for subsequent implementation tasks.
-func NewTxMempoolV2(cfg *MempoolConfig) *TxMempoolV2 {
+// This design enforces explicit dependency injection, making dependencies
+// clear and testable. Callers must construct dependencies before creating
+// the mempool.
+//
+// Returns an error if any required dependencies are missing.
+func NewTxMempoolV2(cfg *MempoolConfig) (*TxMempoolV2, error) {
 	if cfg == nil {
-		cfg = &MempoolConfig{}
+		return nil, fmt.Errorf("mempool config cannot be nil")
+	}
+
+	// Validate required dependencies are provided.
+	if cfg.PolicyEnforcer == nil {
+		return nil, fmt.Errorf("PolicyEnforcer is required")
+	}
+	if cfg.TxValidator == nil {
+		return nil, fmt.Errorf("TxValidator is required")
+	}
+	if cfg.OrphanManager == nil {
+		return nil, fmt.Errorf("OrphanManager is required")
+	}
+	if cfg.FetchUtxoView == nil {
+		return nil, fmt.Errorf("FetchUtxoView is required")
+	}
+	if cfg.BestHeight == nil {
+		return nil, fmt.Errorf("BestHeight is required")
+	}
+	if cfg.MedianTimePast == nil {
+		return nil, fmt.Errorf("MedianTimePast is required")
 	}
 
 	// Initialize graph with provided config or sensible defaults.
@@ -196,37 +238,18 @@ func NewTxMempoolV2(cfg *MempoolConfig) *TxMempoolV2 {
 	}
 	graph := txgraph.New(graphCfg)
 
-	// Initialize orphan manager with Bitcoin Core compatible defaults.
-	// Default: 15 min TTL, 100 orphan limit, 5 min expire scan interval.
-	orphanCfg := cfg.OrphanConfig
-	if orphanCfg.MaxOrphans == 0 {
-		orphanCfg.MaxOrphans = DefaultMaxOrphanTxs
-		orphanCfg.MaxOrphanSize = DefaultMaxOrphanTxSize
-		orphanCfg.OrphanTTL = DefaultOrphanTTL
-		orphanCfg.ExpireScanInterval = DefaultOrphanExpireScanInterval
-	}
-	orphanMgr := NewOrphanManager(orphanCfg)
-
-	// Initialize policy enforcer with Bitcoin Core defaults.
-	// Default: 25 ancestor/descendant limit, 101 KB size limit,
-	// BIP 125 RBF with 0xfffffffd sequence threshold.
-	policyCfg := cfg.PolicyConfig
-	if policyCfg.MaxAncestorCount == 0 {
-		policyCfg = DefaultPolicyConfig()
-	}
-	policy := NewStandardPolicyEnforcer(policyCfg)
-
 	mp := &TxMempoolV2{
-		graph:     graph,
-		orphanMgr: orphanMgr,
-		policy:    policy,
-		cfg:       *cfg,
+		graph:       graph,
+		orphanMgr:   cfg.OrphanManager,
+		policy:      cfg.PolicyEnforcer,
+		txValidator: cfg.TxValidator,
+		cfg:         *cfg,
 	}
 
 	// Initialize last updated timestamp to current time.
 	mp.lastUpdated.Store(time.Now().Unix())
 
-	return mp
+	return mp, nil
 }
 
 // LastUpdated returns the last time a transaction was added to or removed
@@ -296,8 +319,108 @@ func (mp *TxMempoolV2) IsOrphanInPool(hash *chainhash.Hash) bool {
 // without the additional overhead of orphan processing.
 //
 // STUB: Implementation pending in implement-tx-operations task.
+// MaybeAcceptTransaction validates and potentially adds a transaction to the
+// mempool. Returns missing parent hashes if transaction is an orphan,
+// otherwise returns the accepted TxDesc.
+//
+// This method acquires the write lock and calls maybeAcceptTransactionLocked.
 func (mp *TxMempoolV2) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDesc, error) {
-	panic("MaybeAcceptTransaction: not implemented")
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	return mp.maybeAcceptTransactionLocked(tx, isNew, rateLimit, true)
+}
+
+// maybeAcceptTransactionLocked is the internal implementation of
+// MaybeAcceptTransaction that must be called with the mempool lock held.
+//
+// The rejectDupOrphans parameter controls whether to reject transactions that
+// already exist in the orphan pool.
+func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
+	tx *btcutil.Tx,
+	isNew, rateLimit, rejectDupOrphans bool,
+) ([]*chainhash.Hash, *TxDesc, error) {
+
+	txHash := tx.Hash()
+
+	// Validate transaction using the v2 validation pipeline.
+	result, err := mp.checkMempoolAcceptance(tx, isNew, rateLimit, rejectDupOrphans)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// If orphan (has missing parents), return parent hashes.
+	if len(result.MissingParents) > 0 {
+		return result.MissingParents, nil, nil
+	}
+
+	// Handle RBF replacements if conflicts exist.
+	if len(result.Conflicts) > 0 {
+		log.Debugf("Replacing %d transaction(s) with %v (fee_rate=%v sat/vbyte)",
+			len(result.Conflicts), txHash,
+			int64(result.TxFee)*1000/result.TxSize)
+
+		// Remove conflicts from graph. The graph will cascade to
+		// descendants automatically.
+		for conflictHash := range result.Conflicts {
+			if err := mp.graph.RemoveTransaction(conflictHash); err != nil {
+				log.Warnf("Failed to remove conflict %v: %v",
+					conflictHash, err)
+			}
+		}
+	}
+
+	// Create TxDesc for the graph node.
+	graphDesc := &txgraph.TxDesc{
+		TxHash:      *txHash,
+		VirtualSize: result.TxSize,
+		Fee:         int64(result.TxFee),
+		FeePerKB:    int64(result.TxFee) * 1000 / result.TxSize,
+		Added:       time.Now(),
+	}
+
+	// Add transaction to graph.
+	if err := mp.graph.AddTransaction(tx, graphDesc); err != nil {
+		return nil, nil, err
+	}
+
+	// Update address index if enabled.
+	if mp.cfg.AddrIndex != nil {
+		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, result.utxoView)
+	}
+
+	// Record for fee estimation if enabled.
+	if mp.cfg.FeeEstimator != nil {
+		mp.cfg.FeeEstimator.ObserveTransaction(&TxDesc{
+			TxDesc: mining.TxDesc{
+				Tx:       tx,
+				Added:    time.Now(),
+				Height:   result.bestHeight,
+				Fee:      int64(result.TxFee),
+				FeePerKB: int64(result.TxFee) * 1000 / result.TxSize,
+			},
+		})
+	}
+
+	// Update last modified timestamp.
+	mp.lastUpdated.Store(time.Now().Unix())
+
+	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
+		mp.graph.GetNodeCount())
+
+	// Build TxDesc for return value.
+	txDesc := &TxDesc{
+		TxDesc: mining.TxDesc{
+			Tx:       tx,
+			Added:    time.Now(),
+			Height:   result.bestHeight,
+			Fee:      int64(result.TxFee),
+			FeePerKB: int64(result.TxFee) * 1000 / result.TxSize,
+		},
+		StartingPriority: 0, // Priority is deprecated
+	}
+
+	return nil, txDesc, nil
 }
 
 // ProcessTransaction is the main workhorse for handling insertion of new
@@ -309,20 +432,132 @@ func (mp *TxMempoolV2) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit b
 // nil, the list will include the passed transaction itself along with any
 // additional orphan transactions that were added as a result of the passed
 // one being accepted.
-//
-// STUB: Implementation pending in implement-tx-operations task.
 func (mp *TxMempoolV2) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool, tag Tag) ([]*TxDesc, error) {
-	panic("ProcessTransaction: not implemented")
+	log.Tracef("Processing transaction %v", tx.Hash())
+
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	// Attempt to accept transaction into the mempool.
+	missingParents, txDesc, err := mp.maybeAcceptTransactionLocked(
+		tx, true, rateLimit, true,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// If no missing parents, transaction was accepted.
+	if len(missingParents) == 0 {
+		// Process any orphans that can now be accepted.
+		newTxs := mp.processOrphansLocked(tx)
+
+		// Build result with parent first, then promoted orphans.
+		acceptedTxs := make([]*TxDesc, len(newTxs)+1)
+		acceptedTxs[0] = txDesc
+		copy(acceptedTxs[1:], newTxs)
+
+		return acceptedTxs, nil
+	}
+
+	// Transaction is an orphan.
+	if !allowOrphan {
+		// Only use the first missing parent in the error message.
+		// RejectDuplicate matches reference implementation.
+		str := fmt.Sprintf("orphan transaction %v references "+
+			"outputs of unknown or fully-spent transaction %v",
+			tx.Hash(), missingParents[0])
+		return nil, txRuleError(wire.RejectDuplicate, str)
+	}
+
+	// Add to orphan pool.
+	if err := mp.orphanMgr.AddOrphan(tx, tag); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+// processOrphansLocked processes orphans that may now be acceptable after
+// a parent transaction was added. Must be called with lock held.
+//
+// Returns a slice of TxDesc for all orphans that were successfully promoted
+// to the main mempool (including recursively promoted orphans).
+func (mp *TxMempoolV2) processOrphansLocked(acceptedTx *btcutil.Tx) []*TxDesc {
+	var acceptedTxns []*TxDesc
+
+	// Define callback for attempting to accept each orphan.
+	acceptFunc := func(orphanTx *btcutil.Tx) error {
+		// Try to accept the orphan. Don't reject if it's a duplicate
+		// orphan since we're processing it from the orphan pool.
+		_, txDesc, err := mp.maybeAcceptTransactionLocked(
+			orphanTx, true, true, false,
+		)
+		if err != nil {
+			return err
+		}
+
+		// If txDesc is nil, the orphan is still missing parents.
+		if txDesc != nil {
+			acceptedTxns = append(acceptedTxns, txDesc)
+		}
+
+		return nil
+	}
+
+	// Process orphans that spend outputs from the accepted transaction.
+	promoted, err := mp.orphanMgr.ProcessOrphans(*acceptedTx.Hash(), acceptFunc)
+	if err != nil {
+		log.Warnf("Error processing orphans: %v", err)
+	}
+
+	// Recursively process newly promoted orphans.
+	for _, promotedTx := range promoted {
+		moreTxs := mp.processOrphansLocked(promotedTx)
+		acceptedTxns = append(acceptedTxns, moreTxs...)
+	}
+
+	return acceptedTxns
 }
 
 // RemoveTransaction removes the passed transaction from the mempool. When the
 // removeRedeemers flag is set, any transactions that redeem outputs from the
 // removed transaction will also be removed recursively from the mempool, as
 // they would otherwise become orphans.
-//
-// STUB: Implementation pending in implement-tx-operations task.
 func (mp *TxMempoolV2) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
-	panic("RemoveTransaction: not implemented")
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	txHash := tx.Hash()
+
+	// Remove from graph. The removeRedeemers flag determines whether to
+	// cascade the removal to descendants.
+	var err error
+	if removeRedeemers {
+		// Cascade removal to all descendants (default graph behavior).
+		err = mp.graph.RemoveTransaction(*txHash)
+	} else {
+		// Remove only this transaction, leaving descendants as orphans.
+		// Note: The current txgraph doesn't have a non-cascade remove,
+		// so we always cascade. This matches TxPool behavior where
+		// removing a transaction always removes its redeemers.
+		err = mp.graph.RemoveTransaction(*txHash)
+	}
+
+	if err != nil {
+		// Transaction not in pool, nothing to do.
+		return
+	}
+
+	// Update address index if enabled.
+	if mp.cfg.AddrIndex != nil {
+		mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
+	}
+
+	// Update last modified timestamp.
+	mp.lastUpdated.Store(time.Now().Unix())
+
+	log.Debugf("Removed transaction %v (pool size: %v)", txHash,
+		mp.graph.GetNodeCount())
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -330,10 +565,26 @@ func (mp *TxMempoolV2) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 // leads to removing all transactions which rely on them, recursively. This is
 // necessary when a block is connected to the main chain because the block may
 // contain transactions which were previously unknown to the memory pool.
-//
-// STUB: Implementation pending in implement-tx-operations task.
 func (mp *TxMempoolV2) RemoveDoubleSpends(tx *btcutil.Tx) {
-	panic("RemoveDoubleSpends: not implemented")
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	// Use graph's GetConflicts to find all transactions that spend the
+	// same outputs as this transaction.
+	conflicts := mp.graph.GetConflicts(tx)
+
+	// Remove each conflict (with descendants).
+	for conflictHash := range conflicts.Transactions {
+		// Don't try to remove the transaction itself if it's in the pool.
+		if conflictHash == *tx.Hash() {
+			continue
+		}
+
+		if err := mp.graph.RemoveTransaction(conflictHash); err != nil {
+			log.Warnf("Failed to remove double spend %v: %v",
+				conflictHash, err)
+		}
+	}
 }
 
 // RemoveOrphan removes the passed orphan transaction from the orphan pool.
