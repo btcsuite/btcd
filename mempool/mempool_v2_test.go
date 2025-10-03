@@ -9,18 +9,52 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
 )
+
+// newTestMempoolConfig creates a standard test configuration for TxMempoolV2
+// with default dependencies suitable for most tests.
+func newTestMempoolConfig() *MempoolConfig {
+	return &MempoolConfig{
+		FetchUtxoView: func(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
+			return blockchain.NewUtxoViewpoint(), nil
+		},
+		BestHeight: func() int32 {
+			return 100
+		},
+		MedianTimePast: func() time.Time {
+			return time.Now()
+		},
+		PolicyEnforcer: NewStandardPolicyEnforcer(DefaultPolicyConfig()),
+		TxValidator:    NewStandardTxValidator(TxValidatorConfig{}),
+		OrphanManager: NewOrphanManager(OrphanConfig{
+			MaxOrphans:    DefaultMaxOrphanTxs,
+			MaxOrphanSize: DefaultMaxOrphanTxSize,
+		}),
+	}
+}
+
+// newTestMempoolV2 creates a TxMempoolV2 instance with standard test
+// configuration and fails the test if creation fails.
+func newTestMempoolV2(t *testing.T) *TxMempoolV2 {
+	t.Helper()
+	mp, err := NewTxMempoolV2(newTestMempoolConfig())
+	require.NoError(t, err, "failed to create test mempool")
+	require.NotNil(t, mp, "mempool should not be nil")
+	return mp
+}
 
 // TestNewTxMempoolV2 verifies that the constructor creates a properly
 // initialized mempool with all components.
 func TestNewTxMempoolV2(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
-
+	mp, err := NewTxMempoolV2(newTestMempoolConfig())
+	require.NoError(t, err, "should create mempool without error")
 	require.NotNil(t, mp, "mempool should not be nil")
 	require.NotNil(t, mp.graph, "graph should be initialized")
 	require.NotNil(t, mp.orphanMgr, "orphan manager should be initialized")
@@ -33,32 +67,99 @@ func TestNewTxMempoolV2(t *testing.T) {
 		"last updated should be recent")
 }
 
-// TestMempoolConfigDefaults verifies that nil configuration fields receive
-// appropriate defaults.
-func TestMempoolConfigDefaults(t *testing.T) {
+// TestMempoolConfigNilError verifies that nil config returns an error.
+func TestMempoolConfigNilError(t *testing.T) {
 	t.Parallel()
 
 	// Create mempool with nil config.
-	mp := NewTxMempoolV2(nil)
+	mp, err := NewTxMempoolV2(nil)
+	require.Error(t, err, "should error on nil config")
+	require.Nil(t, mp, "mempool should be nil on error")
+	require.Contains(t, err.Error(), "config cannot be nil")
+}
 
-	// Graph should be created with default config.
-	require.Equal(t, 0, mp.graph.GetNodeCount(),
-		"empty graph should have 0 nodes")
+// TestMempoolMissingDependenciesError verifies that missing dependencies
+// return errors.
+func TestMempoolMissingDependenciesError(t *testing.T) {
+	t.Parallel()
 
-	// Orphan manager should use defaults: 100 orphans, 100KB max size,
-	// 20 min TTL, 5 min scan interval.
-	// We can't directly inspect config, but we can verify it exists.
-	require.NotNil(t, mp.orphanMgr)
+	tests := []struct {
+		name        string
+		setupConfig func() *MempoolConfig
+		errContains string
+	}{
+		{
+			name: "missing PolicyEnforcer",
+			setupConfig: func() *MempoolConfig {
+				cfg := newTestMempoolConfig()
+				cfg.PolicyEnforcer = nil
+				return cfg
+			},
+			errContains: "PolicyEnforcer is required",
+		},
+		{
+			name: "missing TxValidator",
+			setupConfig: func() *MempoolConfig {
+				cfg := newTestMempoolConfig()
+				cfg.TxValidator = nil
+				return cfg
+			},
+			errContains: "TxValidator is required",
+		},
+		{
+			name: "missing OrphanManager",
+			setupConfig: func() *MempoolConfig {
+				cfg := newTestMempoolConfig()
+				cfg.OrphanManager = nil
+				return cfg
+			},
+			errContains: "OrphanManager is required",
+		},
+		{
+			name: "missing FetchUtxoView",
+			setupConfig: func() *MempoolConfig {
+				cfg := newTestMempoolConfig()
+				cfg.FetchUtxoView = nil
+				return cfg
+			},
+			errContains: "FetchUtxoView is required",
+		},
+		{
+			name: "missing BestHeight",
+			setupConfig: func() *MempoolConfig {
+				cfg := newTestMempoolConfig()
+				cfg.BestHeight = nil
+				return cfg
+			},
+			errContains: "BestHeight is required",
+		},
+		{
+			name: "missing MedianTimePast",
+			setupConfig: func() *MempoolConfig {
+				cfg := newTestMempoolConfig()
+				cfg.MedianTimePast = nil
+				return cfg
+			},
+			errContains: "MedianTimePast is required",
+		},
+	}
 
-	// Policy enforcer should use defaults.
-	require.NotNil(t, mp.policy)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.setupConfig()
+			mp, err := NewTxMempoolV2(cfg)
+			require.Error(t, err, "should error on missing dependency")
+			require.Nil(t, mp, "mempool should be nil on error")
+			require.Contains(t, err.Error(), tt.errContains)
+		})
+	}
 }
 
 // TestMempoolCount verifies the Count method returns correct transaction count.
 func TestMempoolCount(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
 	// Initial count should be zero.
 	require.Equal(t, 0, mp.Count(), "initial count should be 0")
@@ -72,7 +173,7 @@ func TestMempoolCount(t *testing.T) {
 func TestMempoolHaveTransaction(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
 	// Random hash should not exist.
 	randomHash := chainhash.Hash{0x01, 0x02, 0x03}
@@ -88,7 +189,7 @@ func TestMempoolHaveTransaction(t *testing.T) {
 func TestMempoolIsTransactionInPool(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
 	randomHash := chainhash.Hash{0x01, 0x02, 0x03}
 	require.False(t, mp.IsTransactionInPool(&randomHash),
@@ -103,7 +204,7 @@ func TestMempoolIsTransactionInPool(t *testing.T) {
 func TestMempoolIsOrphanInPool(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
 	randomHash := chainhash.Hash{0x01, 0x02, 0x03}
 	require.False(t, mp.IsOrphanInPool(&randomHash),
@@ -117,7 +218,7 @@ func TestMempoolIsOrphanInPool(t *testing.T) {
 func TestMempoolLastUpdated(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
 	// LastUpdated should return a recent time.
 	lastUpdated := mp.LastUpdated()
@@ -134,7 +235,7 @@ func TestMempoolLastUpdated(t *testing.T) {
 func TestMempoolConcurrentAccess(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
 	// Launch multiple goroutines performing concurrent reads.
 	const numReaders = 10
@@ -168,51 +269,13 @@ func TestMempoolConcurrentAccess(t *testing.T) {
 func TestMempoolStubbedMethodsPanic(t *testing.T) {
 	t.Parallel()
 
-	mp := NewTxMempoolV2(nil)
+	mp := newTestMempoolV2(t)
 
-	// Create a dummy transaction for testing.
-	msgTx := wire.NewMsgTx(wire.TxVersion)
-	msgTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{
-			Hash:  chainhash.Hash{},
-			Index: 0,
-		},
-		Sequence: wire.MaxTxInSequenceNum,
-	})
-	msgTx.AddTxOut(&wire.TxOut{
-		Value:    1000,
-		PkScript: []byte{0x51}, // OP_TRUE
-	})
-
-	// Test that stubbed methods panic.
+	// Test that stubbed methods panic (only for methods not yet implemented).
 	tests := []struct {
 		name string
 		fn   func()
 	}{
-		{
-			name: "MaybeAcceptTransaction",
-			fn: func() {
-				_, _, _ = mp.MaybeAcceptTransaction(nil, false, false)
-			},
-		},
-		{
-			name: "ProcessTransaction",
-			fn: func() {
-				_, _ = mp.ProcessTransaction(nil, false, false, 0)
-			},
-		},
-		{
-			name: "RemoveTransaction",
-			fn: func() {
-				mp.RemoveTransaction(nil, false)
-			},
-		},
-		{
-			name: "RemoveDoubleSpends",
-			fn: func() {
-				mp.RemoveDoubleSpends(nil)
-			},
-		},
 		{
 			name: "RemoveOrphan",
 			fn: func() {
@@ -293,26 +356,48 @@ func TestMempoolInterfaceCompliance(t *testing.T) {
 	var _ TxMempool = (*TxMempoolV2)(nil)
 }
 
-// TestMempoolConfigCustomization verifies that custom configuration is
-// properly applied when provided.
+// TestMempoolConfigCustomization verifies that custom dependencies can be
+// injected via configuration.
 func TestMempoolConfigCustomization(t *testing.T) {
 	t.Parallel()
 
-	// Create a custom policy config.
+	// Create a custom policy enforcer.
 	customPolicyCfg := DefaultPolicyConfig()
 	customPolicyCfg.MaxAncestorCount = 10 // Custom value
+	customPolicy := NewStandardPolicyEnforcer(customPolicyCfg)
+
+	// Create a custom orphan manager.
+	customOrphanMgr := NewOrphanManager(OrphanConfig{
+		MaxOrphans:    50, // Custom value
+		MaxOrphanSize: 50000,
+	})
 
 	cfg := &MempoolConfig{
-		PolicyConfig: customPolicyCfg,
+		FetchUtxoView: func(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
+			return blockchain.NewUtxoViewpoint(), nil
+		},
+		BestHeight: func() int32 {
+			return 100
+		},
+		MedianTimePast: func() time.Time {
+			return time.Now()
+		},
+		PolicyEnforcer: customPolicy,
+		TxValidator:    NewStandardTxValidator(TxValidatorConfig{}),
+		OrphanManager:  customOrphanMgr,
 	}
 
-	mp := NewTxMempoolV2(cfg)
+	mp, err := NewTxMempoolV2(cfg)
+	require.NoError(t, err)
 
 	require.NotNil(t, mp)
 	require.NotNil(t, mp.policy)
+	require.NotNil(t, mp.orphanMgr)
+	require.NotNil(t, mp.txValidator)
 
-	// The policy should use our custom config.
-	// We can't directly inspect the config, but we can verify the policy
-	// was created.
-	require.NotNil(t, mp.policy)
+	// Verify that the injected dependencies are used.
+	require.Same(t, customPolicy, mp.policy,
+		"should use injected policy enforcer")
+	require.Same(t, customOrphanMgr, mp.orphanMgr,
+		"should use injected orphan manager")
 }
