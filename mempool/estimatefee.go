@@ -756,3 +756,6 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 
 	return ef, nil
 }
+
+// Ensure FeeEstimator implements the TxFeeEstimator interface.
+var _ TxFeeEstimator = (*FeeEstimator)(nil)
