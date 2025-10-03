@@ -427,3 +427,6 @@ func (om *OrphanManager) ProcessOrphans(
 
 	return promoted, nil
 }
+
+// Ensure OrphanManager implements the OrphanTxManager interface.
+var _ OrphanTxManager = (*OrphanManager)(nil)
