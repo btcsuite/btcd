@@ -1558,36 +1558,10 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 // validateSegWitDeployment checks that when a transaction has witness data,
 // segwit must be active.
 func (mp *TxPool) validateSegWitDeployment(tx *btcutil.Tx) error {
-	// Exit early if this transaction doesn't have witness data.
-	if !tx.MsgTx().HasWitness() {
-		return nil
-	}
-
-	// If a transaction has witness data, and segwit isn't active yet, then
-	// we won't accept it into the mempool as it can't be mined yet.
-	segwitActive, err := mp.cfg.IsDeploymentActive(
-		chaincfg.DeploymentSegwit,
+	return CheckSegWitDeployment(
+		tx, mp.cfg.IsDeploymentActive, mp.cfg.ChainParams,
+		mp.cfg.BestHeight(),
 	)
-	if err != nil {
-		return err
-	}
-
-	// Exit early if segwit is active.
-	if segwitActive {
-		return nil
-	}
-
-	simnetHint := ""
-	if mp.cfg.ChainParams.Net == wire.SimNet {
-		bestHeight := mp.cfg.BestHeight()
-		simnetHint = fmt.Sprintf(" (The threshold for segwit "+
-			"activation is 300 blocks on simnet, current best "+
-			"height is %d)", bestHeight)
-	}
-	str := fmt.Sprintf("transaction %v has witness data, "+
-		"but segwit isn't active yet%s", tx.Hash(), simnetHint)
-
-	return txRuleError(wire.RejectNonstandard, str)
 }
 
 // validateStandardness checks the transaction passes both transaction standard
@@ -1647,31 +1621,8 @@ func (mp *TxPool) validateStandardness(tx *btcutil.Tx, nextBlockHeight int32,
 func (mp *TxPool) validateSigCost(tx *btcutil.Tx,
 	utxoView *blockchain.UtxoViewpoint) error {
 
-	// Since the coinbase address itself can contain signature operations,
-	// the maximum allowed signature operations per transaction is less
-	// than the maximum allowed signature operations per block.
-	//
-	// TODO(roasbeef): last bool should be conditional on segwit activation
-	sigOpCost, err := blockchain.GetSigOpCost(
-		tx, false, utxoView, true, true,
-	)
-	if err != nil {
-		if cerr, ok := err.(blockchain.RuleError); ok {
-			return chainRuleError(cerr)
-		}
-
-		return err
-	}
-
-	// Exit early if the sig cost is under limit.
-	if sigOpCost <= mp.cfg.Policy.MaxSigOpCostPerTx {
-		return nil
-	}
-
-	str := fmt.Sprintf("transaction %v sigop cost is too high: %d > %d",
-		tx.Hash(), sigOpCost, mp.cfg.Policy.MaxSigOpCostPerTx)
-
-	return txRuleError(wire.RejectNonstandard, str)
+	// Use the standalone CheckTransactionSigCost function.
+	return CheckTransactionSigCost(tx, utxoView, mp.cfg.Policy.MaxSigOpCostPerTx)
 }
 
 // validateRelayFeeMet checks that the min relay fee is covered by this
@@ -1680,56 +1631,32 @@ func (mp *TxPool) validateRelayFeeMet(tx *btcutil.Tx, txFee, txSize int64,
 	utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
 	isNew, rateLimit bool) error {
 
-	txHash := tx.Hash()
-
-	// Most miners allow a free transaction area in blocks they mine to go
-	// alongside the area used for high-priority transactions as well as
-	// transactions with fees. A transaction size of up to 1000 bytes is
-	// considered safe to go into this section. Further, the minimum fee
-	// calculated below on its own would encourage several small
-	// transactions to avoid fees rather than one single larger transaction
-	// which is more desirable. Therefore, as long as the size of the
-	// transaction does not exceed 1000 less than the reserved space for
-	// high-priority transactions, don't require a fee for it.
-	minFee := calcMinRequiredTxRelayFee(txSize, mp.cfg.Policy.MinRelayTxFee)
-
-	if txSize >= (DefaultBlockPrioritySize-1000) && txFee < minFee {
-		str := fmt.Sprintf("transaction %v has %d fees which is under "+
-			"the required amount of %d", txHash, txFee, minFee)
-
-		return txRuleError(wire.RejectInsufficientFee, str)
+	// Use the standalone CheckRelayFee function for min fee and priority
+	// checks.
+	err := CheckRelayFee(
+		tx, txFee, txSize, utxoView, nextBlockHeight,
+		mp.cfg.Policy.MinRelayTxFee,
+		mp.cfg.Policy.DisableRelayPriority, isNew,
+	)
+	if err != nil {
+		return err
 	}
 
-	// Exit early if the min relay fee is met.
+	// Exit early if rate limiting is not requested.
+	if !rateLimit {
+		return nil
+	}
+
+	// Calculate minimum required fee to determine if rate limiting applies.
+	minFee := calcMinRequiredTxRelayFee(txSize, mp.cfg.Policy.MinRelayTxFee)
+
+	// If the fee meets the minimum, no rate limiting needed.
 	if txFee >= minFee {
 		return nil
 	}
 
-	// Exit early if this is neither a new tx or rate limited.
-	if !isNew && !rateLimit {
-		return nil
-	}
-
-	// Require that free transactions have sufficient priority to be mined
-	// in the next block. Transactions which are being added back to the
-	// memory pool from blocks that have been disconnected during a reorg
-	// are exempted.
-	if isNew && !mp.cfg.Policy.DisableRelayPriority {
-		currentPriority := mining.CalcPriority(
-			tx.MsgTx(), utxoView, nextBlockHeight,
-		)
-		if currentPriority <= mining.MinHighPriority {
-			str := fmt.Sprintf("transaction %v has insufficient "+
-				"priority (%g <= %g)", txHash,
-				currentPriority, mining.MinHighPriority)
-
-			return txRuleError(wire.RejectInsufficientFee, str)
-		}
-	}
-
-	// We can only end up here when the rateLimit is true. Free-to-relay
-	// transactions are rate limited here to prevent penny-flooding with
-	// tiny transactions as a form of attack.
+	// Free-to-relay transactions are rate limited here to prevent
+	// penny-flooding with tiny transactions as a form of attack.
 	nowUnix := time.Now().Unix()
 
 	// Decay passed data with an exponentially decaying ~10 minute window -
@@ -1742,7 +1669,7 @@ func (mp *TxPool) validateRelayFeeMet(tx *btcutil.Tx, txFee, txSize int64,
 	// Are we still over the limit?
 	if mp.pennyTotal >= mp.cfg.Policy.FreeTxRelayLimit*10*1000 {
 		str := fmt.Sprintf("transaction %v has been rejected "+
-			"by the rate limiter due to low fees", txHash)
+			"by the rate limiter due to low fees", tx.Hash())
 
 		return txRuleError(wire.RejectInsufficientFee, str)
 	}
