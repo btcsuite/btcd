@@ -591,16 +591,29 @@ func TestValidateRelayFee(t *testing.T) {
 	minFee := calcMinRequiredTxRelayFee(size, cfg.MinRelayTxFee)
 
 	// Test with sufficient fee.
-	err := p.ValidateRelayFee(tx, minFee, size, true)
+	err := p.ValidateRelayFee(tx, minFee, size, nil, 0, true)
 	require.NoError(t, err, "should accept transaction with sufficient fee")
 
 	// Test with insufficient fee (should be rate limited for new tx).
-	err = p.ValidateRelayFee(tx, minFee-1, size, true)
+	err = p.ValidateRelayFee(tx, minFee-1, size, nil, 0, true)
 	require.NoError(t, err, "should accept new low-fee tx (rate limited)")
 
-	// Test with insufficient fee for non-new tx.
-	err = p.ValidateRelayFee(tx, minFee-1, size, false)
-	require.Error(t, err, "should reject non-new low-fee tx")
+	// Test with insufficient fee for non-new tx (reorg scenario).
+	// Non-new transactions are exempted from priority checks per the
+	// CheckRelayFee implementation (line 469-472 in policy.go), so they
+	// should be allowed even with low fees as long as they're under the
+	// size threshold (DefaultBlockPrioritySize - 1000 = 49000 bytes).
+	err = p.ValidateRelayFee(tx, minFee-1, size, nil, 0, false)
+	require.NoError(t, err, "should accept non-new low-fee tx (reorg exemption)")
+
+	// Test with a large transaction that exceeds the free transaction
+	// size threshold. Even non-new transactions should be rejected if
+	// they're too large and have insufficient fees.
+	largeSize := int64(DefaultBlockPrioritySize - 500) // 49500 bytes
+	largeTxMinFee := calcMinRequiredTxRelayFee(largeSize, cfg.MinRelayTxFee)
+	err = p.ValidateRelayFee(tx, largeTxMinFee-1, largeSize, nil, 0, false)
+	require.Error(t, err, "should reject large non-new tx with insufficient fee")
+	require.Contains(t, err.Error(), "under the required amount")
 }
 
 // TestRateLimiting tests that the rate limiter correctly limits free
@@ -616,11 +629,11 @@ func TestRateLimiting(t *testing.T) {
 	size := GetTxVirtualSize(tx)
 
 	// First free tx should be accepted.
-	err := p.ValidateRelayFee(tx, 0, size, true)
+	err := p.ValidateRelayFee(tx, 0, size, nil, 0, true)
 	require.NoError(t, err)
 
 	// Second free tx should be rejected (rate limited).
-	err = p.ValidateRelayFee(tx, 0, size, true)
+	err = p.ValidateRelayFee(tx, 0, size, nil, 0, true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "rate limiter")
 }
@@ -638,7 +651,7 @@ func TestRateLimiterDecay(t *testing.T) {
 	size := int64(50)
 
 	// Accept first transaction.
-	err := p.ValidateRelayFee(tx, 0, size, true)
+	err := p.ValidateRelayFee(tx, 0, size, nil, 0, true)
 	require.NoError(t, err)
 
 	// Manually advance time to simulate decay.
@@ -650,7 +663,7 @@ func TestRateLimiterDecay(t *testing.T) {
 	p.mu.Unlock()
 
 	// Second transaction should be accepted after decay.
-	err = p.ValidateRelayFee(tx, 0, size, true)
+	err = p.ValidateRelayFee(tx, 0, size, nil, 0, true)
 	require.NoError(t, err)
 }
 
@@ -817,8 +830,8 @@ func TestPropertyFeeRateMonotonic(t *testing.T) {
 		tx := createTxWithSequence([]uint32{wire.MaxTxInSequenceNum})
 
 		// Higher fee should always be accepted if lower fee is accepted.
-		err1 := p.ValidateRelayFee(tx, fee1, size, false)
-		err2 := p.ValidateRelayFee(tx, fee2, size, false)
+		err1 := p.ValidateRelayFee(tx, fee1, size, nil, 0, false)
+		err2 := p.ValidateRelayFee(tx, fee2, size, nil, 0, false)
 
 		if err1 == nil && err2 != nil {
 			t.Fatalf("monotonicity violated: fee %d accepted but %d rejected",

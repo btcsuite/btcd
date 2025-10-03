@@ -11,7 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool/txgraph"
 )
@@ -54,22 +56,24 @@ type PolicyGraph interface {
 	// GetNode retrieves a transaction node from the graph.
 	GetNode(hash chainhash.Hash) (*txgraph.TxGraphNode, bool)
 
-	// GetAncestors returns all ancestor transactions up to maxDepth.
-	// A negative maxDepth returns all ancestors.
-	GetAncestors(hash chainhash.Hash, maxDepth int) map[chainhash.Hash]*txgraph.TxGraphNode
+	// GetAncestors returns all ancestor transactions up to maxDepth. A
+	// negative maxDepth returns all ancestors.
+	GetAncestors(hash chainhash.Hash,
+		maxDepth int) map[chainhash.Hash]*txgraph.TxGraphNode
 
-	// GetDescendants returns all descendant transactions up to maxDepth.
-	// A negative maxDepth returns all descendants.
-	GetDescendants(hash chainhash.Hash, maxDepth int) map[chainhash.Hash]*txgraph.TxGraphNode
+	// GetDescendants returns all descendant transactions up to maxDepth. A
+	// negative maxDepth returns all descendants.
+	GetDescendants(hash chainhash.Hash,
+		maxDepth int) map[chainhash.Hash]*txgraph.TxGraphNode
 }
 
 // PolicyEnforcer defines the interface for mempool policy enforcement. This
 // separates policy decisions from graph data structure operations, enabling
 // easier testing and different policy configurations.
 type PolicyEnforcer interface {
-	// SignalsReplacement determines if a transaction signals that it can be
-	// replaced using the Replace-By-Fee (RBF) policy. This includes both
-	// explicit signaling (sequence number) and inherited signaling
+	// SignalsReplacement determines if a transaction signals that it can
+	// be replaced using the Replace-By-Fee (RBF) policy. This includes
+	// both explicit signaling (sequence number) and inherited signaling
 	// (unconfirmed ancestors that signal RBF).
 	SignalsReplacement(graph PolicyGraph, tx *btcutil.Tx) bool
 
@@ -87,9 +91,26 @@ type PolicyEnforcer interface {
 	ValidateDescendantLimits(graph PolicyGraph, hash chainhash.Hash) error
 
 	// ValidateRelayFee checks that a transaction meets the minimum relay
-	// fee requirements, including rate limiting for free transactions.
+	// fee requirements, including priority checks and rate limiting for
+	// free/low-fee transactions.
 	ValidateRelayFee(tx *btcutil.Tx, fee int64, size int64,
+		utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
 		isNew bool) error
+
+	// ValidateStandardness checks that a transaction meets standardness
+	// requirements for relay (version, size, scripts, dust outputs).
+	ValidateStandardness(tx *btcutil.Tx, height int32,
+		medianTimePast time.Time, utxoView *blockchain.UtxoViewpoint,
+	) error
+
+	// ValidateSigCost checks that a transaction's signature operation cost
+	// does not exceed the maximum allowed for relay.
+	ValidateSigCost(tx *btcutil.Tx,
+		utxoView *blockchain.UtxoViewpoint) error
+
+	// ValidateSegWitDeployment checks that if a transaction contains
+	// witness data, the SegWit soft fork must be active.
+	ValidateSegWitDeployment(tx *btcutil.Tx) error
 }
 
 // PolicyConfig defines mempool policy parameters. These settings control
@@ -136,6 +157,25 @@ type PolicyConfig struct {
 	// DisableRelayPriority, if true, disables relaying of low-fee
 	// transactions based on priority.
 	DisableRelayPriority bool
+
+	// MaxTxVersion is the maximum transaction version to accept.
+	// Transactions with versions above this are rejected as non-standard.
+	MaxTxVersion int32
+
+	// MaxSigOpCostPerTx is the cumulative maximum cost of all signature
+	// operations in a single transaction that will be relayed or mined.
+	MaxSigOpCostPerTx int
+
+	// IsDeploymentActive checks if a consensus deployment is active.
+	// This is used for validating SegWit transactions.
+	IsDeploymentActive func(deploymentID uint32) (bool, error)
+
+	// ChainParams identifies the blockchain network (mainnet, testnet,
+	// etc). Used for network-specific validation rules.
+	ChainParams *chaincfg.Params
+
+	// BestHeight returns the current best block height.
+	BestHeight func() int32
 }
 
 // DefaultPolicyConfig returns a PolicyConfig with default values matching
@@ -157,6 +197,23 @@ func DefaultPolicyConfig() PolicyConfig {
 		MinRelayTxFee:        DefaultMinRelayTxFee,
 		FreeTxRelayLimit:     15.0,
 		DisableRelayPriority: false,
+
+		// Transaction version and signature operation limits.
+		MaxTxVersion:      2,     // Standard transaction version
+		MaxSigOpCostPerTx: 80000, // 1/5 of max block sigop cost
+
+		// Default deployment check (assume SegWit is active for testing).
+		IsDeploymentActive: func(deploymentID uint32) (bool, error) {
+			return true, nil
+		},
+
+		// Default to mainnet params.
+		ChainParams: &chaincfg.MainNetParams,
+
+		// Default height (reasonable for testing).
+		BestHeight: func() int32 {
+			return 700000
+		},
 	}
 }
 
@@ -390,9 +447,7 @@ func (p *StandardPolicyEnforcer) ValidateAncestorLimits(
 // size to prevent unbounded chain growth in the mempool. This implementation
 // matches that behavior.
 func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
-	graph PolicyGraph,
-	hash chainhash.Hash,
-) error {
+	graph PolicyGraph, hash chainhash.Hash) error {
 
 	// Get all descendants for this transaction.
 	descendants := graph.GetDescendants(hash, -1)
@@ -421,27 +476,32 @@ func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
 }
 
 // ValidateRelayFee checks that a transaction meets the minimum relay fee
-// requirements, including rate limiting for free/low-fee transactions.
-//
-// Transactions with fees below the minimum are rate-limited using an
-// exponentially decaying counter to prevent spam while allowing some free
+// requirements, including priority checks and rate limiting for free/low-fee
 // transactions.
+//
+// Transactions with fees below the minimum are checked for priority (if
+// enabled) and rate-limited using an exponentially decaying counter to prevent
+// spam while allowing some free transactions.
 func (p *StandardPolicyEnforcer) ValidateRelayFee(
-	tx *btcutil.Tx, fee int64, size int64, isNew bool) error {
+	tx *btcutil.Tx, fee int64, size int64, utxoView *blockchain.UtxoViewpoint,
+	nextBlockHeight int32, isNew bool) error {
 
-	// Calculate minimum required fee for this transaction.
-	minFee := calcMinRequiredTxRelayFee(size, p.cfg.MinRelayTxFee)
-
-	// If the fee meets the minimum, accept it immediately.
-	if fee >= minFee {
-		return nil
+	// First check the minimum relay fee and priority requirements using
+	// the standalone CheckRelayFee function.
+	err := CheckRelayFee(
+		tx, fee, size, utxoView, nextBlockHeight,
+		p.cfg.MinRelayTxFee, p.cfg.DisableRelayPriority, isNew,
+	)
+	if err != nil {
+		return err
 	}
 
-	// If this is not a new transaction or if relay priority is disabled,
-	// reject it for insufficient fee.
-	if !isNew || p.cfg.DisableRelayPriority {
-		return fmt.Errorf("transaction %v has insufficient fee: %d < %d",
-			tx.Hash(), fee, minFee)
+	// Calculate minimum required fee to determine if rate limiting applies.
+	minFee := calcMinRequiredTxRelayFee(size, p.cfg.MinRelayTxFee)
+
+	// If the fee meets the minimum, no rate limiting needed.
+	if fee >= minFee {
+		return nil
 	}
 
 	// Apply rate limiting for free/low-fee transactions.
@@ -467,6 +527,47 @@ func (p *StandardPolicyEnforcer) ValidateRelayFee(
 	p.pennyTotal += float64(size)
 
 	return nil
+}
+
+// ValidateStandardness checks that a transaction meets standardness
+// requirements for relay. This includes version checks, finalization, size
+// limits, script checks, and dust checks.
+func (p *StandardPolicyEnforcer) ValidateStandardness(
+	tx *btcutil.Tx, height int32, medianTimePast time.Time,
+	utxoView *blockchain.UtxoViewpoint) error {
+
+	// Use the existing CheckTransactionStandard function which handles
+	// version, finalization, size, and output script checks.
+	err := CheckTransactionStandard(
+		tx, height, medianTimePast,
+		p.cfg.MinRelayTxFee, p.cfg.MaxTxVersion,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Also check input standardness (signature scripts, etc).
+	return checkInputsStandard(tx, utxoView)
+}
+
+// ValidateSigCost checks that a transaction's signature operation cost does
+// not exceed the maximum allowed for relay.
+func (p *StandardPolicyEnforcer) ValidateSigCost(
+	tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
+
+	// Use the standalone CheckTransactionSigCost function to validate.
+	return CheckTransactionSigCost(tx, utxoView, p.cfg.MaxSigOpCostPerTx)
+}
+
+// ValidateSegWitDeployment checks that if a transaction contains witness data,
+// the SegWit soft fork must be active.
+func (p *StandardPolicyEnforcer) ValidateSegWitDeployment(tx *btcutil.Tx) error {
+
+	// Use the standalone CheckSegWitDeployment function to validate.
+	return CheckSegWitDeployment(
+		tx, p.cfg.IsDeploymentActive, p.cfg.ChainParams,
+		p.cfg.BestHeight(),
+	)
 }
 
 // Ensure StandardPolicyEnforcer implements PolicyEnforcer interface.
