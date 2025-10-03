@@ -10,6 +10,8 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -386,4 +388,167 @@ func GetTxVirtualSize(tx *btcutil.Tx) int64 {
 	// to 4. The division by 4 creates a discount for wit witness data.
 	return (blockchain.GetTransactionWeight(tx) + (blockchain.WitnessScaleFactor - 1)) /
 		blockchain.WitnessScaleFactor
+}
+
+// CheckTransactionSigCost validates that a transaction's signature operation
+// cost does not exceed the specified maximum. This is a standalone function
+// that can be called by both TxPool and TxMempoolV2.
+func CheckTransactionSigCost(tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint,
+	maxSigOpCostPerTx int) error {
+
+	// Since the coinbase address itself can contain signature operations,
+	// the maximum allowed signature operations per transaction is less
+	// than the maximum allowed signature operations per block.
+	sigOpCost, err := blockchain.GetSigOpCost(
+		tx, false, utxoView, true, true,
+	)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return chainRuleError(cerr)
+		}
+		return err
+	}
+
+	// Exit early if the sig cost is under limit.
+	if sigOpCost <= maxSigOpCostPerTx {
+		return nil
+	}
+
+	str := fmt.Sprintf("transaction %v sigop cost is too high: %d > %d",
+		tx.Hash(), sigOpCost, maxSigOpCostPerTx)
+
+	return txRuleError(wire.RejectNonstandard, str)
+}
+
+// CheckRelayFee validates that a transaction meets minimum relay fee
+// requirements. This includes checking the absolute fee against the minimum
+// relay fee policy, and optionally checking transaction priority for free or
+// low-fee transactions.
+//
+// This is extracted from TxPool.validateRelayFeeMet to be reusable by both
+// old TxPool and new TxMempoolV2. Rate limiting is handled separately by the
+// callers.
+func CheckRelayFee(tx *btcutil.Tx, txFee, txSize int64,
+	utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
+	minRelayTxFee btcutil.Amount, disableRelayPriority bool,
+	isNew bool) error {
+
+	txHash := tx.Hash()
+
+	// Most miners allow a free transaction area in blocks they mine to go
+	// alongside the area used for high-priority transactions as well as
+	// transactions with fees. A transaction size of up to 1000 bytes is
+	// considered safe to go into this section. Further, the minimum fee
+	// calculated below on its own would encourage several small
+	// transactions to avoid fees rather than one single larger transaction
+	// which is more desirable. Therefore, as long as the size of the
+	// transaction does not exceed 1000 less than the reserved space for
+	// high-priority transactions, don't require a fee for it.
+	minFee := calcMinRequiredTxRelayFee(txSize, minRelayTxFee)
+
+	if txSize >= (DefaultBlockPrioritySize-1000) && txFee < minFee {
+		str := fmt.Sprintf("transaction %v has %d fees which is under "+
+			"the required amount of %d", txHash, txFee, minFee)
+
+		return txRuleError(wire.RejectInsufficientFee, str)
+	}
+
+	// Exit early if the min relay fee is met.
+	if txFee >= minFee {
+		return nil
+	}
+
+	// Require that free transactions have sufficient priority to be mined
+	// in the next block. Transactions which are being added back to the
+	// memory pool from blocks that have been disconnected during a reorg
+	// are exempted (when isNew is false).
+	//
+	// Priority calculation requires a UTXO view. If utxoView is nil, we
+	// skip the priority check (this can happen in testing scenarios).
+	if isNew && !disableRelayPriority && utxoView != nil {
+		currentPriority := mining.CalcPriority(
+			tx.MsgTx(), utxoView, nextBlockHeight,
+		)
+		if currentPriority <= mining.MinHighPriority {
+			str := fmt.Sprintf("transaction %v has insufficient "+
+				"priority (%g <= %g)", txHash,
+				currentPriority, mining.MinHighPriority)
+
+			return txRuleError(wire.RejectInsufficientFee, str)
+		}
+	}
+
+	return nil
+}
+
+// CheckSequenceLocks validates that a transaction's sequence locks are active,
+// meaning the transaction can be included in the next block with respect to
+// its defined relative lock times.
+//
+// This is extracted from TxPool.checkMempoolAcceptance to be reusable by both
+// old TxPool and new TxMempoolV2.
+func CheckSequenceLocks(
+	tx *btcutil.Tx, utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
+	medianTimePast time.Time,
+	calcSequenceLock func(*btcutil.Tx, *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error),
+) error {
+
+	// Calculate the sequence lock for this transaction.
+	sequenceLock, err := calcSequenceLock(tx, utxoView)
+	if err != nil {
+		if cerr, ok := err.(blockchain.RuleError); ok {
+			return chainRuleError(cerr)
+		}
+		return err
+	}
+
+	// Check if the sequence lock is active (relative timelocks are met).
+	if !blockchain.SequenceLockActive(
+		sequenceLock, nextBlockHeight, medianTimePast,
+	) {
+		return txRuleError(wire.RejectNonstandard,
+			"transaction's sequence locks on inputs not met")
+	}
+
+	return nil
+}
+
+// CheckSegWitDeployment validates that if a transaction contains witness data,
+// the SegWit soft fork must be active. This prevents accepting witness
+// transactions into the mempool before they can be mined.
+//
+// This is extracted from TxPool.validateSegWitDeployment to be reusable by
+// both old TxPool and new TxMempoolV2.
+func CheckSegWitDeployment(
+	tx *btcutil.Tx, isDeploymentActive func(deploymentID uint32) (bool, error),
+	chainParams *chaincfg.Params, bestHeight int32) error {
+
+	// Exit early if this transaction doesn't have witness data.
+	if !tx.MsgTx().HasWitness() {
+		return nil
+	}
+
+	// If a transaction has witness data, and segwit isn't active yet, then
+	// we won't accept it into the mempool as it can't be mined yet.
+	segwitActive, err := isDeploymentActive(chaincfg.DeploymentSegwit)
+	if err != nil {
+		return err
+	}
+
+	// Exit early if segwit is active.
+	if segwitActive {
+		return nil
+	}
+
+	simnetHint := ""
+	if chainParams.Net == wire.SimNet {
+		simnetHint = fmt.Sprintf(" (The threshold for segwit "+
+			"activation is %v and current best height is %v)",
+			chainParams.MinerConfirmationWindow, bestHeight)
+	}
+
+	str := fmt.Sprintf("transaction %v has witness data, but segwit "+
+		"isn't active yet%s", tx.Hash(), simnetHint)
+
+	return txRuleError(wire.RejectNonstandard, str)
 }
