@@ -49,10 +49,16 @@ type OrphanTxManager interface {
 	// AddOrphan adds an orphan transaction to the pool with the given tag.
 	AddOrphan(tx *btcutil.Tx, tag Tag) error
 
+	// RemoveOrphan removes an orphan transaction from the pool.
+	RemoveOrphan(hash chainhash.Hash, cascade bool) error
+
+	// RemoveOrphansByTag removes all orphans tagged with the given tag.
+	RemoveOrphansByTag(tag Tag) int
+
 	// ProcessOrphans processes orphans that may now be acceptable after a
 	// parent transaction was added. Returns the list of promoted orphans.
 	ProcessOrphans(
-		hash chainhash.Hash,
+		parentTx *btcutil.Tx,
 		acceptFunc func(*btcutil.Tx) error,
 	) ([]*btcutil.Tx, error)
 }
@@ -489,23 +495,27 @@ func (mp *TxMempoolV2) processOrphansLocked(acceptedTx *btcutil.Tx) []*TxDesc {
 	acceptFunc := func(orphanTx *btcutil.Tx) error {
 		// Try to accept the orphan. Don't reject if it's a duplicate
 		// orphan since we're processing it from the orphan pool.
-		_, txDesc, err := mp.maybeAcceptTransactionLocked(
+		missingParents, txDesc, err := mp.maybeAcceptTransactionLocked(
 			orphanTx, true, true, false,
 		)
 		if err != nil {
+			// Orphan is invalid - return error so it gets removed.
 			return err
 		}
 
-		// If txDesc is nil, the orphan is still missing parents.
-		if txDesc != nil {
-			acceptedTxns = append(acceptedTxns, txDesc)
+		// If orphan still has missing parents, return error so
+		// OrphanManager keeps it in the pool for future processing.
+		if len(missingParents) > 0 {
+			return fmt.Errorf("orphan still has missing parents")
 		}
 
+		// Successfully accepted - store the descriptor.
+		acceptedTxns = append(acceptedTxns, txDesc)
 		return nil
 	}
 
 	// Process orphans that spend outputs from the accepted transaction.
-	promoted, err := mp.orphanMgr.ProcessOrphans(*acceptedTx.Hash(), acceptFunc)
+	promoted, err := mp.orphanMgr.ProcessOrphans(acceptedTx, acceptFunc)
 	if err != nil {
 		log.Warnf("Error processing orphans: %v", err)
 	}
@@ -589,18 +599,28 @@ func (mp *TxMempoolV2) RemoveDoubleSpends(tx *btcutil.Tx) {
 
 // RemoveOrphan removes the passed orphan transaction from the orphan pool.
 //
-// STUB: Implementation pending in implement-orphan-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) RemoveOrphan(tx *btcutil.Tx) {
-	panic("RemoveOrphan: not implemented")
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	// Delegate to OrphanManager. Use cascade=false to only remove this
+	// specific orphan without affecting its descendants.
+	_ = mp.orphanMgr.RemoveOrphan(*tx.Hash(), false)
 }
 
 // RemoveOrphansByTag removes all orphan transactions tagged with the provided
 // identifier. This is useful when a peer disconnects to remove all orphans
 // that were received from that peer.
 //
-// STUB: Implementation pending in implement-orphan-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) RemoveOrphansByTag(tag Tag) uint64 {
-	panic("RemoveOrphansByTag: not implemented")
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	// Delegate to OrphanManager and convert return type.
+	removed := mp.orphanMgr.RemoveOrphansByTag(tag)
+	return uint64(removed)
 }
 
 // ProcessOrphans determines if there are any orphans which depend on the passed
@@ -610,59 +630,201 @@ func (mp *TxMempoolV2) RemoveOrphansByTag(tag Tag) uint64 {
 // It returns a slice of transactions added to the mempool as a result of
 // processing the orphans.
 //
-// STUB: Implementation pending in implement-orphan-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) ProcessOrphans(acceptedTx *btcutil.Tx) []*TxDesc {
-	panic("ProcessOrphans: not implemented")
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	// Collect TxDesc results from successfully promoted orphans.
+	var acceptedDescs []*TxDesc
+
+	// Create acceptance function that wraps maybeAcceptTransactionLocked.
+	acceptFunc := func(tx *btcutil.Tx) error {
+		// Try to accept the orphan into the mempool.
+		// isNew=true (orphan is new to main pool)
+		// rateLimit=false (already vetted when added as orphan)
+		// rejectDupOrphans=false (it's currently an orphan)
+		_, txDesc, err := mp.maybeAcceptTransactionLocked(
+			tx, true, false, false)
+		if err != nil {
+			return err
+		}
+
+		// Successfully accepted - store the descriptor.
+		acceptedDescs = append(acceptedDescs, txDesc)
+		return nil
+	}
+
+	// Delegate to OrphanManager to process orphans.
+	_, _ = mp.orphanMgr.ProcessOrphans(acceptedTx, acceptFunc)
+
+	return acceptedDescs
 }
 
 // FetchTransaction returns the requested transaction from the transaction pool.
 // This only fetches from the main transaction pool and does not include orphans.
 //
-// STUB: Implementation pending in implement-query-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) {
-	panic("FetchTransaction: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	// Lookup transaction in graph.
+	node, exists := mp.graph.GetNode(*txHash)
+	if !exists {
+		return nil, fmt.Errorf("transaction is not in the pool")
+	}
+
+	return node.Tx, nil
 }
 
 // TxHashes returns a slice of hashes for all of the transactions in the
 // memory pool.
 //
-// STUB: Implementation pending in implement-query-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) TxHashes() []*chainhash.Hash {
-	panic("TxHashes: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	// Pre-allocate slice with exact capacity.
+	count := mp.graph.GetNodeCount()
+	hashes := make([]*chainhash.Hash, 0, count)
+
+	// Iterate all nodes and collect hashes.
+	for node := range mp.graph.Iterate() {
+		// Make a copy of the hash to avoid returning pointers to node internals.
+		hashCopy := node.TxHash
+		hashes = append(hashes, &hashCopy)
+	}
+
+	return hashes
 }
 
 // TxDescs returns a slice of descriptors for all the transactions in the pool.
 // The descriptors are to be treated as read only.
 //
-// STUB: Implementation pending in implement-query-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) TxDescs() []*TxDesc {
-	panic("TxDescs: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	// Pre-allocate slice with exact capacity.
+	count := mp.graph.GetNodeCount()
+	descs := make([]*TxDesc, 0, count)
+
+	// Iterate all nodes and build descriptors.
+	for node := range mp.graph.Iterate() {
+		// Convert graph TxDesc to mempool TxDesc format.
+		desc := &TxDesc{
+			TxDesc: mining.TxDesc{
+				Tx:       node.Tx,
+				Added:    node.TxDesc.Added,
+				Height:   mp.cfg.BestHeight(),
+				Fee:      node.TxDesc.Fee,
+				FeePerKB: node.TxDesc.FeePerKB,
+			},
+			StartingPriority: 0, // Priority is deprecated.
+		}
+		descs = append(descs, desc)
+	}
+
+	return descs
 }
 
 // MiningDescs returns a slice of mining descriptors for all the transactions
 // in the pool. The descriptors are specifically formatted for block template
 // generation.
 //
-// STUB: Implementation pending in implement-query-ops task.
+// This is part of the mining.TxSource interface implementation and is safe for
+// concurrent access as required by the interface contract.
 func (mp *TxMempoolV2) MiningDescs() []*mining.TxDesc {
-	panic("MiningDescs: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	// Pre-allocate slice with exact capacity.
+	count := mp.graph.GetNodeCount()
+	descs := make([]*mining.TxDesc, 0, count)
+
+	// Iterate all nodes and build mining descriptors.
+	for node := range mp.graph.Iterate() {
+		desc := &mining.TxDesc{
+			Tx:       node.Tx,
+			Added:    node.TxDesc.Added,
+			Height:   mp.cfg.BestHeight(),
+			Fee:      node.TxDesc.Fee,
+			FeePerKB: node.TxDesc.FeePerKB,
+		}
+		descs = append(descs, desc)
+	}
+
+	return descs
 }
 
 // RawMempoolVerbose returns all the entries in the mempool as a fully
 // populated btcjson result for the getrawmempool RPC command.
 //
-// STUB: Implementation pending in implement-query-ops task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseResult {
-	panic("RawMempoolVerbose: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	count := mp.graph.GetNodeCount()
+	result := make(map[string]*btcjson.GetRawMempoolVerboseResult, count)
+	bestHeight := mp.cfg.BestHeight()
+
+	// Iterate all nodes and build verbose results.
+	for node := range mp.graph.Iterate() {
+		tx := node.Tx
+
+		// Calculate current priority based on the inputs. Use zero if we
+		// can't fetch the UTXO view for some reason.
+		var currentPriority float64
+		utxos, err := mp.cfg.FetchUtxoView(tx)
+		if err == nil {
+			currentPriority = mining.CalcPriority(tx.MsgTx(), utxos,
+				bestHeight+1)
+		}
+
+		mpd := &btcjson.GetRawMempoolVerboseResult{
+			Size:             int32(tx.MsgTx().SerializeSize()),
+			Vsize:            int32(GetTxVirtualSize(tx)),
+			Weight:           int32(blockchain.GetTransactionWeight(tx)),
+			Fee:              btcutil.Amount(node.TxDesc.Fee).ToBTC(),
+			Time:             node.TxDesc.Added.Unix(),
+			Height:           int64(bestHeight),
+			StartingPriority: 0, // Priority is deprecated.
+			CurrentPriority:  currentPriority,
+			Depends:          make([]string, 0),
+		}
+
+		// Build dependency list (parents that are also in the mempool).
+		for _, txIn := range tx.MsgTx().TxIn {
+			parentHash := txIn.PreviousOutPoint.Hash
+			if mp.graph.HasTransaction(parentHash) {
+				mpd.Depends = append(mpd.Depends, parentHash.String())
+			}
+		}
+
+		result[tx.Hash().String()] = mpd
+	}
+
+	return result
 }
 
 // CheckSpend checks whether the passed outpoint is already spent by a
 // transaction in the mempool. If that's the case, the spending transaction
 // will be returned, otherwise nil will be returned.
-//
-// STUB: Implementation pending in implement-query-ops task.
 func (mp *TxMempoolV2) CheckSpend(op wire.OutPoint) *btcutil.Tx {
-	panic("CheckSpend: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	// Use graph's spentBy index for O(1) lookup.
+	spender, exists := mp.graph.GetSpendingTx(op)
+	if !exists {
+		return nil
+	}
+
+	return spender.Tx
 }
 
 // CheckMempoolAcceptance behaves similarly to bitcoind's `testmempoolaccept`
@@ -670,9 +832,16 @@ func (mp *TxMempoolV2) CheckSpend(op wire.OutPoint) *btcutil.Tx {
 // transaction can be accepted to the mempool. If not, the specific error is
 // returned and the caller needs to take actions based on it.
 //
-// STUB: Implementation pending in implement-rbf-validation task.
+// This function is safe for concurrent access.
 func (mp *TxMempoolV2) CheckMempoolAcceptance(tx *btcutil.Tx) (*MempoolAcceptResult, error) {
-	panic("CheckMempoolAcceptance: not implemented")
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	// Call internal validation with testmempoolaccept-RPC parameters:
+	// - isNew=true (treat as new transaction)
+	// - rateLimit=false (no rate limiting for RPC checks)
+	// - rejectDupOrphans=true (reject if already in orphan pool)
+	return mp.checkMempoolAcceptance(tx, true, false, true)
 }
 
 // Ensure TxMempoolV2 implements the TxMempool interface.

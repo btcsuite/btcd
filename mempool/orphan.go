@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool/txgraph"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // Orphan-specific errors.
@@ -368,28 +369,36 @@ func (om *OrphanManager) Count() int {
 //
 // Returns the list of successfully promoted transactions.
 func (om *OrphanManager) ProcessOrphans(
-	parentHash chainhash.Hash,
+	parentTx *btcutil.Tx,
 	acceptFunc func(*btcutil.Tx) error,
 ) ([]*btcutil.Tx, error) {
 
 	om.mu.Lock()
 	defer om.mu.Unlock()
 
-	// Find orphans that spend from this parent. The graph structure makes
-	// this efficient: we just look at the children of the parent node.
-	parentNode, exists := om.graph.GetNode(parentHash)
-	if !exists {
-		// Parent isn't in orphan graph, so no orphans spend from it.
-		return nil, nil
-	}
-
-	// Collect all orphan descendants of this parent.
+	// Find orphans that spend from this parent's outputs using the spentBy
+	// index. The parent itself is not in the orphan graph (it's in the main
+	// mempool), but orphans that spend its outputs are indexed by outpoint.
 	var promoted []*btcutil.Tx
 	toProcess := txgraph.NewQueue[*txgraph.TxGraphNode]()
 	visited := make(map[chainhash.Hash]bool)
 
-	// Start with direct children.
-	for _, child := range parentNode.Children {
+	// Check each output of the parent to see if it's spent by an orphan.
+	// Iterate through actual outputs of the transaction.
+	parentHash := parentTx.Hash()
+	for txOutIdx := range parentTx.MsgTx().TxOut {
+		outpoint := wire.OutPoint{
+			Hash:  *parentHash,
+			Index: uint32(txOutIdx),
+		}
+
+		child, exists := om.graph.GetSpendingTx(outpoint)
+		if !exists {
+			// No orphan spends this output.
+			continue
+		}
+
+		// Found an orphan that spends this parent output.
 		if !visited[child.TxHash] {
 			toProcess.Enqueue(child)
 			visited[child.TxHash] = true

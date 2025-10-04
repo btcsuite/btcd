@@ -427,6 +427,19 @@ func (g *TxGraph) HasTransaction(hash chainhash.Hash) bool {
 	return exists
 }
 
+// GetSpendingTx returns the transaction that spends the given outpoint, if any.
+// This provides O(1) access to the spentBy index for mempool query operations.
+//
+// Returns the spending transaction node and true if the outpoint is spent by a
+// mempool transaction, otherwise returns nil and false.
+func (g *TxGraph) GetSpendingTx(op wire.OutPoint) (*TxGraphNode, bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	spender, exists := g.indexes.spentBy[op]
+	return spender, exists
+}
+
 // GetAncestors returns all ancestors of a transaction up to maxDepth.
 func (g *TxGraph) GetAncestors(hash chainhash.Hash,
 	maxDepth int) map[chainhash.Hash]*TxGraphNode {

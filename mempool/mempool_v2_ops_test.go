@@ -201,12 +201,38 @@ func (h *testHarness) expectTxAccepted(tx *btcutil.Tx, view *blockchain.UtxoView
 
 // expectTxOrphan sets up mocks for orphan detection.
 func (h *testHarness) expectTxOrphan(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) {
-	h.mockPolicy.On("ValidateSegWitDeployment", tx).Return(nil)
-	h.mockValidator.On("ValidateSanity", tx).Return(nil)
+	h.mockPolicy.On("ValidateSegWitDeployment", tx).Return(nil).Once()
+	h.mockValidator.On("ValidateSanity", tx).Return(nil).Once()
 	// Return a missing parent to indicate this is an orphan.
+	// Use Once() so subsequent calls (during promotion) can have different behavior.
 	missingParent := chainhash.Hash{0x01}
-	h.mockValidator.On("ValidateUtxoAvailability", tx, mock.Anything).Return([]*chainhash.Hash{&missingParent}, nil)
-	h.mockUtxoView.On("FetchUtxoView", tx).Return(view, nil)
+	h.mockValidator.On("ValidateUtxoAvailability", tx, mock.Anything).Return([]*chainhash.Hash{&missingParent}, nil).Once()
+	h.mockUtxoView.On("FetchUtxoView", tx).Return(view, nil).Once()
+}
+
+// expectEarlyValidation sets up mocks for just the early validation steps
+// (SegWit deployment check, sanity check, and UTXO view fetch). This is useful
+// for tests that expect validation to fail at a later stage or for duplicate
+// transaction detection.
+func (h *testHarness) expectEarlyValidation(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) {
+	h.mockPolicy.On("ValidateSegWitDeployment", tx).Return(nil).Once()
+	h.mockValidator.On("ValidateSanity", tx).Return(nil).Once()
+	h.mockUtxoView.On("FetchUtxoView", tx).Return(view, nil).Once()
+}
+
+// expectOrphanPromotion sets up mocks for promoting an orphan transaction.
+// This includes setting up a UTXO view that contains the parent's output and
+// all the standard transaction acceptance checks.
+func (h *testHarness) expectOrphanPromotion(childTx *btcutil.Tx, parentTx *btcutil.Tx, parentOutputIdx uint32) {
+	// Create UTXO view with parent's output.
+	promotionView := blockchain.NewUtxoViewpoint()
+	parentOut := wire.OutPoint{Hash: *parentTx.Hash(), Index: parentOutputIdx}
+	promotionView.Entries()[parentOut] = blockchain.NewUtxoEntry(
+		parentTx.MsgTx().TxOut[parentOutputIdx], 100, false)
+
+	// Set up mocks for child promotion.
+	h.mockUtxoView.On("FetchUtxoView", childTx).Return(promotionView, nil).Once()
+	h.expectTxAccepted(childTx, nil) // Don't set FetchUtxoView again - already done above
 }
 
 // expectValidationFailure sets up mocks for a validation failure at a specific stage.
@@ -487,10 +513,26 @@ func TestProcessTransactionWithOrphans(t *testing.T) {
 	require.True(t, h.mempool.IsOrphanInPool(childTx.Hash()))
 	require.Equal(t, 0, h.mempool.Count()) // Not in main pool
 
-	// TODO: Fix orphan promotion test.
-	// The orphan promotion is not working correctly in the test.
-	// This may require better mock setup or a different testing approach.
-	// For now, we're testing that orphans are correctly detected and stored.
+	// Now add the parent, which should trigger orphan promotion.
+	parentView := createDefaultUtxoView(parentTx)
+	h.expectTxAccepted(parentTx, parentView)
+
+	// Set up mocks for orphan promotion (called during ProcessOrphans).
+	h.expectOrphanPromotion(childTx, parentTx, 0)
+
+	// Process parent transaction.
+	acceptedTxs, err = h.mempool.ProcessTransaction(parentTx, true, false, 0)
+	require.NoError(t, err)
+	require.NotNil(t, acceptedTxs)
+	require.Len(t, acceptedTxs, 2) // Parent + promoted child
+
+	// Verify both parent and child are in main pool.
+	require.True(t, h.mempool.IsTransactionInPool(parentTx.Hash()))
+	require.True(t, h.mempool.IsTransactionInPool(childTx.Hash()))
+	require.Equal(t, 2, h.mempool.Count())
+
+	// Verify child is no longer in orphan pool.
+	require.False(t, h.mempool.IsOrphanInPool(childTx.Hash()))
 }
 
 // TestRemoveTransaction tests transaction removal.
@@ -843,6 +885,9 @@ func TestDuplicateOrphan(t *testing.T) {
 
 	// Try to add the same orphan again. When rejectDupOrphans=true (which
 	// ProcessTransaction sets internally), it should reject duplicates.
+	// Set up mocks for the early validation steps (before duplicate check).
+	h.expectEarlyValidation(tx, view)
+
 	_, err = h.mempool.ProcessTransaction(tx, true, false, 0)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "already have transaction")

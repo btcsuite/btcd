@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
 )
 
@@ -159,13 +158,34 @@ func TestMempoolMissingDependenciesError(t *testing.T) {
 func TestMempoolCount(t *testing.T) {
 	t.Parallel()
 
-	mp := newTestMempoolV2(t)
+	h := createTestMempoolV2()
 
 	// Initial count should be zero.
-	require.Equal(t, 0, mp.Count(), "initial count should be 0")
+	require.Equal(t, 0, h.mempool.Count(), "initial count should be 0")
 
-	// TODO: Add transactions and verify count increases.
-	// This will be tested properly in implement-tx-operations task.
+	// Add first transaction (parent1).
+	parent1 := createTestTx()
+	parent1View := createDefaultUtxoView(parent1)
+	h.expectTxAccepted(parent1, parent1View)
+	_, _, err := h.mempool.MaybeAcceptTransaction(parent1, true, false)
+	require.NoError(t, err)
+	require.Equal(t, 1, h.mempool.Count(), "count should be 1 after adding first tx")
+
+	// Add second transaction (child of parent1) to ensure unique hash.
+	child1 := createChildTx(parent1, 0)
+	child1View := createDefaultUtxoView(child1)
+	h.expectTxAccepted(child1, child1View)
+	_, _, err = h.mempool.MaybeAcceptTransaction(child1, true, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, h.mempool.Count(), "count should be 2 after adding second tx")
+
+	// Add third transaction (child of child1) to avoid conflicts.
+	child2 := createChildTx(child1, 0)
+	child2View := createDefaultUtxoView(child2)
+	h.expectTxAccepted(child2, child2View)
+	_, _, err = h.mempool.MaybeAcceptTransaction(child2, true, false)
+	require.NoError(t, err)
+	require.Equal(t, 3, h.mempool.Count(), "count should be 3 after adding third tx")
 }
 
 // TestMempoolHaveTransaction verifies HaveTransaction checks both main pool
@@ -173,15 +193,40 @@ func TestMempoolCount(t *testing.T) {
 func TestMempoolHaveTransaction(t *testing.T) {
 	t.Parallel()
 
-	mp := newTestMempoolV2(t)
+	h := createTestMempoolV2()
 
 	// Random hash should not exist.
 	randomHash := chainhash.Hash{0x01, 0x02, 0x03}
-	require.False(t, mp.HaveTransaction(&randomHash),
+	require.False(t, h.mempool.HaveTransaction(&randomHash),
 		"random hash should not exist")
 
-	// TODO: Add transaction and verify it's found.
-	// This will be tested properly in implement-tx-operations task.
+	// Add transaction to main pool.
+	tx := createTestTx()
+	view := createDefaultUtxoView(tx)
+	h.expectTxAccepted(tx, view)
+	_, _, err := h.mempool.MaybeAcceptTransaction(tx, true, false)
+	require.NoError(t, err)
+
+	// Verify transaction is found.
+	require.True(t, h.mempool.HaveTransaction(tx.Hash()),
+		"should find transaction in mempool")
+
+	// Add an orphan transaction (create with unique signature).
+	orphan := createTestTx()
+	// Make unique by modifying signature.
+	orphan.MsgTx().TxIn[0].SignatureScript[0] = 0xFF
+	orphanView := createOrphanUtxoView(orphan)
+	h.expectTxOrphan(orphan, orphanView)
+
+	// Use ProcessTransaction to actually add orphan to orphan pool.
+	acceptedTxs, err := h.mempool.ProcessTransaction(orphan, true, false, 0)
+	require.NoError(t, err)
+	// Orphan returns nil (not accepted to main pool).
+	require.Nil(t, acceptedTxs)
+
+	// Verify orphan is also found by HaveTransaction (checks both pools).
+	require.True(t, h.mempool.HaveTransaction(orphan.Hash()),
+		"should find orphan transaction in orphan pool")
 }
 
 // TestMempoolIsTransactionInPool verifies IsTransactionInPool checks only
@@ -189,14 +234,42 @@ func TestMempoolHaveTransaction(t *testing.T) {
 func TestMempoolIsTransactionInPool(t *testing.T) {
 	t.Parallel()
 
-	mp := newTestMempoolV2(t)
+	h := createTestMempoolV2()
 
 	randomHash := chainhash.Hash{0x01, 0x02, 0x03}
-	require.False(t, mp.IsTransactionInPool(&randomHash),
+	require.False(t, h.mempool.IsTransactionInPool(&randomHash),
 		"random hash should not exist in main pool")
 
-	// TODO: Add transaction and verify it's found in main pool but not as
-	// orphan. This will be tested properly in implement-tx-operations task.
+	// Add transaction to main pool.
+	tx := createTestTx()
+	view := createDefaultUtxoView(tx)
+	h.expectTxAccepted(tx, view)
+	_, _, err := h.mempool.MaybeAcceptTransaction(tx, true, false)
+	require.NoError(t, err)
+
+	// Verify transaction is found in main pool.
+	require.True(t, h.mempool.IsTransactionInPool(tx.Hash()),
+		"should find transaction in main pool")
+
+	// Add an orphan transaction (create with unique signature).
+	orphan := createTestTx()
+	// Make unique by modifying signature.
+	orphan.MsgTx().TxIn[0].SignatureScript[0] = 0xFF
+	orphanView := createOrphanUtxoView(orphan)
+	h.expectTxOrphan(orphan, orphanView)
+
+	// Use ProcessTransaction to actually add orphan to orphan pool.
+	acceptedTxs, err := h.mempool.ProcessTransaction(orphan, true, false, 0)
+	require.NoError(t, err)
+	// Orphan returns nil (not accepted to main pool).
+	require.Nil(t, acceptedTxs)
+
+	// Verify orphan is NOT found by IsTransactionInPool (checks only main pool).
+	require.False(t, h.mempool.IsTransactionInPool(orphan.Hash()),
+		"should not find orphan in main pool")
+	// But verify it's in the orphan pool.
+	require.True(t, h.mempool.IsOrphanInPool(orphan.Hash()),
+		"should find orphan in orphan pool")
 }
 
 // TestMempoolIsOrphanInPool verifies IsOrphanInPool checks only the orphan
@@ -204,14 +277,45 @@ func TestMempoolIsTransactionInPool(t *testing.T) {
 func TestMempoolIsOrphanInPool(t *testing.T) {
 	t.Parallel()
 
-	mp := newTestMempoolV2(t)
+	h := createTestMempoolV2()
 
 	randomHash := chainhash.Hash{0x01, 0x02, 0x03}
-	require.False(t, mp.IsOrphanInPool(&randomHash),
+	require.False(t, h.mempool.IsOrphanInPool(&randomHash),
 		"random hash should not exist in orphan pool")
 
-	// TODO: Add orphan and verify it's found in orphan pool but not main
-	// pool. This will be tested properly in implement-orphan-ops task.
+	// Add an orphan transaction (create with unique signature).
+	orphan := createTestTx()
+	// Make unique by modifying signature.
+	orphan.MsgTx().TxIn[0].SignatureScript[0] = 0xFF
+	orphanView := createOrphanUtxoView(orphan)
+	h.expectTxOrphan(orphan, orphanView)
+
+	// Use ProcessTransaction to actually add orphan to orphan pool.
+	acceptedTxs, err := h.mempool.ProcessTransaction(orphan, true, false, 0)
+	require.NoError(t, err)
+	// Orphan returns nil (not accepted to main pool).
+	require.Nil(t, acceptedTxs)
+
+	// Verify orphan is found in orphan pool.
+	require.True(t, h.mempool.IsOrphanInPool(orphan.Hash()),
+		"should find orphan in orphan pool")
+	// But NOT found in main pool.
+	require.False(t, h.mempool.IsTransactionInPool(orphan.Hash()),
+		"should not find orphan in main pool")
+
+	// Add a regular transaction to main pool (create as child to make unique).
+	parent := createTestTx()
+	parentView := createDefaultUtxoView(parent)
+	h.expectTxAccepted(parent, parentView)
+	_, _, err = h.mempool.MaybeAcceptTransaction(parent, true, false)
+	require.NoError(t, err)
+
+	// Verify main pool transaction is NOT in orphan pool.
+	require.False(t, h.mempool.IsOrphanInPool(parent.Hash()),
+		"should not find main pool tx in orphan pool")
+	// But IS found in main pool.
+	require.True(t, h.mempool.IsTransactionInPool(parent.Hash()),
+		"should find main pool tx in main pool")
 }
 
 // TestMempoolLastUpdated verifies that LastUpdated returns a valid timestamp.
@@ -262,98 +366,6 @@ func TestMempoolConcurrentAccess(t *testing.T) {
 
 	// Wait for all readers to complete.
 	wg.Wait()
-}
-
-// TestMempoolStubbedMethodsPanic verifies that unimplemented methods panic
-// with "not implemented" message as expected.
-func TestMempoolStubbedMethodsPanic(t *testing.T) {
-	t.Parallel()
-
-	mp := newTestMempoolV2(t)
-
-	// Test that stubbed methods panic (only for methods not yet implemented).
-	tests := []struct {
-		name string
-		fn   func()
-	}{
-		{
-			name: "RemoveOrphan",
-			fn: func() {
-				mp.RemoveOrphan(nil)
-			},
-		},
-		{
-			name: "RemoveOrphansByTag",
-			fn: func() {
-				_ = mp.RemoveOrphansByTag(0)
-			},
-		},
-		{
-			name: "ProcessOrphans",
-			fn: func() {
-				_ = mp.ProcessOrphans(nil)
-			},
-		},
-		{
-			name: "FetchTransaction",
-			fn: func() {
-				_, _ = mp.FetchTransaction(nil)
-			},
-		},
-		{
-			name: "TxHashes",
-			fn: func() {
-				_ = mp.TxHashes()
-			},
-		},
-		{
-			name: "TxDescs",
-			fn: func() {
-				_ = mp.TxDescs()
-			},
-		},
-		{
-			name: "MiningDescs",
-			fn: func() {
-				_ = mp.MiningDescs()
-			},
-		},
-		{
-			name: "RawMempoolVerbose",
-			fn: func() {
-				_ = mp.RawMempoolVerbose()
-			},
-		},
-		{
-			name: "CheckSpend",
-			fn: func() {
-				_ = mp.CheckSpend(wire.OutPoint{})
-			},
-		},
-		{
-			name: "CheckMempoolAcceptance",
-			fn: func() {
-				_, _ = mp.CheckMempoolAcceptance(nil)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Verify that calling the stubbed method panics.
-			require.Panics(t, tt.fn,
-				"stubbed method %s should panic", tt.name)
-		})
-	}
-}
-
-// TestMempoolInterfaceCompliance verifies that TxMempoolV2 implements the
-// TxMempool interface. This is a compile-time check via the var declaration
-// in mempool_v2.go, but we add an explicit test for documentation.
-func TestMempoolInterfaceCompliance(t *testing.T) {
-	t.Parallel()
-
-	var _ TxMempool = (*TxMempoolV2)(nil)
 }
 
 // TestMempoolConfigCustomization verifies that custom dependencies can be

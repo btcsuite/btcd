@@ -305,16 +305,9 @@ func TestOrphanManagerProcessOrphans(t *testing.T) {
 	}
 
 	// Process orphans when parent arrives (parent is not in orphan pool).
-	result, err := om.ProcessOrphans(*parent.Hash(), acceptFunc)
-	require.NoError(t, err)
-	require.Empty(t, result)
-	require.Empty(t, promoted)
-
-	// Now add parent to orphan pool.
-	require.NoError(t, om.AddOrphan(parent, Tag(1)))
-
-	// Process orphans again.
-	result, err = om.ProcessOrphans(*parent.Hash(), acceptFunc)
+	// This is the common case: parent is accepted to main mempool, and we
+	// promote its orphan children.
+	result, err := om.ProcessOrphans(parent, acceptFunc)
 	require.NoError(t, err)
 
 	// Should have promoted child1, child2, and grandchild (in some order).
@@ -330,9 +323,9 @@ func TestOrphanManagerProcessOrphans(t *testing.T) {
 	require.Contains(t, promotedMap, *child2.Hash())
 	require.Contains(t, promotedMap, *grandchild.Hash())
 
-	// Orphan pool should now only contain parent and unrelated.
-	require.Equal(t, 2, om.Count())
-	require.True(t, om.IsOrphan(*parent.Hash()))
+	// Orphan pool should now only contain unrelated.
+	// (The 3 promoted orphans have been removed.)
+	require.Equal(t, 1, om.Count())
 	require.True(t, om.IsOrphan(*unrelated.Hash()))
 	require.False(t, om.IsOrphan(*child1.Hash()))
 	require.False(t, om.IsOrphan(*child2.Hash()))
@@ -368,7 +361,7 @@ func TestOrphanManagerProcessOrphansPartialFailure(t *testing.T) {
 	}
 
 	// Process orphans.
-	result, err := om.ProcessOrphans(*parent.Hash(), acceptFunc)
+	result, err := om.ProcessOrphans(parent, acceptFunc)
 	require.NoError(t, err)
 
 	// Should only have promoted child2.
@@ -429,7 +422,7 @@ func TestOrphanManagerPackageTracking(t *testing.T) {
 		return nil
 	}
 
-	result, err := om.ProcessOrphans(*root.Hash(), acceptFunc)
+	result, err := om.ProcessOrphans(root, acceptFunc)
 	require.NoError(t, err)
 
 	// Should have promoted all descendants: A, B, C.
