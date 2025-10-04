@@ -365,12 +365,9 @@ func CheckTransactionStandard(tx *btcutil.Tx, height int32,
 		}
 	}
 
-	// A standard transaction must not have more than one output script that
-	// only carries data.
-	if numNullDataOutputs > 1 {
-		str := "more than one transaction output in a nulldata script"
-		return txRuleError(wire.RejectNonstandard, str)
-	}
+	// Note: Multiple OP_RETURN outputs are now allowed as standard.
+	// Each output is still subject to MaxDataCarrierSize and the
+	// overall transaction remains subject to maxStandardTxWeight.
 
 	return nil
 }
