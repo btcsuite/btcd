@@ -462,6 +462,33 @@ func TestCheckTransactionStandard(t *testing.T) {
 			height:     300000,
 			isStandard: true,
 		},
+		{
+			name: "Large nulldata output with 75KB data (standard after v30)",
+			tx: func() wire.MsgTx {
+				// Create a large OP_RETURN with 75KB of data
+				// This is well over previous limits (80 bytes, 520 bytes MaxScriptElementSize)
+				// but under the new 100KB MaxDataCarrierSize limit
+				largeData := make([]byte, 75000)
+				for i := range largeData {
+					largeData[i] = byte(i % 256)
+				}
+				pkScript, err := txscript.NullDataScript(largeData)
+				if err != nil {
+					t.Fatalf("NullDataScript: unexpected error: %v", err)
+				}
+				return wire.MsgTx{
+					Version: 1,
+					TxIn:    []*wire.TxIn{&dummyTxIn},
+					TxOut: []*wire.TxOut{{
+						Value:    0,
+						PkScript: pkScript,
+					}},
+					LockTime: 0,
+				}
+			}(),
+			height:     300000,
+			isStandard: true,
+		},
 	}
 
 	pastMedianTime := time.Now()

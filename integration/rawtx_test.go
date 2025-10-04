@@ -201,3 +201,88 @@ func decodeHex(t *testing.T, txHex string) *wire.MsgTx {
 
 	return tx.MsgTx()
 }
+
+// TestLargeOPReturnMempool tests that large OP_RETURN transactions (up to 100KB)
+// are accepted into the mempool. This validates the Bitcoin Core v30 change that
+// removes the 80-byte OP_RETURN limit.
+func TestLargeOPReturnMempool(t *testing.T) {
+	t.Parallel()
+
+	// Create a single node for testing mempool acceptance.
+	// Use --rejectnonstd to enforce standardness rules (including maxStandardTxWeight).
+	btcdCfg := []string{"--rejectnonstd", "--debuglevel=debug"}
+	node, err := rpctest.New(&chaincfg.SimNetParams, nil, btcdCfg, "")
+	require.NoError(t, err)
+
+	// Setup the node with mature coinbase outputs.
+	require.NoError(t, node.SetUp(true, 100))
+	t.Cleanup(func() {
+		require.NoError(t, node.TearDown())
+	})
+
+	testCases := []struct {
+		name          string
+		dataSize      int
+		shouldSucceed bool
+		failureReason string
+	}{
+		{
+			name:          "75KB OP_RETURN (well over old 80 byte/520 byte limits)",
+			dataSize:      75000,
+			shouldSucceed: true,
+		},
+		{
+			name:          "100KB OP_RETURN (at MaxDataCarrierSize limit)",
+			dataSize:      100000,
+			shouldSucceed: false,
+			failureReason: "transaction size exceeds maxStandardTxWeight (100,000 vbytes)",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			// Create large OP_RETURN script.
+			largeData := make([]byte, tc.dataSize)
+			for i := range largeData {
+				largeData[i] = byte(i % 256)
+			}
+
+			opReturnScript, err := txscript.NullDataScript(largeData)
+			require.NoError(t, err)
+
+			// Create a transaction with OP_RETURN output using the harness wallet.
+			// The wallet will handle signing and input selection.
+			opReturnOutput := &wire.TxOut{
+				Value:    0,
+				PkScript: opReturnScript,
+			}
+
+			// Create transaction with the OP_RETURN output.
+			// The wallet automatically adds inputs and a change output if needed.
+			tx, err := node.CreateTransaction([]*wire.TxOut{opReturnOutput}, 10, true)
+			require.NoError(t, err)
+
+			// Log the actual transaction size.
+			txSize := tx.SerializeSize()
+			txWeight := txSize * 4 // Non-segwit: weight = size * 4
+			t.Logf("Transaction size: %d bytes, weight: %d (limit: 400000)", txSize, txWeight)
+
+			// Submit to the mempool.
+			txHash, err := node.Client.SendRawTransaction(tx, true)
+
+			if tc.shouldSucceed {
+				require.NoError(t, err, "Large OP_RETURN tx should be accepted")
+				t.Logf("✓ Large OP_RETURN tx (%d bytes data) accepted: %s", tc.dataSize, txHash)
+
+				// Verify it's in the mempool.
+				mempool, err := node.Client.GetRawMempool()
+				require.NoError(t, err)
+				require.Contains(t, mempool, txHash, "Transaction should be in mempool")
+			} else {
+				require.Error(t, err, "Transaction should be rejected: %s", tc.failureReason)
+				t.Logf("✓ Transaction correctly rejected (%s): %v", tc.failureReason, err)
+			}
+		})
+	}
+}

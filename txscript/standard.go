@@ -15,7 +15,7 @@ import (
 const (
 	// MaxDataCarrierSize is the maximum number of bytes allowed in pushed
 	// data to be considered a nulldata transaction
-	MaxDataCarrierSize = 80
+	MaxDataCarrierSize = 100000
 
 	// StandardVerifyFlags are the script flags which are used when
 	// executing transaction scripts to enforce additional checks which
@@ -885,6 +885,10 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 // NullDataScript creates a provably-prunable script containing OP_RETURN
 // followed by the passed data.  An Error with the error code ErrTooMuchNullData
 // will be returned if the length of the passed data exceeds MaxDataCarrierSize.
+//
+// Note: This function uses AddFullData to bypass MaxScriptElementSize since
+// OP_RETURN outputs are provably unspendable and never executed. The data size
+// is only constrained by MaxDataCarrierSize policy and MaxScriptSize consensus.
 func NullDataScript(data []byte) ([]byte, error) {
 	if len(data) > MaxDataCarrierSize {
 		str := fmt.Sprintf("data size %d is larger than max "+
@@ -892,7 +896,7 @@ func NullDataScript(data []byte) ([]byte, error) {
 		return nil, scriptError(ErrTooMuchNullData, str)
 	}
 
-	return NewScriptBuilder().AddOp(OP_RETURN).AddData(data).Script()
+	return NewScriptBuilder().AddOp(OP_RETURN).AddFullData(data).Script()
 }
 
 // MultiSigScript returns a valid script for a multisignature redemption where
