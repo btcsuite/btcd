@@ -3,7 +3,7 @@ btcec
 
 [![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://pkg.go.dev/github.com/btcsuite/btcd/btcec/v2?status.png)](https://pkg.go.dev/github.com/btcsuite/btcd/btcec/v2)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd/btcec/v2)
 
 Package btcec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
