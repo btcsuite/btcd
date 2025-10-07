@@ -59,6 +59,11 @@ var (
 	// ErrNotEnoughSigners is returned if a caller attempts to obtain an
 	// early nonce when it wasn't specified
 	ErrNoEarlyNonce = fmt.Errorf("no early nonce available")
+
+	// ErrCombinedNonceAfterPubNonces is returned if RegisterCombinedNonce
+	// is called after public nonces have already been registered.
+	ErrCombinedNonceAfterPubNonces = fmt.Errorf("can't register combined " +
+		"nonce after public nonces")
 )
 
 // Context is a managed signing context for musig2. It takes care of things
@@ -525,7 +530,7 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 	// If we already have all the nonces, then this method was called too
 	// many times.
 	haveAllNonces := len(s.pubNonces) == s.ctx.opts.numSigners
-	if haveAllNonces {
+	if haveAllNonces || s.combinedNonce != nil {
 		return false, ErrAlredyHaveAllNonces
 	}
 
@@ -546,6 +551,43 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 	}
 
 	return haveAllNonces, nil
+}
+
+// RegisterCombinedNonce allows a caller to directly register a combined nonce
+// that was generated externally. This is useful in coordinator-based
+// protocols where the coordinator aggregates all nonces and distributes the
+// combined nonce to participants, rather than each participant aggregating
+// nonces themselves.
+func (s *Session) RegisterCombinedNonce(
+	combinedNonce [PubNonceSize]byte) error {
+
+	// If we already have a combined nonce, then this method was called too
+	// many times.
+	if s.combinedNonce != nil {
+		return ErrAlredyHaveAllNonces
+	}
+
+	// We also don't allow this method to be called if we already registered
+	// some public nonces.
+	if len(s.pubNonces) > 1 {
+		return ErrCombinedNonceAfterPubNonces
+	}
+
+	// We'll now try to parse the combined nonce into it's two points to
+	// ensure it's valid.
+	_, err := btcec.ParsePubKey(combinedNonce[:33])
+	if err != nil {
+		return fmt.Errorf("invalid combined nonce: %w", err)
+	}
+	_, err = btcec.ParsePubKey(combinedNonce[33:])
+	if err != nil {
+		return fmt.Errorf("invalid combined nonce: %w", err)
+	}
+
+	// Otherwise, we'll just set the combined nonce directly.
+	s.combinedNonce = &combinedNonce
+
+	return nil
 }
 
 // Sign generates a partial signature for the target message, using the target

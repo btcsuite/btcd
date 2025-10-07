@@ -439,3 +439,326 @@ func (mr *memsetRandReader) Read(buf []byte) (n int, err error) {
 	}
 	return len(buf), nil
 }
+
+// TestSigningWithAggregatedNonce tests the aggregated nonce signing flow where
+// nonces are aggregated externally and provided to participants via
+// RegisterCombinedNonce, rather than each participant aggregating nonces
+// themselves via RegisterPubNonce.
+func TestSigningWithAggregatedNonce(t *testing.T) {
+	t.Run("basic flow", func(t *testing.T) {
+		const numSigners = 5
+
+		// Generate signers.
+		signerKeys := make([]*btcec.PrivateKey, numSigners)
+		signSet := make([]*btcec.PublicKey, numSigners)
+		for i := 0; i < numSigners; i++ {
+			privKey, err := btcec.NewPrivateKey()
+			if err != nil {
+				t.Fatalf("unable to gen priv key: %v", err)
+			}
+			signerKeys[i] = privKey
+			signSet[i] = privKey.PubKey()
+		}
+
+		// Each signer creates a context and session.
+		sessions := make([]*Session, numSigners)
+		for i, signerKey := range signerKeys {
+			signCtx, err := NewContext(
+				signerKey, false, WithKnownSigners(signSet),
+			)
+			if err != nil {
+				t.Fatalf("unable to generate context: %v", err)
+			}
+
+			session, err := signCtx.NewSession()
+			if err != nil {
+				t.Fatalf("unable to generate new session: %v", err)
+			}
+			sessions[i] = session
+		}
+
+		// Phase 1: Collect all public nonces.
+		pubNonces := make([][PubNonceSize]byte, numSigners)
+		for i, session := range sessions {
+			pubNonces[i] = session.PublicNonce()
+		}
+
+		// Phase 2: Aggregate nonces externally.
+		combinedNonce, err := AggregateNonces(pubNonces)
+		if err != nil {
+			t.Fatalf("unable to aggregate nonces: %v", err)
+		}
+
+		// Phase 3: Participants register combined nonce and sign.
+		msg := sha256.Sum256([]byte("aggregated nonce signing"))
+
+		partialSigs := make([]*PartialSignature, numSigners)
+		for i, session := range sessions {
+			err = session.RegisterCombinedNonce(combinedNonce)
+			if err != nil {
+				t.Fatalf("signer %d unable to register combined nonce: %v",
+					i, err)
+			}
+			sig, err := session.Sign(msg)
+			if err != nil {
+				t.Fatalf("signer %d unable to sign: %v", i, err)
+			}
+			partialSigs[i] = sig
+		}
+
+		// Phase 4: Combine all partial signatures.
+		finalSig := CombineSigs(partialSigs[0].R, partialSigs)
+
+		// Verify the final signature.
+		combinedKey, _, _, err := AggregateKeys(signSet, false)
+		if err != nil {
+			t.Fatalf("unable to aggregate keys: %v", err)
+		}
+
+		if !finalSig.Verify(msg[:], combinedKey.FinalKey) {
+			t.Fatalf("final signature is invalid")
+		}
+	})
+
+	t.Run("error: register combined nonce twice", func(t *testing.T) {
+		privKey, _ := btcec.NewPrivateKey()
+		privKey2, _ := btcec.NewPrivateKey()
+		signSet := []*btcec.PublicKey{privKey.PubKey(), privKey2.PubKey()}
+
+		signCtx, _ := NewContext(privKey, false, WithKnownSigners(signSet))
+		session, _ := signCtx.NewSession()
+
+		fakeCombinedNonce := getValidNonce(t)
+
+		// First call should succeed.
+		err := session.RegisterCombinedNonce(fakeCombinedNonce)
+		if err != nil {
+			t.Fatalf("first RegisterCombinedNonce failed: %v", err)
+		}
+
+		// Second call should fail.
+		err = session.RegisterCombinedNonce(fakeCombinedNonce)
+		if err != ErrAlredyHaveAllNonces {
+			t.Fatalf("expected ErrAlredyHaveAllNonces, got: %v", err)
+		}
+	})
+
+	t.Run("error: register combined nonce after register pub nonce",
+		func(t *testing.T) {
+
+			privKey, _ := btcec.NewPrivateKey()
+			privKey2, _ := btcec.NewPrivateKey()
+			privKey3, _ := btcec.NewPrivateKey()
+			signSet := []*btcec.PublicKey{
+				privKey.PubKey(),
+				privKey2.PubKey(),
+				privKey3.PubKey(),
+			}
+
+			signCtx, _ := NewContext(privKey, false, WithKnownSigners(signSet))
+			session, _ := signCtx.NewSession()
+
+			signCtx2, _ := NewContext(privKey2, false, WithKnownSigners(signSet))
+			session2, _ := signCtx2.NewSession()
+
+			// Register one public nonce first.
+			_, err := session.RegisterPubNonce(session2.PublicNonce())
+			if err != nil {
+				t.Fatalf("RegisterPubNonce failed: %v", err)
+			}
+
+			// Now try to register a combined nonce - this should fail.
+			fakeCombinedNonce := [PubNonceSize]byte{}
+			err = session.RegisterCombinedNonce(fakeCombinedNonce)
+			if err == nil {
+				t.Fatalf("expected error when calling RegisterCombinedNonce " +
+					"after RegisterPubNonce")
+			}
+		})
+
+	t.Run("error: register pub nonce after register combined nonce",
+		func(t *testing.T) {
+
+			const numSigners = 3
+
+			signerKeys := make([]*btcec.PrivateKey, numSigners)
+			signSet := make([]*btcec.PublicKey, numSigners)
+			for i := 0; i < numSigners; i++ {
+				privKey, _ := btcec.NewPrivateKey()
+				signerKeys[i] = privKey
+				signSet[i] = privKey.PubKey()
+			}
+
+			sessions := make([]*Session, numSigners)
+			for i, signerKey := range signerKeys {
+				signCtx, _ := NewContext(signerKey, false, WithKnownSigners(signSet))
+				session, _ := signCtx.NewSession()
+				sessions[i] = session
+			}
+
+			pubNonces := make([][PubNonceSize]byte, numSigners)
+			for i, session := range sessions {
+				pubNonces[i] = session.PublicNonce()
+			}
+
+			combinedNonce, _ := AggregateNonces(pubNonces)
+
+			// Register the combined nonce first.
+			err := sessions[0].RegisterCombinedNonce(combinedNonce)
+			if err != nil {
+				t.Fatalf("RegisterCombinedNonce failed: %v", err)
+			}
+
+			// Now try to register individual nonces - this should fail.
+			_, err = sessions[0].RegisterPubNonce(pubNonces[1])
+			if err == nil {
+				t.Fatalf("expected error when calling RegisterPubNonce " +
+					"after RegisterCombinedNonce")
+			}
+		})
+
+	t.Run("nonce reuse prevention", func(t *testing.T) {
+		privKey, _ := btcec.NewPrivateKey()
+		privKey2, _ := btcec.NewPrivateKey()
+		signSet := []*btcec.PublicKey{privKey.PubKey(), privKey2.PubKey()}
+
+		signCtx, _ := NewContext(privKey, false, WithKnownSigners(signSet))
+		session, _ := signCtx.NewSession()
+
+		fakeCombinedNonce := getValidNonce(t)
+		session.RegisterCombinedNonce(fakeCombinedNonce)
+
+		msg := sha256.Sum256([]byte("nonce reuse test"))
+
+		// First sign should succeed.
+		_, err := session.Sign(msg)
+		if err != nil {
+			t.Fatalf("first sign failed: %v", err)
+		}
+
+		// Second sign should fail due to nonce reuse.
+		_, err = session.Sign(msg)
+		if err != ErrSigningContextReuse {
+			t.Fatalf("expected nonce reuse error, got: %v", err)
+		}
+	})
+
+	t.Run("incorrect combined nonce produces invalid sig", func(t *testing.T) {
+		const numSigners = 3
+
+		signerKeys := make([]*btcec.PrivateKey, numSigners)
+		signSet := make([]*btcec.PublicKey, numSigners)
+		for i := 0; i < numSigners; i++ {
+			privKey, _ := btcec.NewPrivateKey()
+			signerKeys[i] = privKey
+			signSet[i] = privKey.PubKey()
+		}
+
+		sessions := make([]*Session, numSigners)
+		for i, signerKey := range signerKeys {
+			signCtx, _ := NewContext(signerKey, false, WithKnownSigners(signSet))
+			session, _ := signCtx.NewSession()
+			sessions[i] = session
+		}
+
+		pubNonces := make([][PubNonceSize]byte, numSigners)
+		for i, session := range sessions {
+			pubNonces[i] = session.PublicNonce()
+		}
+
+		// Create INCORRECT combined nonce using only a subset.
+		wrongNonces := pubNonces[:2]
+		incorrectCombinedNonce, _ := AggregateNonces(wrongNonces)
+
+		msg := sha256.Sum256([]byte("incorrect nonce test"))
+
+		partialSigs := make([]*PartialSignature, numSigners)
+		for i, session := range sessions {
+			session.RegisterCombinedNonce(incorrectCombinedNonce)
+			sig, _ := session.Sign(msg)
+			partialSigs[i] = sig
+		}
+
+		finalSig := CombineSigs(partialSigs[0].R, partialSigs)
+		combinedKey, _, _, _ := AggregateKeys(signSet, false)
+
+		// Final signature should be INVALID.
+		if finalSig.Verify(msg[:], combinedKey.FinalKey) {
+			t.Fatalf("final signature should be invalid with incorrect nonce")
+		}
+	})
+
+	t.Run("mixed registration methods", func(t *testing.T) {
+		const numSigners = 4
+
+		signerKeys := make([]*btcec.PrivateKey, numSigners)
+		signSet := make([]*btcec.PublicKey, numSigners)
+		for i := 0; i < numSigners; i++ {
+			privKey, _ := btcec.NewPrivateKey()
+			signerKeys[i] = privKey
+			signSet[i] = privKey.PubKey()
+		}
+
+		sessions := make([]*Session, numSigners)
+		for i, signerKey := range signerKeys {
+			signCtx, _ := NewContext(signerKey, false, WithKnownSigners(signSet))
+			session, _ := signCtx.NewSession()
+			sessions[i] = session
+		}
+
+		pubNonces := make([][PubNonceSize]byte, numSigners)
+		for i, session := range sessions {
+			pubNonces[i] = session.PublicNonce()
+		}
+
+		combinedNonce, _ := AggregateNonces(pubNonces)
+		msg := sha256.Sum256([]byte("mixed registration test"))
+
+		// Half use RegisterCombinedNonce.
+		for i := 0; i < numSigners/2; i++ {
+			sessions[i].RegisterCombinedNonce(combinedNonce)
+		}
+
+		// Other half use RegisterPubNonce.
+		for i := numSigners / 2; i < numSigners; i++ {
+			for j, nonce := range pubNonces {
+				if i == j {
+					continue
+				}
+				sessions[i].RegisterPubNonce(nonce)
+			}
+		}
+
+		// All should be able to sign.
+		partialSigs := make([]*PartialSignature, numSigners)
+		for i, session := range sessions {
+			sig, err := session.Sign(msg)
+			if err != nil {
+				t.Fatalf("signer %d unable to sign: %v", i, err)
+			}
+			partialSigs[i] = sig
+		}
+
+		finalSig := CombineSigs(partialSigs[0].R, partialSigs)
+		combinedKey, _, _, _ := AggregateKeys(signSet, false)
+
+		if !finalSig.Verify(msg[:], combinedKey.FinalKey) {
+			t.Fatalf("final signature is invalid")
+		}
+	})
+}
+
+func getValidNonce(t *testing.T) [PubNonceSize]byte {
+	t.Helper()
+
+	var nonce [PubNonceSize]byte
+
+	privKey, err := btcec.NewPrivateKey()
+	if err != nil {
+		t.Fatalf("unable to gen priv key: %v", err)
+	}
+	copy(nonce[:33], privKey.PubKey().SerializeCompressed())
+	copy(nonce[33:], privKey.PubKey().SerializeCompressed())
+
+	return nonce
+}
