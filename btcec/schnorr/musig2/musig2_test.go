@@ -746,6 +746,86 @@ func TestSigningWithAggregatedNonce(t *testing.T) {
 			t.Fatalf("final signature is invalid")
 		}
 	})
+
+	t.Run("get combined nonce after RegisterCombinedNonce", func(t *testing.T) {
+		privKey, _ := btcec.NewPrivateKey()
+		privKey2, _ := btcec.NewPrivateKey()
+		signSet := []*btcec.PublicKey{privKey.PubKey(), privKey2.PubKey()}
+
+		signCtx, _ := NewContext(privKey, false, WithKnownSigners(signSet))
+		session, _ := signCtx.NewSession()
+
+		// Should fail before registering combined nonce.
+		_, err := session.CombinedNonce()
+		if err != ErrCombinedNonceUnavailable {
+			t.Fatalf("expected ErrCombinedNonceUnavailable, got: %v", err)
+		}
+
+		// Register combined nonce.
+		expectedNonce := getValidNonce(t)
+		err = session.RegisterCombinedNonce(expectedNonce)
+		if err != nil {
+			t.Fatalf("RegisterCombinedNonce failed: %v", err)
+		}
+
+		// Should succeed after registering.
+		gotNonce, err := session.CombinedNonce()
+		if err != nil {
+			t.Fatalf("CombinedNonce failed: %v", err)
+		}
+
+		if gotNonce != expectedNonce {
+			t.Fatalf("expected nonce %x, got %x", expectedNonce, gotNonce)
+		}
+	})
+
+	t.Run("get combined nonce after RegisterPubNonce", func(t *testing.T) {
+		const numSigners = 3
+
+		signerKeys := make([]*btcec.PrivateKey, numSigners)
+		signSet := make([]*btcec.PublicKey, numSigners)
+		for i := 0; i < numSigners; i++ {
+			privKey, _ := btcec.NewPrivateKey()
+			signerKeys[i] = privKey
+			signSet[i] = privKey.PubKey()
+		}
+
+		sessions := make([]*Session, numSigners)
+		for i, signerKey := range signerKeys {
+			signCtx, _ := NewContext(signerKey, false, WithKnownSigners(signSet))
+			session, _ := signCtx.NewSession()
+			sessions[i] = session
+		}
+
+		pubNonces := make([][PubNonceSize]byte, numSigners)
+		for i, session := range sessions {
+			pubNonces[i] = session.PublicNonce()
+		}
+
+		// Should fail before all nonces are registered.
+		_, err := sessions[0].CombinedNonce()
+		if err != ErrCombinedNonceUnavailable {
+			t.Fatalf("expected ErrCombinedNonceUnavailable before all nonces, got: %v", err)
+		}
+
+		// Register all nonces via RegisterPubNonce.
+		for i := 1; i < numSigners; i++ {
+			sessions[0].RegisterPubNonce(pubNonces[i])
+		}
+
+		// Should succeed after all nonces are registered.
+		gotNonce, err := sessions[0].CombinedNonce()
+		if err != nil {
+			t.Fatalf("CombinedNonce failed: %v", err)
+		}
+
+		// Verify it matches what AggregateNonces produces.
+		expectedNonce, _ := AggregateNonces(pubNonces)
+		if gotNonce != expectedNonce {
+			t.Fatalf("combined nonce mismatch: expected %x, got %x",
+				expectedNonce[:8], gotNonce[:8])
+		}
+	})
 }
 
 func getValidNonce(t *testing.T) [PubNonceSize]byte {

@@ -553,6 +553,20 @@ func (s *Session) RegisterPubNonce(nonce [PubNonceSize]byte) (bool, error) {
 	return haveAllNonces, nil
 }
 
+// CombinedNonce returns the combined public nonce for the signing session.
+// This will be available after either:
+//   - All individual nonces have been registered via RegisterPubNonce, or
+//   - A combined nonce has been registered via RegisterCombinedNonce
+//
+// If the combined nonce is not yet available, this method returns an error.
+func (s *Session) CombinedNonce() ([PubNonceSize]byte, error) {
+	if s.combinedNonce == nil {
+		return [PubNonceSize]byte{}, ErrCombinedNonceUnavailable
+	}
+
+	return *s.combinedNonce, nil
+}
+
 // RegisterCombinedNonce allows a caller to directly register a combined nonce
 // that was generated externally. This is useful in coordinator-based
 // protocols where the coordinator aggregates all nonces and distributes the
