@@ -19,6 +19,10 @@ github.com/btcsuite/btcd/v2transport v1.0.1 h1:pIyyyBCPwd087K3Wdb/9tIvUubAQdzTJg
 github.com/btcsuite/btcd/v2transport v1.0.1/go.mod h1:N6H0HGSElVVJKntzaYHYVbW71DtWDLMw2yhwVRO3ZOE=
 github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f h1:bAs4lUbRJpnnkd9VhRV3jjAVU7DJVjMaK+IsvSeZvFo=
 github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f/go.mod h1:TdznJufoqS23FtqVCzL0ZqgP5MqXbb4fg/WgDys70nA=
+github.com/btcsuite/btclog v0.0.0-20241003133417-09c4e92e319c h1:4HxD1lBUGUddhzgaNgrCPsFWd7cGYNpeFUgd9ZIgyM0=
+github.com/btcsuite/btclog v0.0.0-20241003133417-09c4e92e319c/go.mod h1:w7xnGOhwT3lmrS4H3b/D1XAXxvh+tbhUm8xeHN2y3TQ=
+github.com/btcsuite/btclog/v2 v2.0.0 h1:ZfOBItEeLWfU0voi88K72j8vtxP4/dHhxRFf2bxZkVo=
+github.com/btcsuite/btclog/v2 v2.0.0/go.mod h1:XItGUfVOxotJL8kkuk2Hj3EVow5KCugXl3wWfQ6K0AE=
 github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d/go.mod h1:+5NJ2+qvTyV9exUAL/rxXi3DcLg2Ts+ymUAY5y4NvMg=
 github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd h1:R/opQEbFEy9JGkIguV40SvRY1uliPX8ifOvi6ICsFCw=
 github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd/go.mod h1:HHNXQzUsZCxOoE+CPiyCTO6x34Zs86zZUiwtpXoGdtg=

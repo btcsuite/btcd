@@ -23,7 +23,8 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/v2transport"
 
-	"github.com/btcsuite/btclog"
+	btclogv1 "github.com/btcsuite/btclog"
+	"github.com/btcsuite/btclog/v2"
 	"github.com/jrick/logrotate/rotator"
 )
 
@@ -49,7 +50,10 @@ var (
 	// backendLog is the logging backend used to create all subsystem loggers.
 	// The backend must not be used before the log rotator has been initialized,
 	// or data races and/or nil pointer dereferences will occur.
-	backendLog = btclog.NewBackend(logWriter{})
+	backendLog = btclogv1.NewBackend(logWriter{})
+
+	// backendLogV2 is the v2 logging backend for subsystems using btclog/v2.
+	backendLogV2 = btclog.NewSLogger(btclog.NewDefaultHandler(logWriter{}))
 
 	// logRotator is one of the logging outputs.  It should be closed on
 	// application shutdown.
@@ -69,7 +73,7 @@ var (
 	scrpLog = backendLog.Logger("SCRP")
 	srvrLog = backendLog.Logger("SRVR")
 	syncLog = backendLog.Logger("SYNC")
-	txmpLog = backendLog.Logger("TXMP")
+	txmpLog = backendLogV2.SubSystem("TXMP")
 	v2trLog = backendLog.Logger(v2transport.Subsystem)
 )
 
@@ -90,7 +94,7 @@ func init() {
 }
 
 // subsystemLoggers maps each subsystem identifier to its associated logger.
-var subsystemLoggers = map[string]btclog.Logger{
+var subsystemLoggers = map[string]any{
 	"ADXR":                adxrLog,
 	"AMGR":                amgrLog,
 	"CMGR":                cmgrLog,
@@ -140,7 +144,14 @@ func setLogLevel(subsystemID string, logLevel string) {
 
 	// Defaults to info if the log level is invalid.
 	level, _ := btclog.LevelFromString(logLevel)
-	logger.SetLevel(level)
+
+	// Handle both v1 and v2 loggers.
+	switch l := logger.(type) {
+	case btclogv1.Logger:
+		l.SetLevel(btclogv1.Level(level))
+	case btclog.Logger:
+		l.SetLevel(level)
+	}
 }
 
 // setLogLevels sets the log level for all subsystem loggers to the passed
