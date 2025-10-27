@@ -67,6 +67,7 @@ const (
 	defaultUtxoCacheMaxSizeMiB   = 250
 	sampleConfigFilename         = "sample-btcd.conf"
 	defaultTxIndex               = false
+	defaultUseTxMempoolV2        = false
 	defaultAddrIndex             = false
 	pruneMinSize                 = 1536
 )
@@ -177,6 +178,7 @@ type config struct {
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
 	UtxoCacheMaxSizeMiB  uint          `long:"utxocachemaxsize" description:"The maximum size in MiB of the UTXO cache"`
 	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	UseTxMempoolV2       bool          `long:"usetxmempoolv2" description:"Use the new graph-based TxMempool V2 implementation instead of the legacy TxPool (experimental, default: false)"`
 	V2Transport          bool          `long:"v2transport" description:"Enable P2P v2 encrypted transport protocol (BIP324) (default: false)"`
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
