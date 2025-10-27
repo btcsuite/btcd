@@ -5,6 +5,7 @@
 package mempool
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -325,12 +326,31 @@ func (p *StandardPolicyEnforcer) ValidateReplacement(
 	txFee int64,
 	conflicts *txgraph.ConflictSet,
 ) error {
+	ctx := context.Background()
+	conflictCount := len(conflicts.Transactions)
+
+	log.TraceS(ctx, "Validating RBF replacement",
+		"tx_hash", tx.Hash(),
+		"conflicts_count", conflictCount,
+		"tx_fee", txFee)
 
 	// Rule 1: Check eviction limit.
-	if len(conflicts.Transactions) > p.cfg.MaxReplacementEvictions {
+	if conflictCount > p.cfg.MaxReplacementEvictions {
+		log.WarnS(ctx, "RBF eviction limit exceeded", nil,
+			"tx_hash", tx.Hash(),
+			"conflicts_count", conflictCount,
+			"max_evictions", p.cfg.MaxReplacementEvictions)
 		return fmt.Errorf("%w: %d conflicts (max %d)",
-			ErrTooManyEvictions, len(conflicts.Transactions),
+			ErrTooManyEvictions, conflictCount,
 			p.cfg.MaxReplacementEvictions)
+	}
+
+	// Warn on large (but acceptable) replacements - potential DoS indicator.
+	if conflictCount > 50 {
+		log.InfoS(ctx, "Large RBF eviction count",
+			"tx_hash", tx.Hash(),
+			"conflicts_count", conflictCount,
+			"threshold_pct", float64(conflictCount)/float64(p.cfg.MaxReplacementEvictions)*100)
 	}
 
 	// Rule 2: The replacement must not spend outputs from any of the
@@ -407,6 +427,7 @@ func (p *StandardPolicyEnforcer) ValidateReplacement(
 // matches that behavior.
 func (p *StandardPolicyEnforcer) ValidateAncestorLimits(
 	graph PolicyGraph, hash chainhash.Hash) error {
+	ctx := context.Background()
 
 	// Get all ancestors for this transaction.
 	ancestors := graph.GetAncestors(hash, -1)
@@ -414,9 +435,22 @@ func (p *StandardPolicyEnforcer) ValidateAncestorLimits(
 	// Check ancestor count limit (includes the transaction itself).
 	ancestorCount := len(ancestors) + 1
 	if ancestorCount > p.cfg.MaxAncestorCount {
+		log.WarnS(ctx, "Ancestor count limit exceeded", nil,
+			"tx_hash", hash,
+			"ancestor_count", ancestorCount,
+			"max_ancestors", p.cfg.MaxAncestorCount)
 		return fmt.Errorf("%w: %d ancestors (max %d)",
 			ErrExceededAncestorLimit, ancestorCount,
 			p.cfg.MaxAncestorCount)
+	}
+
+	// Log when approaching limit (potential chain spam).
+	if ancestorCount > p.cfg.MaxAncestorCount*8/10 {
+		log.DebugS(ctx, "High ancestor count",
+			"tx_hash", hash,
+			"ancestor_count", ancestorCount,
+			"max_ancestors", p.cfg.MaxAncestorCount,
+			"utilization_pct", ancestorCount*100/p.cfg.MaxAncestorCount)
 	}
 
 	// Check ancestor size limit (includes the transaction itself).
@@ -448,6 +482,7 @@ func (p *StandardPolicyEnforcer) ValidateAncestorLimits(
 // matches that behavior.
 func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
 	graph PolicyGraph, hash chainhash.Hash) error {
+	ctx := context.Background()
 
 	// Get all descendants for this transaction.
 	descendants := graph.GetDescendants(hash, -1)
@@ -455,6 +490,10 @@ func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
 	// Check descendant count limit.
 	descendantCount := len(descendants)
 	if descendantCount > p.cfg.MaxDescendantCount {
+		log.WarnS(ctx, "Descendant count limit exceeded", nil,
+			"tx_hash", hash,
+			"descendant_count", descendantCount,
+			"max_descendants", p.cfg.MaxDescendantCount)
 		return fmt.Errorf("%w: %d descendants (max %d)",
 			ErrExceededDescendantLimit, descendantCount,
 			p.cfg.MaxDescendantCount)
@@ -485,6 +524,7 @@ func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
 func (p *StandardPolicyEnforcer) ValidateRelayFee(
 	tx *btcutil.Tx, fee int64, size int64, utxoView *blockchain.UtxoViewpoint,
 	nextBlockHeight int32, isNew bool) error {
+	ctx := context.Background()
 
 	// First check the minimum relay fee and priority requirements using
 	// the standalone CheckRelayFee function.
@@ -493,6 +533,11 @@ func (p *StandardPolicyEnforcer) ValidateRelayFee(
 		p.cfg.MinRelayTxFee, p.cfg.DisableRelayPriority, isNew,
 	)
 	if err != nil {
+		log.DebugS(ctx, "Transaction rejected due to low fee",
+			"tx_hash", tx.Hash(),
+			"fee", fee,
+			"size", size,
+			"fee_rate_sat_kb", fee*1000/size)
 		return err
 	}
 
