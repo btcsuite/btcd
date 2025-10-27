@@ -1,6 +1,7 @@
 package mempool
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -160,23 +161,45 @@ func (om *OrphanManager) AddOrphan(tx *btcutil.Tx, tag Tag) error {
 	om.mu.Lock()
 	defer om.mu.Unlock()
 
+	ctx := context.Background()
 	hash := *tx.Hash()
 
 	// Check if already exists.
 	if _, exists := om.metadata[hash]; exists {
+		log.DebugS(ctx, "Orphan already exists",
+			"tx_hash", hash,
+			"tag", tag)
 		return fmt.Errorf("%w: %v", ErrOrphanAlreadyExists, hash)
 	}
 
 	// Check size limit.
 	size := tx.MsgTx().SerializeSize()
 	if size > om.config.MaxOrphanSize {
+		log.WarnS(ctx, "Orphan too large", nil,
+			"tx_hash", hash,
+			"size", size,
+			"max_size", om.config.MaxOrphanSize)
 		return fmt.Errorf("%w: %d bytes (max %d)",
 			ErrOrphanTooLarge, size, om.config.MaxOrphanSize)
 	}
 
+	currentCount := len(om.metadata)
 	// Check count limit.
-	if len(om.metadata) >= om.config.MaxOrphans {
+	if currentCount >= om.config.MaxOrphans {
+		log.WarnS(ctx, "Orphan pool limit reached", nil,
+			"tx_hash", hash,
+			"current_count", currentCount,
+			"max_orphans", om.config.MaxOrphans,
+			"tag", tag)
 		return fmt.Errorf("%w: %d", ErrOrphanLimitReached, om.config.MaxOrphans)
+	}
+
+	// Warn when approaching capacity (potential memory DoS).
+	if currentCount > om.config.MaxOrphans*8/10 {
+		log.InfoS(ctx, "Orphan pool nearing capacity",
+			"current_count", currentCount,
+			"max_orphans", om.config.MaxOrphans,
+			"utilization_pct", currentCount*100/om.config.MaxOrphans)
 	}
 
 	// Add to graph. Use a minimal TxDesc since we don't need fee
@@ -206,6 +229,13 @@ func (om *OrphanManager) AddOrphan(tx *btcutil.Tx, tag Tag) error {
 	}
 	om.byTag[tag][hash] = struct{}{}
 
+	log.DebugS(ctx, "Orphan added",
+		"tx_hash", hash,
+		"size", size,
+		"tag", tag,
+		"pool_size", len(om.metadata),
+		"max_orphans", om.config.MaxOrphans)
+
 	return nil
 }
 
@@ -222,8 +252,11 @@ func (om *OrphanManager) RemoveOrphan(hash chainhash.Hash, cascade bool) error {
 // removeOrphanUnsafe removes an orphan without locking. Must be called with
 // lock held.
 func (om *OrphanManager) removeOrphanUnsafe(hash chainhash.Hash, cascade bool) error {
+	ctx := context.Background()
 	_, exists := om.metadata[hash]
 	if !exists {
+		log.DebugS(ctx, "Orphan not found for removal",
+			"tx_hash", hash)
 		return fmt.Errorf("%w: %v", ErrOrphanNotFound, hash)
 	}
 
@@ -237,6 +270,12 @@ func (om *OrphanManager) removeOrphanUnsafe(hash chainhash.Hash, cascade bool) e
 		descendants := om.graph.GetDescendants(hash, -1)
 		for descHash := range descendants {
 			toRemove = append(toRemove, descHash)
+		}
+
+		if len(descendants) > 0 {
+			log.DebugS(ctx, "Cascading orphan removal",
+				"tx_hash", hash,
+				"descendant_count", len(descendants))
 		}
 	}
 
@@ -256,6 +295,12 @@ func (om *OrphanManager) removeOrphanUnsafe(hash chainhash.Hash, cascade bool) e
 	}
 
 	// Remove from graph. Use cascade based on caller's preference.
+	log.DebugS(ctx, "Orphan removed",
+		"tx_hash", hash,
+		"cascade", cascade,
+		"removed_count", len(toRemove),
+		"pool_size", len(om.metadata))
+
 	if cascade {
 		return om.graph.RemoveTransaction(hash)
 	}
@@ -270,6 +315,7 @@ func (om *OrphanManager) RemoveOrphansByTag(tag Tag) int {
 	om.mu.Lock()
 	defer om.mu.Unlock()
 
+	ctx := context.Background()
 	tagSet, exists := om.byTag[tag]
 	if !exists {
 		return 0
@@ -281,12 +327,23 @@ func (om *OrphanManager) RemoveOrphansByTag(tag Tag) int {
 		toRemove = append(toRemove, hash)
 	}
 
+	log.DebugS(ctx, "Removing orphans by tag",
+		"tag", tag,
+		"count", len(toRemove))
+
 	// Remove each orphan.
 	removed := 0
 	for _, hash := range toRemove {
 		if err := om.removeOrphanUnsafe(hash, true); err == nil {
 			removed++
 		}
+	}
+
+	if removed > 0 {
+		log.DebugS(ctx, "Orphans removed by tag",
+			"tag", tag,
+			"removed_count", removed,
+			"pool_size", len(om.metadata))
 	}
 
 	return removed
@@ -300,6 +357,7 @@ func (om *OrphanManager) ExpireOrphans() int {
 	om.mu.Lock()
 	defer om.mu.Unlock()
 
+	ctx := context.Background()
 	// Only scan if it's time for the next expiration scan.
 	now := time.Now()
 	if now.Before(om.nextExpireScan) {
@@ -308,6 +366,11 @@ func (om *OrphanManager) ExpireOrphans() int {
 
 	// Update next scan time.
 	om.nextExpireScan = now.Add(om.config.ExpireScanInterval)
+
+	poolSize := len(om.metadata)
+	log.TraceS(ctx, "Scanning for expired orphans",
+		"pool_size", poolSize,
+		"ttl", om.config.OrphanTTL)
 
 	// Find expired orphans.
 	var expired []chainhash.Hash
@@ -323,6 +386,13 @@ func (om *OrphanManager) ExpireOrphans() int {
 		if err := om.removeOrphanUnsafe(hash, true); err == nil {
 			removed++
 		}
+	}
+
+	if removed > 0 {
+		log.DebugS(ctx, "Expired orphans removed",
+			"removed_count", removed,
+			"pool_size", len(om.metadata),
+			"ttl", om.config.OrphanTTL)
 	}
 
 	return removed
@@ -376,6 +446,12 @@ func (om *OrphanManager) ProcessOrphans(
 	om.mu.Lock()
 	defer om.mu.Unlock()
 
+	ctx := context.Background()
+	parentHash := parentTx.Hash()
+	log.TraceS(ctx, "Processing orphans for parent",
+		"parent_tx", parentHash,
+		"orphan_pool_size", len(om.metadata))
+
 	// Find orphans that spend from this parent's outputs using the spentBy
 	// index. The parent itself is not in the orphan graph (it's in the main
 	// mempool), but orphans that spend its outputs are indexed by outpoint.
@@ -385,7 +461,6 @@ func (om *OrphanManager) ProcessOrphans(
 
 	// Check each output of the parent to see if it's spent by an orphan.
 	// Iterate through actual outputs of the transaction.
-	parentHash := parentTx.Hash()
 	for txOutIdx := range parentTx.MsgTx().TxOut {
 		outpoint := wire.OutPoint{
 			Hash:  *parentHash,
@@ -414,14 +489,24 @@ func (om *OrphanManager) ProcessOrphans(
 			// If promotion fails, skip this orphan and its descendants.
 			// They'll remain in the orphan pool for potential future
 			// promotion or eventual expiration.
+			log.DebugS(ctx, "Orphan promotion failed",
+				"orphan_tx", node.Tx.Hash(),
+				"parent_tx", parentHash,
+				"reason", err.Error())
 			continue
 		}
 
 		// Promotion succeeded! Remove from orphan manager.
 		if err := om.removeOrphanUnsafe(*node.Tx.Hash(), false); err != nil {
 			// Log error but continue processing other orphans.
+			log.WarnS(ctx, "Failed to remove promoted orphan", err,
+				"orphan_tx", node.Tx.Hash())
 			continue
 		}
+
+		log.DebugS(ctx, "Orphan promoted",
+			"orphan_tx", node.Tx.Hash(),
+			"parent_tx", parentHash)
 
 		promoted = append(promoted, node.Tx)
 
@@ -432,6 +517,13 @@ func (om *OrphanManager) ProcessOrphans(
 				visited[child.TxHash] = true
 			}
 		}
+	}
+
+	if len(promoted) > 0 {
+		log.DebugS(ctx, "Orphan processing complete",
+			"parent_tx", parentHash,
+			"promoted_count", len(promoted),
+			"orphan_pool_size", len(om.metadata))
 	}
 
 	return promoted, nil
