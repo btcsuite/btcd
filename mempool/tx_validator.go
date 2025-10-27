@@ -5,6 +5,7 @@
 package mempool
 
 import (
+	"context"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -101,6 +102,10 @@ func (v *StandardTxValidator) ValidateScripts(
 	tx *btcutil.Tx,
 	utxoView *blockchain.UtxoViewpoint,
 ) error {
+	ctx := context.Background()
+	log.TraceS(ctx, "Validating transaction scripts",
+		"tx_hash", tx.Hash(),
+		"input_count", len(tx.MsgTx().TxIn))
 
 	// Use blockchain's script validation with standard verification flags.
 	err := blockchain.ValidateTransactionScripts(
@@ -108,6 +113,9 @@ func (v *StandardTxValidator) ValidateScripts(
 		v.cfg.HashCache,
 	)
 	if err != nil {
+		log.DebugS(ctx, "Script validation failed",
+			"tx_hash", tx.Hash(),
+			"reason", err.Error())
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return chainRuleError(cerr)
 		}

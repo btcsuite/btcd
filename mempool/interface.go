@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -68,4 +69,34 @@ type TxMempool interface {
 	// a transaction in the mempool. If that's the case the spending
 	// transaction will be returned, if not nil will be returned.
 	CheckSpend(op wire.OutPoint) *btcutil.Tx
+
+	// RemoveOrphansByTag removes all orphan transactions tagged with the
+	// provided identifier. Returns the number of orphans removed.
+	RemoveOrphansByTag(tag Tag) uint64
+
+	// MiningDescs returns a slice of mining descriptors for all the
+	// transactions in the source pool.
+	MiningDescs() []*mining.TxDesc
+
+	// RemoveDoubleSpends removes all transactions that spend outputs spent
+	// by the passed transaction from the mempool.
+	RemoveDoubleSpends(tx *btcutil.Tx)
+
+	// RemoveOrphan removes the passed orphan transaction from the orphan
+	// pool.
+	RemoveOrphan(tx *btcutil.Tx)
+
+	// ProcessOrphans processes orphan transactions that now have a valid
+	// ancestor after the provided transaction was accepted. Returns a slice
+	// of transaction descriptors for any orphans that were accepted.
+	ProcessOrphans(acceptedTx *btcutil.Tx) []*TxDesc
+
+	// MaybeAcceptTransaction validates and potentially accepts a
+	// transaction to the memory pool. It returns a slice of hashes for all
+	// transactions that were accepted, the transaction descriptor for the
+	// primary transaction (if accepted), and an error if the transaction
+	// was rejected. The isNew parameter indicates whether this is a new
+	// transaction or one being added from a reorganization. The rateLimit
+	// parameter indicates whether to apply rate limiting for relay.
+	MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit bool) ([]*chainhash.Hash, *TxDesc, error)
 }

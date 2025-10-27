@@ -31,7 +31,7 @@ type PeerNotifier interface {
 type Config struct {
 	PeerNotifier PeerNotifier
 	Chain        *blockchain.BlockChain
-	TxMemPool    *mempool.TxPool
+	TxMemPool    mempool.TxMempool
 	ChainParams  *chaincfg.Params
 
 	DisableCheckpoints bool

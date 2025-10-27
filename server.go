@@ -214,7 +214,7 @@ type server struct {
 	rpcServer            *rpcServer
 	syncManager          *netsync.SyncManager
 	chain                *blockchain.BlockChain
-	txMemPool            *mempool.TxPool
+	txMemPool            mempool.TxMempool
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	p2pDowngrader        *peer.P2PDowngrader
@@ -2964,32 +2964,44 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 			mempool.DefaultEstimateFeeMinRegisteredBlocks)
 	}
 
-	txC := mempool.Config{
-		Policy: mempool.Policy{
-			DisableRelayPriority: cfg.NoRelayPriority,
-			AcceptNonStd:         cfg.RelayNonStd,
-			FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
-			MaxOrphanTxs:         cfg.MaxOrphanTxs,
-			MaxOrphanTxSize:      defaultMaxOrphanTxSize,
-			MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
-			MinRelayTxFee:        cfg.minRelayTxFee,
-			MaxTxVersion:         2,
-			RejectReplacement:    cfg.RejectReplacement,
-		},
-		ChainParams:    chainParams,
-		FetchUtxoView:  s.chain.FetchUtxoView,
-		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
-		MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
-		CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
-			return s.chain.CalcSequenceLock(tx, view, true)
-		},
-		IsDeploymentActive: s.chain.IsDeploymentActive,
-		SigCache:           s.sigCache,
-		HashCache:          s.hashCache,
-		AddrIndex:          s.addrIndex,
-		FeeEstimator:       s.feeEstimator,
+	// Initialize mempool based on configuration flag.
+	if cfg.UseTxMempoolV2 {
+		// Use new graph-based TxMempool V2 implementation.
+		srvrLog.Infof("Using TxMempool V2 (graph-based implementation)")
+		s.txMemPool, err = s.initTxMempoolV2(cfg, chainParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize TxMempool V2: %w", err)
+		}
+	} else {
+		// Use legacy TxPool implementation (default).
+		srvrLog.Infof("Using legacy TxPool implementation")
+		txC := mempool.Config{
+			Policy: mempool.Policy{
+				DisableRelayPriority: cfg.NoRelayPriority,
+				AcceptNonStd:         cfg.RelayNonStd,
+				FreeTxRelayLimit:     cfg.FreeTxRelayLimit,
+				MaxOrphanTxs:         cfg.MaxOrphanTxs,
+				MaxOrphanTxSize:      defaultMaxOrphanTxSize,
+				MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
+				MinRelayTxFee:        cfg.minRelayTxFee,
+				MaxTxVersion:         2,
+				RejectReplacement:    cfg.RejectReplacement,
+			},
+			ChainParams:    chainParams,
+			FetchUtxoView:  s.chain.FetchUtxoView,
+			BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
+			MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
+			CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+				return s.chain.CalcSequenceLock(tx, view, true)
+			},
+			IsDeploymentActive: s.chain.IsDeploymentActive,
+			SigCache:           s.sigCache,
+			HashCache:          s.hashCache,
+			AddrIndex:          s.addrIndex,
+			FeeEstimator:       s.feeEstimator,
+		}
+		s.txMemPool = mempool.New(&txC)
 	}
-	s.txMemPool = mempool.New(&txC)
 
 	s.syncManager, err = netsync.New(&netsync.Config{
 		PeerNotifier:       &s,
@@ -3156,6 +3168,66 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	return &s, nil
+}
+
+// initTxMempoolV2 creates and initializes the new graph-based TxMempool V2
+// with all required dependencies. This function constructs the PolicyEnforcer,
+// TxValidator, and OrphanManager components needed by TxMempoolV2.
+func (s *server) initTxMempoolV2(cfg *config, chainParams *chaincfg.Params) (mempool.TxMempool, error) {
+	// Create PolicyEnforcer with configuration from legacy TxPool.
+	policyCfg := mempool.PolicyConfig{
+		MaxRBFSequence:          mempool.MaxRBFSequence,
+		MaxReplacementEvictions: mempool.MaxReplacementEvictions,
+		RejectReplacement:       cfg.RejectReplacement,
+		MaxAncestorCount:        25,
+		MaxAncestorSize:         101000,
+		MaxDescendantCount:      25,
+		MaxDescendantSize:       101000,
+		MinRelayTxFee:           cfg.minRelayTxFee,
+		FreeTxRelayLimit:        cfg.FreeTxRelayLimit,
+		DisableRelayPriority:    cfg.NoRelayPriority,
+		MaxTxVersion:            2,
+		MaxSigOpCostPerTx:       blockchain.MaxBlockSigOpsCost / 4,
+		IsDeploymentActive:      s.chain.IsDeploymentActive,
+		ChainParams:             chainParams,
+		BestHeight:              func() int32 { return s.chain.BestSnapshot().Height },
+	}
+	policyEnforcer := mempool.NewStandardPolicyEnforcer(policyCfg)
+
+	// Create TxValidator with caches and chain access.
+	validatorCfg := mempool.TxValidatorConfig{
+		SigCache:  s.sigCache,
+		HashCache: s.hashCache,
+		CalcSequenceLock: func(tx *btcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+			return s.chain.CalcSequenceLock(tx, view, true)
+		},
+		ChainParams: chainParams,
+	}
+	txValidator := mempool.NewStandardTxValidator(validatorCfg)
+
+	// Create OrphanManager with limits from configuration.
+	orphanCfg := mempool.OrphanConfig{
+		MaxOrphans: cfg.MaxOrphanTxs,
+		MaxOrphanSize: defaultMaxOrphanTxSize,
+		OrphanTTL: 20 * time.Minute,
+		ExpireScanInterval: 5 * time.Minute,
+	}
+	orphanManager := mempool.NewOrphanManager(orphanCfg)
+
+	// Create MempoolConfig with all dependencies.
+	mempoolCfg := &mempool.MempoolConfig{
+		FetchUtxoView:  s.chain.FetchUtxoView,
+		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
+		MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
+		PolicyEnforcer: policyEnforcer,
+		TxValidator:    txValidator,
+		OrphanManager:  orphanManager,
+		AddrIndex:      s.addrIndex,
+		FeeEstimator:   s.feeEstimator,
+		GraphConfig:    nil, // Use defaults.
+	}
+
+	return mempool.NewTxMempoolV2(mempoolCfg)
 }
 
 // initListeners initializes the configured net listeners and adds any bound

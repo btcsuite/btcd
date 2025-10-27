@@ -5,6 +5,7 @@
 package mempool
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -102,8 +103,10 @@ func (mp *TxMempoolV2) checkMempoolAcceptance(
 
 	// Exit early if this transaction is missing parents (it's an orphan).
 	if len(missingParents) > 0 {
-		log.Debugf("Tx %v is an orphan with missing parents: %v",
-			txHash, missingParents)
+		ctx := context.Background()
+		log.DebugS(ctx, "Transaction has missing parents",
+			"tx_hash", txHash,
+			"missing_count", len(missingParents))
 
 		return &MempoolAcceptResult{
 			MissingParents: missingParents,

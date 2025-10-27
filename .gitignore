@@ -58,3 +58,5 @@ btcutil/psbt/coverage.txt
 
 .DS_Store
 .aider*
+
+.tasks*
