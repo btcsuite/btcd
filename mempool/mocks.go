@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/mock"
 )
@@ -122,4 +123,62 @@ func (m *MockTxMempool) CheckSpend(op wire.OutPoint) *btcutil.Tx {
 	}
 
 	return args.Get(0).(*btcutil.Tx)
+}
+
+// RemoveOrphansByTag removes all orphan transactions tagged with the provided
+// identifier.
+func (m *MockTxMempool) RemoveOrphansByTag(tag Tag) uint64 {
+	args := m.Called(tag)
+	return args.Get(0).(uint64)
+}
+
+// MiningDescs returns a slice of mining descriptors for all the transactions
+// in the source pool.
+func (m *MockTxMempool) MiningDescs() []*mining.TxDesc {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]*mining.TxDesc)
+}
+
+// RemoveDoubleSpends removes all transactions that spend outputs spent by the
+// passed transaction from the mempool.
+func (m *MockTxMempool) RemoveDoubleSpends(tx *btcutil.Tx) {
+	m.Called(tx)
+}
+
+// RemoveOrphan removes the passed orphan transaction from the orphan pool.
+func (m *MockTxMempool) RemoveOrphan(tx *btcutil.Tx) {
+	m.Called(tx)
+}
+
+// ProcessOrphans processes orphan transactions that now have a valid ancestor
+// after the provided transaction was accepted.
+func (m *MockTxMempool) ProcessOrphans(acceptedTx *btcutil.Tx) []*TxDesc {
+	args := m.Called(acceptedTx)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).([]*TxDesc)
+}
+
+// MaybeAcceptTransaction validates and potentially accepts a transaction to
+// the memory pool.
+func (m *MockTxMempool) MaybeAcceptTransaction(tx *btcutil.Tx, isNew,
+	rateLimit bool) ([]*chainhash.Hash, *TxDesc, error) {
+
+	args := m.Called(tx, isNew, rateLimit)
+
+	var hashes []*chainhash.Hash
+	if args.Get(0) != nil {
+		hashes = args.Get(0).([]*chainhash.Hash)
+	}
+
+	var desc *TxDesc
+	if args.Get(1) != nil {
+		desc = args.Get(1).(*TxDesc)
+	}
+
+	return hashes, desc, args.Error(2)
 }
