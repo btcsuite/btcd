@@ -5,6 +5,7 @@
 package mempool
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -255,6 +256,10 @@ func NewTxMempoolV2(cfg *MempoolConfig) (*TxMempoolV2, error) {
 	// Initialize last updated timestamp to current time.
 	mp.lastUpdated.Store(time.Now().Unix())
 
+	log.InfoS(context.Background(), "Initialized TxMempoolV2",
+		"graph_capacity", graphCfg.MaxNodes,
+		"max_package_size", graphCfg.MaxPackageSize)
+
 	return mp, nil
 }
 
@@ -348,30 +353,51 @@ func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 ) ([]*chainhash.Hash, *TxDesc, error) {
 
 	txHash := tx.Hash()
+	ctx := context.Background()
+	log.TraceS(ctx, "Processing transaction acceptance",
+		"tx_hash", txHash,
+		"is_new", isNew,
+		"rate_limit", rateLimit)
 
 	// Validate transaction using the v2 validation pipeline.
 	result, err := mp.checkMempoolAcceptance(tx, isNew, rateLimit, rejectDupOrphans)
 	if err != nil {
+		log.DebugS(ctx, "Transaction rejected",
+			"tx_hash", txHash,
+			"reason", err.Error())
 		return nil, nil, err
 	}
 
 	// If orphan (has missing parents), return parent hashes.
 	if len(result.MissingParents) > 0 {
+		log.DebugS(ctx, "Transaction is an orphan",
+			"tx_hash", txHash,
+			"missing_parents", len(result.MissingParents))
 		return result.MissingParents, nil, nil
 	}
 
 	// Handle RBF replacements if conflicts exist.
 	if len(result.Conflicts) > 0 {
-		log.Debugf("Replacing %d transaction(s) with %v (fee_rate=%v sat/vbyte)",
-			len(result.Conflicts), txHash,
-			int64(result.TxFee)*1000/result.TxSize)
+		conflictCount := len(result.Conflicts)
+		feeRate := int64(result.TxFee) * 1000 / result.TxSize
+		log.DebugS(ctx, "RBF replacement",
+			"tx_hash", txHash,
+			"conflicts_count", conflictCount,
+			"fee_rate_sat_vbyte", feeRate)
+
+		// Warn on large replacements (potential DoS indicator).
+		if conflictCount > 10 {
+			log.InfoS(ctx, "Large RBF replacement detected",
+				"tx_hash", txHash,
+				"conflicts_count", conflictCount)
+		}
 
 		// Remove conflicts from graph. The graph will cascade to
 		// descendants automatically.
 		for conflictHash := range result.Conflicts {
 			if err := mp.graph.RemoveTransaction(conflictHash); err != nil {
-				log.Warnf("Failed to remove conflict %v: %v",
-					conflictHash, err)
+				log.WarnS(ctx, "Failed to remove RBF conflict", err,
+					"conflict_hash", conflictHash)
 			}
 		}
 	}
@@ -411,8 +437,12 @@ func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 	// Update last modified timestamp.
 	mp.lastUpdated.Store(time.Now().Unix())
 
-	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
-		mp.graph.GetNodeCount())
+	feeRate := int64(result.TxFee) * 1000 / result.TxSize
+	log.DebugS(ctx, "Transaction accepted",
+		"tx_hash", txHash,
+		"pool_size", mp.graph.GetNodeCount(),
+		"tx_size", result.TxSize,
+		"fee_rate_sat_vbyte", feeRate)
 
 	// Build TxDesc for return value.
 	txDesc := &TxDesc{
@@ -439,7 +469,12 @@ func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 // additional orphan transactions that were added as a result of the passed
 // one being accepted.
 func (mp *TxMempoolV2) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool, tag Tag) ([]*TxDesc, error) {
-	log.Tracef("Processing transaction %v", tx.Hash())
+	ctx := context.Background()
+	log.TraceS(ctx, "Processing transaction",
+		"tx_hash", tx.Hash(),
+		"allow_orphan", allowOrphan,
+		"rate_limit", rateLimit,
+		"tag", tag)
 
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
@@ -517,13 +552,22 @@ func (mp *TxMempoolV2) processOrphansLocked(acceptedTx *btcutil.Tx) []*TxDesc {
 	// Process orphans that spend outputs from the accepted transaction.
 	promoted, err := mp.orphanMgr.ProcessOrphans(acceptedTx, acceptFunc)
 	if err != nil {
-		log.Warnf("Error processing orphans: %v", err)
+		ctx := context.Background()
+		log.WarnS(ctx, "Error processing orphans", err,
+			"parent_tx", acceptedTx.Hash())
 	}
 
 	// Recursively process newly promoted orphans.
-	for _, promotedTx := range promoted {
-		moreTxs := mp.processOrphansLocked(promotedTx)
-		acceptedTxns = append(acceptedTxns, moreTxs...)
+	if len(promoted) > 0 {
+		ctx := context.Background()
+		log.DebugS(ctx, "Orphans promoted",
+			"count", len(promoted),
+			"parent_tx", acceptedTx.Hash())
+
+		for _, promotedTx := range promoted {
+			moreTxs := mp.processOrphansLocked(promotedTx)
+			acceptedTxns = append(acceptedTxns, moreTxs...)
+		}
 	}
 
 	return acceptedTxns
@@ -566,8 +610,11 @@ func (mp *TxMempoolV2) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	// Update last modified timestamp.
 	mp.lastUpdated.Store(time.Now().Unix())
 
-	log.Debugf("Removed transaction %v (pool size: %v)", txHash,
-		mp.graph.GetNodeCount())
+	ctx := context.Background()
+	log.DebugS(ctx, "Transaction removed",
+		"tx_hash", txHash,
+		"pool_size", mp.graph.GetNodeCount(),
+		"remove_redeemers", removeRedeemers)
 }
 
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
@@ -583,7 +630,9 @@ func (mp *TxMempoolV2) RemoveDoubleSpends(tx *btcutil.Tx) {
 	// same outputs as this transaction.
 	conflicts := mp.graph.GetConflicts(tx)
 
+	ctx := context.Background()
 	// Remove each conflict (with descendants).
+	removedCount := 0
 	for conflictHash := range conflicts.Transactions {
 		// Don't try to remove the transaction itself if it's in the pool.
 		if conflictHash == *tx.Hash() {
@@ -591,9 +640,18 @@ func (mp *TxMempoolV2) RemoveDoubleSpends(tx *btcutil.Tx) {
 		}
 
 		if err := mp.graph.RemoveTransaction(conflictHash); err != nil {
-			log.Warnf("Failed to remove double spend %v: %v",
-				conflictHash, err)
+			log.WarnS(ctx, "Failed to remove double spend", err,
+				"conflict_hash", conflictHash,
+				"trigger_tx", tx.Hash())
+		} else {
+			removedCount++
 		}
+	}
+
+	if removedCount > 0 {
+		log.DebugS(ctx, "Double spends removed",
+			"count", removedCount,
+			"trigger_tx", tx.Hash())
 	}
 }
 
