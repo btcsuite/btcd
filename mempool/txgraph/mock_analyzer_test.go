@@ -29,8 +29,8 @@ func (m *MockPackageAnalyzer) IsZeroFee(desc *TxDesc) bool {
 }
 
 // ValidateTRUCPackage validates TRUC package topology rules.
-func (m *MockPackageAnalyzer) ValidateTRUCPackage(nodes []*TxGraphNode) bool {
-	args := m.Called(nodes)
+func (m *MockPackageAnalyzer) ValidateTRUCPackage(pkg *TxPackage) bool {
+	args := m.Called(pkg)
 	return args.Bool(0)
 }
 
