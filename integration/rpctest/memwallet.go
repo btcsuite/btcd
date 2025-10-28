@@ -73,13 +73,15 @@ type CreateTxOption func(*createTxOptions)
 
 // createTxOptions holds the configurable options for CreateTransaction.
 type createTxOptions struct {
-	txVersion int32
+	txVersion   int32
+	forceInputs []wire.OutPoint
 }
 
 // defaultCreateTxOptions returns the default options for CreateTransaction.
 func defaultCreateTxOptions() *createTxOptions {
 	return &createTxOptions{
-		txVersion: wire.TxVersion,
+		txVersion:   wire.TxVersion,
+		forceInputs: nil,
 	}
 }
 
@@ -87,6 +89,15 @@ func defaultCreateTxOptions() *createTxOptions {
 func WithTxVersion(version int32) CreateTxOption {
 	return func(opts *createTxOptions) {
 		opts.txVersion = version
+	}
+}
+
+// WithInputs returns a CreateTxOption that forces the transaction to spend
+// specific outpoints. This enables precise control over transaction topology
+// for testing TRUC packages and parent-child relationships.
+func WithInputs(outpoints []wire.OutPoint) CreateTxOption {
+	return func(opts *createTxOptions) {
+		opts.forceInputs = outpoints
 	}
 }
 
@@ -524,9 +535,19 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
 		tx.AddTxOut(output)
 	}
 
-	// Attempt to fund the transaction with spendable utxos.
-	if err := m.fundTx(tx, outputAmt, feeRate, change); err != nil {
-		return nil, err
+	// If specific inputs are forced, add them directly and skip coin
+	// selection. This enables explicit parent-child relationship testing.
+	if len(opts.forceInputs) > 0 {
+		for _, outpoint := range opts.forceInputs {
+			tx.AddTxIn(wire.NewTxIn(&outpoint, nil, nil))
+		}
+		// Still call fundTx for change output creation if needed, but
+		// inputs are already selected.
+	} else {
+		// Attempt to fund the transaction with spendable utxos.
+		if err := m.fundTx(tx, outputAmt, feeRate, change); err != nil {
+			return nil, err
+		}
 	}
 
 	// Populate all the selected inputs with valid sigScript for spending.
@@ -535,7 +556,10 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
 	spentOutputs := make([]*utxo, 0, len(tx.TxIn))
 	for i, txIn := range tx.TxIn {
 		outPoint := txIn.PreviousOutPoint
-		utxo := m.utxos[outPoint]
+		utxo, ok := m.utxos[outPoint]
+		if !ok {
+			return nil, fmt.Errorf("outpoint %v not found in wallet", outPoint)
+		}
 
 		extendedKey, err := m.hdRoot.Derive(utxo.keyIndex)
 		if err != nil {
@@ -587,6 +611,63 @@ func (m *memWallet) UnlockOutputs(inputs []*wire.TxIn) {
 
 		utxo.isLocked = false
 	}
+}
+
+// AddUnconfirmedTx manually adds a transaction's outputs to the wallet's UTXO
+// set without requiring block confirmation. This enables testing of unconfirmed
+// parent-child transaction relationships, critical for TRUC 1P1C package
+// testing where the child must spend unconfirmed parent outputs.
+//
+// The function automatically matches each output's pkScript to wallet addresses
+// to determine the correct keyIndex for signing.
+//
+// This function is safe for concurrent access.
+func (m *memWallet) AddUnconfirmedTx(tx *wire.MsgTx) error {
+	m.Lock()
+	defer m.Unlock()
+
+	txHash := tx.TxHash()
+
+	for i, output := range tx.TxOut {
+		outPoint := wire.OutPoint{Hash: txHash, Index: uint32(i)}
+
+		// Find the keyIndex by matching pkScript to wallet addresses.
+		// Try current and recent HD indexes.
+		keyIndex := m.hdIndex
+		for idx := uint32(0); idx <= m.hdIndex+10; idx++ {
+			derivedKey, err := m.hdRoot.Derive(idx)
+			if err != nil {
+				continue
+			}
+			privKey, err := derivedKey.ECPrivKey()
+			if err != nil {
+				continue
+			}
+			addr, err := keyToAddr(privKey, m.net)
+			if err != nil {
+				continue
+			}
+			testScript, err := txscript.PayToAddrScript(addr)
+			if err != nil {
+				continue
+			}
+
+			if bytes.Equal(output.PkScript, testScript) {
+				keyIndex = idx
+				break
+			}
+		}
+
+		m.utxos[outPoint] = &utxo{
+			value:          btcutil.Amount(output.Value),
+			keyIndex:       keyIndex,
+			maturityHeight: 0,
+			pkScript:       output.PkScript,
+			isLocked:       false,
+		}
+	}
+
+	return nil
 }
 
 // ConfirmedBalance returns the confirmed balance of the wallet.

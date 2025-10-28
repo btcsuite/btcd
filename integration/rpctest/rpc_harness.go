@@ -438,6 +438,15 @@ func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
 	return h.wallet.CreateTransaction(targetOutputs, feeRate, change, options...)
 }
 
+// AddUnconfirmedTx registers a transaction's outputs in the wallet's UTXO set
+// without requiring block confirmation. This enables testing unconfirmed
+// parent-child relationships essential for TRUC 1P1C package validation.
+//
+// This function is safe for concurrent access.
+func (h *Harness) AddUnconfirmedTx(tx *wire.MsgTx) error {
+	return h.wallet.AddUnconfirmedTx(tx)
+}
+
 // UnlockOutputs unlocks any outputs which were previously marked as
 // unspendabe due to being selected to fund a transaction via the
 // CreateTransaction method.

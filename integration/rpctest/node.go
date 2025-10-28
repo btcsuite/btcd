@@ -136,7 +136,20 @@ func (n *nodeConfig) arguments() []string {
 
 // command returns the exec.Cmd which will be used to start the btcd process.
 func (n *nodeConfig) command() *exec.Cmd {
-	return exec.Command(n.exe, n.arguments()...)
+	cmd := exec.Command(n.exe, n.arguments()...)
+
+	// Capture stderr and stdout to files for debugging crashes and panics.
+	stderrFile, err := os.Create(filepath.Join(n.nodeDir, "btcd.stderr"))
+	if err == nil {
+		cmd.Stderr = stderrFile
+	}
+
+	stdoutFile, err := os.Create(filepath.Join(n.nodeDir, "btcd.stdout"))
+	if err == nil {
+		cmd.Stdout = stdoutFile
+	}
+
+	return cmd
 }
 
 // rpcConnConfig returns the rpc connection config that can be used to connect
