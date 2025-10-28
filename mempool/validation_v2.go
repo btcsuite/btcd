@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -82,11 +83,8 @@ func (mp *TxMempoolV2) checkMempoolAcceptance(
 	conflicts := mp.graph.GetConflicts(tx)
 	isReplacement := len(conflicts.Transactions) > 0
 
-	// Fetch all of the unspent transaction outputs referenced by the
-	// inputs to this transaction. This function also attempts to fetch the
-	// transaction itself to be used for detecting a duplicate transaction
-	// without needing to do a separate lookup.
-	utxoView, err := mp.cfg.FetchUtxoView(tx)
+	// Fetch UTXO view including both confirmed and unconfirmed outputs.
+	utxoView, err := mp.fetchInputUtxos(tx)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
@@ -164,6 +162,11 @@ func (mp *TxMempoolV2) checkMempoolAcceptance(
 	// then we're processing a potential replacement. Use the policy
 	// enforcer to validate RBF rules.
 	if isReplacement {
+		ctx := context.Background()
+		log.DebugS(ctx, "Processing potential RBF replacement",
+			"tx_hash", txHash,
+			"conflicts_count", len(conflicts.Transactions))
+
 		// Check if transaction signals replacement (explicit or inherited).
 		if !mp.policy.SignalsReplacement(mp.graph, tx) {
 			str := fmt.Sprintf("transaction %v spends outputs "+
@@ -172,13 +175,22 @@ func (mp *TxMempoolV2) checkMempoolAcceptance(
 			return nil, txRuleError(wire.RejectDuplicate, str)
 		}
 
+		log.DebugS(ctx, "Calling ValidateReplacement",
+			"tx_hash", txHash)
+
 		// Validate replacement according to BIP 125 rules.
 		err = mp.policy.ValidateReplacement(
 			mp.graph, tx, txFee, conflicts,
 		)
 		if err != nil {
+			log.DebugS(ctx, "ValidateReplacement failed",
+				"tx_hash", txHash,
+				"error", err.Error())
 			return nil, err
 		}
+
+		log.DebugS(ctx, "ValidateReplacement succeeded",
+			"tx_hash", txHash)
 	}
 
 	// Verify crypto signatures for each input and reject the transaction
@@ -203,4 +215,36 @@ func (mp *TxMempoolV2) checkMempoolAcceptance(
 	}
 
 	return result, nil
+}
+
+// fetchInputUtxos loads UTXO details for transaction inputs from both the
+// blockchain and the mempool. This matches TxPool behavior and enables
+// parent-child transaction chains where children spend unconfirmed parent
+// outputs.
+//
+// First it fetches from the blockchain, then augments with unconfirmed outputs
+// from the mempool graph. This is essential for CPFP, package relay, and TRUC
+// validation.
+func (mp *TxMempoolV2) fetchInputUtxos(tx *btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
+	// Fetch blockchain UTXOs.
+	utxoView, err := mp.cfg.FetchUtxoView(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Augment with unconfirmed outputs from mempool graph.
+	for _, txIn := range tx.MsgTx().TxIn {
+		prevOut := &txIn.PreviousOutPoint
+		entry := utxoView.LookupEntry(*prevOut)
+		if entry != nil && !entry.IsSpent() {
+			continue
+		}
+
+		// Check if parent exists in mempool.
+		if parentNode, exists := mp.graph.GetNode(prevOut.Hash); exists {
+			utxoView.AddTxOut(parentNode.Tx, prevOut.Index, mining.UnminedHeight)
+		}
+	}
+
+	return utxoView, nil
 }

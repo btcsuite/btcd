@@ -98,6 +98,14 @@ func (m *mockGraph) getDescendantsRecursive(hash chainhash.Hash,
 	}
 }
 
+func (m *mockGraph) IsValidPackageExtension(tx *btcutil.Tx,
+	desc *txgraph.TxDesc) error {
+
+	// Mock implementation always returns nil (valid).
+	// Tests that need package validation failures should use real TxGraph.
+	return nil
+}
+
 // Ensure mockGraph implements the necessary Graph interface methods.
 var _ interface {
 	GetNode(chainhash.Hash) (*txgraph.TxGraphNode, bool)
@@ -277,6 +285,32 @@ func TestSignalsReplacementInheritedDeep(t *testing.T) {
 		t, signals, "child should inherit RBF signaling from "+
 			"grandparent",
 	)
+}
+
+// TestSignalsReplacementV3Transaction tests that v3 transactions always signal
+// RBF replaceability per BIP 431 Rule 1, regardless of sequence numbers.
+func TestSignalsReplacementV3Transaction(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultPolicyConfig()
+	p := NewStandardPolicyEnforcer(cfg)
+	graph := newMockGraph()
+
+	// BIP 431 requires v3 to signal RBF even when using maximum sequence
+	// numbers that would normally indicate non-replaceability under BIP 125.
+	v3Tx := createTxWithSequence([]uint32{wire.MaxTxInSequenceNum})
+	v3Tx.MsgTx().Version = 3
+
+	signals := p.SignalsReplacement(graph, v3Tx)
+	require.True(t, signals, "v3 transaction should always signal RBF")
+
+	// Verify v2 transactions with identical sequence numbers follow standard
+	// BIP 125 rules and do not signal replaceability.
+	v2Tx := createTxWithSequence([]uint32{wire.MaxTxInSequenceNum})
+	v2Tx.MsgTx().Version = 2
+
+	signals = p.SignalsReplacement(graph, v2Tx)
+	require.False(t, signals, "v2 without BIP 125 signaling should not signal RBF")
 }
 
 // TestValidateReplacementBasic tests basic RBF replacement validation.

@@ -66,6 +66,14 @@ type PolicyGraph interface {
 	// negative maxDepth returns all descendants.
 	GetDescendants(hash chainhash.Hash,
 		maxDepth int) map[chainhash.Hash]*txgraph.TxGraphNode
+
+	// IsValidPackageExtension validates that adding the transaction would
+	// create a valid package with its parents and siblings. This checks
+	// package-level constraints (TRUC topology, ephemeral dust, size limits)
+	// without tracking the package. This composite method encapsulates the
+	// details of package construction and validation.
+	IsValidPackageExtension(tx *btcutil.Tx,
+		desc *txgraph.TxDesc) error
 }
 
 // PolicyEnforcer defines the interface for mempool policy enforcement. This
@@ -112,6 +120,17 @@ type PolicyEnforcer interface {
 	// ValidateSegWitDeployment checks that if a transaction contains
 	// witness data, the SegWit soft fork must be active.
 	ValidateSegWitDeployment(tx *btcutil.Tx) error
+
+	// ValidatePackagePolicy validates that the transaction's package meets
+	// all policy requirements (TRUC topology, ephemeral dust, size limits).
+	//
+	// This validates BIP 431 TRUC constraints and other package-level
+	// policies. TRUC topology rules enforce ancestor/descendant limits
+	// (max depth=1, 1-parent-1-child) to prevent pinning attacks. This is
+	// conceptually similar to ValidateAncestorLimits but operates at the
+	// package level.
+	ValidatePackagePolicy(graph PolicyGraph, tx *btcutil.Tx,
+		desc *txgraph.TxDesc) error
 }
 
 // PolicyConfig defines mempool policy parameters. These settings control
@@ -244,8 +263,16 @@ func NewStandardPolicyEnforcer(cfg PolicyConfig) *StandardPolicyEnforcer {
 //
 // 1. Explicit signaling: Any input has a sequence number <= MaxRBFSequence.
 // 2. Inherited signaling: Any unconfirmed ancestor signals replaceability.
+//
+// Additionally, per BIP 431 Rule 1, v3 (TRUC) transactions always signal
+// replaceability regardless of sequence numbers.
 func (p *StandardPolicyEnforcer) SignalsReplacement(
 	graph PolicyGraph, tx *btcutil.Tx) bool {
+
+	// BIP 431 Rule 1: v3 transactions always signal replaceability.
+	if tx.MsgTx().Version == 3 {
+		return true
+	}
 
 	// Check for explicit signaling in this transaction's inputs.
 	for _, txIn := range tx.MsgTx().TxIn {
@@ -353,13 +380,28 @@ func (p *StandardPolicyEnforcer) ValidateReplacement(
 			"threshold_pct", float64(conflictCount)/float64(p.cfg.MaxReplacementEvictions)*100)
 	}
 
-	// Rule 2: The replacement must not spend outputs from any of the
-	// conflicts. Get all ancestors to check for overlap.
-	ancestors := graph.GetAncestors(*tx.Hash(), -1)
-	for conflictHash := range conflicts.Transactions {
-		if _, exists := ancestors[conflictHash]; exists {
-			return fmt.Errorf("%w: %v", ErrReplacementSpendsParent,
-				conflictHash)
+	// Rule 2: The replacement must not spend outputs from any of the conflicts.
+	// Build ancestor set from the candidate transaction's inputs since the
+	// candidate doesn't exist in the graph yet.
+	for _, txIn := range tx.MsgTx().TxIn {
+		parentHash := txIn.PreviousOutPoint.Hash
+
+		// If the parent is one of the conflicts, that's OK (direct replacement).
+		// But if any ancestor of the parent is a conflict, that violates BIP 125.
+		if _, exists := graph.GetNode(parentHash); exists {
+			// Check if this parent is a conflict.
+			if _, isConflict := conflicts.Transactions[parentHash]; isConflict {
+				continue // Direct parent conflict is allowed.
+			}
+
+			// Check if any of this parent's ancestors are conflicts.
+			parentAncestors := graph.GetAncestors(parentHash, -1)
+			for ancestorHash := range parentAncestors {
+				if _, isConflict := conflicts.Transactions[ancestorHash]; isConflict {
+					return fmt.Errorf("%w: %v", ErrReplacementSpendsParent,
+						ancestorHash)
+				}
+			}
 		}
 	}
 
@@ -429,19 +471,31 @@ func (p *StandardPolicyEnforcer) ValidateAncestorLimits(
 	graph PolicyGraph, hash chainhash.Hash) error {
 	ctx := context.Background()
 
-	// Get all ancestors for this transaction.
+	node, exists := graph.GetNode(hash)
+	if !exists {
+		return fmt.Errorf("transaction not found in graph")
+	}
+
+	// TRUC transactions have stricter topology limits (max 1 unconfirmed
+	// ancestor) enforced by the PackageAnalyzer during package validation.
+	// The standard 25-ancestor limit still applies to non-TRUC transactions.
+	maxAncestors := p.cfg.MaxAncestorCount
+	if node.Tx.MsgTx().Version == 3 {
+		maxAncestors = 1
+	}
+
 	ancestors := graph.GetAncestors(hash, -1)
 
-	// Check ancestor count limit (includes the transaction itself).
 	ancestorCount := len(ancestors) + 1
-	if ancestorCount > p.cfg.MaxAncestorCount {
+	if ancestorCount > maxAncestors {
 		log.WarnS(ctx, "Ancestor count limit exceeded", nil,
 			"tx_hash", hash,
 			"ancestor_count", ancestorCount,
-			"max_ancestors", p.cfg.MaxAncestorCount)
+			"max_ancestors", maxAncestors,
+			"is_truc", node.Tx.MsgTx().Version == 3)
 		return fmt.Errorf("%w: %d ancestors (max %d)",
 			ErrExceededAncestorLimit, ancestorCount,
-			p.cfg.MaxAncestorCount)
+			maxAncestors)
 	}
 
 	// Log when approaching limit (potential chain spam).
@@ -460,10 +514,7 @@ func (p *StandardPolicyEnforcer) ValidateAncestorLimits(
 	}
 
 	// Add this transaction's size.
-	node, exists := graph.GetNode(hash)
-	if exists {
-		ancestorSize += node.TxDesc.VirtualSize
-	}
+	ancestorSize += node.TxDesc.VirtualSize
 
 	if ancestorSize > p.cfg.MaxAncestorSize {
 		return fmt.Errorf("%w: %d bytes (max %d)",
@@ -484,19 +535,30 @@ func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
 	graph PolicyGraph, hash chainhash.Hash) error {
 	ctx := context.Background()
 
-	// Get all descendants for this transaction.
+	node, exists := graph.GetNode(hash)
+	if !exists {
+		return fmt.Errorf("transaction not found in graph")
+	}
+
+	// TRUC transactions enforce max 1 unconfirmed descendant to prevent
+	// pinning via descendant limits. Standard transactions use 25.
+	maxDescendants := p.cfg.MaxDescendantCount
+	if node.Tx.MsgTx().Version == 3 {
+		maxDescendants = 1
+	}
+
 	descendants := graph.GetDescendants(hash, -1)
 
-	// Check descendant count limit.
 	descendantCount := len(descendants)
-	if descendantCount > p.cfg.MaxDescendantCount {
+	if descendantCount > maxDescendants {
 		log.WarnS(ctx, "Descendant count limit exceeded", nil,
 			"tx_hash", hash,
 			"descendant_count", descendantCount,
-			"max_descendants", p.cfg.MaxDescendantCount)
+			"max_descendants", maxDescendants,
+			"is_truc", node.Tx.MsgTx().Version == 3)
 		return fmt.Errorf("%w: %d descendants (max %d)",
 			ErrExceededDescendantLimit, descendantCount,
-			p.cfg.MaxDescendantCount)
+			maxDescendants)
 	}
 
 	// Check descendant size limit.
@@ -613,6 +675,23 @@ func (p *StandardPolicyEnforcer) ValidateSegWitDeployment(tx *btcutil.Tx) error 
 		tx, p.cfg.IsDeploymentActive, p.cfg.ChainParams,
 		p.cfg.BestHeight(),
 	)
+}
+
+// ValidatePackagePolicy validates that the transaction's package meets all
+// policy requirements (TRUC topology, ephemeral dust, size limits).
+//
+// This validates BIP 431 TRUC constraints and other package-level policies.
+// TRUC topology rules enforce ancestor/descendant limits (max depth=1,
+// 1-parent-1-child) to prevent pinning attacks. This is conceptually similar
+// to ValidateAncestorLimits but operates at the package level.
+func (p *StandardPolicyEnforcer) ValidatePackagePolicy(
+	graph PolicyGraph,
+	tx *btcutil.Tx,
+	desc *txgraph.TxDesc,
+) error {
+
+	// Delegate to graph's composite validation method.
+	return graph.IsValidPackageExtension(tx, desc)
 }
 
 // Ensure StandardPolicyEnforcer implements PolicyEnforcer interface.
