@@ -27,9 +27,9 @@ type PackageAnalyzer interface {
 	IsZeroFee(desc *TxDesc) bool
 
 	// ValidateTRUCPackage enforces BIP 431 topology restrictions on v3
-	// packages. This includes single-parent rules, size limits, and
-	// topology constraints that prevent pinning attacks.
-	ValidateTRUCPackage(nodes []*TxGraphNode) bool
+	// packages. This includes single-parent rules, size limits, depth
+	// constraints, and topology restrictions that prevent pinning attacks.
+	ValidateTRUCPackage(pkg *TxPackage) bool
 
 	// ValidateEphemeralPackage ensures all ephemeral dust outputs are
 	// spent within the package. This prevents unspendable dust from

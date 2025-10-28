@@ -411,6 +411,18 @@ func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 		Added:       time.Now(),
 	}
 
+	// Validate package topology BEFORE adding to graph. This validates TRUC
+	// rules (BIP 431) and ensures transactions don't violate protocol
+	// constraints. Validation is unconditional to catch both v3→v2 and v2→v3
+	// violations (all-or-none rule applies in both directions).
+	//
+	// ValidatePackagePolicy in PolicyEnforcer delegates to the graph's
+	// IsValidPackageExtension method, which performs validation in dry run
+	// mode (no tracking) to avoid index inconsistency if AddTransaction fails.
+	if err := mp.policy.ValidatePackagePolicy(mp.graph, tx, graphDesc); err != nil {
+		return nil, nil, fmt.Errorf("transaction violates package policy: %w", err)
+	}
+
 	// Add transaction to graph.
 	if err := mp.graph.AddTransaction(tx, graphDesc); err != nil {
 		return nil, nil, err
@@ -470,7 +482,7 @@ func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 // one being accepted.
 func (mp *TxMempoolV2) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit bool, tag Tag) ([]*TxDesc, error) {
 	ctx := context.Background()
-	log.TraceS(ctx, "Processing transaction",
+	log.InfoS(ctx, "TxMempoolV2.ProcessTransaction called",
 		"tx_hash", tx.Hash(),
 		"allow_orphan", allowOrphan,
 		"rate_limit", rateLimit,
@@ -900,6 +912,18 @@ func (mp *TxMempoolV2) CheckMempoolAcceptance(tx *btcutil.Tx) (*MempoolAcceptRes
 	// - rateLimit=false (no rate limiting for RPC checks)
 	// - rejectDupOrphans=true (reject if already in orphan pool)
 	return mp.checkMempoolAcceptance(tx, true, false, true)
+}
+
+// NewStandardPackageAnalyzer creates a new standard package analyzer for TRUC
+// (BIP 431) validation. This is a convenience wrapper for the txgraph package.
+func NewStandardPackageAnalyzer() *txgraph.StandardPackageAnalyzer {
+	return txgraph.NewStandardPackageAnalyzer()
+}
+
+// DefaultGraphConfig returns the default txgraph configuration. This is a
+// convenience wrapper for the txgraph package.
+func DefaultGraphConfig() *txgraph.Config {
+	return txgraph.DefaultConfig()
 }
 
 // Ensure TxMempoolV2 implements the TxMempool interface.

@@ -2984,7 +2984,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 				MaxOrphanTxSize:      defaultMaxOrphanTxSize,
 				MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
 				MinRelayTxFee:        cfg.minRelayTxFee,
-				MaxTxVersion:         2,
+				MaxTxVersion:         mempool.MaxStandardTxVersion,
 				RejectReplacement:    cfg.RejectReplacement,
 			},
 			ChainParams:    chainParams,
@@ -3186,7 +3186,7 @@ func (s *server) initTxMempoolV2(cfg *config, chainParams *chaincfg.Params) (mem
 		MinRelayTxFee:           cfg.minRelayTxFee,
 		FreeTxRelayLimit:        cfg.FreeTxRelayLimit,
 		DisableRelayPriority:    cfg.NoRelayPriority,
-		MaxTxVersion:            2,
+		MaxTxVersion:            mempool.MaxStandardTxVersion,
 		MaxSigOpCostPerTx:       blockchain.MaxBlockSigOpsCost / 4,
 		IsDeploymentActive:      s.chain.IsDeploymentActive,
 		ChainParams:             chainParams,
@@ -3214,7 +3214,27 @@ func (s *server) initTxMempoolV2(cfg *config, chainParams *chaincfg.Params) (mem
 	}
 	orphanManager := mempool.NewOrphanManager(orphanCfg)
 
+	// Create PackageAnalyzer for TRUC (BIP 431) validation.
+	packageAnalyzer := mempool.NewStandardPackageAnalyzer()
+
+	// Create GraphConfig with package analyzer.
+	graphCfg := mempool.DefaultGraphConfig()
+	graphCfg.PackageAnalyzer = packageAnalyzer
+
 	// Create MempoolConfig with all dependencies.
+	// Note: AddrIndex and FeeEstimator are optional and may be nil. Only
+	// assign them to the interface fields if they're non-nil to avoid the
+	// typed nil interface issue.
+	var addrIndex mempool.TxAddrIndexer
+	if s.addrIndex != nil {
+		addrIndex = s.addrIndex
+	}
+
+	var feeEstimator mempool.TxFeeEstimator
+	if s.feeEstimator != nil {
+		feeEstimator = s.feeEstimator
+	}
+
 	mempoolCfg := &mempool.MempoolConfig{
 		FetchUtxoView:  s.chain.FetchUtxoView,
 		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
@@ -3222,9 +3242,9 @@ func (s *server) initTxMempoolV2(cfg *config, chainParams *chaincfg.Params) (mem
 		PolicyEnforcer: policyEnforcer,
 		TxValidator:    txValidator,
 		OrphanManager:  orphanManager,
-		AddrIndex:      s.addrIndex,
-		FeeEstimator:   s.feeEstimator,
-		GraphConfig:    nil, // Use defaults.
+		AddrIndex:      addrIndex,
+		FeeEstimator:   feeEstimator,
+		GraphConfig:    graphCfg,
 	}
 
 	return mempool.NewTxMempoolV2(mempoolCfg)

@@ -57,11 +57,13 @@ type Config struct {
 	PackageAnalyzer PackageAnalyzer
 }
 
-// DefaultConfig returns the default graph configuration.
+// DefaultConfig returns the default graph configuration with the standard
+// package analyzer for Bitcoin protocol validation.
 func DefaultConfig() *Config {
 	return &Config{
-		MaxNodes:       100000,
-		MaxPackageSize: 101,
+		MaxNodes:        100000,
+		MaxPackageSize:  101,
+		PackageAnalyzer: NewStandardPackageAnalyzer(),
 	}
 }
 
@@ -245,10 +247,86 @@ func (g *TxGraph) AddTransaction(tx *btcutil.Tx, txDesc *TxDesc) error {
 		atomic.AddInt32(&g.metrics.trucCount, 1)
 	}
 
+	// Invalidate parent packages since topology changed (new child added).
+	// This must happen before tracking the new package to ensure we don't
+	// have stale packages in the index.
+	for parentHash := range node.Parents {
+		g.invalidatePackagesContaining(parentHash)
+	}
+
+	// Track package if node has parents (is part of a chain).
+	// The package is constructed from the node, its parents, and siblings,
+	// matching the validation context from BuildPackageNodes.
+	if len(node.Parents) > 0 {
+		g.trackNodePackage(node)
+	}
+
 	// Update metrics.
 	atomic.AddInt32(&g.metrics.nodeCount, 1)
 
 	return nil
+}
+
+// trackNodePackage identifies and tracks the package containing the given
+// node. This is called after AddTransaction successfully adds a node to
+// ensure the package index remains consistent with graph state.
+//
+// The package is constructed from:
+//   - The node itself
+//   - All parent nodes in the graph
+//   - All sibling nodes (children of parents)
+//
+// This creates the same package context that was validated before addition.
+// Must be called with lock held.
+func (g *TxGraph) trackNodePackage(node *TxGraphNode) {
+	// Collect package members (all exist in graph now).
+	members := []*TxGraphNode{node}
+
+	// Add parents and their children (siblings).
+	for parentHash := range node.Parents {
+		parent, exists := g.nodes[parentHash]
+		if !exists {
+			continue
+		}
+		members = append(members, parent)
+
+		// Add siblings (other children of this parent).
+		for childHash, child := range parent.Children {
+			if childHash != node.TxHash {
+				members = append(members, child)
+			}
+		}
+	}
+
+	// Create package - will be tracked since all nodes exist.
+	// Note: CreatePackage calls maybeTrackPackage which checks all nodes
+	// are in the graph before tracking. If validation fails here, it
+	// indicates a bug since the package was validated before AddTransaction.
+	_, _ = g.CreatePackage(members)
+}
+
+// invalidatePackagesContaining removes packages that contain the given
+// transaction from the index. This is called when the transaction's
+// package topology changes (e.g., a new child is added).
+//
+// Must be called with lock held.
+func (g *TxGraph) invalidatePackagesContaining(txHash chainhash.Hash) {
+	pkgID, exists := g.indexes.nodeToPackage[txHash]
+	if !exists {
+		return
+	}
+
+	pkg, exists := g.indexes.packages[pkgID]
+	if !exists {
+		return
+	}
+
+	// Remove all mappings for this package.
+	for hash := range pkg.Transactions {
+		delete(g.indexes.nodeToPackage, hash)
+	}
+	delete(g.indexes.packages, pkgID)
+	atomic.AddInt32(&g.metrics.packageCount, -1)
 }
 
 // RemoveTransaction removes a transaction from the graph.
@@ -386,20 +464,9 @@ func (g *TxGraph) removeTransactionUnsafe(hash chainhash.Hash) error {
 		delete(g.indexes.nodeToCluster, hash)
 	}
 
-	// Remove from packages.
-	if pkgID := node.Metadata.PackageID; pkgID != nil {
-		if pkg, exists := g.indexes.packages[*pkgID]; exists {
-			delete(pkg.Transactions, hash)
-
-			if len(pkg.Transactions) == 0 {
-				delete(g.indexes.packages, *pkgID)
-
-				atomic.AddInt32(&g.metrics.packageCount, -1)
-			}
-		}
-
-		delete(g.indexes.nodeToPackage, hash)
-	}
+	// Remove from packages. This invalidates any package containing this
+	// transaction, cleaning up both the package and nodeToPackage indexes.
+	g.invalidatePackagesContaining(hash)
 
 	// Remove node.
 	delete(g.nodes, hash)
@@ -449,7 +516,9 @@ func (g *TxGraph) GetAncestors(hash chainhash.Hash,
 
 	node, exists := g.nodes[hash]
 	if !exists {
-		return nil
+		// Return empty map instead of nil to prevent nil map access panics.
+		// Callers can check len(result) == 0 to detect non-existent nodes.
+		return make(map[chainhash.Hash]*TxGraphNode)
 	}
 
 	ancestors := make(map[chainhash.Hash]*TxGraphNode)
@@ -490,7 +559,8 @@ func (g *TxGraph) GetDescendants(hash chainhash.Hash,
 
 	node, exists := g.nodes[hash]
 	if !exists {
-		return nil
+		// Return empty map instead of nil to prevent nil map access panics.
+		return make(map[chainhash.Hash]*TxGraphNode)
 	}
 
 	descendants := make(map[chainhash.Hash]*TxGraphNode)
@@ -639,6 +709,104 @@ func (g *TxGraph) GetConflicts(tx *btcutil.Tx) *ConflictSet {
 	return result
 }
 
+// BuildPackageNodes constructs the complete set of nodes needed to validate
+// adding a new transaction to the mempool. This includes:
+//  - The new transaction itself (as a temporary node)
+//  - All unconfirmed ancestors (parents, grandparents, etc.) from the mempool
+//  - All existing descendants of those ancestors (siblings, cousins, etc.)
+//
+// This complete context ensures package validation rules (especially TRUC
+// topology restrictions like the 1-child limit and no-grandchildren rule)
+// see the full relationship graph. Without complete ancestor traversal, we
+// cannot detect violations like creating a 3-generation v3 chain.
+//
+// The returned nodes can be passed directly to CreatePackage for validation.
+//
+// TODO: Consider further refactoring this method and its interaction with
+// CreatePackage/AddTransaction for better separation of concerns.
+func (g *TxGraph) BuildPackageNodes(tx *btcutil.Tx, desc *TxDesc) []*TxGraphNode {
+	txHash := tx.Hash()
+
+	// Create temporary node for the new transaction.
+	tempNode := &TxGraphNode{
+		TxHash:   *txHash,
+		Tx:       tx,
+		TxDesc:   desc,
+		Parents:  make(map[chainhash.Hash]*TxGraphNode),
+		Children: make(map[chainhash.Hash]*TxGraphNode),
+	}
+
+	// Track all nodes we've seen to avoid duplicates.
+	seen := make(map[chainhash.Hash]bool)
+	seen[*txHash] = true
+
+	// Collect all ancestors using BFS traversal upward through the graph.
+	// This ensures we catch violations like v3→v3→v3 chains (grandparent).
+	ancestors := make(map[chainhash.Hash]*TxGraphNode)
+	queue := NewQueue[*TxGraphNode]()
+
+	// Find immediate parents and establish relationships.
+	for _, txIn := range tx.MsgTx().TxIn {
+		parentHash := txIn.PreviousOutPoint.Hash
+		if parentNode, exists := g.GetNode(parentHash); exists {
+			tempNode.Parents[parentHash] = parentNode
+			ancestors[parentHash] = parentNode
+			queue.Enqueue(parentNode)
+			seen[parentHash] = true
+		}
+	}
+
+	// BFS traversal: collect all unconfirmed ancestors recursively.
+	for !queue.IsEmpty() {
+		node, _ := queue.Dequeue()
+
+		// Add this node's parents (going up the ancestry chain).
+		for parentHash, parentNode := range node.Parents {
+			if !seen[parentHash] {
+				ancestors[parentHash] = parentNode
+				queue.Enqueue(parentNode)
+				seen[parentHash] = true
+			}
+		}
+	}
+
+	// Build final validation set: new tx + all ancestors + all their descendants.
+	// Including descendants ensures we see siblings and detect topology violations.
+	validationNodes := []*TxGraphNode{tempNode}
+
+	for _, ancestor := range ancestors {
+		validationNodes = append(validationNodes, ancestor)
+
+		// Include all children of this ancestor (siblings/cousins of new tx).
+		for childHash, childNode := range ancestor.Children {
+			if !seen[childHash] {
+				validationNodes = append(validationNodes, childNode)
+				seen[childHash] = true
+			}
+		}
+	}
+
+	return validationNodes
+}
+
+// IsValidPackageExtension validates that adding the transaction would
+// create a valid package with its parents and siblings. This checks
+// package-level constraints (TRUC topology, ephemeral dust, size limits)
+// without tracking the package in the graph's indexes.
+//
+// This encapsulates BuildPackageNodes + CreatePackage with dry run mode,
+// providing a single composite method for package validation. This is used
+// during pre-acceptance validation to ensure the transaction doesn't violate
+// package policies before committing to AddTransaction.
+func (g *TxGraph) IsValidPackageExtension(tx *btcutil.Tx, desc *TxDesc) error {
+	// Build validation context (temporary node + parents + siblings).
+	validationNodes := g.BuildPackageNodes(tx, desc)
+
+	// Validate package without tracking (dry run mode).
+	_, err := g.CreatePackage(validationNodes, WithDryRun())
+	return err
+}
+
 // ValidatePackage validates a transaction package.
 func (g *TxGraph) ValidatePackage(pkg *TxPackage) error {
 	if pkg == nil {
@@ -672,11 +840,13 @@ func (g *TxGraph) ValidatePackage(pkg *TxPackage) error {
 		// TODO: Validate 1 parent, 1 child relationship.
 
 	case PackageTypeTRUC:
-		// All transactions must be version 3.
-		for _, node := range pkg.Transactions {
-			if !node.Metadata.IsTRUC {
-				return fmt.Errorf("non-TRUC " +
-					"transaction in TRUC package")
+		// Enforce BIP 431 TRUC topology, depth, and size restrictions using
+		// the analyzer. This prevents transaction pinning attacks by validating
+		// 1-parent-1-child topology, 2-generation depth limit, size limits,
+		// and all-or-none v3 requirement.
+		if g.analyzer != nil {
+			if !g.analyzer.ValidateTRUCPackage(pkg) {
+				return ErrInvalidTopology
 			}
 		}
 	}

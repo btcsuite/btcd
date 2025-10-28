@@ -65,6 +65,11 @@ func (m *mockPolicyEnforcer) ValidateSegWitDeployment(tx *btcutil.Tx) error {
 	return args.Error(0)
 }
 
+func (m *mockPolicyEnforcer) ValidatePackagePolicy(graph PolicyGraph, tx *btcutil.Tx, desc *txgraph.TxDesc) error {
+	args := m.Called(graph, tx, desc)
+	return args.Error(0)
+}
+
 // mockTxValidator is a mock implementation of TxValidator for testing.
 type mockTxValidator struct {
 	mock.Mock
@@ -193,6 +198,7 @@ func (h *testHarness) expectTxAccepted(tx *btcutil.Tx, view *blockchain.UtxoView
 	h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+	h.mockPolicy.On("ValidatePackagePolicy", mock.Anything, tx, mock.Anything).Return(nil)
 	h.mockValidator.On("ValidateScripts", tx, mock.Anything).Return(nil)
 	if view != nil {
 		h.mockUtxoView.On("FetchUtxoView", tx).Return(view, nil)
@@ -298,6 +304,7 @@ func (h *testHarness) expectRBFReplacement(tx *btcutil.Tx, view *blockchain.Utxo
 	h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+	h.mockPolicy.On("ValidatePackagePolicy", mock.Anything, tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("SignalsReplacement", mock.Anything, tx).Return(true)
 	h.mockPolicy.On("ValidateReplacement", mock.Anything, tx, fee, mock.Anything).Return(nil)
 	h.mockValidator.On("ValidateScripts", tx, mock.Anything).Return(nil)
@@ -314,6 +321,7 @@ func (h *testHarness) expectRBFRejection(tx *btcutil.Tx, view *blockchain.UtxoVi
 	h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+	h.mockPolicy.On("ValidatePackagePolicy", mock.Anything, tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("SignalsReplacement", mock.Anything, tx).Return(false)
 	h.mockUtxoView.On("FetchUtxoView", tx).Return(view, nil)
 }

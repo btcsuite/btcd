@@ -757,25 +757,8 @@ func TestRemoveTransactionPackageCleanup(t *testing.T) {
 	require.NoError(t, g.AddTransaction(parent, parentDesc))
 	require.NoError(t, g.AddTransaction(child, childDesc))
 
-	// Identify and assign packages.
-	packages, err := g.IdentifyPackages()
-	require.NoError(t, err)
-	require.Len(t, packages, 1)
-
-	// Assign package IDs.
-	for i := range packages {
-		pkg := packages[i]
-		for hash := range pkg.Transactions {
-			node, _ := g.GetNode(hash)
-			node.Metadata.PackageID = &pkg.ID
-		}
-		g.indexes.packages[pkg.ID] = pkg
-		for hash := range pkg.Transactions {
-			g.indexes.nodeToPackage[hash] = pkg.ID
-		}
-	}
-
-	// Verify package exists.
+	// Package is now automatically tracked during AddTransaction.
+	// Verify package was tracked.
 	require.Equal(t, 1, g.GetMetrics().PackageCount)
 
 	// Remove parent (should remove child and clean up package).
@@ -1454,5 +1437,141 @@ func TestAddToClusterWhenClusterDoesNotExist(t *testing.T) {
 	require.True(t, exists, "New cluster should exist")
 	require.Equal(t, 1, cluster.Size, "Cluster should have 1 node")
 	require.Contains(t, cluster.Nodes, *tx3.Hash(), "Cluster should contain tx3")
+}
+
+// TestAddTransactionTracksPackage verifies that packages are automatically
+// tracked when transactions with parents are added to the graph.
+func TestAddTransactionTracksPackage(t *testing.T) {
+	g := New(DefaultConfig())
+
+	// Create parent and add to graph.
+	parent, parentDesc := createTestTx(nil, 1)
+	require.NoError(t, g.AddTransaction(parent, parentDesc))
+
+	// Initially no packages tracked (single transaction).
+	require.Equal(t, 0, g.GetMetrics().PackageCount)
+
+	// Create child and add to graph.
+	child, childDesc := createTestTx(
+		[]wire.OutPoint{{Hash: *parent.Hash(), Index: 0}}, 1)
+	require.NoError(t, g.AddTransaction(child, childDesc))
+
+	// Package should now be tracked automatically.
+	require.Equal(t, 1, g.GetMetrics().PackageCount,
+		"Package should be tracked after child added")
+
+	// Verify nodeToPackage mapping exists for both transactions.
+	parentPkgID, parentExists := g.indexes.nodeToPackage[*parent.Hash()]
+	require.True(t, parentExists, "Parent should have package mapping")
+
+	childPkgID, childExists := g.indexes.nodeToPackage[*child.Hash()]
+	require.True(t, childExists, "Child should have package mapping")
+
+	// Both should reference the same package.
+	require.Equal(t, parentPkgID, childPkgID, "Should reference same package")
+
+	// Verify the package exists and contains both transactions.
+	pkg, exists := g.indexes.packages[parentPkgID]
+	require.True(t, exists, "Package should exist in indexes")
+	require.Len(t, pkg.Transactions, 2, "Package should contain 2 transactions")
+	require.Contains(t, pkg.Transactions, *parent.Hash())
+	require.Contains(t, pkg.Transactions, *child.Hash())
+}
+
+// TestCreatePackageDoesNotTrackTemporary verifies that packages containing
+// temporary nodes (not yet in graph) are not tracked during validation.
+func TestCreatePackageDoesNotTrackTemporary(t *testing.T) {
+	g := New(DefaultConfig())
+
+	// Create parent and add to graph.
+	parent, parentDesc := createTestTx(nil, 1)
+	require.NoError(t, g.AddTransaction(parent, parentDesc))
+
+	// Create child transaction but don't add to graph.
+	child, childDesc := createTestTx(
+		[]wire.OutPoint{{Hash: *parent.Hash(), Index: 0}}, 1)
+
+	// Validate using BuildPackageNodes + CreatePackage (dry run).
+	validationNodes := g.BuildPackageNodes(child, childDesc)
+	pkg, err := g.CreatePackage(validationNodes, WithDryRun())
+	require.NoError(t, err)
+	require.NotNil(t, pkg)
+
+	// Package should NOT be tracked (contains temporary node).
+	require.Equal(t, 0, g.GetMetrics().PackageCount,
+		"Temporary package should not be tracked")
+	require.Empty(t, g.indexes.packages, "Packages map should be empty")
+	require.Empty(t, g.indexes.nodeToPackage, "Node-to-package map should be empty")
+}
+
+// TestRemoveTransactionCleansUpPackage verifies that packages are properly
+// cleaned up when transactions are removed from the graph.
+func TestRemoveTransactionCleansUpPackage(t *testing.T) {
+	g := New(DefaultConfig())
+
+	// Create 1P1C package.
+	parent, parentDesc := createTestTx(nil, 1)
+	child, childDesc := createTestTx(
+		[]wire.OutPoint{{Hash: *parent.Hash(), Index: 0}}, 1)
+
+	require.NoError(t, g.AddTransaction(parent, parentDesc))
+	require.NoError(t, g.AddTransaction(child, childDesc))
+
+	// Verify package is tracked.
+	require.Equal(t, 1, g.GetMetrics().PackageCount)
+
+	// Remove parent (should remove child and clean up package).
+	require.NoError(t, g.RemoveTransaction(*parent.Hash()))
+
+	// Verify both transactions are gone.
+	require.False(t, g.HasTransaction(*parent.Hash()))
+	require.False(t, g.HasTransaction(*child.Hash()))
+
+	// Verify package is cleaned up.
+	require.Equal(t, 0, g.GetMetrics().PackageCount,
+		"Package should be removed")
+	require.Empty(t, g.indexes.packages, "Packages map should be empty")
+	require.Empty(t, g.indexes.nodeToPackage, "Node-to-package map should be empty")
+}
+
+// TestInvalidatePackagesWhenChildAdded verifies that parent packages are
+// invalidated when new children are added, and new packages are tracked.
+func TestInvalidatePackagesWhenChildAdded(t *testing.T) {
+	g := New(DefaultConfig())
+
+	// Create parent with two outputs.
+	parent, parentDesc := createTestTx(nil, 2)
+	require.NoError(t, g.AddTransaction(parent, parentDesc))
+
+	// Add first child - creates 1P1C package.
+	child1, child1Desc := createTestTx(
+		[]wire.OutPoint{{Hash: *parent.Hash(), Index: 0}}, 1)
+	require.NoError(t, g.AddTransaction(child1, child1Desc))
+
+	// Verify first package tracked.
+	require.Equal(t, 1, g.GetMetrics().PackageCount)
+	firstPkgID := g.indexes.nodeToPackage[*parent.Hash()]
+
+	// Add second child - should invalidate first package and create new one.
+	child2, child2Desc := createTestTx(
+		[]wire.OutPoint{{Hash: *parent.Hash(), Index: 1}}, 1)
+	require.NoError(t, g.AddTransaction(child2, child2Desc))
+
+	// Still should have 1 package (old invalidated, new tracked).
+	require.Equal(t, 1, g.GetMetrics().PackageCount,
+		"Should still have 1 package after invalidation and re-tracking")
+
+	// Verify new package ID is different.
+	newPkgID := g.indexes.nodeToPackage[*parent.Hash()]
+	require.NotEqual(t, firstPkgID, newPkgID,
+		"Package ID should change after topology change")
+
+	// Verify new package contains all three transactions.
+	pkg := g.indexes.packages[newPkgID]
+	require.Len(t, pkg.Transactions, 3,
+		"New package should contain parent + both children")
+	require.Contains(t, pkg.Transactions, *parent.Hash())
+	require.Contains(t, pkg.Transactions, *child1.Hash())
+	require.Contains(t, pkg.Transactions, *child2.Hash())
 }
 
