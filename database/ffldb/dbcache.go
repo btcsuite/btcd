@@ -611,19 +611,27 @@ func (c *dbCache) commitTx(tx *transaction) error {
 	c.cacheLock.RUnlock()
 
 	// Apply every key to add in the database transaction to the cache.
+	pendingKeys := make([][]byte, 0, tx.pendingKeys.Len())
+	pendingKeyValues := make([][]byte, 0, tx.pendingKeys.Len())
 	tx.pendingKeys.ForEach(func(k, v []byte) bool {
+		pendingKeys = append(pendingKeys, k)
+		pendingKeyValues = append(pendingKeyValues, v)
+
 		newCachedRemove = newCachedRemove.Delete(k)
-		newCachedKeys = newCachedKeys.Put(k, v)
 		return true
 	})
+	newCachedKeys = newCachedKeys.Put(pendingKeys, pendingKeyValues)
 	tx.pendingKeys = nil
 
 	// Apply every key to remove in the database transaction to the cache.
+	pendingRemoveKeys := make([][]byte, 0, tx.pendingRemove.Len())
 	tx.pendingRemove.ForEach(func(k, v []byte) bool {
+		pendingRemoveKeys = append(pendingRemoveKeys, k)
+
 		newCachedKeys = newCachedKeys.Delete(k)
-		newCachedRemove = newCachedRemove.Put(k, nil)
 		return true
 	})
+	newCachedRemove = newCachedRemove.Put(pendingRemoveKeys, nil)
 	tx.pendingRemove = nil
 
 	// Atomically replace the immutable treaps which hold the cached keys to
