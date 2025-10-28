@@ -99,6 +99,11 @@ func TestTRUCPackageIdentification(t *testing.T) {
 	// Configure mock to report transactions as TRUC (v3).
 	mockAnalyzer.On("IsTRUCTransaction", mock.Anything).Return(true)
 
+	// AddTransaction now calls trackNodePackage which needs these methods.
+	// Allow multiple calls since validation happens during add and identification.
+	mockAnalyzer.On("AnalyzePackageType", mock.Anything).Return(PackageTypeTRUC).Maybe()
+	mockAnalyzer.On("ValidateTRUCPackage", mock.Anything).Return(true).Maybe()
+
 	require.NoError(t, g.AddTransaction(parent, parentDesc))
 	require.NoError(t, g.AddTransaction(child, childDesc))
 
@@ -172,6 +177,11 @@ func TestEphemeralPackageIdentification(t *testing.T) {
 	mockAnalyzer.On("IsTRUCTransaction", mock.Anything).Return(false)
 	mockAnalyzer.On("HasEphemeralDust", mock.Anything).Return(true)
 	mockAnalyzer.On("IsZeroFee", mock.Anything).Return(true)
+
+	// AddTransaction now calls trackNodePackage which needs these methods.
+	// Allow multiple calls since validation happens during add and identification.
+	mockAnalyzer.On("AnalyzePackageType", mock.Anything).Return(PackageTypeEphemeral).Maybe()
+	mockAnalyzer.On("ValidateEphemeralPackage", mock.Anything).Return(true).Maybe()
 
 	require.NoError(t, g.AddTransaction(parent, parentDesc))
 	require.NoError(t, g.AddTransaction(child, childDesc))
@@ -546,4 +556,167 @@ func TestValidatePackage(t *testing.T) {
 	}
 	err = g.ValidatePackage(emptyPkg)
 	require.Error(t, err)
+}
+
+// TestTopologyCalculationWithTemporaryNodes verifies that
+// calculateTopology correctly computes MaxDepth even when the package
+// includes temporary nodes not yet added to the graph. This is critical
+// for TRUC validation because depth checks must work during validation
+// (before AddTransaction is called), when the new transaction is
+// represented as a temporary node with Parents set but not yet in any
+// Children maps.
+//
+// This test specifically addresses the bug where BFS traversal using
+// node.Children couldn't reach temporary nodes, causing depth checks to
+// fail and allowing invalid TRUC chains (grandparent→parent→child) to be
+// accepted.
+func TestTopologyCalculationWithTemporaryNodes(t *testing.T) {
+	g := New(DefaultConfig())
+
+	// Create parent (v3) and add to graph.
+	parentTx := wire.NewMsgTx(3)
+	parentTx.AddTxOut(wire.NewTxOut(100000, nil))
+	parent := btcutil.NewTx(parentTx)
+	parentDesc := &TxDesc{
+		TxHash:      *parent.Hash(),
+		VirtualSize: 200,
+		Fee:         1000,
+		FeePerKB:    5000,
+	}
+	require.NoError(t, g.AddTransaction(parent, parentDesc))
+
+	// Create child (v3) spending parent and add to graph.
+	childTx := wire.NewMsgTx(3)
+	childTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{
+		Hash:  *parent.Hash(),
+		Index: 0,
+	}, nil, nil))
+	childTx.AddTxOut(wire.NewTxOut(90000, nil))
+	child := btcutil.NewTx(childTx)
+	childDesc := &TxDesc{
+		TxHash:      *child.Hash(),
+		VirtualSize: 200,
+		Fee:         1000,
+		FeePerKB:    5000,
+	}
+	require.NoError(t, g.AddTransaction(child, childDesc))
+
+	// Create grandchild (v3) spending child but DON'T add to graph yet.
+	// This simulates the validation scenario where we're checking if
+	// grandchild is valid before adding it.
+	grandchildTx := wire.NewMsgTx(3)
+	grandchildTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{
+		Hash:  *child.Hash(),
+		Index: 0,
+	}, nil, nil))
+	grandchildTx.AddTxOut(wire.NewTxOut(80000, nil))
+	grandchild := btcutil.NewTx(grandchildTx)
+	grandchildDesc := &TxDesc{
+		TxHash:      *grandchild.Hash(),
+		VirtualSize: 200,
+		Fee:         1000,
+		FeePerKB:    5000,
+	}
+
+	// Use BuildPackageNodes to create package including temporary node.
+	// This is what happens during validation in mempool_v2.go.
+	nodes := g.BuildPackageNodes(grandchild, grandchildDesc)
+	require.Len(t, nodes, 3, "Should collect grandchild + child + parent")
+
+	// Attempt to create package, which should FAIL because our fix now
+	// correctly calculates MaxDepth = 2, which violates TRUC topology
+	// constraints (BIP 431 requires MaxDepth ≤ 1).
+	//
+	// This demonstrates that the bug is fixed: calculateTopology now
+	// correctly traverses temporary nodes and computes depth even when
+	// the node isn't in any Children maps yet.
+	_, err := g.CreatePackage(nodes)
+	require.Error(t, err, "CreatePackage should reject invalid TRUC chain")
+	require.Contains(t, err.Error(), "invalid package topology",
+		"Error should indicate topology violation")
+
+	// The test verified that with our fix:
+	// 1. BuildPackageNodes correctly creates temp node with Parents set
+	// 2. CreatePackage builds package-local Children map during topology calc
+	// 3. MaxDepth is correctly calculated as 2 (not 1)
+	// 4. TRUC validation correctly rejects the package
+	//
+	// Before the fix, MaxDepth would be 1 (couldn't reach temp node),
+	// allowing invalid 3-transaction TRUC chains to be accepted.
+}
+
+// TestTopologyCalculationLinearChains verifies that MaxDepth is correctly
+// calculated for chains of various lengths, including edge cases like
+// single transactions and long chains.
+func TestTopologyCalculationLinearChains(t *testing.T) {
+	testCases := []struct {
+		name          string
+		chainLength   int
+		expectedDepth int
+	}{
+		{
+			name:          "single transaction",
+			chainLength:   1,
+			expectedDepth: 0,
+		},
+		{
+			name:          "two transactions (parent→child)",
+			chainLength:   2,
+			expectedDepth: 1,
+		},
+		{
+			name:          "three transactions (violates TRUC)",
+			chainLength:   3,
+			expectedDepth: 2,
+		},
+		{
+			name:          "long chain",
+			chainLength:   5,
+			expectedDepth: 4,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := New(DefaultConfig())
+
+			// Build a linear chain of the specified length.
+			var prevHash *chainhash.Hash
+			nodes := make([]*TxGraphNode, 0, tc.chainLength)
+
+			for i := 0; i < tc.chainLength; i++ {
+				var tx *btcutil.Tx
+				var desc *TxDesc
+
+				if i == 0 {
+					// First transaction has no parents.
+					tx, desc = createTestTx(nil, 1)
+				} else {
+					// Subsequent transactions spend from previous.
+					tx, desc = createTestTx(
+						[]wire.OutPoint{{Hash: *prevHash, Index: 0}},
+						1,
+					)
+				}
+
+				require.NoError(t, g.AddTransaction(tx, desc))
+				node, exists := g.GetNode(*tx.Hash())
+				require.True(t, exists)
+				nodes = append(nodes, node)
+
+				prevHash = tx.Hash()
+			}
+
+			// Create package and verify depth calculation.
+			pkg, err := g.CreatePackage(nodes)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedDepth, pkg.Topology.MaxDepth,
+				"Chain of length %d should have MaxDepth %d",
+				tc.chainLength, tc.expectedDepth)
+			require.Equal(t, 1, pkg.Topology.MaxWidth,
+				"Linear chain should always have MaxWidth 1")
+			require.True(t, pkg.Topology.IsLinear,
+				"Linear chain should be flagged as linear")
+		})
+	}
 }

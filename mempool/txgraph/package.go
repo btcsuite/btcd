@@ -9,6 +9,25 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
+// PackageOption is a functional option for configuring CreatePackage behavior.
+type PackageOption func(*packageOptions)
+
+// packageOptions holds configuration for package creation.
+type packageOptions struct {
+	dryRun bool
+}
+
+// WithDryRun configures CreatePackage to skip package tracking. This is used
+// during validation-only scenarios where we want to check package policy
+// without adding the package to persistent indexes. The dry run mode is
+// essential during pre-acceptance validation to avoid tracking packages for
+// transactions that haven't been added to the graph yet.
+func WithDryRun() PackageOption {
+	return func(opts *packageOptions) {
+		opts.dryRun = true
+	}
+}
+
 // IdentifyPackages scans the graph to detect and classify transaction
 // packages according to their type (1P1C, TRUC, ephemeral, standard).
 // Package classification enables the relay system to apply appropriate
@@ -417,77 +436,91 @@ func (g *TxGraph) calculateTopology(pkg *TxPackage) PackageTopology {
 		TotalNodes: len(pkg.Transactions),
 	}
 
-	// Traverse from root using BFS to compute depth and width
-	// metrics. Without a root, we cannot determine meaningful
-	// topology.
-	if pkg.Root != nil {
-		visited := make(map[chainhash.Hash]int)
-		queue := []struct {
-			node  *TxGraphNode
-			depth int
-		}{{pkg.Root, 0}}
+	// Without a root, we cannot traverse the package to compute depth
+	// and width metrics. Return early with minimal topology info.
+	if pkg.Root == nil {
+		return topology
+	}
 
-		maxDepth := 0
-		widthByDepth := make(map[int]int)
-
-		for len(queue) > 0 {
-			current := queue[0]
-			queue = queue[1:]
-
-			if _, exists := visited[current.node.TxHash]; exists {
-				continue
+	// Build package-local Children map by examining Parents of all
+	// nodes in the package. This ensures temporary nodes (not yet
+	// added to the graph) are included in topology calculation.
+	// This is critical for validating TRUC depth constraints when
+	// the package includes a new transaction not yet in the graph.
+	pkgChildren := make(map[chainhash.Hash]map[chainhash.Hash]*TxGraphNode)
+	for _, node := range pkg.Transactions {
+		for parentHash := range node.Parents {
+			if pkgChildren[parentHash] == nil {
+				pkgChildren[parentHash] = make(map[chainhash.Hash]*TxGraphNode)
 			}
-			visited[current.node.TxHash] = current.depth
+			pkgChildren[parentHash][node.TxHash] = node
+		}
+	}
 
-			widthByDepth[current.depth]++
-			if current.depth > maxDepth {
-				maxDepth = current.depth
-			}
+	visited := make(map[chainhash.Hash]int)
 
-			// Explore children to measure package depth. Only
-			// include children that are part of this package to
-			// avoid counting external dependencies.
-			for _, child := range current.node.Children {
-				_, exists := pkg.Transactions[child.TxHash]
-				if exists {
-					if _, visited := visited[child.TxHash]; !visited {
-						queue = append(
-							queue, struct {
-								node  *TxGraphNode
-								depth int
-							}{child, current.depth + 1},
-						)
-					}
+	// Use proper Queue data structure for BFS traversal.
+	type queueItem struct {
+		node  *TxGraphNode
+		depth int
+	}
+	queue := NewQueue[queueItem]()
+	queue.Enqueue(queueItem{pkg.Root, 0})
+
+	maxDepth := 0
+	widthByDepth := make(map[int]int)
+
+	for !queue.IsEmpty() {
+		current, _ := queue.Dequeue()
+
+		if _, exists := visited[current.node.TxHash]; exists {
+			continue
+		}
+		visited[current.node.TxHash] = current.depth
+
+		widthByDepth[current.depth]++
+		if current.depth > maxDepth {
+			maxDepth = current.depth
+		}
+
+		// Explore children using package-local Children map. This
+		// includes temporary nodes not yet added to the graph,
+		// ensuring correct depth calculation during validation.
+		for _, child := range pkgChildren[current.node.TxHash] {
+			_, exists := pkg.Transactions[child.TxHash]
+			if exists {
+				if _, visited := visited[child.TxHash]; !visited {
+					queue.Enqueue(queueItem{child, current.depth + 1})
 				}
 			}
 		}
-
-		topology.MaxDepth = maxDepth
-
-		// Determine maximum width (most siblings at any depth
-		// level). High width indicates parallel transaction
-		// structure.
-		for _, width := range widthByDepth {
-			if width > topology.MaxWidth {
-				topology.MaxWidth = width
-			}
-		}
-
-		// Check if package forms a linear chain. Linear chains are
-		// simpler to validate and optimize for block template
-		// construction.
-		topology.IsLinear = true
-		for _, width := range widthByDepth {
-			if width > 1 {
-				topology.IsLinear = false
-				break
-			}
-		}
-
-		// Verify tree structure (no diamond dependencies). Tree
-		// topology simplifies relay and prevents pinning attacks.
-		topology.IsTree = g.isPackageTree(pkg)
 	}
+
+	topology.MaxDepth = maxDepth
+
+	// Determine maximum width (most siblings at any depth
+	// level). High width indicates parallel transaction
+	// structure.
+	for _, width := range widthByDepth {
+		if width > topology.MaxWidth {
+			topology.MaxWidth = width
+		}
+	}
+
+	// Check if package forms a linear chain. Linear chains are
+	// simpler to validate and optimize for block template
+	// construction.
+	topology.IsLinear = true
+	for _, width := range widthByDepth {
+		if width > 1 {
+			topology.IsLinear = false
+			break
+		}
+	}
+
+	// Verify tree structure (no diamond dependencies). Tree
+	// topology simplifies relay and prevents pinning attacks.
+	topology.IsTree = g.isPackageTree(pkg)
 
 	return topology
 }
@@ -597,7 +630,16 @@ func (g *TxGraph) isPackageConnected(nodes []*TxGraphNode) bool {
 // groups. The function enforces connectivity requirements, computes
 // topology metrics, and classifies package type based on BIP 431 and
 // ephemeral dust rules to ensure appropriate relay policies are applied.
-func (g *TxGraph) CreatePackage(nodes []*TxGraphNode) (*TxPackage, error) {
+//
+// By default, successfully validated packages are tracked in the graph's
+// package indexes. Use WithDryRun() to skip tracking during validation-only
+// scenarios (e.g., pre-acceptance checks before AddTransaction).
+func (g *TxGraph) CreatePackage(nodes []*TxGraphNode, opts ...PackageOption) (*TxPackage, error) {
+	// Apply functional options.
+	options := &packageOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 	if len(nodes) == 0 {
 		return nil, ErrInvalidTopology
 	}
@@ -649,8 +691,11 @@ func (g *TxGraph) CreatePackage(nodes []*TxGraphNode) (*TxPackage, error) {
 	}
 
 	// Classify package type (TRUC, ephemeral, 1P1C, standard) to
-	// determine which relay policies apply.
-	pkg.Type = g.determinePackageType(pkg)
+	// determine which relay policies apply. Use the analyzer if
+	// available; otherwise default to standard (already set).
+	if g.analyzer != nil {
+		pkg.Type = g.analyzer.AnalyzePackageType(nodes)
+	}
 
 	// Finalize package metrics for fee rate evaluation and relay
 	// decisions.
@@ -676,77 +721,40 @@ func (g *TxGraph) CreatePackage(nodes []*TxGraphNode) (*TxPackage, error) {
 	pkg.IsValid = true
 	pkg.LastValidated = nodes[0].Metadata.AddedTime
 
+	// Track the package if all nodes are persistent (exist in graph) and
+	// this is not a dry run. This ensures we only track packages after
+	// AddTransaction succeeds, preventing index inconsistency if validation
+	// passes but addition fails. Dry run mode is used during pre-acceptance
+	// validation to check policy without modifying indexes.
+	if !options.dryRun {
+		g.maybeTrackPackage(pkg)
+	}
+
 	return pkg, nil
 }
 
-// determinePackageType classifies a package by examining its topology
-// and transaction properties. Classification determines which relay
-// policies apply: TRUC packages follow BIP 431 rules, ephemeral packages
-// must spend dust outputs, 1P1C packages get simplified validation, and
-// standard packages use default rules. We check types in priority order
-// from most to least restrictive.
-func (g *TxGraph) determinePackageType(pkg *TxPackage) PackageType {
-	// Check for 1-parent-1-child topology by verifying exactly two
-	// transactions with a single parent-child relationship.
-	if len(pkg.Transactions) == 2 {
-		parentCount := 0
-		childCount := 0
-		for _, node := range pkg.Transactions {
-			hasParentInPkg := false
-			hasChildInPkg := false
-
-			for parentHash := range node.Parents {
-				_, exists := pkg.Transactions[parentHash]
-				if exists {
-					hasParentInPkg = true
-					break
-				}
-			}
-
-			for childHash := range node.Children {
-				_, exists := pkg.Transactions[childHash]
-				if exists {
-					hasChildInPkg = true
-					break
-				}
-			}
-
-			if !hasParentInPkg {
-				parentCount++
-			}
-			if !hasChildInPkg {
-				childCount++
-			}
-		}
-
-		if parentCount == 1 && childCount == 1 {
-			return PackageType1P1C
+// maybeTrackPackage tracks the package only if all nodes exist in the
+// graph (no temporary nodes from validation). This prevents tracking
+// packages during validation before AddTransaction succeeds.
+//
+// The package is indexed in two ways:
+//   - packages map: PackageID → *TxPackage
+//   - nodeToPackage map: TxHash → PackageID (for reverse lookup)
+func (g *TxGraph) maybeTrackPackage(pkg *TxPackage) {
+	// Check if any node is temporary (not in graph yet).
+	for hash := range pkg.Transactions {
+		if _, exists := g.nodes[hash]; !exists {
+			// Contains temporary node - don't track yet.
+			// This happens during validation before AddTransaction.
+			return
 		}
 	}
 
-	// Check for TRUC by verifying all transactions are version 3.
-	// Mixed versions are not allowed in TRUC packages per BIP 431.
-	allTRUC := true
-	for _, node := range pkg.Transactions {
-		if !node.Metadata.IsTRUC {
-			allTRUC = false
-			break
-		}
+	// All nodes are persistent - track the package.
+	g.indexes.packages[pkg.ID] = pkg
+	for hash := range pkg.Transactions {
+		g.indexes.nodeToPackage[hash] = pkg.ID
 	}
-	if allTRUC {
-		return PackageTypeTRUC
-	}
-
-	// Check for ephemeral dust. If any transaction creates
-	// ephemeral outputs, the entire package is classified as
-	// ephemeral and must meet dust spending requirements.
-	for _, node := range pkg.Transactions {
-		if node.Metadata.IsEphemeral {
-			return PackageTypeEphemeral
-		}
-	}
-
-	// Default to standard package type for all other cases.
-	return PackageTypeStandard
+	atomic.AddInt32(&g.metrics.packageCount, 1)
 }
 
