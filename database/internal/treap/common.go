@@ -51,6 +51,16 @@ type treapNode struct {
 	right    *treapNode
 }
 
+// recycle resets and puts the treapNode into the treapNodePool to be recycled.
+func (n *treapNode) recycle() {
+	n.key = nil
+	n.value = nil
+	n.priority = 0
+	n.left = nil
+	n.right = nil
+	treapNodePool.Put(n)
+}
+
 // nodeSize returns the number of bytes the specified node occupies including
 // the struct fields and the contents of the key and value.
 func nodeSize(node *treapNode) uint64 {
