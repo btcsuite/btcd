@@ -219,7 +219,7 @@ func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
 
 	// Once BIP0034 is known to be active on this chain, duplicate coinbases
 	// can no longer occur, so the check can be omitted.
-	if node.height >= params.BIP0034Height {
+	if node.height > params.BIP0034Height {
 		return false
 	}
 

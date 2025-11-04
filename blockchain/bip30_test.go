@@ -61,6 +61,20 @@ func TestBip0030CheckNeededBeforeBIP34(t *testing.T) {
 	require.True(t, bip0030CheckNeeded(node, &params))
 }
 
+// TestBip0030CheckNeededAtActivationHeight validates that the activation block
+// itself still triggers the check.
+func TestBip0030CheckNeededAtActivationHeight(t *testing.T) {
+	params := chaincfg.MainNetParams
+
+	node := &blockNode{
+		height: params.BIP0034Height,
+		hash:   mustHashFromStr(t, "000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8"),
+		parent: &blockNode{height: params.BIP0034Height - 1},
+	}
+
+	require.True(t, bip0030CheckNeeded(node, &params))
+}
+
 // TestBip0030CheckNeededAfterBIP34 covers the happy-path where we are on a
 // chain that contains the recorded BIP34 activation block.  In that case the
 // expensive duplicate-coinbase check can be skipped.
