@@ -51,6 +51,11 @@ const (
 	// block of a difficulty adjustment period is allowed to
 	// be earlier than the last block of the previous period (BIP94).
 	maxTimeWarp = 600 * time.Second
+
+	// bip34ReenableBIP30Height is the height where BIP0030 is re-enabled even
+	// though BIP34 is active.  This mirrors Bitcoin Core's safeguard against
+	// coinbases that serialized future heights prior to BIP34 activation.
+	bip34ReenableBIP30Height int32 = 1983702
 )
 
 var (
@@ -202,9 +207,10 @@ func isBIP0030Node(node *blockNode) bool {
 // In addition, as of BIP0034, duplicate coinbases are no longer possible due to
 // its requirement for including the block height in the coinbase and thus it is
 // no longer possible to create transactions that 'overwrite' older ones.
-// Therefore, only enforce the rule if BIP0034 is not yet active.  This is a
-// useful optimization because the BIP0030 check is expensive since it involves
-// a ton of cache misses in the utxoset.
+// Therefore, only enforce the rule if BIP0034 is not yet active, or the chain
+// has reached the height bip34ReenableBIP30Height where the optimization must
+// no longer apply.  This is a useful optimization because the BIP0030 check is
+// expensive since it involves a ton of cache misses in the utxoset.
 func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
 	// Sanity checks for the inputs not to dereference a nil pointer.
 	if node == nil || params == nil {
@@ -218,8 +224,11 @@ func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
 	}
 
 	// Once BIP0034 is known to be active on this chain, duplicate coinbases
-	// can no longer occur, so the check can be omitted.
-	if node.height > params.BIP0034Height {
+	// can no longer occur, so the check can be omitted until the re-enable
+	// height.  See the following comment for the details about re-enabling:
+	// https://github.com/bitcoin/bitcoin/pull/12204#issuecomment-359106628
+	h := node.height
+	if params.BIP0034Height < h && h < bip34ReenableBIP30Height {
 		// Make sure that BIP0034 was activated.  We need to make sure
 		// that there is a block with the hash we expect at the height
 		// BIP0034Height.  If this is not the case, we might be on an

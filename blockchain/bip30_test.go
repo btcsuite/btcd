@@ -123,3 +123,27 @@ func TestBip0030CheckNeededMismatchedActivation(t *testing.T) {
 
 	require.True(t, bip0030CheckNeeded(node, &params))
 }
+
+// TestBip0030CheckNeededReenabled ensures that once the chain reaches the
+// re-enable height, the duplicate check is performed again even when BIP34 is
+// active on the current branch.
+func TestBip0030CheckNeededReenabled(t *testing.T) {
+	params := chaincfg.MainNetParams
+
+	ancestor := &blockNode{
+		height: params.BIP0034Height,
+		hash:   mustHashFromStr(t, "000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8"),
+	}
+	parent := &blockNode{
+		height: ancestor.height + 1,
+		hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000100"),
+		parent: ancestor,
+	}
+	node := &blockNode{
+		height: bip34ReenableBIP30Height,
+		hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000200"),
+		parent: parent,
+	}
+
+	require.True(t, bip0030CheckNeeded(node, &params))
+}
