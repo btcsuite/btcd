@@ -220,7 +220,18 @@ func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
 	// Once BIP0034 is known to be active on this chain, duplicate coinbases
 	// can no longer occur, so the check can be omitted.
 	if node.height > params.BIP0034Height {
-		return false
+		// Make sure that BIP0034 was activated.  We need to make sure
+		// that there is a block with the hash we expect at the height
+		// BIP0034Height.  If this is not the case, we might be on an
+		// alternate chain that hasn't activated BIP34 yet - even if its
+		// height is higher.  In that case, BIP30 still applies.
+		if params.BIP0034Hash != nil && node.parent != nil {
+			ancestor := node.parent.Ancestor(params.BIP0034Height)
+			want := params.BIP0034Hash
+			if ancestor != nil && ancestor.hash.IsEqual(want) {
+				return false
+			}
+		}
 	}
 
 	return true

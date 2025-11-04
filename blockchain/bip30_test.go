@@ -98,3 +98,28 @@ func TestBip0030CheckNeededAfterBIP34(t *testing.T) {
 
 	require.False(t, bip0030CheckNeeded(node, &params))
 }
+
+// TestBip0030CheckNeededMismatchedActivation verifies that if the block at the
+// recorded BIP34 activation height does not match, we continue to run the BIP30
+// check (this matches Bitcoin Core's behavior and guards against alternative
+// chains that have not activated BIP34 yet).
+func TestBip0030CheckNeededMismatchedActivation(t *testing.T) {
+	params := chaincfg.MainNetParams
+
+	ancestor := &blockNode{
+		height: params.BIP0034Height,
+		hash:   mustHashFromStr(t, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+	}
+	parent := &blockNode{
+		height: ancestor.height + 1,
+		hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000004"),
+		parent: ancestor,
+	}
+	node := &blockNode{
+		height: parent.height + 1,
+		hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000005"),
+		parent: parent,
+	}
+
+	require.True(t, bip0030CheckNeeded(node, &params))
+}
