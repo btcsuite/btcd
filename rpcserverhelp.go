@@ -744,6 +744,23 @@ var helpDescsEnUS = map[string]string{
 	"testmempoolacceptfees-effective-feerate":  "The effective feerate in BTC per KvB.",
 	"testmempoolacceptfees-effective-includes": "Transactions whose fees and vsizes are included in effective-feerate. Each item is a transaction wtxid in hex.",
 
+	// SubmitPackageCmd help.
+	"submitpackage--synopsis":                      "Submit a package of raw transactions to the mempool for relay and inclusion in blocks.",
+	"submitpackage-package":                        "Array of raw hex-encoded transactions, topologically sorted (parents before children).",
+	"submitpackage-maxfeerate":                     "Maximum acceptable feerate in BTC/kvB for the package (default: 0.10). Set to 0 for no limit.",
+	"submitpackage-maxburnamount":                  "Maximum total value of provably unspendable outputs in BTC (default: 0.00).",
+	"jsonsubmitpackageresult-package_msg":          "Summary message: 'success' or error description.",
+	"jsonsubmitpackageresult-tx-results":           "Per-transaction results keyed by wtxid.",
+	"jsonsubmitpackageresult-replaced-transactions": "Transaction IDs replaced via package RBF (if any).",
+	"jsonsubmitpackagetxresult-txid":               "The transaction ID (txid).",
+	"jsonsubmitpackagetxresult-other-wtxid":        "Witness transaction ID of conflicting tx already in mempool, if applicable.",
+	"jsonsubmitpackagetxresult-vsize":              "Virtual transaction size in vbytes.",
+	"jsonsubmitpackagetxresult-fees":               "Transaction fees (if accepted).",
+	"jsonsubmitpackagetxresult-error":              "Rejection reason (if not accepted).",
+	"jsonsubmitpackagefees-base":                   "Transaction fee in BTC.",
+	"jsonsubmitpackagefees-effective-feerate":      "Effective fee rate in BTC/kvB, considering package context.",
+	"jsonsubmitpackagefees-effective-includes":     "Transaction wtxids included in effective fee rate calculation.",
+
 	// GetTxSpendingPrevOutCmd help.
 	"gettxspendingprevout--synopsis": "Scans the mempool to find transactions spending any of the given outputs",
 	"gettxspendingprevout-outputs":   "The transaction outputs that we want to check, and within each, the txid (string) vout (numeric).",
@@ -812,6 +829,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"verifymessage":          {(*bool)(nil)},
 	"version":                {(*map[string]btcjson.VersionResult)(nil)},
 	"testmempoolaccept":      {(*[]btcjson.TestMempoolAcceptResult)(nil)},
+	"submitpackage":          {(*btcjson.JsonSubmitPackageResult)(nil)},
 	"gettxspendingprevout":   {(*[]btcjson.GetTxSpendingPrevOutResult)(nil)},
 
 	// Websocket commands.
