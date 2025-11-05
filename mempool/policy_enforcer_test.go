@@ -106,6 +106,32 @@ func (m *mockGraph) IsValidPackageExtension(tx *btcutil.Tx,
 	return nil
 }
 
+func (m *mockGraph) BuildPackageNodes(tx *btcutil.Tx, desc *txgraph.TxDesc) []*txgraph.TxGraphNode {
+	// Mock implementation returns a single node for the transaction.
+	// Tests that need complex package structures should use real TxGraph.
+	tempNode := &txgraph.TxGraphNode{
+		TxHash:   *tx.Hash(),
+		Tx:       tx,
+		TxDesc:   desc,
+		Parents:  make(map[chainhash.Hash]*txgraph.TxGraphNode),
+		Children: make(map[chainhash.Hash]*txgraph.TxGraphNode),
+	}
+	return []*txgraph.TxGraphNode{tempNode}
+}
+
+func (m *mockGraph) CreatePackage(nodes []*txgraph.TxGraphNode, opts ...txgraph.PackageOption) (*txgraph.TxPackage, error) {
+	// Mock implementation returns a simple standard package.
+	// Tests that need specific package types should use real TxGraph.
+	pkg := &txgraph.TxPackage{
+		Type:         txgraph.PackageTypeStandard,
+		Transactions: make(map[chainhash.Hash]*txgraph.TxGraphNode),
+	}
+	for _, node := range nodes {
+		pkg.Transactions[node.TxHash] = node
+	}
+	return pkg, nil
+}
+
 // Ensure mockGraph implements the necessary Graph interface methods.
 var _ interface {
 	GetNode(chainhash.Hash) (*txgraph.TxGraphNode, bool)
@@ -625,11 +651,11 @@ func TestValidateRelayFee(t *testing.T) {
 	minFee := calcMinRequiredTxRelayFee(size, cfg.MinRelayTxFee)
 
 	// Test with sufficient fee.
-	err := p.ValidateRelayFee(tx, minFee, size, nil, 0, true)
+	err := p.ValidateRelayFee(tx, minFee, size, nil, 0, true, nil)
 	require.NoError(t, err, "should accept transaction with sufficient fee")
 
 	// Test with insufficient fee (should be rate limited for new tx).
-	err = p.ValidateRelayFee(tx, minFee-1, size, nil, 0, true)
+	err = p.ValidateRelayFee(tx, minFee-1, size, nil, 0, true, nil)
 	require.NoError(t, err, "should accept new low-fee tx (rate limited)")
 
 	// Test with insufficient fee for non-new tx (reorg scenario).
@@ -637,7 +663,7 @@ func TestValidateRelayFee(t *testing.T) {
 	// CheckRelayFee implementation (line 469-472 in policy.go), so they
 	// should be allowed even with low fees as long as they're under the
 	// size threshold (DefaultBlockPrioritySize - 1000 = 49000 bytes).
-	err = p.ValidateRelayFee(tx, minFee-1, size, nil, 0, false)
+	err = p.ValidateRelayFee(tx, minFee-1, size, nil, 0, false, nil)
 	require.NoError(t, err, "should accept non-new low-fee tx (reorg exemption)")
 
 	// Test with a large transaction that exceeds the free transaction
@@ -645,7 +671,7 @@ func TestValidateRelayFee(t *testing.T) {
 	// they're too large and have insufficient fees.
 	largeSize := int64(DefaultBlockPrioritySize - 500) // 49500 bytes
 	largeTxMinFee := calcMinRequiredTxRelayFee(largeSize, cfg.MinRelayTxFee)
-	err = p.ValidateRelayFee(tx, largeTxMinFee-1, largeSize, nil, 0, false)
+	err = p.ValidateRelayFee(tx, largeTxMinFee-1, largeSize, nil, 0, false, nil)
 	require.Error(t, err, "should reject large non-new tx with insufficient fee")
 	require.Contains(t, err.Error(), "under the required amount")
 }
@@ -663,11 +689,11 @@ func TestRateLimiting(t *testing.T) {
 	size := GetTxVirtualSize(tx)
 
 	// First free tx should be accepted.
-	err := p.ValidateRelayFee(tx, 0, size, nil, 0, true)
+	err := p.ValidateRelayFee(tx, 0, size, nil, 0, true, nil)
 	require.NoError(t, err)
 
 	// Second free tx should be rejected (rate limited).
-	err = p.ValidateRelayFee(tx, 0, size, nil, 0, true)
+	err = p.ValidateRelayFee(tx, 0, size, nil, 0, true, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "rate limiter")
 }
@@ -685,7 +711,7 @@ func TestRateLimiterDecay(t *testing.T) {
 	size := int64(50)
 
 	// Accept first transaction.
-	err := p.ValidateRelayFee(tx, 0, size, nil, 0, true)
+	err := p.ValidateRelayFee(tx, 0, size, nil, 0, true, nil)
 	require.NoError(t, err)
 
 	// Manually advance time to simulate decay.
@@ -697,7 +723,7 @@ func TestRateLimiterDecay(t *testing.T) {
 	p.mu.Unlock()
 
 	// Second transaction should be accepted after decay.
-	err = p.ValidateRelayFee(tx, 0, size, nil, 0, true)
+	err = p.ValidateRelayFee(tx, 0, size, nil, 0, true, nil)
 	require.NoError(t, err)
 }
 
@@ -864,8 +890,8 @@ func TestPropertyFeeRateMonotonic(t *testing.T) {
 		tx := createTxWithSequence([]uint32{wire.MaxTxInSequenceNum})
 
 		// Higher fee should always be accepted if lower fee is accepted.
-		err1 := p.ValidateRelayFee(tx, fee1, size, nil, 0, false)
-		err2 := p.ValidateRelayFee(tx, fee2, size, nil, 0, false)
+		err1 := p.ValidateRelayFee(tx, fee1, size, nil, 0, false, nil)
+		err2 := p.ValidateRelayFee(tx, fee2, size, nil, 0, false, nil)
 
 		if err1 == nil && err2 != nil {
 			t.Fatalf("monotonicity violated: fee %d accepted but %d rejected",
