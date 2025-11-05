@@ -998,6 +998,83 @@ func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
 	return c.SendCmd(cmd)
 }
 
+// FutureSubmitPackageResult is a future promise to deliver the result of a
+// SubmitPackage RPC invocation (or an applicable error).
+type FutureSubmitPackageResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// response from SubmitPackage.
+func (r FutureSubmitPackageResult) Receive() (
+	*btcjson.JsonSubmitPackageResult, error) {
+
+	response, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal as JsonSubmitPackageResult.
+	var result btcjson.JsonSubmitPackageResult
+	err = json.Unmarshal(response, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// SubmitPackageAsync returns an instance of a type that can be used to get the
+// result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SubmitPackage for the blocking version and more details.
+func (c *Client) SubmitPackageAsync(txns []*wire.MsgTx,
+	maxFeeRate, maxBurnAmount *float64) FutureSubmitPackageResult {
+
+	// Validate package size (max 25 transactions).
+	if len(txns) > 25 {
+		return newFutureError(fmt.Errorf("%w: package exceeds 25 transaction limit",
+			ErrInvalidParam))
+	}
+
+	// Require at least one transaction.
+	if len(txns) == 0 {
+		return newFutureError(fmt.Errorf("%w: no transactions provided",
+			ErrInvalidParam))
+	}
+
+	// Serialize transactions to hex.
+	rawTxs := make([]string, len(txns))
+	for i, tx := range txns {
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		rawTxs[i] = hex.EncodeToString(buf.Bytes())
+	}
+
+	// Build command with optional parameters.
+	cmd := btcjson.NewJsonSubmitPackageCmd(rawTxs, maxFeeRate, maxBurnAmount)
+	return c.SendCmd(cmd)
+}
+
+// SubmitPackage submits a package of raw transactions to the mempool for relay
+// and inclusion in blocks. The package must be topologically sorted (parents
+// before children).
+//
+// Optional parameters:
+// - maxFeeRate: Maximum acceptable fee rate in BTC/kvB (default 0.10, 0 = no limit)
+// - maxBurnAmount: Maximum provably unspendable output value in BTC (default 0.00)
+//
+// Returns per-transaction results including acceptance status, fees, and any
+// errors. Supports BIP 431 TRUC package relay and zero-fee transactions.
+//
+// Requires btcd with --usetxmempoolv2 flag enabled.
+func (c *Client) SubmitPackage(txns []*wire.MsgTx,
+	maxFeeRate, maxBurnAmount *float64) (*btcjson.JsonSubmitPackageResult, error) {
+
+	return c.SubmitPackageAsync(txns, maxFeeRate, maxBurnAmount).Receive()
+}
+
 // TestMempoolAccept returns result of mempool acceptance tests indicating if
 // raw transaction(s) would be accepted by mempool.
 //
