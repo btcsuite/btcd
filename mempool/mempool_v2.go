@@ -339,7 +339,7 @@ func (mp *TxMempoolV2) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit b
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 
-	return mp.maybeAcceptTransactionLocked(tx, isNew, rateLimit, true)
+	return mp.maybeAcceptTransactionLocked(tx, isNew, rateLimit, true, nil)
 }
 
 // maybeAcceptTransactionLocked is the internal implementation of
@@ -350,6 +350,7 @@ func (mp *TxMempoolV2) MaybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit b
 func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 	tx *btcutil.Tx,
 	isNew, rateLimit, rejectDupOrphans bool,
+	packageContext *PackageContext,
 ) ([]*chainhash.Hash, *TxDesc, error) {
 
 	txHash := tx.Hash()
@@ -360,7 +361,8 @@ func (mp *TxMempoolV2) maybeAcceptTransactionLocked(
 		"rate_limit", rateLimit)
 
 	// Validate transaction using the v2 validation pipeline.
-	result, err := mp.checkMempoolAcceptance(tx, isNew, rateLimit, rejectDupOrphans)
+	// Pass packageContext to enable BIP 431 Rule 6 (zero-fee TRUC in packages).
+	result, err := mp.checkMempoolAcceptance(tx, isNew, rateLimit, rejectDupOrphans, packageContext)
 	if err != nil {
 		log.DebugS(ctx, "Transaction rejected",
 			"tx_hash", txHash,
@@ -493,7 +495,7 @@ func (mp *TxMempoolV2) ProcessTransaction(tx *btcutil.Tx, allowOrphan, rateLimit
 
 	// Attempt to accept transaction into the mempool.
 	missingParents, txDesc, err := mp.maybeAcceptTransactionLocked(
-		tx, true, rateLimit, true,
+		tx, true, rateLimit, true, nil,
 	)
 	if err != nil {
 		return nil, err
@@ -543,7 +545,7 @@ func (mp *TxMempoolV2) processOrphansLocked(acceptedTx *btcutil.Tx) []*TxDesc {
 		// Try to accept the orphan. Don't reject if it's a duplicate
 		// orphan since we're processing it from the orphan pool.
 		missingParents, txDesc, err := mp.maybeAcceptTransactionLocked(
-			orphanTx, true, true, false,
+			orphanTx, true, true, false, nil,
 		)
 		if err != nil {
 			// Orphan is invalid - return error so it gets removed.
@@ -583,6 +585,479 @@ func (mp *TxMempoolV2) processOrphansLocked(acceptedTx *btcutil.Tx) []*TxDesc {
 	}
 
 	return acceptedTxns
+}
+
+// packageEntry captures per-transaction metadata used during package
+// acceptance. It allows us to reuse fee and size calculations across the
+// progressive acceptance flow.
+type packageEntry struct {
+	tx               *btcutil.Tx
+	desc             *txgraph.TxDesc
+	fee              int64
+	vsize            int64
+	alreadyInMempool bool
+}
+
+// preparedPackage bundles analyzer output and per-transaction metadata for a
+// submitted package. Both ProcessPackage and CheckPackageAcceptance consume
+// this structure to avoid duplicated policy logic.
+type preparedPackage struct {
+	entries           []packageEntry
+	context           *PackageContext
+	pkg               *txgraph.TxPackage
+	conflicts         map[chainhash.Hash]*txgraph.ConflictSet
+	hasConflicts      bool
+	packageFeesForRBF int64
+}
+
+// preparePackageForAcceptance validates the submitted package using the policy
+// analyzer and precomputes the metadata needed for progressive acceptance.
+func (mp *TxMempoolV2) preparePackageForAcceptance(
+	txs []*btcutil.Tx,
+) (*preparedPackage, error) {
+
+	ctx := context.Background()
+
+	entries := make([]packageEntry, len(txs))
+	descs := make([]*txgraph.TxDesc, len(txs))
+	allConflicts := make(map[chainhash.Hash]*txgraph.ConflictSet)
+	var packageFeesForRBF int64
+	hasConflicts := false
+
+	bestHeight := mp.cfg.BestHeight()
+	nextBlockHeight := bestHeight + 1
+
+	for i, tx := range txs {
+		txHash := *tx.Hash()
+		entry := packageEntry{
+			tx:    tx,
+			vsize: GetTxVirtualSize(tx),
+		}
+
+		if node, exists := mp.graph.GetNode(txHash); exists {
+			entry.alreadyInMempool = true
+			entry.fee = node.TxDesc.Fee
+			entry.desc = node.TxDesc
+			descs[i] = node.TxDesc
+			packageFeesForRBF += node.TxDesc.Fee
+			entries[i] = entry
+			continue
+		}
+
+		utxoView, err := mp.fetchInputUtxos(tx)
+		if err != nil {
+			log.WarnS(ctx, "Failed to fetch UTXO view for package fee calculation", err,
+				"tx_hash", txHash)
+		}
+
+		var txFee int64
+		if err == nil {
+			var feeErr error
+			txFee, feeErr = mp.txValidator.ValidateInputs(tx, nextBlockHeight, utxoView)
+			if feeErr != nil {
+				log.WarnS(ctx, "Failed to validate inputs for package fee calculation", feeErr,
+					"tx_hash", txHash)
+			} else {
+				packageFeesForRBF += txFee
+			}
+		}
+
+		desc := &txgraph.TxDesc{
+			TxHash:      txHash,
+			VirtualSize: entry.vsize,
+			Fee:         txFee,
+			FeePerKB:    0,
+			Added:       time.Now(),
+		}
+		if entry.vsize > 0 {
+			desc.FeePerKB = txFee * 1000 / entry.vsize
+		}
+
+		entry.fee = txFee
+		entry.desc = desc
+		entries[i] = entry
+		descs[i] = desc
+
+		conflicts := mp.graph.GetConflicts(tx)
+		if len(conflicts.Transactions) > 0 {
+			allConflicts[txHash] = conflicts
+			hasConflicts = true
+		}
+	}
+
+	packageContext, pkg, err := mp.policy.BuildPackageContext(mp.graph, txs, descs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &preparedPackage{
+		entries:           entries,
+		context:           packageContext,
+		pkg:               pkg,
+		conflicts:         allConflicts,
+		hasConflicts:      hasConflicts,
+		packageFeesForRBF: packageFeesForRBF,
+	}, nil
+}
+
+// ProcessPackage validates and accepts a package of transactions into the
+// mempool. This implements Bitcoin Core's progressive package acceptance model
+// where transactions are processed one-by-one with proper deduplication and
+// package-level validation.
+//
+// The package must be topologically sorted (parents before children) and meet
+// size/count limits. Transactions already in the mempool are skipped
+// (deduplication). Package RBF is supported if all replacement criteria are met.
+//
+// Returns a PackageAcceptResult containing per-transaction results, replaced
+// transactions, and aggregate package statistics.
+func (mp *TxMempoolV2) ProcessPackage(
+	txs []*btcutil.Tx,
+	opts *PackageValidationOptions,
+) (*PackageAcceptResult, error) {
+	ctx := context.Background()
+	log.InfoS(ctx, "TxMempoolV2.ProcessPackage called",
+		"tx_count", len(txs))
+
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	prep, err := mp.preparePackageForAcceptance(txs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize result structure.
+	result := &PackageAcceptResult{
+		PackageMsg:  "success",
+		TxResults:   make(map[chainhash.Hash]*TxAcceptResult),
+		ReplacedTxs: make([]chainhash.Hash, 0),
+	}
+
+	// If conflicts exist, validate package replacement before proceeding.
+	if prep.hasConflicts {
+		log.InfoS(ctx, "Package has conflicts, validating package RBF",
+			"conflict_sets", len(prep.conflicts),
+			"package_fee", prep.packageFeesForRBF)
+
+		// Validate package replacement using BIP 125 rules at package level.
+		err := mp.policy.ValidatePackageReplacement(
+			mp.graph, txs, prep.packageFeesForRBF, prep.conflicts,
+		)
+		if err != nil {
+			log.WarnS(ctx, "Package RBF validation failed", err)
+			return nil, fmt.Errorf("package replacement validation failed: %w", err)
+		}
+
+		// Atomically remove all conflicting transactions before adding new package.
+		// This prevents partial state if later transactions in package fail.
+		replacedSet := make(map[chainhash.Hash]bool)
+		for _, conflictSet := range prep.conflicts {
+			for conflictHash := range conflictSet.Transactions {
+				if !replacedSet[conflictHash] {
+					if err := mp.graph.RemoveTransaction(conflictHash); err != nil {
+						log.WarnS(ctx, "Failed to remove conflict", err,
+							"conflict_hash", conflictHash)
+					} else {
+						result.ReplacedTxs = append(result.ReplacedTxs, conflictHash)
+						replacedSet[conflictHash] = true
+					}
+				}
+			}
+		}
+
+		log.InfoS(ctx, "Package RBF conflicts removed",
+			"replaced_count", len(result.ReplacedTxs))
+	}
+
+	// Process each transaction progressively.
+	for i, entry := range prep.entries {
+		tx := entry.tx
+		txHash := *tx.Hash()
+		wtxid := tx.WitnessHash()
+
+		// Initialize per-transaction result.
+		txResult := &TxAcceptResult{
+			TxHash: txHash,
+			Wtxid:  *wtxid,
+		}
+		result.TxResults[*wtxid] = txResult
+
+		// Check if transaction is already in mempool (deduplication).
+		if entry.alreadyInMempool {
+			log.DebugS(ctx, "Package transaction already in mempool",
+				"tx_hash", txHash,
+				"index", i)
+
+			// Check if different witness (other-wtxid case).
+			existingNode, _ := mp.graph.GetNode(txHash)
+			if existingNode != nil && existingNode.Tx.WitnessHash() != wtxid {
+				existingWtxid := existingNode.Tx.WitnessHash()
+				txResult.OtherWtxid = existingWtxid
+			}
+
+			txResult.AlreadyInMempool = true
+			txResult.Accepted = true
+			txResult.VSize = entry.vsize
+			txResult.Fee = btcutil.Amount(entry.fee)
+			if existingNode != nil {
+				txResult.EffectiveFeeRate = existingNode.TxDesc.FeePerKB
+			} else if entry.desc != nil {
+				txResult.EffectiveFeeRate = entry.desc.FeePerKB
+			}
+
+			// Add to package totals even if deduplicated.
+			result.TotalFees += txResult.Fee
+			result.TotalVSize += txResult.VSize
+			result.AcceptedCount++
+
+			continue
+		}
+
+		// Pass package context to enable BIP 431 Rule 6: TRUC transactions
+		// may be below minimum relay fee when part of a valid package.
+		// Attempt to accept new transaction.
+		missingParents, txDesc, err := mp.maybeAcceptTransactionLocked(
+			tx, true, true, true, prep.context,
+		)
+		if err != nil {
+			// Transaction rejected - record error but continue processing.
+			log.WarnS(ctx, "Package transaction rejected", err,
+				"tx_hash", txHash,
+				"index", i)
+
+			txResult.Accepted = false
+			txResult.Error = err
+			result.RejectedCount++
+
+			// If this is an early transaction in the package and it failed,
+			// later transactions may depend on it and will likely fail too.
+			// But we continue processing to provide complete feedback.
+			continue
+		}
+
+		// Handle orphan case.
+		if len(missingParents) > 0 {
+			// In a valid package, all parents should be earlier in the array.
+			// If we find an orphan, it means parents are outside this package.
+			errMsg := fmt.Sprintf("transaction %v references missing parents (orphan in package)",
+				txHash)
+			txResult.Accepted = false
+			txResult.Error = fmt.Errorf(errMsg)
+			result.RejectedCount++
+
+			log.WarnS(ctx, "Orphan found in package", nil,
+				"tx_hash", txHash,
+				"missing_parents", len(missingParents))
+			continue
+		}
+
+		// Transaction accepted successfully.
+		txResult.Accepted = true
+		txResult.VSize = GetTxVirtualSize(tx)
+		txResult.Fee = btcutil.Amount(txDesc.TxDesc.Fee)
+		txResult.EffectiveFeeRate = txDesc.TxDesc.FeePerKB
+
+		// Accumulate for package totals and update package context.
+		result.TotalFees += txResult.Fee
+		result.TotalVSize += txResult.VSize
+		result.AcceptedCount++
+
+		log.DebugS(ctx, "Package transaction accepted",
+			"tx_hash", txHash,
+			"index", i,
+			"fee", txResult.Fee,
+			"vsize", txResult.VSize)
+	}
+
+	// Calculate package-level fee rate.
+	if result.TotalVSize > 0 {
+		result.PackageFeeRate = int64(result.TotalFees) * 1000 / result.TotalVSize
+	}
+
+	// Validate package fee rate against options.
+	if opts != nil && opts.MaxFeeRate != nil && *opts.MaxFeeRate > 0 {
+		maxFeeRateSatKvB := int64(*opts.MaxFeeRate)
+		if result.PackageFeeRate > maxFeeRateSatKvB {
+			result.PackageMsg = fmt.Sprintf("package fee rate %d sat/kvB exceeds maximum %d sat/kvB",
+				result.PackageFeeRate, maxFeeRateSatKvB)
+			return result, txRuleError(wire.RejectInsufficientFee, result.PackageMsg)
+		}
+	}
+
+	// Process orphans that may now be acceptable after package acceptance.
+	// We process orphans for each accepted transaction in the package.
+	for _, tx := range txs {
+		if result.TxResults[*tx.WitnessHash()].Accepted {
+			_ = mp.processOrphansLocked(tx)
+			// Note: We don't include promoted orphans in the package result,
+			// they'll show up in later RPC calls or mempool queries.
+		}
+	}
+
+	// Update final status message.
+	if result.RejectedCount > 0 {
+		result.PackageMsg = fmt.Sprintf("%d transaction(s) accepted, %d rejected",
+			result.AcceptedCount, result.RejectedCount)
+	}
+
+	log.InfoS(ctx, "Package processing complete",
+		"accepted", result.AcceptedCount,
+		"rejected", result.RejectedCount,
+		"total_fees", result.TotalFees,
+		"package_fee_rate", result.PackageFeeRate)
+
+	return result, nil
+}
+
+// CheckPackageAcceptance validates a package of transactions without actually
+// adding them to the mempool (dry-run mode). This is useful for testing package
+// acceptance without modifying mempool state.
+//
+// Returns the same PackageAcceptResult structure as ProcessPackage, but no
+// transactions are actually added to the mempool.
+func (mp *TxMempoolV2) CheckPackageAcceptance(
+	txs []*btcutil.Tx,
+	opts *PackageValidationOptions,
+) (*PackageAcceptResult, error) {
+	ctx := context.Background()
+	log.InfoS(ctx, "TxMempoolV2.CheckPackageAcceptance called",
+		"tx_count", len(txs))
+
+	mp.mu.RLock()
+	defer mp.mu.RUnlock()
+
+	prep, err := mp.preparePackageForAcceptance(txs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize result structure.
+	result := &PackageAcceptResult{
+		PackageMsg:  "success",
+		TxResults:   make(map[chainhash.Hash]*TxAcceptResult),
+		ReplacedTxs: make([]chainhash.Hash, 0),
+	}
+
+	if prep.hasConflicts {
+		log.InfoS(ctx, "Package has conflicts, validating package RBF (dry-run)",
+			"conflict_sets", len(prep.conflicts),
+			"package_fee", prep.packageFeesForRBF)
+
+		if err := mp.policy.ValidatePackageReplacement(
+			mp.graph, txs, prep.packageFeesForRBF, prep.conflicts,
+		); err != nil {
+			log.DebugS(ctx, "Package RBF validation failed during dry-run", err)
+			return nil, fmt.Errorf("package replacement validation failed: %w", err)
+		}
+	}
+
+	// Check each transaction (dry-run validation only).
+	for i, entry := range prep.entries {
+		tx := entry.tx
+		txHash := *tx.Hash()
+		wtxid := tx.WitnessHash()
+
+		// Initialize per-transaction result.
+		txResult := &TxAcceptResult{
+			TxHash: txHash,
+			Wtxid:  *wtxid,
+		}
+		result.TxResults[*wtxid] = txResult
+
+		// Check if transaction is already in mempool.
+		if entry.alreadyInMempool {
+			existingNode, _ := mp.graph.GetNode(txHash)
+			if existingNode != nil && existingNode.Tx.WitnessHash() != wtxid {
+				existingWtxid := existingNode.Tx.WitnessHash()
+				txResult.OtherWtxid = existingWtxid
+			}
+
+			txResult.AlreadyInMempool = true
+			txResult.Accepted = true
+			txResult.VSize = entry.vsize
+			txResult.Fee = btcutil.Amount(entry.fee)
+			if existingNode != nil {
+				txResult.EffectiveFeeRate = existingNode.TxDesc.FeePerKB
+			} else if entry.desc != nil {
+				txResult.EffectiveFeeRate = entry.desc.FeePerKB
+			}
+
+			result.TotalFees += txResult.Fee
+			result.TotalVSize += txResult.VSize
+			result.AcceptedCount++
+			continue
+		}
+
+		// Perform dry-run validation using checkMempoolAcceptance.
+		acceptResult, err := mp.checkMempoolAcceptance(tx, true, true, true, prep.context)
+		if err != nil {
+			log.DebugS(ctx, "Package transaction would be rejected",
+				"tx_hash", txHash,
+				"index", i,
+				"reason", err.Error())
+
+			txResult.Accepted = false
+			txResult.Error = err
+			result.RejectedCount++
+			continue
+		}
+
+		// Check for missing parents (orphan).
+		if len(acceptResult.MissingParents) > 0 {
+			errMsg := fmt.Sprintf("transaction %v references missing parents (orphan in package)",
+				txHash)
+			txResult.Accepted = false
+			txResult.Error = fmt.Errorf(errMsg)
+			result.RejectedCount++
+			continue
+		}
+
+		// Transaction would be accepted.
+		txResult.Accepted = true
+		txResult.VSize = acceptResult.TxSize
+		txResult.Fee = acceptResult.TxFee
+		txResult.EffectiveFeeRate = int64(acceptResult.TxFee) * 1000 / acceptResult.TxSize
+
+		result.TotalFees += txResult.Fee
+		result.TotalVSize += txResult.VSize
+		result.AcceptedCount++
+
+		log.DebugS(ctx, "Package transaction would be accepted",
+			"tx_hash", txHash,
+			"index", i,
+			"fee", txResult.Fee,
+			"vsize", txResult.VSize)
+	}
+
+	// Calculate package-level fee rate.
+	if result.TotalVSize > 0 {
+		result.PackageFeeRate = int64(result.TotalFees) * 1000 / result.TotalVSize
+	}
+
+	// Validate package fee rate against options.
+	if opts != nil && opts.MaxFeeRate != nil && *opts.MaxFeeRate > 0 {
+		maxFeeRateSatKvB := int64(*opts.MaxFeeRate)
+		if result.PackageFeeRate > maxFeeRateSatKvB {
+			result.PackageMsg = fmt.Sprintf("package fee rate %d sat/kvB exceeds maximum %d sat/kvB",
+				result.PackageFeeRate, maxFeeRateSatKvB)
+			return result, txRuleError(wire.RejectInsufficientFee, result.PackageMsg)
+		}
+	}
+
+	// Update final status message.
+	if result.RejectedCount > 0 {
+		result.PackageMsg = fmt.Sprintf("%d transaction(s) would be accepted, %d rejected",
+			result.AcceptedCount, result.RejectedCount)
+	}
+
+	log.InfoS(ctx, "Package acceptance check complete",
+		"would_accept", result.AcceptedCount,
+		"would_reject", result.RejectedCount,
+		"total_fees", result.TotalFees,
+		"package_fee_rate", result.PackageFeeRate)
+
+	return result, nil
 }
 
 // RemoveTransaction removes the passed transaction from the mempool. When the
@@ -714,8 +1189,9 @@ func (mp *TxMempoolV2) ProcessOrphans(acceptedTx *btcutil.Tx) []*TxDesc {
 		// isNew=true (orphan is new to main pool)
 		// rateLimit=false (already vetted when added as orphan)
 		// rejectDupOrphans=false (it's currently an orphan)
+		// packageContext=nil (single orphan promotion)
 		_, txDesc, err := mp.maybeAcceptTransactionLocked(
-			tx, true, false, false)
+			tx, true, false, false, nil)
 		if err != nil {
 			return err
 		}
@@ -911,7 +1387,8 @@ func (mp *TxMempoolV2) CheckMempoolAcceptance(tx *btcutil.Tx) (*MempoolAcceptRes
 	// - isNew=true (treat as new transaction)
 	// - rateLimit=false (no rate limiting for RPC checks)
 	// - rejectDupOrphans=true (reject if already in orphan pool)
-	return mp.checkMempoolAcceptance(tx, true, false, true)
+	// - packageContext=nil (single transaction validation)
+	return mp.checkMempoolAcceptance(tx, true, false, true, nil)
 }
 
 // NewStandardPackageAnalyzer creates a new standard package analyzer for TRUC
