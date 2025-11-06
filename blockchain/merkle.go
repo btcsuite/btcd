@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/bits"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -155,6 +156,69 @@ func BuildMerkleTreeStore(transactions []*btcutil.Tx, witness bool) []*chainhash
 	}
 
 	return merkles
+}
+
+// treeRows returns the number of rows given n leaves.
+func treeRows(n uint64) uint8 {
+	if n == 0 {
+		return 0
+	}
+
+	return uint8(bits.Len64(n - 1))
+}
+
+// sibling returns the sibling of this node.
+func sibling(pos uint64) uint64 {
+	return pos ^ 1
+}
+
+// parent returns the position of the parent of this position.
+func parent(position uint64, forestRows uint8) uint64 {
+	return (position >> 1) | (1 << forestRows)
+}
+
+// ExtractMerkleBranch returns the merkle branches needed to prove the txHash.
+// The returned merkle branch does not contain the passed in tx hash.
+func ExtractMerkleBranch(merkles []*chainhash.Hash, txHash chainhash.Hash) []*chainhash.Hash {
+	// Since the merkle trees are always a perfect power of 2,
+	// the total length of all the nodes will be:
+	// len(merkles) = (numLeaves * 2) - 1
+	//
+	// This means we can calculate the number of leaves with the
+	// total length of all nodes in the merkle tree.
+	// (len(merkles)+1)/2 = numLeaves
+	numLeaves := (len(merkles) + 1) / 2
+
+	// Look for the tx in the leaves.
+	idx := -1
+	for i := 0; i < numLeaves; i++ {
+		if *merkles[i] == txHash {
+			idx = i
+			break
+		}
+	}
+	// The tx we're looking for is not in the merkles.
+	if idx == -1 {
+		return nil
+	}
+	forestRows := treeRows(uint64(numLeaves))
+	relevantMerkles := make([]*chainhash.Hash, forestRows)
+
+	// Start with the sibling.
+	idx = int(sibling(uint64(idx)))
+	for i := range relevantMerkles {
+		switch {
+		case merkles[idx] == nil:
+			relevantMerkles[i] = merkles[sibling(uint64(idx))]
+		default:
+			relevantMerkles[i] = merkles[idx]
+		}
+
+		// Set the idx as the aunt.
+		idx = int(sibling(parent(uint64(idx), forestRows)))
+	}
+
+	return relevantMerkles
 }
 
 // CalcMerkleRoot computes the merkle root over a set of hashed leaves. The
