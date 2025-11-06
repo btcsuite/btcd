@@ -1356,10 +1356,11 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 		Transport: &http.Transport{
 			Proxy:           proxyFunc,
 			TLSClientConfig: tlsConfig,
-			DialContext: func(_ context.Context, _,
+			DialContext: func(ctx context.Context, _,
 				_ string) (net.Conn, error) {
-
-				return net.Dial(
+				d := &net.Dialer{}
+				return d.DialContext(
+					ctx,
 					parsedDialAddr.Network(),
 					parsedDialAddr.String(),
 				)
