@@ -9,12 +9,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 // This example demonstrates creating a script which pays to a bitcoin address.
@@ -26,14 +26,14 @@ func ExamplePayToAddrScript() {
 	// the address type.  It is also required for the upcoming call to
 	// PayToAddrScript.
 	addressStr := "12gpXQVcCL2qhTNQgyLVdCFG2Qs2px98nV"
-	address, err := btcutil.DecodeAddress(addressStr, &chaincfg.MainNetParams)
+	addr, err := address.DecodeAddress(addressStr, &chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	// Create a public key script that pays to the address.
-	script, err := txscript.PayToAddrScript(address)
+	script, err := txscript.PayToAddrScript(addr)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -91,8 +91,8 @@ func ExampleSignTxOutput() {
 		return
 	}
 	privKey, pubKey := btcec.PrivKeyFromBytes(privKeyBytes)
-	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash,
+	pubKeyHash := address.Hash160(pubKey.SerializeCompressed())
+	addr, err := address.NewAddressPubKeyHash(pubKeyHash,
 		&chaincfg.MainNetParams)
 	if err != nil {
 		fmt.Println(err)
@@ -131,7 +131,7 @@ func ExampleSignTxOutput() {
 	redeemTx.AddTxOut(txOut)
 
 	// Sign the redeeming transaction.
-	lookupKey := func(a btcutil.Address) (*btcec.PrivateKey, bool, error) {
+	lookupKey := func(a address.Address) (*btcec.PrivateKey, bool, error) {
 		// Ordinarily this function would involve looking up the private
 		// key for the provided address, but since the only thing being
 		// signed in this example uses the address associated with the
@@ -187,7 +187,7 @@ func ExampleSignTxOutput() {
 func ExampleScriptTokenizer() {
 	// Create a script to use in the example.  Ordinarily this would come from
 	// some other source.
-	hash160 := btcutil.Hash160([]byte("example"))
+	hash160 := address.Hash160([]byte("example"))
 	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_DUP).
 		AddOp(txscript.OP_HASH160).AddData(hash160).
 		AddOp(txscript.OP_EQUALVERIFY).AddOp(txscript.OP_CHECKSIG).Script()

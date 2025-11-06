@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -149,7 +149,7 @@ func (s PkScript) Script() []byte {
 }
 
 // Address encodes the script into an address for the given chain.
-func (s PkScript) Address(chainParams *chaincfg.Params) (btcutil.Address, error) {
+func (s PkScript) Address(chainParams *chaincfg.Params) (address.Address, error) {
 	_, addrs, _, err := ExtractPkScriptAddrs(s.Script(), chainParams)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse address: %v", err)
