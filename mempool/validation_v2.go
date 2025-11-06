@@ -22,9 +22,13 @@ import (
 // This is a standalone implementation for TxMempoolV2 that uses the graph for
 // conflict detection and the policy enforcer for RBF validation. It does NOT
 // modify the old TxPool implementation.
+//
+// The optional packageContext enables BIP 431 Rule 6 support: TRUC transactions
+// may be below minimum relay fee when part of a valid package.
 func (mp *TxMempoolV2) checkMempoolAcceptance(
 	tx *btcutil.Tx,
 	isNew, rateLimit, rejectDupOrphans bool,
+	packageContext *PackageContext,
 ) (*MempoolAcceptResult, error) {
 
 	txHash := tx.Hash()
@@ -150,9 +154,10 @@ func (mp *TxMempoolV2) checkMempoolAcceptance(
 	txSize := GetTxVirtualSize(tx)
 
 	// For TxMempoolV2, use the policy enforcer's ValidateRelayFee method
-	// instead of the old validateRelayFeeMet.
+	// instead of the old validateRelayFeeMet. Pass packageContext to enable
+	// BIP 431 Rule 6 (zero-fee TRUC transactions in packages).
 	err = mp.policy.ValidateRelayFee(
-		tx, txFee, txSize, utxoView, nextBlockHeight, isNew,
+		tx, txFee, txSize, utxoView, nextBlockHeight, isNew, packageContext,
 	)
 	if err != nil {
 		return nil, err

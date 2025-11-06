@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mempool/txgraph"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // Policy violation errors.
@@ -74,6 +75,17 @@ type PolicyGraph interface {
 	// details of package construction and validation.
 	IsValidPackageExtension(tx *btcutil.Tx,
 		desc *txgraph.TxDesc) error
+
+	// BuildPackageNodes constructs the complete set of nodes needed to
+	// validate adding a transaction to the mempool. This includes the new
+	// transaction, all unconfirmed ancestors, and their descendants.
+	// Required for package context building in BIP 431 Rule 6.
+	BuildPackageNodes(tx *btcutil.Tx, desc *txgraph.TxDesc) []*txgraph.TxGraphNode
+
+	// CreatePackage validates and classifies a package of transaction nodes.
+	// Supports dry-run mode (WithDryRun option) for validation without
+	// tracking. Required for package context building in BIP 431 Rule 6.
+	CreatePackage(nodes []*txgraph.TxGraphNode, opts ...txgraph.PackageOption) (*txgraph.TxPackage, error)
 }
 
 // PolicyEnforcer defines the interface for mempool policy enforcement. This
@@ -102,9 +114,13 @@ type PolicyEnforcer interface {
 	// ValidateRelayFee checks that a transaction meets the minimum relay
 	// fee requirements, including priority checks and rate limiting for
 	// free/low-fee transactions.
+	//
+	// The optional packageContext parameter enables BIP 431 Rule 6 support:
+	// TRUC (v3) transactions may be below the minimum relay fee when part
+	// of a valid package, as long as the package fee rate meets requirements.
 	ValidateRelayFee(tx *btcutil.Tx, fee int64, size int64,
 		utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
-		isNew bool) error
+		isNew bool, packageContext *PackageContext) error
 
 	// ValidateStandardness checks that a transaction meets standardness
 	// requirements for relay (version, size, scripts, dust outputs).
@@ -131,6 +147,28 @@ type PolicyEnforcer interface {
 	// package level.
 	ValidatePackagePolicy(graph PolicyGraph, tx *btcutil.Tx,
 		desc *txgraph.TxDesc) error
+
+	// BuildPackageContext analyzes transactions and their relationship to
+	// existing mempool transactions to build a package context for BIP 431
+	// Rule 6 validation (allowing zero-fee TRUC transactions in packages).
+	//
+	// This method leverages existing package infrastructure:
+	// - BuildPackageNodes: builds validation context (new txs + ancestors)
+	// - CreatePackage (dry run): validates and classifies the package
+	// - AnalyzePackageType: determines if it's TRUC/ephemeral/1P1C
+	//
+	// Returns a populated PackageContext along with the validated TxPackage.
+	// The context is always returned when validation succeeds, even if the
+	// package is not classified as TRUC. The returned error explains why a
+	// package is invalid (topology, limits, etc.).
+	BuildPackageContext(graph PolicyGraph, txs []*btcutil.Tx,
+		descs []*txgraph.TxDesc) (*PackageContext, *txgraph.TxPackage, error)
+
+	// ValidatePackageReplacement validates that a package can replace existing
+	// mempool transactions according to BIP 125 rules, applied at package level.
+	// This extends single-transaction RBF to entire packages.
+	ValidatePackageReplacement(graph PolicyGraph, txs []*btcutil.Tx,
+		packageFee int64, allConflicts map[chainhash.Hash]*txgraph.ConflictSet) error
 }
 
 // PolicyConfig defines mempool policy parameters. These settings control
@@ -583,12 +621,41 @@ func (p *StandardPolicyEnforcer) ValidateDescendantLimits(
 // Transactions with fees below the minimum are checked for priority (if
 // enabled) and rate-limited using an exponentially decaying counter to prevent
 // spam while allowing some free transactions.
+//
+// The optional packageContext enables BIP 431 Rule 6: TRUC (v3) transactions
+// may be below the minimum relay fee when part of a valid package, as long as
+// the package fee rate meets requirements.
 func (p *StandardPolicyEnforcer) ValidateRelayFee(
 	tx *btcutil.Tx, fee int64, size int64, utxoView *blockchain.UtxoViewpoint,
-	nextBlockHeight int32, isNew bool) error {
+	nextBlockHeight int32, isNew bool, packageContext *PackageContext) error {
 	ctx := context.Background()
 
-	// First check the minimum relay fee and priority requirements using
+	// BIP 431 Rule 6: TRUC (v3) transactions in packages may be below the
+	// minimum relay fee. Individual transactions below the minimum are allowed
+	// if they're part of a valid TRUC package where the package fee rate
+	// meets requirements.
+	//
+	// This enables zero-fee commitment transactions in Lightning with fee
+	// bumping via CPFP in a child transaction.
+	if packageContext != nil && packageContext.IsTRUCPackage {
+		// Check if this is a TRUC (v3) transaction.
+		if tx.MsgTx().Version == 3 {
+			// Skip individual min-relay-fee check for TRUC transactions
+			// in packages. The package fee rate will be validated
+			// separately to ensure the package as a whole meets fee
+			// requirements.
+			//
+			// This allows zero-fee parent transactions as long as the
+			// child pays enough to cover both (CPFP).
+			log.DebugS(ctx, "TRUC transaction in package, skipping individual fee check",
+				"tx_hash", tx.Hash(),
+				"tx_fee", fee,
+				"package_fee_rate", packageContext.PackageFeeRate)
+			return nil
+		}
+	}
+
+	// Check the minimum relay fee and priority requirements using
 	// the standalone CheckRelayFee function.
 	err := CheckRelayFee(
 		tx, fee, size, utxoView, nextBlockHeight,
@@ -692,6 +759,247 @@ func (p *StandardPolicyEnforcer) ValidatePackagePolicy(
 
 	// Delegate to graph's composite validation method.
 	return graph.IsValidPackageExtension(tx, desc)
+}
+
+// BuildPackageContext analyzes transactions and their mempool relationships
+// to determine if they form a TRUC package that qualifies for BIP 431 Rule 6
+// (allowing zero-fee transactions in packages).
+//
+// This leverages existing package validation infrastructure to properly
+// classify and validate packages, reusing all the TRUC detection logic. A
+// PackageContext and validated TxPackage are returned when validation succeeds,
+// regardless of whether the package is classified as TRUC.
+func (p *StandardPolicyEnforcer) BuildPackageContext(
+	graph PolicyGraph,
+	txs []*btcutil.Tx,
+	descs []*txgraph.TxDesc,
+) (*PackageContext, *txgraph.TxPackage, error) {
+
+	if len(txs) == 0 || len(txs) != len(descs) {
+		return nil, nil, fmt.Errorf("invalid package inputs: tx/descs length mismatch or zero")
+	}
+
+	// Enforce external submission limits (count, topology, weight).
+	if err := validateSubmittedPackage(txs); err != nil {
+		return nil, nil, err
+	}
+
+	// Build validation nodes for all transactions. This includes:
+	// - Temporary nodes for new transactions
+	// - Existing ancestors from mempool
+	// - Siblings/descendants of those ancestors
+	//
+	// This gives us the complete package context for validation.
+	allNodes := make([]*txgraph.TxGraphNode, 0)
+	nodesSeen := make(map[chainhash.Hash]bool)
+
+	for i, tx := range txs {
+		// BuildPackageNodes returns all nodes needed to validate this tx,
+		// including its mempool parents and their relationships.
+		nodes := graph.BuildPackageNodes(tx, descs[i])
+
+		// Deduplicate nodes across multiple transactions.
+		for _, node := range nodes {
+			if !nodesSeen[node.TxHash] {
+				allNodes = append(allNodes, node)
+				nodesSeen[node.TxHash] = true
+			}
+		}
+	}
+
+	if len(allNodes) == 0 {
+		return nil, nil, fmt.Errorf("package context has no nodes")
+	}
+
+	// Use CreatePackage with dry run to validate and classify the package.
+	// This reuses ALL the existing validation and classification logic:
+	// - Topology validation
+	// - Connectivity checks
+	// - Package type classification (TRUC/ephemeral/1P1C)
+	// - Fee rate calculation
+	pkg, err := graph.CreatePackage(allNodes, txgraph.WithDryRun())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Build package context for fee validation. The package fee rate and size
+	// are provided even for non-TRUC packages so callers can enforce their own
+	// limits or telemetry.
+	ctx := &PackageContext{
+		IsPartOfPackage: len(allNodes) > 1,
+		PackageFeeRate:  pkg.FeeRate,
+		PackageSize:     pkg.TotalSize,
+		IsTRUCPackage:   pkg.Type == txgraph.PackageTypeTRUC,
+	}
+
+	return ctx, pkg, nil
+}
+
+// validateSubmittedPackage enforces external package submission limits:
+//   - Package must be non-empty
+//   - Transaction count must be <= MaxPackageCount (25)
+//   - Package weight must be <= MaxPackageWeight (404000 wu)
+//   - Package must be topologically sorted (parents before children)
+func validateSubmittedPackage(txs []*btcutil.Tx) error {
+	if len(txs) == 0 {
+		return txRuleError(wire.RejectInvalid,
+			"package must contain at least one transaction")
+	}
+
+	if len(txs) > MaxPackageCount {
+		return txRuleError(wire.RejectInvalid,
+			fmt.Sprintf("package contains %d transactions, max %d allowed",
+				len(txs), MaxPackageCount))
+	}
+
+	// Build index for quick lookup of package membership/ordering.
+	pkgTxs := make(map[chainhash.Hash]int, len(txs))
+	for i, tx := range txs {
+		pkgTxs[*tx.Hash()] = i
+	}
+
+	var totalVSize int64
+	for i, tx := range txs {
+		totalVSize += GetTxVirtualSize(tx)
+
+		for _, txIn := range tx.MsgTx().TxIn {
+			prevHash := txIn.PreviousOutPoint.Hash
+			if parentIdx, inPackage := pkgTxs[prevHash]; inPackage {
+				if parentIdx >= i {
+					return txRuleError(wire.RejectInvalid,
+						fmt.Sprintf("transaction %v at index %d references "+
+							"transaction %v at index %d (not topologically sorted)",
+							tx.Hash(), i, prevHash, parentIdx))
+				}
+			}
+		}
+	}
+
+	totalWeight := totalVSize * 4
+	if totalWeight > MaxPackageWeight {
+		return txRuleError(wire.RejectInvalid,
+			fmt.Sprintf("package weight %d exceeds max %d",
+				totalWeight, MaxPackageWeight))
+	}
+
+	return nil
+}
+
+// ValidatePackageReplacement validates that a package of transactions can
+// replace existing mempool transactions according to BIP 125 rules.
+//
+// Package RBF applies BIP 125 rules at the package level, comparing aggregate
+// fees and fee rates rather than individual transaction metrics. This enables
+// CPFP-based package replacements where the child pays for both transactions.
+func (p *StandardPolicyEnforcer) ValidatePackageReplacement(
+	graph PolicyGraph,
+	txs []*btcutil.Tx,
+	packageFee int64,
+	allConflicts map[chainhash.Hash]*txgraph.ConflictSet,
+) error {
+	ctx := context.Background()
+
+	// Aggregate all conflicts from all transactions in the package.
+	allConflictTxs := make(map[chainhash.Hash]*txgraph.TxGraphNode)
+	totalConflictCount := 0
+
+	for _, conflicts := range allConflicts {
+		for hash, node := range conflicts.Transactions {
+			if _, exists := allConflictTxs[hash]; !exists {
+				allConflictTxs[hash] = node
+				totalConflictCount++
+			}
+		}
+	}
+
+	// If no conflicts, this isn't a replacement.
+	if totalConflictCount == 0 {
+		return nil
+	}
+
+	log.TraceS(ctx, "Validating package RBF replacement",
+		"package_txs", len(txs),
+		"total_conflicts", totalConflictCount,
+		"package_fee", packageFee)
+
+	// Rule 1: Check eviction limit at package level.
+	if totalConflictCount > p.cfg.MaxReplacementEvictions {
+		log.WarnS(ctx, "Package RBF eviction limit exceeded", nil,
+			"conflicts_count", totalConflictCount,
+			"max_evictions", p.cfg.MaxReplacementEvictions)
+		return fmt.Errorf("%w: package replaces %d transactions (max %d)",
+			ErrTooManyEvictions, totalConflictCount,
+			p.cfg.MaxReplacementEvictions)
+	}
+
+	// Rule 2: Package must not spend outputs from any conflicts (except direct replacements).
+	// Build set of all conflict hashes for quick lookup.
+	conflictHashes := make(map[chainhash.Hash]bool)
+	for hash := range allConflictTxs {
+		conflictHashes[hash] = true
+	}
+
+	for _, tx := range txs {
+		for _, txIn := range tx.MsgTx().TxIn {
+			parentHash := txIn.PreviousOutPoint.Hash
+
+			// Check if parent exists in graph.
+			if _, exists := graph.GetNode(parentHash); exists {
+				// Check if parent is a direct conflict (allowed).
+				if conflictHashes[parentHash] {
+					continue
+				}
+
+				// Check if any ancestors are conflicts (not allowed).
+				ancestors := graph.GetAncestors(parentHash, -1)
+				for ancestorHash := range ancestors {
+					if conflictHashes[ancestorHash] {
+						return fmt.Errorf("%w: package tx spends ancestor %v of conflict",
+							ErrReplacementSpendsParent, ancestorHash)
+					}
+				}
+			}
+		}
+	}
+
+	// Rule 3: Package fee rate must be higher than each conflict's fee rate.
+	var packageSize int64
+	for _, tx := range txs {
+		packageSize += GetTxVirtualSize(tx)
+	}
+	packageFeeRate := packageFee * 1000 / packageSize
+
+	for conflictHash, conflictNode := range allConflictTxs {
+		conflictFeeRate := conflictNode.TxDesc.Fee * 1000 /
+			conflictNode.TxDesc.VirtualSize
+
+		if packageFeeRate <= conflictFeeRate {
+			return fmt.Errorf("%w: package fee rate %d sat/kB <= "+
+				"conflict %v fee rate %d sat/kB",
+				ErrInsufficientFeeRate, packageFeeRate, conflictHash,
+				conflictFeeRate)
+		}
+	}
+
+	// Rule 4: Package must pay for bandwidth (conflicts + relay fee).
+	var conflictsFee int64
+	for _, conflictNode := range allConflictTxs {
+		conflictsFee += conflictNode.TxDesc.Fee
+	}
+
+	minRelayFee := calcMinRequiredTxRelayFee(packageSize, p.cfg.MinRelayTxFee)
+	if packageFee < conflictsFee+minRelayFee {
+		return fmt.Errorf("%w: package fee %d < conflicts fee %d + relay fee %d",
+			ErrInsufficientAbsoluteFee, packageFee, conflictsFee, minRelayFee)
+	}
+
+	log.DebugS(ctx, "Package RBF validation passed",
+		"package_fee", packageFee,
+		"package_fee_rate", packageFeeRate,
+		"conflicts_fee", conflictsFee,
+		"evictions", totalConflictCount)
+
+	return nil
 }
 
 // Ensure StandardPolicyEnforcer implements PolicyEnforcer interface.

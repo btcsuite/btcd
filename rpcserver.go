@@ -185,6 +185,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"verifymessage":          handleVerifyMessage,
 	"version":                handleVersion,
 	"testmempoolaccept":      handleTestMempoolAccept,
+	"submitpackage":          handleSubmitPackage,
 	"gettxspendingprevout":   handleGetTxSpendingPrevOut,
 }
 
@@ -3917,6 +3918,126 @@ func handleTestMempoolAccept(s *rpcServer, cmd interface{},
 	}
 
 	return results, nil
+}
+
+// handleSubmitPackage implements the submitpackage command. It accepts a
+// package of raw transactions and attempts to accept them to the mempool.
+// This enables package relay for BIP 431 TRUC transactions and CPFP fee bumping.
+func handleSubmitPackage(s *rpcServer, cmd interface{},
+	closeChan <-chan struct{}) (interface{}, error) {
+
+	c := cmd.(*btcjson.JsonSubmitPackageCmd)
+
+	// Check if v2 mempool is enabled. Package relay requires v2 mempool.
+	mempoolV2, ok := s.cfg.TxMemPool.(interface {
+		ProcessPackage([]*btcutil.Tx, *mempool.PackageValidationOptions) (*mempool.PackageAcceptResult, error)
+	})
+	if !ok {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCInternal.Code,
+			Message: "submitpackage requires v2 mempool " +
+				"(use --usetxmempoolv2 flag)",
+		}
+	}
+
+	// Deserialize transactions from hex.
+	txs := make([]*btcutil.Tx, 0, len(c.RawTxs))
+	for i, hexStr := range c.RawTxs {
+		// Handle odd-length hex strings.
+		if len(hexStr)%2 != 0 {
+			hexStr = "0" + hexStr
+		}
+
+		serializedTx, err := hex.DecodeString(hexStr)
+		if err != nil {
+			return nil, rpcDecodeHexError(hexStr)
+		}
+
+		var msgTx wire.MsgTx
+		err = msgTx.Deserialize(bytes.NewReader(serializedTx))
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCDeserialization,
+				Message: fmt.Sprintf("TX %d decode failed: %v", i, err),
+			}
+		}
+
+		txs = append(txs, btcutil.NewTx(&msgTx))
+	}
+
+	// Build validation options from parameters.
+	opts := &mempool.PackageValidationOptions{}
+	if c.MaxFeeRate != nil {
+		// Convert from BTC/kvB to satoshis/kvB.
+		maxFeeRateSats := btcutil.Amount(*c.MaxFeeRate * btcutil.SatoshiPerBitcoin)
+		opts.MaxFeeRate = &maxFeeRateSats
+	}
+	if c.MaxBurnAmount != nil {
+		maxBurnSats := btcutil.Amount(*c.MaxBurnAmount * btcutil.SatoshiPerBitcoin)
+		opts.MaxBurnAmount = &maxBurnSats
+	}
+
+	// Process the package.
+	result, err := mempoolV2.ProcessPackage(txs, opts)
+	if err != nil {
+		// Package-level error (topology, size limits, etc.).
+		rpcsLog.Debugf("Package rejected: %v", err)
+
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCTxRejected,
+			Message: "Package rejected: " + err.Error(),
+		}
+	}
+
+	// Build JSON result structure.
+	jsonResult := &btcjson.JsonSubmitPackageResult{
+		PackageMsg: result.PackageMsg,
+		TxResults:  make(map[string]btcjson.JsonSubmitPackageTxResult),
+	}
+
+	// Map per-transaction results.
+	for wtxid, txResult := range result.TxResults {
+		jsonTxResult := btcjson.JsonSubmitPackageTxResult{
+			TxID:  txResult.TxHash.String(),
+			VSize: txResult.VSize,
+		}
+
+		// Set fees if transaction was accepted.
+		if txResult.Accepted {
+			baseFee := float64(txResult.Fee) / btcutil.SatoshiPerBitcoin
+			effectiveFeeRate := float64(txResult.EffectiveFeeRate) / 1000.0 / btcutil.SatoshiPerBitcoin
+
+			jsonTxResult.Fees = btcjson.JsonSubmitPackageFees{
+				Base:              baseFee,
+				EffectiveFeeRate:  &effectiveFeeRate,
+				EffectiveIncludes: []string{wtxid.String()},
+			}
+		}
+
+		// Set error if transaction was rejected.
+		if txResult.Error != nil {
+			errMsg := txResult.Error.Error()
+			jsonTxResult.Error = &errMsg
+		}
+
+		// Set other-wtxid if present (duplicate with different witness).
+		if txResult.OtherWtxid != nil {
+			otherWtxid := txResult.OtherWtxid.String()
+			jsonTxResult.OtherWtxid = &otherWtxid
+		}
+
+		jsonResult.TxResults[wtxid.String()] = jsonTxResult
+	}
+
+	// Add replaced transactions if any.
+	if len(result.ReplacedTxs) > 0 {
+		jsonResult.ReplacedTransactions = make([]string, len(result.ReplacedTxs))
+		for i, hash := range result.ReplacedTxs {
+			jsonResult.ReplacedTransactions[i] = hash.String()
+		}
+	}
+
+	return jsonResult, nil
 }
 
 // handleGetTxSpendingPrevOut implements the gettxspendingprevout command.

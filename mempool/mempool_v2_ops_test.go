@@ -45,8 +45,8 @@ func (m *mockPolicyEnforcer) ValidateDescendantLimits(graph PolicyGraph, hash ch
 	return args.Error(0)
 }
 
-func (m *mockPolicyEnforcer) ValidateRelayFee(tx *btcutil.Tx, fee int64, size int64, utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32, isNew bool) error {
-	args := m.Called(tx, fee, size, utxoView, nextBlockHeight, isNew)
+func (m *mockPolicyEnforcer) ValidateRelayFee(tx *btcutil.Tx, fee int64, size int64, utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32, isNew bool, packageContext *PackageContext) error {
+	args := m.Called(tx, fee, size, utxoView, nextBlockHeight, isNew, packageContext)
 	return args.Error(0)
 }
 
@@ -67,6 +67,26 @@ func (m *mockPolicyEnforcer) ValidateSegWitDeployment(tx *btcutil.Tx) error {
 
 func (m *mockPolicyEnforcer) ValidatePackagePolicy(graph PolicyGraph, tx *btcutil.Tx, desc *txgraph.TxDesc) error {
 	args := m.Called(graph, tx, desc)
+	return args.Error(0)
+}
+
+func (m *mockPolicyEnforcer) BuildPackageContext(graph PolicyGraph, txs []*btcutil.Tx, descs []*txgraph.TxDesc) (*PackageContext, *txgraph.TxPackage, error) {
+	args := m.Called(graph, txs, descs)
+	var ctx *PackageContext
+	if c := args.Get(0); c != nil {
+		ctx = c.(*PackageContext)
+	}
+
+	var pkg *txgraph.TxPackage
+	if p := args.Get(1); p != nil {
+		pkg = p.(*txgraph.TxPackage)
+	}
+
+	return ctx, pkg, args.Error(2)
+}
+
+func (m *mockPolicyEnforcer) ValidatePackageReplacement(graph PolicyGraph, txs []*btcutil.Tx, packageFee int64, allConflicts map[chainhash.Hash]*txgraph.ConflictSet) error {
+	args := m.Called(graph, txs, packageFee, allConflicts)
 	return args.Error(0)
 }
 
@@ -197,7 +217,7 @@ func (h *testHarness) expectTxAccepted(tx *btcutil.Tx, view *blockchain.UtxoView
 	h.mockPolicy.On("ValidateStandardness", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
-	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidatePackagePolicy", mock.Anything, tx, mock.Anything).Return(nil)
 	h.mockValidator.On("ValidateScripts", tx, mock.Anything).Return(nil)
 	if view != nil {
@@ -281,7 +301,7 @@ func (h *testHarness) expectValidationFailure(tx *btcutil.Tx, view *blockchain.U
 		h.mockPolicy.On("ValidateStandardness", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
-		h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(err)
+		h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, mock.Anything).Return(err)
 	case "scripts":
 		h.mockValidator.On("ValidateSanity", tx).Return(nil)
 		h.mockValidator.On("ValidateUtxoAvailability", tx, mock.Anything).Return([]*chainhash.Hash(nil), nil)
@@ -289,7 +309,7 @@ func (h *testHarness) expectValidationFailure(tx *btcutil.Tx, view *blockchain.U
 		h.mockPolicy.On("ValidateStandardness", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
-		h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+		h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 		h.mockValidator.On("ValidateScripts", tx, mock.Anything).Return(err)
 	}
 }
@@ -303,7 +323,7 @@ func (h *testHarness) expectRBFReplacement(tx *btcutil.Tx, view *blockchain.Utxo
 	h.mockPolicy.On("ValidateStandardness", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
-	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidatePackagePolicy", mock.Anything, tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("SignalsReplacement", mock.Anything, tx).Return(true)
 	h.mockPolicy.On("ValidateReplacement", mock.Anything, tx, fee, mock.Anything).Return(nil)
@@ -320,7 +340,7 @@ func (h *testHarness) expectRBFRejection(tx *btcutil.Tx, view *blockchain.UtxoVi
 	h.mockPolicy.On("ValidateStandardness", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockValidator.On("ValidateSequenceLocks", tx, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidateSigCost", tx, mock.Anything).Return(nil)
-	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true).Return(nil)
+	h.mockPolicy.On("ValidateRelayFee", tx, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, mock.Anything).Return(nil)
 	h.mockPolicy.On("ValidatePackagePolicy", mock.Anything, tx, mock.Anything).Return(nil)
 	h.mockPolicy.On("SignalsReplacement", mock.Anything, tx).Return(false)
 	h.mockUtxoView.On("FetchUtxoView", tx).Return(view, nil)
