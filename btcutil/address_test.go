@@ -723,6 +723,39 @@ func TestAddresses(t *testing.T) {
 			valid: false,
 			net:   &chaincfg.TestNet3Params,
 		},
+		{
+			name:  "segwit v1 mainnet bech32m empty data section",
+			addr:  "bc1gmk9yu",
+			valid: false,
+			net:   &chaincfg.MainNetParams,
+		},
+
+		// AddressWitness tests for witness versions 2-16
+		{
+			name:    "segwit mainnet witness v12 20-byte program",
+			addr:    "bc1vq2qcpt0zqnguh74f9ne3v8sqqz3wxd3teswdls",
+			encoded: "bc1vq2qcpt0zqnguh74f9ne3v8sqqz3wxd3teswdls",
+			valid:   true,
+			result: btcutil.TstAddressWitness(
+				12,
+				[]byte{
+					0x02, 0x81, 0x80, 0xad, 0xe2, 0x04, 0xd1, 0xcb,
+					0xfa, 0xa9, 0x2c, 0xf3, 0x16, 0x1e, 0x00, 0x00,
+					0xa2, 0xe3, 0x36, 0x2b,
+				},
+				chaincfg.MainNetParams.Bech32HRPSegwit),
+			f: func() (btcutil.Address, error) {
+				witnessProg := []byte{
+					0x02, 0x81, 0x80, 0xad, 0xe2, 0x04, 0xd1, 0xcb,
+					0xfa, 0xa9, 0x2c, 0xf3, 0x16, 0x1e, 0x00, 0x00,
+					0xa2, 0xe3, 0x36, 0x2b,
+				}
+				return btcutil.NewAddressWitnessWithVersion(witnessProg, 12, &chaincfg.MainNetParams)
+			},
+			net: &chaincfg.MainNetParams,
+		},
+
+		// Unsupported witness versions (version 0 and 1 only supported at this point)
 	}
 
 	if err := chaincfg.Register(&customParams); err != nil {
@@ -784,6 +817,8 @@ func TestAddresses(t *testing.T) {
 				saddr = btcutil.TstAddressSegwitSAddr(encoded)
 			case *btcutil.AddressTaproot:
 				saddr = btcutil.TstAddressTaprootSAddr(encoded)
+			case *btcutil.AddressWitness:
+				saddr = btcutil.TstAddressSegwitSAddr(encoded)
 			}
 
 			// Check script address, as well as the Hash160 method for P2PKH and
@@ -836,6 +871,26 @@ func TestAddresses(t *testing.T) {
 				}
 
 				expVer := test.result.(*btcutil.AddressWitnessScriptHash).WitnessVersion()
+				if v := a.WitnessVersion(); v != expVer {
+					t.Errorf("%v: witness versions do not match:\n%x != \n%x",
+						test.name, expVer, v)
+					return
+				}
+
+				if p := a.WitnessProgram(); !bytes.Equal(saddr, p) {
+					t.Errorf("%v: witness programs do not match:\n%x != \n%x",
+						test.name, saddr, p)
+					return
+				}
+
+			case *btcutil.AddressWitness:
+				if hrp := a.Hrp(); test.net.Bech32HRPSegwit != hrp {
+					t.Errorf("%v: hrps do not match:\n%x != \n%x",
+						test.name, test.net.Bech32HRPSegwit, hrp)
+					return
+				}
+
+				expVer := test.result.(*btcutil.AddressWitness).WitnessVersion()
 				if v := a.WitnessVersion(); v != expVer {
 					t.Errorf("%v: witness versions do not match:\n%x != \n%x",
 						test.name, expVer, v)

@@ -64,7 +64,7 @@ func encodeAddress(hash160 []byte, netID byte) string {
 	return base58.CheckEncode(hash160[:ripemd160.Size], netID)
 }
 
-// encodeSegWitAddress creates a bech32 (or bech32m for SegWit v1) encoded
+// encodeSegWitAddress creates a bech32 (or bech32m for SegWit v1+) encoded
 // address string representation from witness version and witness program.
 func encodeSegWitAddress(hrp string, witnessVersion byte, witnessProgram []byte) (string, error) {
 	// Group the address bytes into 5 bit groups, as this is what is used to
@@ -85,7 +85,7 @@ func encodeSegWitAddress(hrp string, witnessVersion byte, witnessProgram []byte)
 	case 0:
 		bech, err = bech32.Encode(hrp, combined)
 
-	case 1:
+	case 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16:
 		bech, err = bech32.EncodeM(hrp, combined)
 
 	default:
@@ -160,26 +160,35 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 				return nil, err
 			}
 
-			// We currently only support P2WPKH and P2WSH, which is
-			// witness version 0 and P2TR which is witness version
-			// 1.
-			if witnessVer != 0 && witnessVer != 1 {
+			// We currently support P2WPKH and P2WSH (witness version 0),
+			// P2TR (witness version 1), and future witness versions 2-16.
+			if witnessVer > 16 {
 				return nil, UnsupportedWitnessVerError(witnessVer)
 			}
 
 			// The HRP is everything before the found '1'.
 			hrp := prefix[:len(prefix)-1]
-
 			switch len(witnessProg) {
 			case 20:
-				return newAddressWitnessPubKeyHash(hrp, witnessProg)
+				if witnessVer == 0 {
+					return newAddressWitnessPubKeyHash(hrp, witnessProg)
+				}
+				// For witness versions 1-16, create a generic witness address
+				return newAddressWitness(hrp, witnessVer, witnessProg)
 			case 32:
+				if witnessVer == 0 {
+					return newAddressWitnessScriptHash(hrp, witnessProg)
+				}
 				if witnessVer == 1 {
 					return newAddressTaproot(hrp, witnessProg)
 				}
-
-				return newAddressWitnessScriptHash(hrp, witnessProg)
+				// For witness versions 2-16, create a generic witness address
+				return newAddressWitness(hrp, witnessVer, witnessProg)
 			default:
+				// For witness versions 2-16, allow any program length between 2-40 bytes
+				if witnessVer >= 2 && witnessVer <= 16 && len(witnessProg) >= 2 && len(witnessProg) <= 40 {
+					return newAddressWitness(hrp, witnessVer, witnessProg)
+				}
 				return nil, UnsupportedWitnessProgLenError(len(witnessProg))
 			}
 		}
@@ -269,10 +278,10 @@ func decodeSegWitAddress(address string) (byte, []byte, error) {
 			"encoding for address with witness version 0")
 	}
 
-	// For witness version 1, the bech32m encoding must be used.
-	if version == 1 && bech32version != bech32.VersionM {
-		return 0, nil, fmt.Errorf("invalid checksum expected bech32m " +
-			"encoding for address with witness version 1")
+	// For witness version 1-16, the bech32m encoding must be used.
+	if version >= 1 && version <= 16 && bech32version != bech32.VersionM {
+		return 0, nil, fmt.Errorf("invalid checksum expected bech32m "+
+			"encoding for address with witness version %d", version)
 	}
 
 	return version, regrouped, nil
@@ -708,4 +717,60 @@ func newAddressTaproot(hrp string,
 	}
 
 	return addr, nil
+}
+
+// AddressWitness is a generic Address for witness versions 2-16 that don't have
+// specific address types defined yet. This allows for future witness versions
+// to be supported without requiring code changes.
+type AddressWitness struct {
+	AddressSegWit
+}
+
+// NewAddressWitness returns a new AddressWitness for witness versions 2-16.
+func NewAddressWitness(witnessProg []byte, net *chaincfg.Params) (*AddressWitness, error) {
+	return newAddressWitness(net.Bech32HRPSegwit, 2, witnessProg) // Default to version 2
+}
+
+// NewAddressWitnessWithVersion returns a new AddressWitness with a specific witness version.
+func NewAddressWitnessWithVersion(witnessProg []byte, witnessVer byte, net *chaincfg.Params) (*AddressWitness, error) {
+	return newAddressWitness(net.Bech32HRPSegwit, witnessVer, witnessProg)
+}
+
+// newAddressWitness is an internal helper function to create an
+// AddressWitness with a known human-readable part and witness version.
+func newAddressWitness(hrp string, witnessVer byte, witnessProg []byte) (*AddressWitness, error) {
+	// Check for valid witness version (2-16)
+	if witnessVer < 2 || witnessVer > 16 {
+		return nil, fmt.Errorf("witness version must be between 2 and 16, got %d", witnessVer)
+	}
+
+	// Check for valid program length (2-40 bytes for witness versions 2-16)
+	if len(witnessProg) < 2 || len(witnessProg) > 40 {
+		return nil, fmt.Errorf("witness program must be between 2 and 40 bytes for witness version %d, got %d", witnessVer, len(witnessProg))
+	}
+
+	addr := &AddressWitness{
+		AddressSegWit{
+			hrp:            strings.ToLower(hrp),
+			witnessVersion: witnessVer,
+			witnessProgram: witnessProg,
+		},
+	}
+
+	return addr, nil
+}
+
+// WitnessVersion returns the witness version of the AddressWitness.
+func (a *AddressWitness) WitnessVersion() byte {
+	return a.witnessVersion
+}
+
+// WitnessProgram returns the witness program of the AddressWitness.
+func (a *AddressWitness) WitnessProgram() []byte {
+	return a.witnessProgram[:]
+}
+
+// Hrp returns the human-readable part of the bech32m encoded AddressWitness.
+func (a *AddressWitness) Hrp() string {
+	return a.hrp
 }
