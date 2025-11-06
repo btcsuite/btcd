@@ -594,7 +594,7 @@ func ReadPartialMessageWithEncodingN(r io.Reader, pver uint32,
 
 // readMessageWithEncodingNInternal is used to deduplicate the code because we
 // typically parse messages and headers all at once except in the case of a
-// downgraded v2->v1 conncection.
+// downgraded v2->v1 connection.
 func readMessageWithEncodingNInternal(r io.Reader, pver uint32,
 	hdr *messageHeader, btcnet BitcoinNet, enc MessageEncoding,
 	totalBytes int) (int, Message, []byte, error) {
