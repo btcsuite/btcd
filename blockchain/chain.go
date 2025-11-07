@@ -2124,7 +2124,7 @@ type Config struct {
 
 	// HashCache defines a transaction hash mid-state cache to use when
 	// validating transactions. This cache has the potential to greatly
-	// speed up transaction validation as re-using the pre-calculated
+	// speed up transaction validation as reusing the pre-calculated
 	// mid-state eliminates the O(N^2) validation complexity due to the
 	// SigHashAll flag.
 	//
@@ -2235,7 +2235,7 @@ func New(config *Config) (*BlockChain, error) {
 		return nil, err
 	}
 
-	// Make sure the utxo state is catched up if it was left in an inconsistent
+	// Make sure the utxo state is caught up if it was left in an inconsistent
 	// state.
 	bestNode := b.bestChain.Tip()
 	if err := b.InitConsistentState(bestNode, config.Interrupt); err != nil {

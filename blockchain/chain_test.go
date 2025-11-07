@@ -1339,7 +1339,7 @@ func randomSelect(input []*testhelper.SpendableOut) (
 }
 
 // addBlocks generates new blocks and adds them to the chain.  The newly generated
-// blocks will spend from the spendable outputs passed in.  The returned hases are
+// blocks will spend from the spendable outputs passed in.  The returned hashes are
 // the hashes of the newly generated blocks.
 func addBlocks(count int, chain *BlockChain, prevBlock *btcutil.Block,
 	allSpendableOutputs []*testhelper.SpendableOut) (
@@ -1814,7 +1814,7 @@ func TestReconsiderBlock(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				// Compare the tips aginst the tips we've cached.
+				// Compare the tips against the tips we've cached.
 				gotChainTips := chain.ChainTips()
 				for _, gotChainTip := range gotChainTips {
 					testChainTip, found := expectedChainTips[gotChainTip.BlockHash]

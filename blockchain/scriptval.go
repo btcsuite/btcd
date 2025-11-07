@@ -199,7 +199,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	segwitActive := flags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
 
 	// If the hashcache doesn't yet has the sighash midstate for this
-	// transaction, then we'll compute them now so we can re-use them
+	// transaction, then we'll compute them now so we can reuse them
 	// amongst all worker validation goroutines.
 	if segwitActive && tx.MsgTx().HasWitness() &&
 		!hashCache.ContainsHashes(tx.Hash()) {
@@ -209,7 +209,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	var cachedHashes *txscript.TxSigHashes
 	if segwitActive && tx.MsgTx().HasWitness() {
 		// The same pointer to the transaction's sighash midstate will
-		// be re-used amongst all validation goroutines. By
+		// be reused amongst all validation goroutines. By
 		// pre-computing the sighash here instead of during validation,
 		// we ensure the sighashes
 		// are only computed once.
