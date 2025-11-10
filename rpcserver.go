@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"net"
@@ -1259,6 +1258,9 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		case chaincfg.DeploymentTestDummyMinActivation:
 			forkName = "dummy-min-activation"
 
+		case chaincfg.DeploymentTestDummyAlwaysActive:
+			forkName = "dummy-always-active"
+
 		case chaincfg.DeploymentCSV:
 			forkName = "csv"
 
@@ -2359,7 +2361,7 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		Connections:     s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:           cfg.Proxy,
 		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		TestNet:         cfg.TestNet3,
+		TestNet:         cfg.TestNet3 || cfg.TestNet4,
 		RelayFee:        cfg.minRelayTxFee.ToBTC(),
 	}
 
@@ -2414,7 +2416,7 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		HashesPerSec:       s.cfg.CPUMiner.HashesPerSecond(),
 		NetworkHashPS:      networkHashesPerSec,
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
-		TestNet:            cfg.TestNet3,
+		TestNet:            cfg.TestNet3 || cfg.TestNet4,
 	}
 	return &result, nil
 }
@@ -2586,6 +2588,7 @@ func handleGetPeerInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 			BanScore:       int32(p.BanScore()),
 			FeeFilter:      p.FeeFilter(),
 			SyncNode:       statsSnap.ID == syncPeerID,
+			V2Connection:   statsSnap.V2Connection,
 		}
 		if p.ToPeer().LastPingNonce() != 0 {
 			wait := float64(time.Since(statsSnap.LastPingTime).Nanoseconds())
@@ -3595,14 +3598,7 @@ func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-cha
 	wire.WriteVarString(&buf, 0, c.Message)
 	messageHash := chainhash.DoubleHashB(buf.Bytes())
 
-	sig, err := ecdsa.SignCompact(wif.PrivKey,
-		messageHash, wif.CompressPubKey)
-	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCInvalidAddressOrKey,
-			Message: "Sign failed",
-		}
-	}
+	sig := ecdsa.SignCompact(wif.PrivKey, messageHash, wif.CompressPubKey)
 
 	return base64.StdEncoding.EncodeToString(sig), nil
 }
@@ -4342,7 +4338,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 	}
 
 	// Read and close the JSON-RPC request body from the caller.
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	r.Body.Close()
 	if err != nil {
 		errCode := http.StatusBadRequest

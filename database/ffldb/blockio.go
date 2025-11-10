@@ -10,6 +10,7 @@ package ffldb
 import (
 	"container/list"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
@@ -137,7 +139,7 @@ type blockStore struct {
 	// lruMutex protects concurrent access to the least recently used list
 	// and lookup map.
 	//
-	// openBlocksLRU tracks how the open files are refenced by pushing the
+	// openBlocksLRU tracks how the open files are referenced by pushing the
 	// most recently used files to the front of the list thereby trickling
 	// the least recently used files to end of the list.  When a file needs
 	// to be closed due to exceeding the max number of allowed open
@@ -224,7 +226,7 @@ func serializeBlockLoc(loc blockLocation) []byte {
 	return serializedData[:]
 }
 
-// blockFilePath return the file path for the provided block file number.
+// blockFilePath returns the file path for the provided block file number.
 func blockFilePath(dbPath string, fileNum uint32) string {
 	fileName := fmt.Sprintf(blockFilenameTemplate, fileNum)
 	return filepath.Join(dbPath, fileName)
@@ -281,17 +283,7 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 	lruList := s.openBlocksLRU
 	if lruList.Len() >= maxOpenFiles {
 		lruFileNum := lruList.Remove(lruList.Back()).(uint32)
-		oldBlockFile := s.openBlockFiles[lruFileNum]
-
-		// Close the old file under the write lock for the file in case
-		// any readers are currently reading from it so it's not closed
-		// out from under them.
-		oldBlockFile.Lock()
-		_ = oldBlockFile.file.Close()
-		oldBlockFile.Unlock()
-
-		delete(s.openBlockFiles, lruFileNum)
-		delete(s.fileNumToLRUElem, lruFileNum)
+		s.closeFile(lruFileNum)
 	}
 	s.fileNumToLRUElem[fileNum] = lruList.PushFront(fileNum)
 	s.lruMutex.Unlock()
@@ -302,11 +294,36 @@ func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
 	return blockFile, nil
 }
 
+// closeFile checks that the file corresponding to the file number is open and
+// if it is, it closes it in a concurrency safe manner and cleans up associated
+// data in the blockstore struct.
+func (s *blockStore) closeFile(fileNum uint32) {
+	blockFile := s.openBlockFiles[fileNum]
+	if blockFile == nil {
+		return
+	}
+
+	// Close the old file under the write lock for the file in case
+	// any readers are currently reading from it so it's not closed
+	// out from under them.
+	blockFile.Lock()
+	_ = blockFile.file.Close()
+	blockFile.Unlock()
+
+	delete(s.openBlockFiles, fileNum)
+	delete(s.fileNumToLRUElem, fileNum)
+}
+
 // deleteFile removes the block file for the passed flat file number.  The file
 // must already be closed and it is the responsibility of the caller to do any
 // other state cleanup necessary.
 func (s *blockStore) deleteFile(fileNum uint32) error {
 	filePath := blockFilePath(s.basePath, fileNum)
+	blockFile := s.openBlockFiles[fileNum]
+	if blockFile != nil {
+		err := fmt.Errorf("attempted to delete open file at %v", filePath)
+		return makeDbErr(database.ErrDriverSpecific, err.Error(), err)
+	}
 	if err := os.Remove(filePath); err != nil {
 		return makeDbErr(database.ErrDriverSpecific, err.Error(), err)
 	}
@@ -387,6 +404,12 @@ func (s *blockStore) writeData(data []byte, fieldName string) error {
 	n, err := wc.curFile.file.WriteAt(data, int64(wc.curOffset))
 	wc.curOffset += uint32(n)
 	if err != nil {
+		if errors.Is(err, syscall.ENOSPC) {
+			log.Errorf("%v. Cannot save any more blocks "+
+				"due to the disk being full "+
+				"-- exiting", err)
+			os.Exit(1)
+		}
 		str := fmt.Sprintf("failed to write %s to file %d at "+
 			"offset %d: %v", fieldName, wc.curFileNum,
 			wc.curOffset-uint32(n), err)
@@ -616,6 +639,12 @@ func (s *blockStore) syncBlocks() error {
 
 	// Sync the file to disk.
 	if err := wc.curFile.file.Sync(); err != nil {
+		if errors.Is(err, syscall.ENOSPC) {
+			log.Errorf("%v. Cannot save any more blocks "+
+				"due to the disk being full "+
+				"-- exiting", err)
+			os.Exit(1)
+		}
 		str := fmt.Sprintf("failed to sync file %d: %v", wc.curFileNum,
 			err)
 		return makeDbErr(database.ErrDriverSpecific, str, err)
@@ -765,7 +794,7 @@ func scanBlockFiles(dbPath string) (int, int, uint32, error) {
 // and offset set and all fields initialized.
 func newBlockStore(basePath string, network wire.BitcoinNet) (*blockStore, error) {
 	// Look for the end of the latest block to file to determine what the
-	// write cursor position is from the viewpoing of the block files on
+	// write cursor position is from the viewpoint of the block files on
 	// disk.
 	_, fileNum, fileOff, err := scanBlockFiles(basePath)
 	if err != nil {

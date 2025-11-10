@@ -19,9 +19,9 @@ ARG ARCH=amd64
 # https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
 # https://cloud.google.com/architecture/using-container-images
 # https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md
-# ➜  ~ crane digest golang:1.17.13-alpine3.16
-# sha256:c80567372be0d486766593cc722d3401038e2f150a0f6c5c719caa63afb4026a
-FROM golang@sha256:c80567372be0d486766593cc722d3401038e2f150a0f6c5c719caa63afb4026a AS build-container
+# ➜  ~ crane digest golang:1.23.12-alpine3.21
+# sha256:4bb4be21ac98da06bc26437ee870c4973f8039f13e9a1a36971b4517632b0fc6
+FROM golang@sha256:4bb4be21ac98da06bc26437ee870c4973f8039f13e9a1a36971b4517632b0fc6 AS build-container
 
 ARG ARCH
 
@@ -34,7 +34,7 @@ RUN set -ex \
   && echo "Compiling for $GOARCH" \
   && go install -v . ./cmd/...
 
-FROM $ARCH/alpine:3.16
+FROM $ARCH/alpine:3.21
 
 COPY --from=build-container /go/bin /bin
 

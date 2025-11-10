@@ -38,14 +38,14 @@ func (m *MsgAddrV2) BtcDecode(r io.Reader, pver uint32,
 	for i := uint64(0); i < count; i++ {
 		na := &addrList[i]
 		err := readNetAddressV2(r, pver, na)
-		switch err {
-		case ErrSkippedNetworkID:
-			// This may be a network ID we don't know of, but is
-			// still valid. We can safely skip those.
-			continue
-		case ErrInvalidAddressSize:
-			// The encoding used by the peer does not follow
-			// BIP-155 and we should stop processing this message.
+		if err != nil {
+			// A network address of a type we don't know of may be
+			// safely skipped. All other errors mean we should stop
+			// processing the message.
+			if err == ErrSkippedNetworkID {
+				continue
+			}
+
 			return err
 		}
 
@@ -61,8 +61,8 @@ func (m *MsgAddrV2) BtcEncode(w io.Writer, pver uint32,
 
 	count := len(m.AddrList)
 	if count > MaxV2AddrPerMsg {
-		str := fmt.Sprintf("too many addresses for message [count %v,"+
-			" max %v]", count, MaxV2AddrPerMsg)
+		str := fmt.Sprintf("too many addresses for message: "+
+			"got %v, max %v", count, MaxV2AddrPerMsg)
 		return messageError("MsgAddrV2.BtcEncode", str)
 	}
 
