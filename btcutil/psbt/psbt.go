@@ -37,6 +37,12 @@ const MaxPsbtValueLength = 4000000
 // deserialize from the wire. Anything more will return ErrInvalidKeyData.
 const MaxPsbtKeyLength = 10000
 
+// MaxPsbtKeyValue is the maximum value of a key type in a PSBT. This maximum
+// isn't specified by the BIP but used by bitcoind in various places to limit
+// the number of items processed. So we use it to validate the key type in order
+// to have a consistent behavior.
+const MaxPsbtKeyValue = 0x02000000
+
 var (
 
 	// ErrInvalidPsbtFormat is a generic error for any situation in which a
@@ -129,6 +135,13 @@ type Packet struct {
 	// produced by this PSBT.
 	Outputs []POutput
 
+	// XPubs is a list of extended public keys that can be used to derive
+	// public keys used in the inputs and outputs of this transaction. It
+	// should be the public key at the highest hardened derivation index so
+	// that the unhardened child keys used in the transaction can be
+	// derived.
+	XPubs []XPub
+
 	// Unknowns are the set of custom types (global only) within this PSBT.
 	Unknowns []*Unknown
 }
@@ -155,12 +168,14 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 
 	inSlice := make([]PInput, len(tx.TxIn))
 	outSlice := make([]POutput, len(tx.TxOut))
+	xPubSlice := make([]XPub, 0)
 	unknownSlice := make([]*Unknown, 0)
 
 	return &Packet{
 		UnsignedTx: tx,
 		Inputs:     inSlice,
 		Outputs:    outSlice,
+		XPubs:      xPubSlice,
 		Unknowns:   unknownSlice,
 	}, nil
 }
@@ -224,7 +239,10 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 	// Next we parse any unknowns that may be present, making sure that we
 	// break at the separator.
-	var unknownSlice []*Unknown
+	var (
+		xPubSlice    []XPub
+		unknownSlice []*Unknown
+	)
 	for {
 		keyint, keydata, err := getKey(r)
 		if err != nil {
@@ -241,14 +259,32 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			return nil, err
 		}
 
-		keyintanddata := []byte{byte(keyint)}
-		keyintanddata = append(keyintanddata, keydata...)
+		switch GlobalType(keyint) {
+		case XPubType:
+			xPub, err := ReadXPub(keydata, value)
+			if err != nil {
+				return nil, err
+			}
 
-		newUnknown := &Unknown{
-			Key:   keyintanddata,
-			Value: value,
+			// Duplicate keys are not allowed
+			for _, x := range xPubSlice {
+				if bytes.Equal(x.ExtendedKey, keyData) {
+					return nil, ErrDuplicateKey
+				}
+			}
+
+			xPubSlice = append(xPubSlice, *xPub)
+
+		default:
+			keyintanddata := []byte{byte(keyint)}
+			keyintanddata = append(keyintanddata, keydata...)
+
+			newUnknown := &Unknown{
+				Key:   keyintanddata,
+				Value: value,
+			}
+			unknownSlice = append(unknownSlice, newUnknown)
 		}
-		unknownSlice = append(unknownSlice, newUnknown)
 	}
 
 	// Next we parse the INPUT section.
@@ -280,6 +316,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		UnsignedTx: msgTx,
 		Inputs:     inSlice,
 		Outputs:    outSlice,
+		XPubs:      xPubSlice,
 		Unknowns:   unknownSlice,
 	}
 
@@ -317,6 +354,19 @@ func (p *Packet) Serialize(w io.Writer) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	// Serialize the global xPubs.
+	for _, xPub := range p.XPubs {
+		pathBytes := SerializeBIP32Derivation(
+			xPub.MasterKeyFingerprint, xPub.Bip32Path,
+		)
+		err := serializeKVPairWithType(
+			w, uint8(XPubType), xPub.ExtendedKey, pathBytes,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Unknown is a special case; we don't have a key type, only a key and

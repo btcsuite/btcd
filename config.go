@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -114,6 +115,7 @@ type config struct {
 	ConnectPeers         []string      `long:"connect" description:"Connect only to the specified peers at startup"`
 	CPUProfile           string        `long:"cpuprofile" description:"Write CPU profile to the specified file"`
 	MemoryProfile        string        `long:"memprofile" description:"Write memory profile to the specified file"`
+	TraceProfile         string        `long:"traceprofile" description:"Write execution trace to the specified file"`
 	DataDir              string        `short:"b" long:"datadir" description:"Directory to store data"`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	DebugLevel           string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
@@ -169,11 +171,13 @@ type config struct {
 	SigNet               bool          `long:"signet" description:"Use the signet test network"`
 	SigNetChallenge      string        `long:"signetchallenge" description:"Connect to a custom signet network defined by this challenge instead of using the global default signet test network -- Can be specified multiple times"`
 	SigNetSeedNode       []string      `long:"signetseednode" description:"Specify a seed node for the signet network instead of using the global default signet network seed nodes"`
-	TestNet3             bool          `long:"testnet" description:"Use the test network"`
+	TestNet3             bool          `long:"testnet" description:"Use the test network (version 3)"`
+	TestNet4             bool          `long:"testnet4" description:"Use the test network (version 4)"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
 	UtxoCacheMaxSizeMiB  uint          `long:"utxocachemaxsize" description:"The maximum size in MiB of the UTXO cache"`
 	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	V2Transport          bool          `long:"v2transport" description:"Enable P2P v2 encrypted transport protocol (BIP324) (default: false)"`
 	UserAgentComments    []string      `long:"uacomment" description:"Comment to add to the user agent -- See BIP 14 for more information."`
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	ShowVersion          bool          `short:"V" long:"version" description:"Display version information and exit"`
@@ -293,13 +297,7 @@ func parseAndSetDebugLevels(debugLevel string) error {
 
 // validDbType returns whether or not dbType is a supported database type.
 func validDbType(dbType string) bool {
-	for _, knownType := range knownDbTypes {
-		if dbType == knownType {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(knownDbTypes, dbType)
 }
 
 // removeDuplicateAddresses returns a new slice with all duplicate entries in
@@ -445,6 +443,7 @@ func loadConfig() (*config, []string, error) {
 		Generate:             defaultGenerate,
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,
+		V2Transport:          false,
 	}
 
 	// Service options which are only added on Windows.
@@ -551,6 +550,10 @@ func loadConfig() (*config, []string, error) {
 	if cfg.TestNet3 {
 		numNets++
 		activeNetParams = &testNet3Params
+	}
+	if cfg.TestNet4 {
+		numNets++
+		activeNetParams = &testNet4Params
 	}
 	if cfg.RegressionTest {
 		numNets++

@@ -250,23 +250,32 @@ func getKey(r io.Reader) (int, []byte, error) {
 
 	// Next, we ready out the designated number of bytes, which may include
 	// a type, key, and optional data.
-	keyTypeAndData := make([]byte, count)
-	if _, err := io.ReadFull(r, keyTypeAndData[:]); err != nil {
-		return -1, nil, err
+	keyTypeReader := io.LimitReader(r, int64(count))
+	keyType, err := wire.ReadVarInt(keyTypeReader, 0)
+	if err != nil {
+		return -1, nil, ErrInvalidPsbtFormat
 	}
 
-	keyType := int(string(keyTypeAndData)[0])
+	// The maximum value of a compact size int is capped in bitcoind, do the
+	// same here to mimic the behavior.
+	if keyType > MaxPsbtKeyValue {
+		return -1, nil, ErrInvalidPsbtFormat
+	}
+
+	keyData, err := io.ReadAll(keyTypeReader)
+	if err != nil {
+		return -1, nil, ErrInvalidPsbtFormat
+	}
 
 	// Note that the second return value will usually be empty, since most
 	// keys contain no more than the key type byte.
-	if len(keyTypeAndData) == 1 {
-		return keyType, nil, nil
+	if len(keyData) == 0 {
+		return int(keyType), nil, nil
 	}
 
 	// Otherwise, we return the key, along with any data that it may
 	// contain.
-	return keyType, keyTypeAndData[1:], nil
-
+	return int(keyType), keyData, nil
 }
 
 // readTxOut is a limited version of wire.ReadTxOut, because the latter is not

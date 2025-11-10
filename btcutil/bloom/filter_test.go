@@ -26,19 +26,52 @@ func TestFilterLarge(t *testing.T) {
 
 // TestFilterLoad ensures loading and unloading of a filter pass.
 func TestFilterLoad(t *testing.T) {
-	merkle := wire.MsgFilterLoad{}
-
-	f := bloom.LoadFilter(&merkle)
-	if !f.IsLoaded() {
-		t.Errorf("TestFilterLoad IsLoaded test failed: want %v got %v",
-			true, !f.IsLoaded())
-		return
+	// Test various filter configurations
+	tests := []struct {
+		name      string
+		filter    *wire.MsgFilterLoad
+		wantMatch bool
+	}{
+		{
+			"normal filter",
+			&wire.MsgFilterLoad{
+				Filter:    []byte{0x00},
+				HashFuncs: 1,
+			},
+			false,
+		},
+		{
+			"empty filter with funcs",
+			&wire.MsgFilterLoad{
+				Filter:    []byte{},
+				HashFuncs: 1,
+			},
+			false,
+		},
+		{
+			"minimal filter",
+			&wire.MsgFilterLoad{},
+			false,
+		},
 	}
-	f.Unload()
-	if f.IsLoaded() {
-		t.Errorf("TestFilterLoad IsLoaded test failed: want %v got %v",
-			f.IsLoaded(), false)
-		return
+
+	for _, test := range tests {
+		f := bloom.LoadFilter(test.filter)
+		if !f.IsLoaded() {
+			t.Errorf("%s: IsLoaded test failed: "+
+				"want true got false", test.name)
+			continue
+		}
+
+		if f.Matches([]byte("test")) != test.wantMatch {
+			t.Errorf("%s: unexpected match result", test.name)
+		}
+
+		f.Unload()
+		if f.IsLoaded() {
+			t.Errorf("%s: IsLoaded after Unload failed: "+
+				"want false got true", test.name)
+		}
 	}
 }
 
@@ -652,9 +685,46 @@ func TestFilterReload(t *testing.T) {
 		t.Errorf("TestFilterReload LoadFilter test failed")
 		return
 	}
-	bFilter.Reload(nil)
 
-	if bFilter.MsgFilterLoad() != nil {
-		t.Errorf("TestFilterReload Reload test failed")
+	reloadTests := []struct {
+		name   string
+		filter *wire.MsgFilterLoad
+	}{
+		{
+			name:   "nil filter",
+			filter: nil,
+		},
+		{
+			name: "empty filter",
+			filter: &wire.MsgFilterLoad{
+				Filter:    []byte{},
+				HashFuncs: 3,
+			},
+		},
+		{
+			name: "normal filter",
+			filter: &wire.MsgFilterLoad{
+				Filter:    []byte{0x00},
+				HashFuncs: 1,
+			},
+		},
+	}
+
+	for _, test := range reloadTests {
+		bFilter.Reload(test.filter)
+		if test.filter == nil {
+			if bFilter.MsgFilterLoad() != nil {
+				t.Errorf("%s: Reload test failed - "+
+					"expected nil", test.name)
+			}
+		} else {
+			bFilter.Add([]byte("test data"))
+			if bFilter.Matches([]byte("test data")) &&
+				len(test.filter.Filter) == 0 {
+
+				t.Errorf("%s: empty filter should "+
+					"not match", test.name)
+			}
+		}
 	}
 }

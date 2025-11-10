@@ -103,14 +103,13 @@ func TestCreateOpenFail(t *testing.T) {
 
 	// Ensure operations against a closed database return the expected
 	// error.
-	dbPath := filepath.Join(os.TempDir(), "ffldb-createfail")
+	dbPath := filepath.Join(t.TempDir(), "ffldb-createfail")
 	_ = os.RemoveAll(dbPath)
 	db, err := database.Create(dbType, dbPath, blockDataNet)
 	if err != nil {
 		t.Errorf("Create: unexpected error: %v", err)
 		return
 	}
-	defer os.RemoveAll(dbPath)
 	db.Close()
 
 	wantErrCode = database.ErrDbNotOpen
@@ -154,14 +153,13 @@ func TestPersistence(t *testing.T) {
 	t.Parallel()
 
 	// Create a new database to run tests against.
-	dbPath := filepath.Join(os.TempDir(), "ffldb-persistencetest")
+	dbPath := filepath.Join(t.TempDir(), "ffldb-persistencetest")
 	_ = os.RemoveAll(dbPath)
 	db, err := database.Create(dbType, dbPath, blockDataNet)
 	if err != nil {
 		t.Errorf("Failed to create test database (%s) %v", dbType, err)
 		return
 	}
-	defer os.RemoveAll(dbPath)
 	defer db.Close()
 
 	// Create a bucket, put some values into it, and store a block so they
@@ -335,6 +333,20 @@ func TestPrune(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Open the first block file before the pruning happens in the
+		// code snippet below.  This let's us test that block files are
+		// properly closed before attempting to delete them.
+		err = db.View(func(tx database.Tx) error {
+			_, err := tx.FetchBlock(blocks[0].Hash())
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		var deletedBlocks []chainhash.Hash
 
 		// This should leave 3 files on disk.
@@ -433,14 +445,13 @@ func TestInterface(t *testing.T) {
 	t.Parallel()
 
 	// Create a new database to run tests against.
-	dbPath := filepath.Join(os.TempDir(), "ffldb-interfacetest")
+	dbPath := filepath.Join(t.TempDir(), "ffldb-interfacetest")
 	_ = os.RemoveAll(dbPath)
 	db, err := database.Create(dbType, dbPath, blockDataNet)
 	if err != nil {
 		t.Errorf("Failed to create test database (%s) %v", dbType, err)
 		return
 	}
-	defer os.RemoveAll(dbPath)
 	defer db.Close()
 
 	// Ensure the driver type is the expected value.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -30,7 +31,7 @@ var (
 	activeNetParams = &chaincfg.MainNetParams
 )
 
-// config defines the configuration options for findcheckpoint.
+// config defines the configuration options for addblock.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
@@ -41,7 +42,8 @@ type config struct {
 	Progress       int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
-	TestNet3       bool   `long:"testnet" description:"Use the test network"`
+	TestNet3       bool   `long:"testnet" description:"Use the test network (version 3)"`
+	TestNet4       bool   `long:"testnet4" description:"Use the test network (version 4)"`
 	TxIndex        bool   `long:"txindex" description:"Build a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
 }
 
@@ -57,13 +59,7 @@ func fileExists(name string) bool {
 
 // validDbType returns whether or not dbType is a supported database type.
 func validDbType(dbType string) bool {
-	for _, knownType := range knownDbTypes {
-		if dbType == knownType {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(knownDbTypes, dbType)
 }
 
 // netName returns the name used when referring to a bitcoin network.  At the
@@ -112,6 +108,10 @@ func loadConfig() (*config, []string, error) {
 	if cfg.TestNet3 {
 		numNets++
 		activeNetParams = &chaincfg.TestNet3Params
+	}
+	if cfg.TestNet4 {
+		numNets++
+		activeNetParams = &chaincfg.TestNet4Params
 	}
 	if cfg.RegressionTest {
 		numNets++

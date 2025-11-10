@@ -651,14 +651,12 @@ func TestScalarMultRand(t *testing.T) {
 		_, err := rand.Read(data)
 		if err != nil {
 			t.Fatalf("failed to read random data at %d", i)
-			break
 		}
 		x, y = s256.ScalarMult(x, y, data)
 		exponent.Mul(exponent, new(big.Int).SetBytes(data))
 		xWant, yWant := s256.ScalarBaseMult(exponent.Bytes())
 		if x.Cmp(xWant) != 0 || y.Cmp(yWant) != 0 {
 			t.Fatalf("%d: bad output for %X: got (%X, %X), want (%X, %X)", i, data, x, y, xWant, yWant)
-			break
 		}
 	}
 }
@@ -814,7 +812,6 @@ func TestSplitKRand(t *testing.T) {
 		_, err := rand.Read(bytesK)
 		if err != nil {
 			t.Fatalf("failed to read random data at %d", i)
-			break
 		}
 		k := new(big.Int).SetBytes(bytesK)
 		k1, k2, k1Sign, k2Sign := splitK(bytesK)

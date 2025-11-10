@@ -170,7 +170,7 @@ func BenchmarkSignCompact(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = SignCompact(privKey, msgHash, true)
+		_ = SignCompact(privKey, msgHash, true)
 	}
 }
 
