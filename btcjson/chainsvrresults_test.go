@@ -215,3 +215,51 @@ func TestChainSvrMiningInfoResults(t *testing.T) {
 		}
 	}
 }
+
+// TestGetNetworkInfoWarnings tests that we can use both a single string value
+// and an array of string values for the warnings field in GetNetworkInfoResult.
+func TestGetNetworkInfoWarnings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		result   string
+		expected btcjson.GetNetworkInfoResult
+	}{
+		{
+			name:   "network info with single warning",
+			result: `{"warnings": "this is a warning"}`,
+			expected: btcjson.GetNetworkInfoResult{
+				Warnings: btcjson.StringOrArray{
+					"this is a warning",
+				},
+			},
+		},
+		{
+			name:   "network info with array of warnings",
+			result: `{"warnings": ["a", "or", "b"]}`,
+			expected: btcjson.GetNetworkInfoResult{
+				Warnings: btcjson.StringOrArray{
+					"a", "or", "b",
+				},
+			},
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		var infoResult btcjson.GetNetworkInfoResult
+		err := json.Unmarshal([]byte(test.result), &infoResult)
+		if err != nil {
+			t.Errorf("Test #%d (%s) unexpected error: %v", i,
+				test.name, err)
+			continue
+		}
+		if !reflect.DeepEqual(infoResult, test.expected) {
+			t.Errorf("Test #%d (%s) unexpected marhsalled data - "+
+				"got %+v, want %+v", i, test.name, infoResult,
+				test.expected)
+			continue
+		}
+	}
+}

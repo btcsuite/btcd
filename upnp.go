@@ -201,7 +201,7 @@ func getChildDevice(d *device, deviceType string) *device {
 	return nil
 }
 
-// getChildDevice searches the service list of device for a service with the
+// getChildService searches the service list of device for a service with the
 // given type.
 func getChildService(d *device, serviceType string) *service {
 	for i := range d.ServiceList.Service {

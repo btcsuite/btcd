@@ -19,6 +19,20 @@ is outlined on this page.
 We highly encourage code contributions, however it is imperative that you adhere
 to the guidelines established on this page.
 
+## Substantial contributions only
+
+Due to the prevalence of automated analysis and pull request authoring tools
+and online competitions that incentivize creating commits in popular
+repositories, the maintainers of this project are flooded with trivial pull
+requests that only change some typos or other insubstantial content (e.g. the
+year in the license file).
+If you are an honest user that wants to contribute to this project, please
+consider that every pull request takes precious time from the maintainers to
+review and consider the impact of changes. Time that could be spent writing
+features or fixing bugs.
+If you really want to contribute, consider reviewing and testing other users'
+pull requests instead. Or add value to the project by writing unit tests.
+
 ## Minimum Recommended Skillset
 
 The following list is a set of core competencies that we recommend you possess
@@ -182,6 +196,11 @@ if amt < 5460 {
 but it was left as a magic number to show how much of a difference a good
 comment can make.
 
+**Please refer to the [code formatting rules
+document](./code_formatting_rules.md)** to see the list of additional style
+rules we enforce.
+
+
 ## Model Git Commit Messages
 
 This project prefers to keep a clean commit history with well-formed commit
@@ -223,8 +242,8 @@ commit messages.
 Here are some of the reasons why wrapping your commit messages to 72 columns is
 a good thing.
 
-- git log doesn’t do any special special wrapping of the commit messages. With
-  the default pager of less -S, this means your paragraphs flow far off the edge
+- git log doesn’t do any special wrapping of the commit messages. With the
+  default pager of less -S, this means your paragraphs flow far off the edge
   of the screen, making them difficult to read. On an 80 column terminal, if we
   subtract 4 columns for the indent on the left and 4 more for symmetry on the
   right, we’re left with 72 columns.
@@ -297,7 +316,7 @@ Rejoice as you will now be listed as a [contributor](https://github.com/btcsuite
 
 ## Contribution Checklist
 
-- [&nbsp;&nbsp;] All changes are Go version 1.17 compliant
+- [&nbsp;&nbsp;] All changes are Go version 1.22 compliant
 - [&nbsp;&nbsp;] The code being submitted is commented according to the
   [Code Documentation and Commenting](#CodeDocumentation) section
 - [&nbsp;&nbsp;] For new code: Code is accompanied by tests which exercise both

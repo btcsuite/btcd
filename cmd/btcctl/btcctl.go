@@ -49,6 +49,7 @@ func usage(errorMessage string) {
 func main() {
 	cfg, args, err := loadConfig()
 	if err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to load config:", err)
 		os.Exit(1)
 	}
 	if len(args) < 1 {

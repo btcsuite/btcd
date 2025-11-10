@@ -5,8 +5,8 @@
 package main
 
 import (
-	"os"
 	"log"
+	"os"
 	"path/filepath"
 	"time"
 

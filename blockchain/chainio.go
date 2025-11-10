@@ -1058,7 +1058,14 @@ func dbPutUtxoStateConsistency(dbTx database.Tx, hash *chainhash.Hash) error {
 // nothing was found.
 func dbFetchUtxoStateConsistency(dbTx database.Tx) []byte {
 	// Fetch the serialized data from the database.
-	return dbTx.Metadata().Get(utxoStateConsistencyKeyName)
+	statusBytes := dbTx.Metadata().Get(utxoStateConsistencyKeyName)
+	if statusBytes != nil {
+		result := make([]byte, len(statusBytes))
+		copy(result, statusBytes)
+		return result
+	}
+
+	return nil
 }
 
 // createChainState initializes both the database and the chain state to the

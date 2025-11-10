@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -78,6 +79,16 @@ type Checkpoint struct {
 	Hash   *chainhash.Hash
 }
 
+// EffectiveAlwaysActiveHeight returns the effective activation height for the
+// deployment. If AlwaysActiveHeight is unset (i.e. zero), it returns
+// the maximum uint32 value to indicate that it does not force activation.
+func (d *ConsensusDeployment) EffectiveAlwaysActiveHeight() uint32 {
+	if d.AlwaysActiveHeight == 0 {
+		return math.MaxUint32
+	}
+	return d.AlwaysActiveHeight
+}
+
 // DNSSeed identifies a DNS seed.
 type DNSSeed struct {
 	// Host defines the hostname of the seed.
@@ -107,6 +118,11 @@ type ConsensusDeployment struct {
 	// MinerConfirmationWindow denotes the threshold required for
 	// activation. A value of 1815 block denotes a 90% threshold.
 	CustomActivationThreshold uint32
+
+	// AlwaysActiveHeight defines an optional block threshold at which the
+	// deployment is forced to be active. If unset (0), it defaults to
+	// math.MaxUint32, meaning the deployment does not force activation.
+	AlwaysActiveHeight uint32
 
 	// DeploymentStarter is used to determine if the given
 	// ConsensusDeployment has started or not.
@@ -145,6 +161,10 @@ const (
 	// Taproot (+Schnorr) soft-fork package. The taproot package includes
 	// the deployment of BIPS 340, 341 and 342.
 	DeploymentTaproot
+
+	// DeploymentTestDummyAlwaysActive is a dummy deployment that is meant
+	// to always be active.
+	DeploymentTestDummyAlwaysActive
 
 	// NOTE: DefinedDeployments must always come last since it is used to
 	// determine how many defined deployments there currently are.
@@ -188,6 +208,10 @@ type Params struct {
 	// retargeting enabled or not. This should only be set to true for
 	// regtest like networks.
 	PoWNoRetargeting bool
+
+	// EnforceBIP94 enforces timewarp attack mitigation and on testnet4
+	// this also enforces the block storm mitigation.
+	EnforceBIP94 bool
 
 	// These fields define the block heights at which the specified softfork
 	// BIP became active.
@@ -375,6 +399,16 @@ var MainNetParams = Params{
 				time.Time{}, // Never expires
 			),
 		},
+		DeploymentTestDummyAlwaysActive: {
+			BitNumber: 30,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
+		},
 		DeploymentCSV: {
 			BitNumber: 0,
 			DeploymentStarter: NewMedianTimeDeploymentStarter(
@@ -485,6 +519,16 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires
 			),
+		},
+		DeploymentTestDummyAlwaysActive: {
+			BitNumber: 30,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
 		},
 		DeploymentCSV: {
 			BitNumber: 0,
@@ -620,6 +664,16 @@ var TestNet3Params = Params{
 				time.Time{}, // Never expires
 			),
 		},
+		DeploymentTestDummyAlwaysActive: {
+			BitNumber: 30,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
+		},
 		DeploymentCSV: {
 			BitNumber: 0,
 			DeploymentStarter: NewMedianTimeDeploymentStarter(
@@ -647,6 +701,131 @@ var TestNet3Params = Params{
 				time.Unix(1628640000, 0), // August 11th, 2021 UTC
 			),
 			CustomActivationThreshold: 1512, // 75%
+		},
+	},
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
+
+	// Address encoding magics
+	PubKeyHashAddrID:        0x6f, // starts with m or n
+	ScriptHashAddrID:        0xc4, // starts with 2
+	WitnessPubKeyHashAddrID: 0x03, // starts with QW
+	WitnessScriptHashAddrID: 0x28, // starts with T7n
+	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 1,
+}
+
+// TestNet4Params defines the network parameters for the test Bitcoin network
+// (version 4).
+var TestNet4Params = Params{
+	Name:        "testnet4",
+	Net:         wire.TestNet4,
+	DefaultPort: "48333",
+	DNSSeeds: []DNSSeed{
+		{"seed.testnet4.bitcoin.sprovoost.nl", true},
+		{"seed.testnet4.wiz.biz", true},
+	},
+
+	// Chain parameters
+	GenesisBlock:             &testNet4GenesisBlock,
+	GenesisHash:              &testNet4GenesisHash,
+	PowLimit:                 testNet3PowLimit,
+	PowLimitBits:             0x1d00ffff,
+	EnforceBIP94:             true,
+	BIP0034Height:            1,
+	BIP0065Height:            1,
+	BIP0066Height:            1,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+	GenerateSupported:        false,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: []Checkpoint{},
+
+	// Consensus rule change deployments.
+	//
+	// The miner confirmation window is defined as:
+	//   target proof of work timespan / target proof of work spacing
+	RuleChangeActivationThreshold: 1512, // 75% of MinerConfirmationWindow
+	MinerConfirmationWindow:       2016,
+	Deployments: [DefinedDeployments]ConsensusDeployment{
+		DeploymentTestDummy: {
+			BitNumber: 28,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Unix(1199145601, 0), // January 1, 2008 UTC
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Unix(1230767999, 0), // December 31, 2008 UTC
+			),
+		},
+		DeploymentTestDummyMinActivation: {
+			BitNumber:                 22,
+			CustomActivationThreshold: 1815,    // Only needs 90% hash rate.
+			MinActivationHeight:       10_0000, // Can only activate after height 10k.
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+		},
+		DeploymentTestDummyAlwaysActive: {
+			BitNumber: 30,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
+		},
+		DeploymentCSV: {
+			BitNumber: 31,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
+		},
+		DeploymentSegwit: {
+			BitNumber: 29,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
+		},
+		DeploymentTaproot: {
+			BitNumber: 2,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			MinActivationHeight: 0,
+			AlwaysActiveHeight:  1,
 		},
 	},
 
@@ -761,6 +940,16 @@ var SimNetParams = Params{
 			),
 			CustomActivationThreshold: 75, // Only needs 75% hash rate.
 		},
+		DeploymentTestDummyAlwaysActive: {
+			BitNumber: 29,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{}, // Always available for vote
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				time.Time{}, // Never expires
+			),
+			AlwaysActiveHeight: 1,
+		},
 	},
 
 	// Mempool parameters
@@ -860,6 +1049,16 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 				DeploymentEnder: NewMedianTimeDeploymentEnder(
 					time.Time{}, // Never expires
 				),
+			},
+			DeploymentTestDummyAlwaysActive: {
+				BitNumber: 30,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{}, // Always available for vote
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					time.Time{}, // Never expires
+				),
+				AlwaysActiveHeight: 1,
 			},
 			DeploymentCSV: {
 				BitNumber: 29,
@@ -1075,6 +1274,7 @@ func init() {
 	// Register all default networks when the package is initialized.
 	mustRegister(&MainNetParams)
 	mustRegister(&TestNet3Params)
+	mustRegister(&TestNet4Params)
 	mustRegister(&RegressionNetParams)
 	mustRegister(&SimNetParams)
 }

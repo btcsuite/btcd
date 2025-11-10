@@ -229,6 +229,11 @@ func NewOutPointFromString(outpoint string) (*OutPoint, error) {
 	if len(parts) != 2 {
 		return nil, errors.New("outpoint should be of the form txid:index")
 	}
+
+	if len(parts[0]) != chainhash.MaxHashStringSize {
+		return nil, errors.New("outpoint txid should be 64 hex chars")
+	}
+
 	hash, err := chainhash.NewHashFromStr(parts[0])
 	if err != nil {
 		return nil, err
