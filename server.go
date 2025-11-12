@@ -3298,7 +3298,7 @@ func addLocalAddress(addrMgr *addrmgr.AddrManager, addr string, services wire.Se
 
 	if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
 		// If bound to unspecified address, advertise all local interfaces
-		addrs, err := net.InterfaceAddrs()
+		addrs, err := btcutil.InterfaceAddrs()
 		if err != nil {
 			return err
 		}
