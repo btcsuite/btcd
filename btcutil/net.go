@@ -2,8 +2,8 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-//go:build !appengine
-// +build !appengine
+//go:build !android && !appengine
+// +build !android,!appengine
 
 package btcutil
 
