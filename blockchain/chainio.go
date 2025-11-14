@@ -1079,6 +1079,7 @@ func (b *BlockChain) createChainState() error {
 	node := newBlockNode(header, nil)
 	node.status = statusDataStored | statusValid
 	b.bestChain.SetTip(node)
+	b.bestHeader.SetTip(node)
 
 	// Add the new node to the index which is used for faster lookups.
 	b.index.addNode(node)
@@ -1261,6 +1262,9 @@ func (b *BlockChain) initChainState() error {
 			lastNode = node
 			i++
 		}
+
+		// Set the lastNode in the blockindex as the bestheader.
+		b.bestHeader.SetTip(lastNode)
 
 		// Set the best chain view to the stored best state.
 		tip := b.index.LookupNode(&state.hash)
