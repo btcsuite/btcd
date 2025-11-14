@@ -496,10 +496,14 @@ testLoop:
 	for i, test := range tests {
 		// Insert a bunch of keys.
 		testTreap := NewImmutable()
+		keys := make([][]byte, 0, test.numKeys)
+		kvPairs := make([]KVPair, 0, test.numKeys)
 		for i := 0; i < test.numKeys; i += test.step {
 			key := serializeUint32(uint32(i))
-			testTreap = testTreap.Put(key, key)
+			keys = append(keys, key)
+			kvPairs = append(kvPairs, KVPair{key, key})
 		}
+		testTreap = testTreap.Put(kvPairs...)
 
 		// Create new iterator limited by the test params.
 		iter := testTreap.Iterator(test.startKey, test.limitKey)
