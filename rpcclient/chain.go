@@ -29,13 +29,7 @@ func (r FutureGetBestBlockHashResult) Receive() (*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var txHashStr string
-	err = json.Unmarshal(res, &txHashStr)
-	if err != nil {
-		return nil, err
-	}
-	return chainhash.NewHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(parseJSONString(res))
 }
 
 // GetBestBlockHashAsync returns an instance of a type that can be used to get
@@ -113,22 +107,9 @@ func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var blockHex string
-	err = json.Unmarshal(res, &blockHex)
-	if err != nil {
-		return nil, err
-	}
-
-	// Decode the serialized block hex to raw bytes.
-	serializedBlock, err := hex.DecodeString(blockHex)
-	if err != nil {
-		return nil, err
-	}
-
 	// Deserialize the block and return it.
 	var msgBlock wire.MsgBlock
-	err = msgBlock.Deserialize(bytes.NewReader(serializedBlock))
+	err = msgBlock.Deserialize(hex.NewDecoder(parseJSONStringReader(res)))
 	if err != nil {
 		return nil, err
 	}
@@ -560,13 +541,7 @@ func (r FutureGetBlockHashResult) Receive() (*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Unmarshal the result as a string-encoded sha.
-	var txHashStr string
-	err = json.Unmarshal(res, &txHashStr)
-	if err != nil {
-		return nil, err
-	}
-	return chainhash.NewHashFromStr(txHashStr)
+	return chainhash.NewHashFromStr(parseJSONString(res))
 }
 
 // GetBlockHashAsync returns an instance of a type that can be used to get the
@@ -597,21 +572,9 @@ func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var bhHex string
-	err = json.Unmarshal(res, &bhHex)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedBH, err := hex.DecodeString(bhHex)
-	if err != nil {
-		return nil, err
-	}
-
 	// Deserialize the blockheader and return it.
 	var bh wire.BlockHeader
-	err = bh.Deserialize(bytes.NewReader(serializedBH))
+	err = bh.Deserialize(hex.NewDecoder(parseJSONStringReader(res)))
 	if err != nil {
 		return nil, err
 	}
@@ -1246,15 +1209,8 @@ func (r FutureGetCFilterResult) Receive() (*wire.MsgCFilter, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var filterHex string
-	err = json.Unmarshal(res, &filterHex)
-	if err != nil {
-		return nil, err
-	}
-
 	// Decode the serialized cf hex to raw bytes.
-	serializedFilter, err := hex.DecodeString(filterHex)
+	serializedFilter, err := hex.DecodeString(parseJSONString(res))
 	if err != nil {
 		return nil, err
 	}
@@ -1301,15 +1257,8 @@ func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var headerHex string
-	err = json.Unmarshal(res, &headerHex)
-	if err != nil {
-		return nil, err
-	}
-
 	// Assign the decoded header into a hash
-	headerHash, err := chainhash.NewHashFromStr(headerHex)
+	headerHash, err := chainhash.NewHashFromStr(parseJSONString(res))
 	if err != nil {
 		return nil, err
 	}
