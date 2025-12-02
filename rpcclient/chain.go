@@ -6,9 +6,9 @@
 package rpcclient
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -27,12 +27,12 @@ func (r FutureGetBestBlockHashResult) Receive() (*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var txHashStr string
-	err = json.Unmarshal(res, &txHashStr)
-	if err != nil {
-		return nil, err
-	}
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	txHashStr := strings.TrimPrefix(
+		strings.TrimSuffix(string(res), "\""), "\"",
+	)
 	return chainhash.NewHashFromStr(txHashStr)
 }
 
@@ -111,22 +111,16 @@ func (r FutureGetBlockResult) Receive() (*wire.MsgBlock, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var blockHex string
-	err = json.Unmarshal(res, &blockHex)
-	if err != nil {
-		return nil, err
-	}
-
-	// Decode the serialized block hex to raw bytes.
-	serializedBlock, err := hex.DecodeString(blockHex)
-	if err != nil {
-		return nil, err
-	}
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	blockHex := strings.TrimPrefix(
+		strings.TrimSuffix(string(res), "\""), "\"",
+	)
 
 	// Deserialize the block and return it.
 	var msgBlock wire.MsgBlock
-	err = msgBlock.Deserialize(bytes.NewReader(serializedBlock))
+	err = msgBlock.Deserialize(hex.NewDecoder(strings.NewReader(blockHex)))
 	if err != nil {
 		return nil, err
 	}
@@ -558,12 +552,12 @@ func (r FutureGetBlockHashResult) Receive() (*chainhash.Hash, error) {
 		return nil, err
 	}
 
-	// Unmarshal the result as a string-encoded sha.
-	var txHashStr string
-	err = json.Unmarshal(res, &txHashStr)
-	if err != nil {
-		return nil, err
-	}
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	txHashStr := strings.TrimPrefix(
+		strings.TrimSuffix(string(res), "\""), "\"",
+	)
 	return chainhash.NewHashFromStr(txHashStr)
 }
 
@@ -595,21 +589,16 @@ func (r FutureGetBlockHeaderResult) Receive() (*wire.BlockHeader, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var bhHex string
-	err = json.Unmarshal(res, &bhHex)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedBH, err := hex.DecodeString(bhHex)
-	if err != nil {
-		return nil, err
-	}
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	bhHex := strings.TrimPrefix(
+		strings.TrimSuffix(string(res), "\""), "\"",
+	)
 
 	// Deserialize the blockheader and return it.
 	var bh wire.BlockHeader
-	err = bh.Deserialize(bytes.NewReader(serializedBH))
+	err = bh.Deserialize(hex.NewDecoder(strings.NewReader(bhHex)))
 	if err != nil {
 		return nil, err
 	}
@@ -1251,12 +1240,12 @@ func (r FutureGetCFilterResult) Receive() (*wire.MsgCFilter, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var filterHex string
-	err = json.Unmarshal(res, &filterHex)
-	if err != nil {
-		return nil, err
-	}
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	filterHex := strings.TrimPrefix(
+		strings.TrimSuffix(string(res), "\""), "\"",
+	)
 
 	// Decode the serialized cf hex to raw bytes.
 	serializedFilter, err := hex.DecodeString(filterHex)
@@ -1306,12 +1295,12 @@ func (r FutureGetCFilterHeaderResult) Receive() (*wire.MsgCFHeaders, error) {
 		return nil, err
 	}
 
-	// Unmarshal result as a string.
-	var headerHex string
-	err = json.Unmarshal(res, &headerHex)
-	if err != nil {
-		return nil, err
-	}
+	// The result is just a single hex string. So we don't need to unmarshal
+	// it into a string, replacing the quotes achieves the same result, just
+	// much faster and with fewer allocations.
+	headerHex := strings.TrimPrefix(
+		strings.TrimSuffix(string(res), "\""), "\"",
+	)
 
 	// Assign the decoded header into a hash
 	headerHash, err := chainhash.NewHashFromStr(headerHex)
