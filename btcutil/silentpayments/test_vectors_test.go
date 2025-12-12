@@ -8,6 +8,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/wire"
 )
 
 var (
@@ -129,4 +130,56 @@ func ReadTestVectors() ([]*TestVector, error) {
 	}
 
 	return testVectors, nil
+}
+
+type TxInPubKeyTestCase struct {
+	PrevOP         string   `json:"prev_op"`
+	SigScript      string   `json:"sig_script"`
+	Witness        []string `json:"witness"`
+	ExpectedPubKey string   `json:"expected_pub_key"`
+	PrevOutScript  string   `json:"prev_out_script"`
+	Typ            string   `json:"type"`
+}
+
+func (t *TxInPubKeyTestCase) AsTxIn() (*wire.TxIn, error) {
+	witness := make([][]byte, 0, len(t.Witness))
+	for _, item := range t.Witness {
+		itemBytes, err := hex.DecodeString(item)
+		if err != nil {
+			return nil, err
+		}
+
+		witness = append(witness, itemBytes)
+	}
+
+	prevOP, err := wire.NewOutPointFromString(t.PrevOP)
+	if err != nil {
+		return nil, err
+	}
+
+	sigScript, err := hex.DecodeString(t.SigScript)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wire.TxIn{
+		PreviousOutPoint: *prevOP,
+		SignatureScript:  sigScript,
+		Witness:          witness,
+	}, nil
+}
+
+func ReadTxInPubKeyTestCases() ([]*TxInPubKeyTestCase, error) {
+	fileName := filepath.Join(testdataDir, "tx-input-pub-keys.json")
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var cases []*TxInPubKeyTestCase
+	if err := json.NewDecoder(file).Decode(&cases); err != nil {
+		return nil, err
+	}
+
+	return cases, nil
 }
