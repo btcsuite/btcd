@@ -405,6 +405,7 @@ func TestUtxoCacheFlush(t *testing.T) {
 	defer tearDown()
 	cache := chain.utxoCache
 	tip := btcutil.NewBlock(params.GenesisBlock)
+	tip.SetHeight(0)
 
 	// The chainSetup init triggers the consistency status write.
 	err := assertConsistencyState(chain, params.GenesisHash)
