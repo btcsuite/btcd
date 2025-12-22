@@ -481,9 +481,9 @@ var RegressionNetParams = Params{
 	PowLimitBits:             0x207fffff,
 	PoWNoRetargeting:         true,
 	CoinbaseMaturity:         100,
-	BIP0034Height:            100000000, // Not active - Permit ver 1 blocks
-	BIP0065Height:            1351,      // Used by regression tests
-	BIP0066Height:            1251,      // Used by regression tests
+	BIP0034Height:            1,
+	BIP0065Height:            1,
+	BIP0066Height:            1,
 	SubsidyReductionInterval: 150,
 	TargetTimespan:           time.Hour * 24 * 14, // 14 days
 	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
@@ -540,6 +540,7 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires
 			),
+			AlwaysActiveHeight: 1,
 		},
 		DeploymentSegwit: {
 			BitNumber: 1,
@@ -549,6 +550,7 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires.
 			),
+			AlwaysActiveHeight: 1,
 		},
 		DeploymentTaproot: {
 			BitNumber: 2,
@@ -558,6 +560,8 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires.
 			),
+			MinActivationHeight: 0,
+			AlwaysActiveHeight:  1,
 			CustomActivationThreshold: 108, // Only needs 75% hash rate.
 		},
 	},
