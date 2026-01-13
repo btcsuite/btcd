@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/stretchr/testify/require"
 )
 
 type signatureTest struct {
@@ -798,5 +799,34 @@ func TestPrivKeys(t *testing.T) {
 			t.Errorf("%s unexpected serialized bytes - got: %x, "+
 				"want: %x", test.name, serializedKey, test.key)
 		}
+	}
+}
+
+func TestVerifyLowS(t *testing.T) {
+	signatureTests := []struct {
+		name    string
+		sig     []byte
+		wantErr error
+	}{
+		{
+			name:    "Low S value",
+			sig:     hexToBytes("3045022100af340daf02cc15c8d5d08d7735dfe6b98a474ed373bdb5fbecf7571be52b384202205009fb27f37034a9b24b707b7c6b79ca23ddef9e25f7282e8a797efe53a8f124"),
+			wantErr: nil,
+		},
+		{
+			name:    "High S value",
+			sig:     hexToBytes("304502200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errHighS,
+		},
+		{
+			name:    "Invalid signature format",
+			sig:     hexToBytes("404502200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errNoHeaderMagic,
+		},
+	}
+
+	for _, test := range signatureTests {
+		err := VerifyLowS(test.sig)
+		require.ErrorIs(t, err, test.wantErr)
 	}
 }
