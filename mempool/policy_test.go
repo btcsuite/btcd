@@ -323,9 +323,31 @@ func TestCheckTransactionStandard(t *testing.T) {
 			isStandard: true,
 		},
 		{
+			name: "Version 2 transaction",
+			tx: wire.MsgTx{
+				Version:  2,
+				TxIn:     []*wire.TxIn{&dummyTxIn},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: true,
+		},
+		{
+			name: "Version 3 transaction",
+			tx: wire.MsgTx{
+				Version:  3,
+				TxIn:     []*wire.TxIn{&dummyTxIn},
+				TxOut:    []*wire.TxOut{&dummyTxOut},
+				LockTime: 0,
+			},
+			height:     300000,
+			isStandard: true,
+		},
+		{
 			name: "Transaction version too high",
 			tx: wire.MsgTx{
-				Version:  wire.TxVersion + 1,
+				Version:  MaxStandardTxVersion + 1,
 				TxIn:     []*wire.TxIn{&dummyTxIn},
 				TxOut:    []*wire.TxOut{&dummyTxOut},
 				LockTime: 0,
@@ -467,8 +489,9 @@ func TestCheckTransactionStandard(t *testing.T) {
 	pastMedianTime := time.Now()
 	for _, test := range tests {
 		// Ensure standardness is as expected.
-		err := CheckTransactionStandard(btcutil.NewTx(&test.tx),
-			test.height, pastMedianTime, DefaultMinRelayTxFee, 1)
+		err := CheckTransactionStandard(
+			btcutil.NewTx(&test.tx), test.height, pastMedianTime, DefaultMinRelayTxFee, MaxStandardTxVersion,
+		)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.
