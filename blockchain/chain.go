@@ -128,8 +128,12 @@ type BlockChain struct {
 	//
 	// bestChain tracks the current active chain by making use of an
 	// efficient chain view into the block index.
-	index     *blockIndex
-	bestChain *chainView
+	//
+	// bestHeader tracks the current active header chain. The tip is the last
+	// header we have on the block index.
+	index      *blockIndex
+	bestChain  *chainView
+	bestHeader *chainView
 
 	// The UTXO state holds a cached view of the UTXO state of the chain.
 	// It is protected by the chain lock.
@@ -191,9 +195,10 @@ type BlockChain struct {
 	notifications     []NotificationCallback
 }
 
-// HaveBlock returns whether or not the chain instance has the block represented
-// by the passed hash.  This includes checking the various places a block can
-// be like part of the main chain, on a side chain, or in the orphan pool.
+// HaveBlock returns whether or not the chain instance has the block data
+// represented by the passed hash.  This includes checking the various places a
+// block can be like part of the main chain, on a side chain, or in the orphan
+// pool.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) HaveBlock(hash *chainhash.Hash) (bool, error) {
@@ -1339,6 +1344,15 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	return snapshot
 }
 
+// BestHeader returns the hash and the height of the best header.
+func (b *BlockChain) BestHeader() (chainhash.Hash, int32) {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	best := b.bestHeader.Tip()
+	return best.hash, best.height
+}
+
 // TipStatus is the status of a chain tip.
 type TipStatus byte
 
@@ -1528,6 +1542,54 @@ func (b *BlockChain) BlockHashByHeight(blockHeight int32) (*chainhash.Hash, erro
 	}
 
 	return &node.hash, nil
+}
+
+// IsValidHeader checks that we've already checked that this header connects to the
+// chain of best headers and did not receive an invalid state.
+func (b *BlockChain) IsValidHeader(blockHash *chainhash.Hash) bool {
+	node := b.index.LookupNode(blockHash)
+	if node == nil || !b.bestHeader.Contains(node) {
+		return false
+	}
+
+	return !node.status.KnownInvalid()
+}
+
+// LatestBlockLocatorByHeader returns a block locator for the latest known tip of the
+// header chain.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) LatestBlockLocatorByHeader() (BlockLocator, error) {
+	b.chainLock.RLock()
+	locator := b.bestHeader.BlockLocator(nil)
+	b.chainLock.RUnlock()
+	return locator, nil
+}
+
+// HeaderHashByHeight returns the block header's hash given its height.
+//
+// NOTE: If the blockNode at the given blockHeight is not included in the
+// bestHeader chain, the function will return an error indicating that the
+// blockHeight wasn't found.
+func (b *BlockChain) HeaderHashByHeight(blockHeight int32) (
+	*chainhash.Hash, error) {
+
+	node := b.bestHeader.NodeByHeight(blockHeight)
+	if node == nil || !b.bestHeader.Contains(node) {
+		return nil, fmt.Errorf("blockheight %v not found", blockHeight)
+	}
+
+	return &node.hash, nil
+}
+
+// HeaderHeightByHash returns the height of the header given its hash.
+func (b *BlockChain) HeaderHeightByHash(blockHash chainhash.Hash) (int32, error) {
+	node := b.index.LookupNode(&blockHash)
+	if node == nil || !b.bestHeader.Contains(node) {
+		return -1, fmt.Errorf("blockhash %v not found", blockHash)
+	}
+
+	return node.height, nil
 }
 
 // HeightRange returns a range of block hashes for the given start and end
@@ -2188,6 +2250,7 @@ func New(config *Config) (*BlockChain, error) {
 		utxoCache:           newUtxoCache(config.DB, config.UtxoCacheMaxSize),
 		hashCache:           config.HashCache,
 		bestChain:           newChainView(nil),
+		bestHeader:          newChainView(nil),
 		orphans:             make(map[chainhash.Hash]*orphanBlock),
 		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
 		warningCaches:       newThresholdCaches(vbNumBits),

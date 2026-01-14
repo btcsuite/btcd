@@ -33,6 +33,9 @@ const (
 	// has failed validation, thus the block is also invalid.
 	statusInvalidAncestor
 
+	// statusHeaderStored indicates that the block's header is stored on disk.
+	statusHeaderStored
+
 	// statusNone indicates that the block has no validation state flags set.
 	//
 	// NOTE: This must be defined last in order to avoid influencing iota.
@@ -44,6 +47,11 @@ const (
 // kept.
 func (status blockStatus) HaveData() bool {
 	return status&statusDataStored != 0
+}
+
+// HaveHeader returns whether the header data is stored in the database.
+func (status blockStatus) HaveHeader() bool {
+	return status&statusHeaderStored != 0
 }
 
 // KnownValid returns whether the block is known to be valid. This will return
@@ -377,14 +385,15 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 	}
 }
 
-// HaveBlock returns whether or not the block index contains the provided hash.
+// HaveBlock returns whether or not the block index contains the provided hash
+// and if the data exists on disk.
 //
 // This function is safe for concurrent access.
 func (bi *blockIndex) HaveBlock(hash *chainhash.Hash) bool {
 	bi.RLock()
-	_, hasBlock := bi.index[*hash]
+	node, hasBlock := bi.index[*hash]
 	bi.RUnlock()
-	return hasBlock
+	return hasBlock && node.status.HaveData()
 }
 
 // LookupNode returns the block node identified by the provided hash.  It will
@@ -499,6 +508,17 @@ func (bi *blockIndex) flushToDB() error {
 
 	err := bi.db.Update(func(dbTx database.Tx) error {
 		for node := range bi.dirty {
+			// NOTE: we specifically don't flush the block indexes that
+			// we don't have the data for backwards compatibility.
+			// While flushing would save us the work of re-downloading
+			// the block headers upon restart, if the user were to start
+			// up a btcd node with an older version, it would result in
+			// an unrecoverable error as older versions would consider a
+			// blockNode being present as having the block data as well.
+			if node.status.HaveHeader() &&
+				!node.status.HaveData() {
+				continue
+			}
 			err := dbStoreBlockNode(dbTx, node)
 			if err != nil {
 				return err

@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when
@@ -241,4 +242,35 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	log.Debugf("Accepted block %v", blockHash)
 
 	return isMainChain, false, nil
+}
+
+// ProcessBlockHeader is the main workhorse for handling insertion of new block
+// headers into the block chain using headers-first semantics.  It includes
+// functionality such as rejecting headers that do not connect to an existing
+// known header, ensuring headers follow all rules and insertion into the block
+// index.
+//
+// Block headers that have already been inserted are ignored, unless they have
+// subsequently been marked invalid, in which case an appropriate error is
+// returned.
+//
+// It should be noted that this function intentionally does not accept block
+// headers that do not connect to an existing known header or to headers which
+// are already known to be a part of an invalid branch.  This means headers must
+// be processed in order.
+//
+// The skipCheckpoint boolean allows skipping of the check for if the header is
+// part of the existing checkpoints.
+//
+// The returned boolean indicates whether or not the header was in the main chain
+// or not.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ProcessBlockHeader(header *wire.BlockHeader,
+	flags BehaviorFlags, skipCheckpoint bool) (bool, error) {
+
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	return b.maybeAcceptBlockHeader(header, flags, skipCheckpoint)
 }
