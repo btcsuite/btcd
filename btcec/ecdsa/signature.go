@@ -254,3 +254,40 @@ func RecoverCompact(signature, hash []byte) (*btcec.PublicKey, bool, error) {
 func Sign(key *btcec.PrivateKey, hash []byte) *Signature {
 	return secp_ecdsa.Sign(key, hash)
 }
+
+// halfOrderBytes is the secp256k1 curve order divided by 2, used for
+// determining if an S value is in the "low" range per BIP-62.
+// N/2 = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
+var halfOrderBytes = []byte{
+	0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	0x5d, 0x57, 0x6e, 0x73, 0x57, 0xa4, 0x50, 0x1d,
+	0xdf, 0xe9, 0x2f, 0x46, 0x68, 0x1b, 0x20, 0xa0,
+}
+
+// VerifyLowS checks whether the S component of the signature is in the
+// "low" range as defined by BIP-62. A canonical signature requires
+// S <= N/2 where N is the secp256k1 curve order.
+//
+// This is useful for validating that signatures conform to the canonical
+// signature requirements used in Bitcoin and Lightning Network protocols.
+// Returns true if the signature has a low S value, false otherwise.
+func VerifyLowS(sig *Signature) bool {
+	// Get the S value bytes from the signature.
+	sBytes := sig.S()
+	sBytesArr := sBytes.Bytes()
+
+	// Compare S against N/2 byte-by-byte.
+	// S is low if S <= halfOrder.
+	for i := 0; i < 32; i++ {
+		if sBytesArr[i] < halfOrderBytes[i] {
+			return true // S < halfOrder, definitely low
+		}
+		if sBytesArr[i] > halfOrderBytes[i] {
+			return false // S > halfOrder, not low
+		}
+		// Equal so far, continue checking
+	}
+	// S == halfOrder, which is still considered "low"
+	return true
+}
