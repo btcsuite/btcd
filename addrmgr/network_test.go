@@ -79,7 +79,7 @@ func TestIPTypes(t *testing.T) {
 		newIPTest("64:ff9b::1", false, false, false, false, false, false,
 			false, false, false, false, true, false, false, false, false, true, true),
 		newIPTest("::ffff:abcd:ef12:1", false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, true, true),
+			false, false, false, false, false, false, false, false, false, true, false),
 		newIPTest("::1", false, false, false, false, false, false, false, false,
 			false, false, false, false, false, false, true, true, false),
 		newIPTest("198.18.0.1", false, true, false, false, false, false, false,
@@ -88,6 +88,27 @@ func TestIPTypes(t *testing.T) {
 			false, false, false, false, false, true, false, false, true, false),
 		newIPTest("203.0.113.1", false, false, false, false, false, false, false,
 			false, false, false, false, false, false, false, false, true, false),
+
+		// IPv6 zero-prefix addresses (0000::/16 reserved range).
+		// These should NOT be routable per RFC 4291.
+		newIPTest("0:9881:8181:8181:fe00:a:9e:9801", false, false, false,
+			false, false, false, false, false, false, false, false,
+			false, false, false, false, true, false),
+		newIPTest("0::1", false, false, false, false, false, false, false,
+			false, false, false, false, false, false, false, true,
+			true, false),
+		newIPTest("0:1::1", false, false, false, false, false, false,
+			false, false, false, false, false, false, false, false,
+			false, true, false),
+		newIPTest("0:ffff::1", false, false, false, false, false, false,
+			false, false, false, false, false, false, false, false,
+			false, true, false),
+
+		// RFC 6145 translated IPv4 addresses (::ffff:0:0:0/96) are
+		// within 0000::/16 but should still be routable.
+		newIPTest("::ffff:0:0c01:0203", false, false, false, false,
+			false, false, false, false, false, false, false, true,
+			false, false, false, true, true),
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -153,6 +174,75 @@ func TestIPTypes(t *testing.T) {
 	}
 }
 
+// TestIsZero ensures the IsZero function correctly identifies addresses in the
+// reserved zero address blocks while excluding allocated sub-ranges.
+func TestIsZero(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   string
+		want bool
+	}{
+		// IPv4 zero addresses (0.0.0.0/8).
+		{name: "ipv4 zero", ip: "0.0.0.0", want: true},
+		{name: "ipv4 zero prefix", ip: "0.1.2.3", want: true},
+		{name: "ipv4 zero 0.255.255.255", ip: "0.255.255.255", want: true},
+
+		// IPv4 non-zero addresses.
+		{name: "ipv4 normal", ip: "1.2.3.4", want: false},
+		{name: "ipv4 loopback", ip: "127.0.0.1", want: false},
+		{name: "ipv4 private", ip: "192.168.1.1", want: false},
+
+		// IPv6 zero-prefix addresses (0000::/16 reserved).
+		{name: "ipv6 zero all", ip: "::", want: true},
+		{name: "ipv6 loopback", ip: "::1", want: true},
+		{name: "ipv6 zero prefix 0::2", ip: "0::2", want: true},
+		{name: "ipv6 zero prefix 0:1::1", ip: "0:1::1", want: true},
+		{name: "ipv6 zero prefix 0:ffff::1", ip: "0:ffff::1", want: true},
+		{
+			name: "ipv6 zero prefix from bug report",
+			ip:   "0:9881:8181:8181:fe00:a:9e:9801",
+			want: true,
+		},
+		{
+			name: "ipv6 zero prefix unallocated",
+			ip:   "::ffff:abcd:ef12:1",
+			want: true,
+		},
+
+		// RFC 6145 addresses (::ffff:0:0:0/96) — allocated sub-range
+		// of 0000::/16 that should NOT be flagged as zero.
+		{
+			name: "ipv6 rfc6145 translated ipv4",
+			ip:   "::ffff:0:0c01:0203",
+			want: false,
+		},
+		{
+			name: "ipv6 rfc6145 another",
+			ip:   "::ffff:0:1.2.3.4",
+			want: false,
+		},
+
+		// IPv6 non-zero-prefix addresses.
+		{name: "ipv6 normal", ip: "2602:100::1", want: false},
+		{name: "ipv6 rfc6052", ip: "64:ff9b::1", want: false},
+		{name: "ipv6 private", ip: "fd00:dead::1", want: false},
+		{name: "ipv6 teredo", ip: "2001::1", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nip := net.ParseIP(test.ip)
+			na := wire.NewNetAddressIPPort(
+				nip, 8333, wire.SFNodeNetwork,
+			)
+			if got := addrmgr.IsZero(na); got != test.want {
+				t.Errorf("IsZero(%s) = %v, want %v",
+					test.ip, got, test.want)
+			}
+		})
+	}
+}
+
 // TestGroupKey tests the GroupKey function to ensure it properly groups various
 // IP addresses.
 func TestGroupKey(t *testing.T) {
@@ -178,6 +268,8 @@ func TestGroupKey(t *testing.T) {
 		{name: "ipv6 rfc4843 2001:10::/28", ip: "2001:10::1234", expected: "unroutable"},
 		{name: "ipv6 rfc7343 2001:20::/28", ip: "2001:20::1234", expected: "unroutable"},
 		{name: "ipv6 rfc4862 fe80::/64", ip: "fe80::1234", expected: "unroutable"},
+		{name: "ipv6 zero prefix 0::/16", ip: "0:9881:8181:8181:fe00:a:9e:9801", expected: "unroutable"},
+		{name: "ipv6 zero prefix 0:1::1", ip: "0:1::1", expected: "unroutable"},
 
 		// IPv4 normal.
 		{name: "ipv4 normal class a", ip: "12.1.2.3", expected: "12.1.0.0"},
