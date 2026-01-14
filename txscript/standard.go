@@ -14,8 +14,16 @@ import (
 
 const (
 	// MaxDataCarrierSize is the maximum number of bytes allowed in pushed
-	// data to be considered a nulldata transaction
+	// data to be considered a nulldata transaction when using the
+	// NullDataScript function. This is kept at 80 for backwards compatibility.
 	MaxDataCarrierSize = 80
+
+	// MaxNullDataScriptSize is the maximum total size in bytes of a nulldata
+	// script (including OP_RETURN and all push opcodes) to be considered
+	// standard. This was increased from 83 bytes to 10000 bytes to match
+	// Bitcoin Core's relaxed policy as of v0.12.0, which removed the single
+	// push restriction and enforces limits on total script size instead.
+	MaxNullDataScriptSize = 10000
 
 	// StandardVerifyFlags are the script flags which are used when
 	// executing transaction scripts to enforce additional checks which
@@ -502,14 +510,21 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 	}
 
 	// A null script is of the form:
-	//  OP_RETURN <optional data>
+	//  OP_RETURN <optional data pushes>
 	//
-	// Thus, it can either be a single OP_RETURN or an OP_RETURN followed by a
-	// data push up to MaxDataCarrierSize bytes.
+	// It can be a single OP_RETURN or an OP_RETURN followed by any number of
+	// data pushes. The total script size must not exceed MaxNullDataScriptSize.
+	// This matches Bitcoin Core's behavior as of v0.12.0 which removed the
+	// single push restriction.
 
 	// The script can't possibly be a null data script if it doesn't start
 	// with OP_RETURN.  Fail fast to avoid more work below.
 	if len(script) < 1 || script[0] != OP_RETURN {
+		return false
+	}
+
+	// Enforce the total script size limit.
+	if len(script) > MaxNullDataScriptSize {
 		return false
 	}
 
@@ -518,11 +533,9 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 		return true
 	}
 
-	// OP_RETURN followed by data push up to MaxDataCarrierSize bytes.
-	tokenizer := MakeScriptTokenizer(scriptVersion, script[1:])
-	return tokenizer.Next() && tokenizer.Done() &&
-		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4) &&
-		len(tokenizer.Data()) <= MaxDataCarrierSize
+	// OP_RETURN followed by push-only data. All opcodes after OP_RETURN
+	// must be data pushes (OP_0 through OP_16 and direct/PUSHDATA pushes).
+	return IsPushOnlyScript(script[1:])
 }
 
 // scriptType returns the type of the script being inspected from the known
