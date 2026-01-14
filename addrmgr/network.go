@@ -88,6 +88,11 @@ var (
 	// (0.0.0.0/8).
 	zero4Net = ipNet("0.0.0.0", 8, 32)
 
+	// zero6Net defines the IPv6 address block for addresses starting with 0
+	// (0::/8). These addresses are reserved per RFC 4291 and should not be
+	// routable on the public internet.
+	zero6Net = ipNet("::", 8, 128)
+
 	// heNet defines the Hurricane Electric IPv6 address block.
 	heNet = ipNet("2001:470::", 32, 128)
 )
@@ -107,6 +112,13 @@ func IsIPv4(na *wire.NetAddress) bool {
 // IsLocal returns whether or not the given address is a local address.
 func IsLocal(na *wire.NetAddress) bool {
 	return na.IP.IsLoopback() || zero4Net.Contains(na.IP)
+}
+
+// IsZero returns whether or not the given address is in a reserved zero
+// address block. This includes IPv4 addresses starting with 0 (0.0.0.0/8)
+// and IPv6 addresses starting with 0 (0::/8).
+func IsZero(na *wire.NetAddress) bool {
+	return zero4Net.Contains(na.IP) || zero6Net.Contains(na.IP)
 }
 
 // IsOnionCatTor returns whether or not the passed address is in the IPv6 range
@@ -234,7 +246,7 @@ func IsRoutable(na *wire.NetAddressV2) bool {
 	return IsValid(lna) && !(IsRFC1918(lna) || IsRFC2544(lna) ||
 		IsRFC3927(lna) || IsRFC4862(lna) || IsRFC3849(lna) ||
 		IsRFC4843(lna) || IsRFC5737(lna) || IsRFC6598(lna) ||
-		IsLocal(lna) || (IsRFC4193(lna) &&
+		IsLocal(lna) || IsZero(lna) || (IsRFC4193(lna) &&
 		!IsOnionCatTor(lna)))
 }
 
