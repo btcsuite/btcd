@@ -504,25 +504,51 @@ func isNullDataScript(scriptVersion uint16, script []byte) bool {
 	// A null script is of the form:
 	//  OP_RETURN <optional data>
 	//
-	// Thus, it can either be a single OP_RETURN or an OP_RETURN followed by a
-	// data push up to MaxDataCarrierSize bytes.
+	// The entire scriptPubKey, including OP_RETURN and the payload, must not
+	// exceed 83 bytes by default.
 
-	// The script can't possibly be a null data script if it doesn't start
-	// with OP_RETURN.  Fail fast to avoid more work below.
+	const MaxScriptPubKeySize = 83
+
+	// Check if the script size exceeds the maximum allowed size.
+	if len(script) > MaxScriptPubKeySize {
+		return false
+	}
+
+	// The script must start with OP_RETURN.
 	if len(script) < 1 || script[0] != OP_RETURN {
 		return false
 	}
 
-	// Single OP_RETURN.
+	// Single OP_RETURN (no payload).
 	if len(script) == 1 {
 		return true
 	}
 
-	// OP_RETURN followed by data push up to MaxDataCarrierSize bytes.
+	// Tokenize and validate the script after OP_RETURN.
 	tokenizer := MakeScriptTokenizer(scriptVersion, script[1:])
-	return tokenizer.Next() && tokenizer.Done() &&
-		(IsSmallInt(tokenizer.Opcode()) || tokenizer.Opcode() <= OP_PUSHDATA4) &&
-		len(tokenizer.Data()) <= MaxDataCarrierSize
+	for tokenizer.Next() {
+		opcode := tokenizer.Opcode()
+
+		// Allow small integer opcodes (OP_1 to OP_16).
+		if IsSmallInt(opcode) {
+			continue
+		}
+
+		// Allow valid data pushes.
+		if opcode <= OP_PUSHDATA4 {
+			// Ensure each data push is valid and within limits.
+			if len(tokenizer.Data()) > MaxDataCarrierSize {
+				return false
+			}
+			continue
+		}
+
+		// Any other opcode is invalid for a null data script.
+		return false
+	}
+
+	// Ensure the tokenizer successfully parsed the entire script.
+	return tokenizer.Done()
 }
 
 // scriptType returns the type of the script being inspected from the known
