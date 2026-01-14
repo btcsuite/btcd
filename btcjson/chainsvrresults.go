@@ -371,7 +371,9 @@ type StringOrArray []string
 
 // MarshalJSON implements the json.Marshaler interface.
 func (h StringOrArray) MarshalJSON() ([]byte, error) {
-	return json.Marshal(h)
+	// Convert to []string to avoid infinite recursion since calling
+	// json.Marshal on StringOrArray would invoke MarshalJSON again.
+	return json.Marshal([]string(h))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
