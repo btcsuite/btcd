@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"sort"
 
@@ -17,6 +18,8 @@ type POutput struct {
 	TaprootInternalKey     []byte
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
+	SilentPaymentInfo      *SilentPaymentInfo
+	SilentPaymentLabel     *uint32
 	Unknowns               []*Unknown
 }
 
@@ -144,6 +147,31 @@ func (po *POutput) deserialize(r io.Reader) error {
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
 
+		case SilentPaymentV0InfoOutputType:
+			if po.SilentPaymentInfo != nil {
+				return ErrDuplicateKey
+			}
+
+			info, err := ReadSilentPaymentInfo(value)
+			if err != nil {
+				return err
+			}
+
+			po.SilentPaymentInfo = info
+
+		case SilentPaymentV0LabelOutputType:
+			if po.SilentPaymentLabel != nil {
+				return ErrDuplicateKey
+			}
+
+			if len(value) != uint32Size {
+				return ErrInvalidKeyData
+			}
+
+			label := binary.LittleEndian.Uint32(value)
+
+			po.SilentPaymentLabel = &label
+
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -240,6 +268,30 @@ func (po *POutput) serialize(w io.Writer) error {
 		err = serializeKVPairWithType(
 			w, uint8(TaprootBip32DerivationOutputType),
 			derivation.XOnlyPubKey, value,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if po.SilentPaymentInfo != nil {
+		err := serializeKVPairWithType(
+			w, uint8(SilentPaymentV0InfoOutputType), nil,
+			SerializeSilentPaymentInfo(po.SilentPaymentInfo),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if po.SilentPaymentLabel != nil {
+		var labelBytes [uint32Size]byte
+		binary.LittleEndian.PutUint32(
+			labelBytes[:], *po.SilentPaymentLabel,
+		)
+		err := serializeKVPairWithType(
+			w, uint8(SilentPaymentV0LabelOutputType), nil,
+			labelBytes[:],
 		)
 		if err != nil {
 			return err
