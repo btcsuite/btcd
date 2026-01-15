@@ -766,7 +766,7 @@ out:
 // handleSendPostMessage handles performing the passed HTTP request, reading the
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
-func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
+func (c *Client) handleSendPostMessage(ctx context.Context, jReq *jsonRequest) {
 	var (
 		lastErr      error
 		backoff      time.Duration
@@ -782,12 +782,17 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 	}
 
 	tries := 10
+retryloop:
 	for i := 0; i < tries; i++ {
 		var httpReq *http.Request
 
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err = http.NewRequest("POST", httpURL, bodyReader)
+		httpReq, err = http.NewRequestWithContext(ctx, "POST", httpURL, bodyReader)
 		if err != nil {
+			// We must observe the contract that shutdown returns ErrClientShutdown.
+			if errors.Is(err, context.Canceled) && errors.Is(context.Cause(ctx), ErrClientShutdown) {
+				err = ErrClientShutdown
+			}
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
 		}
@@ -812,6 +817,11 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 			break
 		}
 
+		// We must observe the contract that shutdown returns ErrClientShutdown.
+		if errors.Is(err, context.Canceled) && errors.Is(context.Cause(ctx), ErrClientShutdown) {
+			err = ErrClientShutdown
+		}
+
 		// Save the last error for the case where we backoff further,
 		// retry and get an invalid response but no error. If this
 		// happens the saved last error will be used to enrich the error
@@ -830,8 +840,13 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		select {
 		case <-time.After(backoff):
 
-		case <-c.shutdown:
-			return
+		case <-ctx.Done():
+			err = ctx.Err()
+			// maintain our contract: shutdown errors are ErrClientShutdown
+			if errors.Is(context.Cause(ctx), ErrClientShutdown) {
+				err = ErrClientShutdown
+			}
+			break retryloop
 		}
 	}
 	if err != nil {
@@ -891,30 +906,28 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 // in HTTP POST mode.  It uses a buffered channel to serialize output messages
 // while allowing the sender to continue running asynchronously.  It must be run
 // as a goroutine.
-func (c *Client) sendPostHandler() {
+func (c *Client) sendPostHandler(ctx context.Context) {
 out:
 	for {
 		// Send any messages ready for send until the shutdown channel
 		// is closed.
 		select {
 		case jReq := <-c.sendPostChan:
-			c.handleSendPostMessage(jReq)
+			c.handleSendPostMessage(ctx, jReq)
 
-		case <-c.shutdown:
+		case <-ctx.Done():
 			break out
 		}
 	}
 
+	err := context.Cause(ctx)
 	// Drain any wait channels before exiting so nothing is left waiting
 	// around to send.
 cleanup:
 	for {
 		select {
 		case jReq := <-c.sendPostChan:
-			jReq.responseChan <- &Response{
-				result: nil,
-				err:    ErrClientShutdown,
-			}
+			jReq.responseChan <- &Response{result: nil, err: err}
 
 		default:
 			break cleanup
@@ -1178,8 +1191,13 @@ func (c *Client) start() {
 	// Start the I/O processing handlers depending on whether the client is
 	// in HTTP POST mode or the default websocket mode.
 	if c.config.HTTPPostMode {
+		ctx, cancel := context.WithCancelCause(context.Background())
 		c.wg.Add(1)
-		go c.sendPostHandler()
+		go c.sendPostHandler(ctx)
+		go func() {
+			<-c.shutdown
+			cancel(ErrClientShutdown)
+		}()
 	} else {
 		c.wg.Add(3)
 		go func() {
