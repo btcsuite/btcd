@@ -133,13 +133,17 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":                handleAddNode,
-	"createrawtransaction":   handleCreateRawTransaction,
-	"debuglevel":             handleDebugLevel,
-	"decoderawtransaction":   handleDecodeRawTransaction,
-	"decodescript":           handleDecodeScript,
-	"estimatefee":            handleEstimateFee,
-	"generate":               handleGenerate,
+    "addminingaddr":         handleAddMiningAddr,
+    "addnode":                handleAddNode,
+    "createrawtransaction":   handleCreateRawTransaction,
+    "debuglevel":             handleDebugLevel,
+    "decoderawtransaction":   handleDecodeRawTransaction,
+    "decodescript":           handleDecodeScript,
+    "delminingaddr":          handleDelMiningAddr,
+    "listminingaddrs":        handleListMiningAddrs,
+    "generatetoaddress":      handleGenerateToAddress,
+    "estimatefee":            handleEstimateFee,
+    "generate":               handleGenerate,
 	"getaddednodeinfo":       handleGetAddedNodeInfo,
 	"getbestblock":           handleGetBestBlock,
 	"getbestblockhash":       handleGetBestBlockHash,
@@ -939,6 +943,114 @@ func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 
 	return reply, nil
+}
+
+// handleAddMiningAddr implements the addminingaddr command.
+func handleAddMiningAddr(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+    c := cmd.(*btcjson.AddMiningAddrCmd)
+
+    addr, err := btcutil.DecodeAddress(c.Address, s.cfg.ChainParams)
+    if err != nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInvalidAddressOrKey, Message: "Invalid address: " + err.Error()}
+    }
+    if !addr.IsForNet(s.cfg.ChainParams) {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInvalidAddressOrKey, Message: fmt.Sprintf("Mining address %s is for the wrong network: %s", addr.String(), s.cfg.ChainParams.Name)}
+    }
+
+    src := s.cfg.CPUMiner.AddrSource()
+    if src == nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInternal.Code, Message: "Dynamic mining address source unavailable"}
+    }
+    if err := src.AddAddr(addr); err != nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInternal.Code, Message: "Duplicate mining address detected"}
+    }
+    return nil, nil
+}
+
+// handleDelMiningAddr implements the delminingaddr command.
+func handleDelMiningAddr(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+    c := cmd.(*btcjson.DelMiningAddrCmd)
+
+    addr, err := btcutil.DecodeAddress(c.Address, s.cfg.ChainParams)
+    if err != nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInvalidAddressOrKey, Message: "Invalid address: " + err.Error()}
+    }
+    if !addr.IsForNet(s.cfg.ChainParams) {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInvalidAddressOrKey, Message: fmt.Sprintf("Mining address %s is for the wrong network: %s", addr.String(), s.cfg.ChainParams.Name)}
+    }
+
+    src := s.cfg.CPUMiner.AddrSource()
+    if src == nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInternal.Code, Message: "Dynamic mining address source unavailable"}
+    }
+    if err := src.RemoveAddr(addr); err != nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInvalidAddressOrKey, Message: fmt.Sprintf("Mining address %s not found", addr.String())}
+    }
+    return nil, nil
+}
+
+// handleListMiningAddrs implements the listminingaddrs command.
+func handleListMiningAddrs(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+    src := s.cfg.CPUMiner.AddrSource()
+    if src == nil {
+        return nil, &btcjson.RPCError{Code: btcjson.ErrRPCInternal.Code, Message: "Dynamic mining address source unavailable"}
+    }
+    list := src.ListEncodedAddrs()
+    return list, nil
+}
+
+// handleGenerateToAddress handles generatetoaddress commands.
+func handleGenerateToAddress(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+    // Respond with an error if there's virtually 0 chance of mining a block
+    // with the CPU.
+    if !s.cfg.ChainParams.GenerateSupported {
+        return nil, &btcjson.RPCError{
+            Code: btcjson.ErrRPCDifficulty,
+            Message: fmt.Sprintf("No support for `generatetoaddress` on the current network, %s, as it's unlikely to be possible to mine a block with the CPU.", s.cfg.ChainParams.Net),
+        }
+    }
+
+    c := cmd.(*btcjson.GenerateToAddressCmd)
+
+    // Respond with an error if the client is requesting 0 blocks to be generated.
+    if c.NumBlocks <= 0 {
+        return nil, &btcjson.RPCError{
+            Code:    btcjson.ErrRPCInternal.Code,
+            Message: "Please request a positive number of blocks to generate.",
+        }
+    }
+
+    // Decode the passed address and ensure it's for the current network.
+    addr, err := btcutil.DecodeAddress(c.Address, s.cfg.ChainParams)
+    if err != nil {
+        return nil, &btcjson.RPCError{
+            Code:    btcjson.ErrRPCInvalidAddressOrKey,
+            Message: "Invalid address: " + err.Error(),
+        }
+    }
+    if !addr.IsForNet(s.cfg.ChainParams) {
+        return nil, &btcjson.RPCError{
+            Code:    btcjson.ErrRPCInvalidAddressOrKey,
+            Message: "Address is for the wrong network",
+        }
+    }
+
+    // Create a reply
+    reply := make([]string, c.NumBlocks)
+
+    // Generate the requested number of blocks to the provided address.
+    blockHashes, err := s.cfg.CPUMiner.GenerateNBlocksToAddr(uint32(c.NumBlocks), addr)
+    if err != nil {
+        return nil, &btcjson.RPCError{
+            Code:    btcjson.ErrRPCInternal.Code,
+            Message: err.Error(),
+        }
+    }
+    for i, hash := range blockHashes {
+        reply[i] = hash.String()
+    }
+
+    return reply, nil
 }
 
 // handleGetAddedNodeInfo handles getaddednodeinfo commands.

@@ -104,9 +104,37 @@ type GetCurrentNetCmd struct{}
 // NewGetCurrentNetCmd returns a new instance which can be used to issue a
 // getcurrentnet JSON-RPC command.
 func NewGetCurrentNetCmd() *GetCurrentNetCmd {
-	return &GetCurrentNetCmd{}
+    return &GetCurrentNetCmd{}
 }
 
+// AddMiningAddrCmd defines the addminingaddr JSON-RPC command.
+type AddMiningAddrCmd struct {
+    Address string `json:"address"`
+}
+
+// NewAddMiningAddrCmd returns a new instance which can be used to issue a
+// addminingaddr JSON-RPC command.
+func NewAddMiningAddrCmd(addr string) *AddMiningAddrCmd {
+    return &AddMiningAddrCmd{Address: addr}
+}
+
+// DelMiningAddrCmd defines the delminingaddr JSON-RPC command.
+type DelMiningAddrCmd struct {
+    Address string `json:"address"`
+}
+
+// NewDelMiningAddrCmd returns a new instance which can be used to issue a
+// delminingaddr JSON-RPC command.
+func NewDelMiningAddrCmd(addr string) *DelMiningAddrCmd {
+    return &DelMiningAddrCmd{Address: addr}
+}
+
+// ListMiningAddrsCmd defines the listminingaddrs JSON-RPC command.
+type ListMiningAddrsCmd struct{}
+
+// NewListMiningAddrsCmd returns a new instance which can be used to issue a
+// listminingaddrs JSON-RPC command.
+func NewListMiningAddrsCmd() *ListMiningAddrsCmd { return &ListMiningAddrsCmd{} }
 // GetHeadersCmd defines the getheaders JSON-RPC command.
 //
 // NOTE: This is a btcsuite extension ported from
@@ -142,15 +170,20 @@ type VersionCmd struct{}
 func NewVersionCmd() *VersionCmd { return new(VersionCmd) }
 
 func init() {
-	// No special flags for commands in this file.
-	flags := UsageFlag(0)
+    // No special flags for commands in this file.
+    flags := UsageFlag(0)
 
-	MustRegisterCmd("debuglevel", (*DebugLevelCmd)(nil), flags)
-	MustRegisterCmd("node", (*NodeCmd)(nil), flags)
-	MustRegisterCmd("generate", (*GenerateCmd)(nil), flags)
-	MustRegisterCmd("generatetoaddress", (*GenerateToAddressCmd)(nil), flags)
-	MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
-	MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
-	MustRegisterCmd("getheaders", (*GetHeadersCmd)(nil), flags)
-	MustRegisterCmd("version", (*VersionCmd)(nil), flags)
+    MustRegisterCmd("debuglevel", (*DebugLevelCmd)(nil), flags)
+    MustRegisterCmd("node", (*NodeCmd)(nil), flags)
+    MustRegisterCmd("generate", (*GenerateCmd)(nil), flags)
+    MustRegisterCmd("generatetoaddress", (*GenerateToAddressCmd)(nil), flags)
+    MustRegisterCmd("getbestblock", (*GetBestBlockCmd)(nil), flags)
+    MustRegisterCmd("getcurrentnet", (*GetCurrentNetCmd)(nil), flags)
+    MustRegisterCmd("getheaders", (*GetHeadersCmd)(nil), flags)
+    MustRegisterCmd("version", (*VersionCmd)(nil), flags)
+
+    // Dynamic mining address management.
+    MustRegisterCmd("addminingaddr", (*AddMiningAddrCmd)(nil), flags)
+    MustRegisterCmd("delminingaddr", (*DelMiningAddrCmd)(nil), flags)
+    MustRegisterCmd("listminingaddrs", (*ListMiningAddrsCmd)(nil), flags)
 }
