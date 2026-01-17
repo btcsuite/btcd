@@ -370,6 +370,17 @@ func TestChainSvrCmds(t *testing.T) {
 			unmarshalled: &btcjson.GetBlockChainInfoCmd{},
 		},
 		{
+			name: "getindexinfo",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("getindexinfo")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGetIndexInfoCmd()
+			},
+			marshalled:   `{"jsonrpc":"1.0","method":"getindexinfo","params":[],"id":1}`,
+			unmarshalled: &btcjson.GetIndexInfoCmd{},
+		},
+		{
 			name: "getblockcount",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getblockcount")
