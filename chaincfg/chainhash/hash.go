@@ -19,6 +19,9 @@ const HashSize = 32
 const MaxHashStringSize = HashSize * 2
 
 var (
+	// TagBIP0322SignedMsg is the BIP-0322 tag for generic signed messages.
+	TagBIP0322SignedMsg = []byte("BIP0322-signed-message")
+
 	// TagBIP0340Challenge is the BIP-0340 tag for challenges.
 	TagBIP0340Challenge = []byte("BIP0340/challenge")
 
