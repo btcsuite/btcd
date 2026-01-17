@@ -8,6 +8,7 @@ package txscript
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"strings"
@@ -47,6 +48,11 @@ const (
 	// pathways of a script to be restricted based on the age of the output
 	// being spent.  This is BIP0112.
 	ScriptVerifyCheckSequenceVerify
+
+	//	ScriptVerifyCheckTemplateVerify defines whether to verify that the
+	//	script being executed is a valid template utxo.
+	//	This is BIP0119.
+	ScriptVerifyCheckTemplateVerify
 
 	// ScriptVerifyCleanStack defines that the stack must contain only
 	// one stack element after evaluation and that the element must be
@@ -289,6 +295,8 @@ type Engine struct {
 	witnessProgram  []byte
 	inputAmount     int64
 	taprootCtx      *taprootExecutionCtx
+
+	preComputedData map[string][]byte
 
 	// stepCallback is an optional function that will be called every time
 	// a step has been performed during script execution.
@@ -1650,4 +1658,88 @@ func NewDebugEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int,
 
 	vm.stepCallback = stepCallback
 	return vm, nil
+}
+
+// GetDefaultCheckTemplatePrecomputedData calculates and caches precomputed data for current MsgTx.
+func (vm *Engine) GetDefaultCheckTemplatePrecomputedData() (map[string][]byte, error) {
+	if vm.preComputedData != nil {
+		return vm.preComputedData, nil
+	}
+
+	result := make(map[string][]byte)
+	var scriptSigs, sequences, outputs bytes.Buffer
+
+	for _, txIn := range vm.tx.TxIn {
+		err := wire.WriteVarBytes(&scriptSigs, wire.ProtocolVersion, txIn.SignatureScript)
+		if err != nil {
+			return nil, err
+		}
+		err = binary.Write(&sequences, binary.LittleEndian, txIn.Sequence)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if scriptSigs.Len() > 0 {
+		hash := chainhash.HashB(scriptSigs.Bytes())
+		result["scriptSigs"] = hash
+	}
+
+	if sequences.Len() > 0 {
+		seqHash := chainhash.HashB(sequences.Bytes())
+		result["sequences"] = seqHash
+	}
+
+	for _, txOut := range vm.tx.TxOut {
+		outputs.Write(txOut.PkScript)
+		err := binary.Write(&outputs, binary.LittleEndian, txOut.Value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if outputs.Len() > 0 {
+		outHash := chainhash.HashB(outputs.Bytes())
+		result["outputs"] = outHash
+	}
+
+	vm.preComputedData = result
+
+	return result, nil
+}
+
+// GetDefaultCheckTemplateHash calculates the default check template hash for a given MsgTx.
+func (vm *Engine) GetDefaultCheckTemplateHash(nIn int) ([]byte, error) {
+	preComputedData, err := vm.GetDefaultCheckTemplatePrecomputedData()
+
+	var result bytes.Buffer
+	err = binary.Write(&result, binary.LittleEndian, vm.tx.Version)
+	if err != nil {
+		return nil, err
+	}
+	err = binary.Write(&result, binary.LittleEndian, vm.tx.LockTime)
+	if err != nil {
+		return nil, err
+	}
+
+	if scriptSigs, ok := preComputedData["scriptSigs"]; ok {
+		result.Write(scriptSigs)
+	}
+
+	err = binary.Write(&result, binary.LittleEndian, uint32(len(vm.tx.TxIn)))
+	if err != nil {
+		return nil, err
+	}
+	result.Write(preComputedData["sequences"])
+
+	err = binary.Write(&result, binary.LittleEndian, uint32(len(vm.tx.TxOut)))
+	if err != nil {
+		return nil, err
+	}
+	result.Write(preComputedData["outputs"])
+
+	err = binary.Write(&result, binary.LittleEndian, nIn)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.HashB(result.Bytes()), nil
 }
