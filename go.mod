@@ -14,7 +14,7 @@ require (
 	github.com/decred/dcrd/lru v1.0.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/jessevdk/go-flags v1.4.0
-	github.com/jrick/logrotate v1.0.0
+	github.com/jrick/logrotate v1.1.2
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	golang.org/x/crypto v0.25.0
@@ -27,6 +27,7 @@ require (
 	github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23 // indirect
+	github.com/klauspost/compress v1.15.15
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
