@@ -2547,9 +2547,6 @@ func (s *server) Start() {
 
 	srvrLog.Trace("Starting server")
 
-	// Server startup time. Used for the uptime command for uptime calculation.
-	s.startupTime = time.Now().Unix()
-
 	// Start the peer handler which in turn starts the address and block
 	// managers.
 	s.wg.Add(1)
@@ -2845,6 +2842,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s := server{
+		startupTime:          time.Now().Unix(),
 		chainParams:          chainParams,
 		addrManager:          amgr,
 		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
