@@ -199,13 +199,19 @@ func (b *ScriptBuilder) addData(data []byte) *ScriptBuilder {
 	return b
 }
 
-// AddFullData should not typically be used by ordinary users as it does not
-// include the checks which prevent data pushes larger than the maximum allowed
-// sizes which leads to scripts that can't be executed.  This is provided for
-// testing purposes such as regression tests where sizes are intentionally made
-// larger than allowed.
+// AddFullData pushes the passed data to the end of the script without
+// enforcing MaxScriptElementSize limits. It automatically chooses canonical
+// opcodes depending on the length of the data.
 //
-// Use AddData instead.
+// This function bypasses the 520-byte MaxScriptElementSize limit and is
+// intended for:
+//
+//  1. Creating OP_RETURN outputs with data larger than 520 bytes, since they
+//     are provably unspendable and never executed.
+//  2. Testing purposes where scripts need to intentionally exceed limits.
+//
+// For regular data pushes that will be executed, use AddData instead, which
+// enforces size limits to ensure the resulting script can be executed.
 func (b *ScriptBuilder) AddFullData(data []byte) *ScriptBuilder {
 	if b.err != nil {
 		return b

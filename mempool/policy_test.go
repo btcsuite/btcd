@@ -416,7 +416,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 			code:       wire.RejectNonstandard,
 		},
 		{
-			name: "More than one nulldata output",
+			name: "Multiple nulldata outputs (now standard)",
 			tx: wire.MsgTx{
 				Version: 1,
 				TxIn:    []*wire.TxIn{&dummyTxIn},
@@ -430,8 +430,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 				LockTime: 0,
 			},
 			height:     300000,
-			isStandard: false,
-			code:       wire.RejectNonstandard,
+			isStandard: true,
 		},
 		{
 			name: "Dust output",
@@ -461,6 +460,152 @@ func TestCheckTransactionStandard(t *testing.T) {
 			},
 			height:     300000,
 			isStandard: true,
+		},
+		{
+			name: "Large nulldata output with 75KB data (standard after v30)",
+			tx: func() wire.MsgTx {
+				// Create a large OP_RETURN with 75KB of data
+				// This is well over previous limits (80 bytes, 520 bytes MaxScriptElementSize)
+				// but under the new 100KB MaxDataCarrierSize limit
+				largeData := make([]byte, 75000)
+				for i := range largeData {
+					largeData[i] = byte(i % 256)
+				}
+				pkScript, err := txscript.NullDataScript(largeData)
+				if err != nil {
+					t.Fatalf("NullDataScript: unexpected error: %v", err)
+				}
+				return wire.MsgTx{
+					Version: 1,
+					TxIn:    []*wire.TxIn{&dummyTxIn},
+					TxOut: []*wire.TxOut{{
+						Value:    0,
+						PkScript: pkScript,
+					}},
+					LockTime: 0,
+				}
+			}(),
+			height:     300000,
+			isStandard: true,
+		},
+		{
+			name: "Three nulldata outputs totaling ~75KB",
+			tx: func() wire.MsgTx {
+				// Create three large OP_RETURNs totaling approximately 75KB
+				data1 := make([]byte, 25000)
+				data2 := make([]byte, 25000)
+				data3 := make([]byte, 25000)
+				for i := range data1 {
+					data1[i] = byte(i % 256)
+				}
+				for i := range data2 {
+					data2[i] = byte((i + 100) % 256)
+				}
+				for i := range data3 {
+					data3[i] = byte((i + 200) % 256)
+				}
+
+				pkScript1, _ := txscript.NullDataScript(data1)
+				pkScript2, _ := txscript.NullDataScript(data2)
+				pkScript3, _ := txscript.NullDataScript(data3)
+
+				return wire.MsgTx{
+					Version: 1,
+					TxIn:    []*wire.TxIn{&dummyTxIn},
+					TxOut: []*wire.TxOut{{
+						Value:    0,
+						PkScript: pkScript1,
+					}, {
+						Value:    0,
+						PkScript: pkScript2,
+					}, {
+						Value:    0,
+						PkScript: pkScript3,
+					}},
+					LockTime: 0,
+				}
+			}(),
+			height:     300000,
+			isStandard: true,
+		},
+		{
+			name: "Mixed outputs with two large OP_RETURNs and payment",
+			tx: func() wire.MsgTx {
+				// Create two large OP_RETURNs plus a payment output
+				data1 := make([]byte, 37000)
+				data2 := make([]byte, 37000)
+				for i := range data1 {
+					data1[i] = byte(i % 256)
+				}
+				for i := range data2 {
+					data2[i] = byte((i + 150) % 256)
+				}
+
+				pkScript1, _ := txscript.NullDataScript(data1)
+				pkScript2, _ := txscript.NullDataScript(data2)
+
+				return wire.MsgTx{
+					Version: 1,
+					TxIn:    []*wire.TxIn{&dummyTxIn},
+					TxOut: []*wire.TxOut{{
+						Value:    100000000, // 1 BTC payment
+						PkScript: dummyPkScript,
+					}, {
+						Value:    0,
+						PkScript: pkScript1,
+					}, {
+						Value:    0,
+						PkScript: pkScript2,
+					}},
+					LockTime: 0,
+				}
+			}(),
+			height:     300000,
+			isStandard: true,
+		},
+		{
+			name: "Multiple OP_RETURNs with combined size over 100KB (but each under limit)",
+			tx: func() wire.MsgTx {
+				// Each OP_RETURN is under 100KB individually, but combined they exceed it.
+				// Each is 60KB, total is 180KB of OP_RETURN data.
+				// This tests that each output is independently subject to MaxDataCarrierSize,
+				// and the transaction as a whole is limited by maxStandardTxWeight.
+				data1 := make([]byte, 60000)
+				data2 := make([]byte, 60000)
+				data3 := make([]byte, 60000)
+				for i := range data1 {
+					data1[i] = byte(i % 256)
+				}
+				for i := range data2 {
+					data2[i] = byte((i + 100) % 256)
+				}
+				for i := range data3 {
+					data3[i] = byte((i + 200) % 256)
+				}
+
+				pkScript1, _ := txscript.NullDataScript(data1)
+				pkScript2, _ := txscript.NullDataScript(data2)
+				pkScript3, _ := txscript.NullDataScript(data3)
+
+				return wire.MsgTx{
+					Version: 1,
+					TxIn:    []*wire.TxIn{&dummyTxIn},
+					TxOut: []*wire.TxOut{{
+						Value:    0,
+						PkScript: pkScript1,
+					}, {
+						Value:    0,
+						PkScript: pkScript2,
+					}, {
+						Value:    0,
+						PkScript: pkScript3,
+					}},
+					LockTime: 0,
+				}
+			}(),
+			height:     300000,
+			isStandard: false, // Rejected due to exceeding maxStandardTxWeight
+			code:       wire.RejectNonstandard,
 		},
 	}
 

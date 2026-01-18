@@ -1022,14 +1022,14 @@ var scriptClassTests = []struct {
 		class: NullDataTy,
 	},
 	{
-		// Nulldata with more than max allowed data to be considered
-		// standard (so therefore nonstandard)
-		name: "nulldata exceed max standard push",
+		// Nulldata with 81 bytes is now standard (previously exceeded
+		// the old 80 byte limit, but is well under the new 100KB limit)
+		name: "nulldata 81 bytes standard",
 		script: "RETURN PUSHDATA1 0x51 0x046708afdb0fe5548271967f1a67" +
 			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
 			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
 			"962e0ea1f61deb649f6bc3f4cef308",
-		class: NonStandardTy,
+		class: NullDataTy,
 	},
 	{
 		// Almost nulldata, but add an additional opcode after the data
@@ -1238,11 +1238,30 @@ func TestNullDataScript(t *testing.T) {
 			class: NullDataTy,
 		},
 		{
-			name: "too big",
+			name: "81 bytes now standard",
 			data: hexToBytes("000102030405060708090a0b0c0d0e0f101" +
 				"112131415161718191a1b1c1d1e1f202122232425262" +
 				"728292a2b2c2d2e2f303132333435363738393a3b3c3" +
 				"d3e3f404142434445464748494a4b4c4d4e4f50"),
+			expected: mustParseShortForm("RETURN PUSHDATA1 0x51 " +
+				"0x000102030405060708090a0b0c0d0e0f101112131" +
+				"415161718191a1b1c1d1e1f20212223242526272829" +
+				"2a2b2c2d2e2f303132333435363738393a3b3c3d3e3" +
+				"f404142434445464748494a4b4c4d4e4f50"),
+			err:   nil,
+			class: NullDataTy,
+		},
+		{
+			name: "large data - 9995 bytes (under MaxScriptSize)",
+			data: make([]byte, 9995),
+			// MaxScriptSize (10000) - OP_RETURN (1) - PUSHDATA2 (3) - length field (1) ≈ 9995
+			expected: nil, // Not checking exact encoding for large data
+			err:      nil,
+			class:    NullDataTy,
+		},
+		{
+			name:     "exceeds MaxDataCarrierSize limit",
+			data:     make([]byte, 100001),
 			expected: nil,
 			err:      scriptError(ErrTooMuchNullData, ""),
 			class:    NonStandardTy,
@@ -1259,7 +1278,8 @@ func TestNullDataScript(t *testing.T) {
 		}
 
 		// Check that the expected result was returned.
-		if !bytes.Equal(script, test.expected) {
+		// Skip exact comparison if expected is nil (for large data tests).
+		if test.expected != nil && !bytes.Equal(script, test.expected) {
 			t.Errorf("NullDataScript: #%d (%s) wrong result\n"+
 				"got: %x\nwant: %x", i, test.name, script,
 				test.expected)
