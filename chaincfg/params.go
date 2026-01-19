@@ -260,6 +260,12 @@ type Params struct {
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
 
+	// SwiftSync contains the precomputed bitmap for fast UTXO bootstrapping.
+	// When enabled, btcd can quickly construct the UTXO set without replaying
+	// all historical transactions. This is only used when checkpoints are
+	// enabled.
+	SwiftSync *SwiftSyncData
+
 	// These fields are related to voting on consensus rule changes as
 	// defined by BIP0009.
 	//
@@ -1022,6 +1028,9 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 
 		// Checkpoints ordered from oldest to newest.
 		Checkpoints: nil,
+
+		// SwiftSync data for fast UTXO bootstrapping.
+		SwiftSync: sigNetSwiftSync,
 
 		// Consensus rule change deployments.
 		//
