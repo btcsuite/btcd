@@ -161,12 +161,14 @@ func TestHTTPPostShutdownInterruptsPendingRequest(t *testing.T) {
 
 	future := client.GetBlockCountAsync()
 
+	// Ensure the server sees the request before we initiate shutdown.
 	select {
 	case <-requestAccepted:
 	case <-time.After(2 * time.Second):
 		t.Fatalf("server did not accept client connection")
 	}
 
+	// The request should remain pending until shutdown is requested.
 	select {
 	case <-future:
 		t.Fatalf("expected request to remain pending until shutdown")
@@ -181,6 +183,7 @@ func TestHTTPPostShutdownInterruptsPendingRequest(t *testing.T) {
 		close(waitDone)
 	}()
 
+	// Wait for shutdown to complete before asserting the final error.
 	select {
 	case <-waitDone:
 	case <-time.After(5 * time.Second):

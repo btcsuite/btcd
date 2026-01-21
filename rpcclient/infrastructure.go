@@ -789,10 +789,6 @@ retryloop:
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
 		httpReq, err = http.NewRequestWithContext(ctx, "POST", httpURL, bodyReader)
 		if err != nil {
-			// We must observe the contract that shutdown returns ErrClientShutdown.
-			if errors.Is(err, context.Canceled) && errors.Is(context.Cause(ctx), ErrClientShutdown) {
-				err = ErrClientShutdown
-			}
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
 		}
