@@ -151,6 +151,23 @@ type updatePeerHeightsMsg struct {
 	originPeer *peer.Peer
 }
 
+// peerLifecycleAction describes the type of peer lifecycle event.
+type peerLifecycleAction uint8
+
+const (
+	peerAdd  peerLifecycleAction = iota
+	peerDone
+)
+
+// peerLifecycleEvent represents a peer connection or disconnection event.
+// Using a single channel for both event types guarantees FIFO ordering:
+// the add event from OnVerAck is always enqueued before the done event
+// from peerDoneHandler, so the receiver always sees add before done.
+type peerLifecycleEvent struct {
+	action peerLifecycleAction
+	sp     *serverPeer
+}
+
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
@@ -218,8 +235,7 @@ type server struct {
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	p2pDowngrader        *peer.P2PDowngrader
-	newPeers             chan *serverPeer
-	donePeers            chan *serverPeer
+	peerLifecycle        chan peerLifecycleEvent
 	banPeers             chan *serverPeer
 	query                chan interface{}
 	relayInv             chan relayMsg
@@ -1907,7 +1923,22 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 		}
 		delete(list, sp.ID())
 		srvrLog.Debugf("Removed peer %s", sp)
-		return
+	}
+
+	// Notify the sync manager the peer is gone and evict any remaining
+	// orphans that were sent by the peer. This is done here rather than in
+	// peerDoneHandler so that the notification is serialized with NewPeer
+	// calls through the peerHandler goroutine, guaranteeing that the sync
+	// manager always sees NewPeer before DonePeer for a given peer.
+	if sp.VerAckReceived() {
+		s.syncManager.DonePeer(sp.Peer)
+
+		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
+		if numEvicted > 0 {
+			txmpLog.Debugf("Evicted %d %s from peer %v (id %d)",
+				numEvicted, pickNoun(numEvicted, "orphan",
+					"orphans"), sp, sp.ID())
+		}
 	}
 }
 
@@ -2291,21 +2322,7 @@ func (s *server) peerDoneHandler(sp *serverPeer) {
 		s.p2pDowngrader.MarkForDowngrade(sp.Addr())
 	}
 
-	// This is sent to a buffered channel, so it may not execute immediately.
-	s.donePeers <- sp
-
-	// Only tell sync manager we are gone if we ever told it we existed.
-	if sp.VerAckReceived() {
-		s.syncManager.DonePeer(sp.Peer)
-
-		// Evict any remaining orphans that were sent by the peer.
-		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
-		if numEvicted > 0 {
-			txmpLog.Debugf("Evicted %d %s from peer %v (id %d)",
-				numEvicted, pickNoun(numEvicted, "orphan",
-					"orphans"), sp, sp.ID())
-		}
-	}
+	s.peerLifecycle <- peerLifecycleEvent{action: peerDone, sp: sp}
 	close(sp.quit)
 }
 
@@ -2348,13 +2365,15 @@ func (s *server) peerHandler() {
 out:
 	for {
 		select {
-		// New peers connected to the server.
-		case p := <-s.newPeers:
-			s.handleAddPeerMsg(state, p)
+		// Peer connected or disconnected.
+		case event := <-s.peerLifecycle:
+			switch event.action {
+			case peerAdd:
+				s.handleAddPeerMsg(state, event.sp)
 
-		// Disconnected peers.
-		case p := <-s.donePeers:
-			s.handleDonePeerMsg(state, p)
+			case peerDone:
+				s.handleDonePeerMsg(state, event.sp)
+			}
 
 		// Block accepted in mainchain or orphan, update peer height.
 		case umsg := <-s.peerHeightsUpdate:
@@ -2395,8 +2414,7 @@ out:
 cleanup:
 	for {
 		select {
-		case <-s.newPeers:
-		case <-s.donePeers:
+		case <-s.peerLifecycle:
 		case <-s.peerHeightsUpdate:
 		case <-s.relayInv:
 		case <-s.broadcast:
@@ -2411,7 +2429,7 @@ cleanup:
 
 // AddPeer adds a new peer that has already been connected to the server.
 func (s *server) AddPeer(sp *serverPeer) {
-	s.newPeers <- sp
+	s.peerLifecycle <- peerLifecycleEvent{action: peerAdd, sp: sp}
 }
 
 // BanPeer bans a peer that has already been connected to the server by ip.
@@ -2847,8 +2865,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s := server{
 		chainParams:          chainParams,
 		addrManager:          amgr,
-		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
-		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
+		peerLifecycle:        make(chan peerLifecycleEvent, cfg.MaxPeers*2),
 		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
