@@ -485,6 +485,18 @@ func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 		return scriptError(ErrElementTooBig, str)
 	}
 
+	// With ScriptVerifyConstScriptCode, OP_CODESEPARATOR in non-segwit
+	// script is rejected even in an unexecuted branch. This mirrors
+	// Bitcoin Core's behavior where the check fires unconditionally
+	// before the branch execution gate.
+	if op.value == OP_CODESEPARATOR && vm.taprootCtx == nil &&
+		vm.witnessProgram == nil &&
+		vm.hasFlag(ScriptVerifyConstScriptCode) {
+
+		str := "OP_CODESEPARATOR used in non-segwit script"
+		return scriptError(ErrCodeSeparator, str)
+	}
+
 	// Nothing left to do when this is not a conditional opcode and it is
 	// not in an executing branch.
 	if !vm.isBranchExecuting() && !isOpcodeConditional(op.value) {
