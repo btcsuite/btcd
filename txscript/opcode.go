@@ -1947,18 +1947,15 @@ func opcodeHash256(op *opcode, data []byte, vm *Engine) error {
 // opcodeCodeSeparator stores the current script offset as the most recently
 // seen OP_CODESEPARATOR which is used during signature checking.
 //
-// This opcode does not change the contents of the data stack.
+// This opcode does not change the contents of the data stack. The
+// non-segwit ScriptVerifyConstScriptCode rejection is enforced in
+// executeOpcode before this handler is dispatched, so it is not
+// re-checked here.
 func opcodeCodeSeparator(op *opcode, data []byte, vm *Engine) error {
 	vm.lastCodeSep = int(vm.tokenizer.ByteIndex())
 
 	if vm.taprootCtx != nil {
 		vm.taprootCtx.codeSepPos = uint32(vm.tokenizer.OpcodePosition())
-	} else if vm.witnessProgram == nil &&
-		vm.hasFlag(ScriptVerifyConstScriptCode) {
-
-		// Disable OP_CODESEPARATOR for non-segwit scripts.
-		str := "OP_CODESEPARATOR used in non-segwit script"
-		return scriptError(ErrCodeSeparator, str)
 	}
 
 	return nil

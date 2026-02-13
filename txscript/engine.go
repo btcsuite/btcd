@@ -485,6 +485,26 @@ func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 		return scriptError(ErrElementTooBig, str)
 	}
 
+	// With ScriptVerifyConstScriptCode, OP_CODESEPARATOR in a non-segwit
+	// script is rejected even in an unexecuted branch. The script is
+	// non-segwit when neither a witness program nor a taproot execution
+	// context has been recorded on the engine: vm.witnessProgram is set
+	// for v0/v1 native witness spends and nested P2SH-witness spends,
+	// and vm.taprootCtx is set once the engine has recursed into the
+	// taproot script-path layer. Both nil means we are still executing
+	// a legacy script (scriptSig + scriptPubKey, or a P2SH redeem
+	// script), which is the only case the const-scriptcode rule
+	// applies to. The check is performed here, before the branch
+	// execution gate below, so it fires unconditionally on every
+	// OP_CODESEPARATOR encountered during script iteration.
+	if op.value == OP_CODESEPARATOR && vm.taprootCtx == nil &&
+		vm.witnessProgram == nil &&
+		vm.hasFlag(ScriptVerifyConstScriptCode) {
+
+		str := "OP_CODESEPARATOR used in non-segwit script"
+		return scriptError(ErrCodeSeparator, str)
+	}
+
 	// Nothing left to do when this is not a conditional opcode and it is
 	// not in an executing branch.
 	if !vm.isBranchExecuting() && !isOpcodeConditional(op.value) {
