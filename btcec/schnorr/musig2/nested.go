@@ -539,3 +539,244 @@ func AggregateNestedPartialSigs(
 
 	return &result, nil
 }
+
+// NestedSession represents a managed signing session for a leaf signer in a
+// nested MuSig2 tree. It wraps a Context configured with WithNestedSigners and
+// handles nonce lifecycle, signing, peer signature verification, and same-level
+// partial signature aggregation.
+//
+// A new NestedSession should be created for each signing operation via
+// Context.NewNestedSession.
+type NestedSession struct {
+	// ctx is the parent context, configured with WithNestedSigners.
+	ctx *Context
+
+	// localNonces holds the signer's secret and public nonces. This is
+	// zeroed after Sign() to prevent nonce reuse.
+	localNonces *Nonces
+
+	// combinedNonce is the top-level aggregate nonce, set via
+	// RegisterCombinedNonce.
+	combinedNonce *[PubNonceSize]byte
+
+	// numPeers is the total number of signers at this signer's own
+	// nesting level (including ourselves).
+	numPeers int
+
+	// peerSigs accumulates partial signatures from peers at the same
+	// nesting level.
+	peerSigs []*PartialSignature
+
+	// ourSig stores our own partial signature after Sign() is called.
+	ourSig *PartialSignature
+
+	// aggregatedSig is the result of AggregateNestedPartialSigs, computed
+	// once all peer sigs (plus ours) have been collected.
+	aggregatedSig *PartialSignature
+
+	// msg is the 32-byte message being signed, set during Sign().
+	msg [32]byte
+}
+
+// NewNestedSession creates a new nested signing session from a context that
+// was configured with WithNestedSigners. The numPeers parameter is the total
+// number of signers at the signer's own nesting level, including ourselves.
+func (c *Context) NewNestedSession(numPeers int,
+	opts ...SessionOption) (*NestedSession, error) {
+
+	if c.opts.nestingLevels == nil {
+		return nil, ErrNotNestedContext
+	}
+
+	if numPeers < 1 {
+		return nil, ErrNumPeersTooSmall
+	}
+
+	sessOpts := defaultSessionOptions()
+	for _, opt := range opts {
+		opt(sessOpts)
+	}
+
+	// Determine the local nonces to use.
+	var localNonces *Nonces
+	if c.sessionNonce != nil {
+		// Use the early nonce and blank it out to prevent reuse.
+		localNonces = c.sessionNonce
+		c.sessionNonce = nil
+	} else if sessOpts.externalNonce != nil {
+		localNonces = sessOpts.externalNonce
+	}
+
+	// Generate fresh nonces if none were provided.
+	if localNonces == nil {
+		var err error
+		localNonces, err = GenNonces(
+			WithPublicKey(c.pubKey),
+			WithNonceSecretKeyAux(c.signingKey),
+			WithNonceCombinedKeyAux(c.combinedKey.FinalKey),
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &NestedSession{
+		ctx:         c,
+		localNonces: localNonces,
+		numPeers:    numPeers,
+		peerSigs:    make([]*PartialSignature, 0, numPeers-1),
+	}, nil
+}
+
+// PublicNonce returns the public nonce for this nested signer. This should be
+// sent to the nonce aggregator so it can be included in the bottom-up nonce
+// aggregation chain.
+func (s *NestedSession) PublicNonce() [PubNonceSize]byte {
+	return s.localNonces.PubNonce
+}
+
+// RegisterCombinedNonce sets the top-level aggregate nonce that was produced
+// by the coordinator after aggregating and externalizing nonces at every depth.
+// This must be called before Sign().
+func (s *NestedSession) RegisterCombinedNonce(
+	nonce [PubNonceSize]byte) error {
+
+	if s.combinedNonce != nil {
+		return ErrAlredyHaveAllNonces
+	}
+
+	// Validate that both nonce points are well-formed.
+	_, err := btcec.ParsePubKey(nonce[:33])
+	if err != nil {
+		return fmt.Errorf("invalid combined nonce: %w", err)
+	}
+	_, err = btcec.ParsePubKey(nonce[33:])
+	if err != nil {
+		return fmt.Errorf("invalid combined nonce: %w", err)
+	}
+
+	s.combinedNonce = &nonce
+
+	return nil
+}
+
+// Sign produces a nested partial signature for the target message. The local
+// nonces are zeroed after signing to prevent reuse. Calling Sign a second time
+// returns ErrSigningContextReuse.
+func (s *NestedSession) Sign(
+	msg [32]byte) (*PartialSignature, error) {
+
+	switch {
+	case s.localNonces == nil:
+		return nil, ErrSigningContextReuse
+	case s.combinedNonce == nil:
+		return nil, ErrCombinedNonceUnavailable
+	}
+
+	// Build sign options from the context's tweak configuration.
+	var signOpts []SignOption
+	switch {
+	case s.ctx.opts.bip86Tweak:
+		signOpts = append(signOpts, WithBip86SignTweak())
+	case s.ctx.opts.taprootTweak != nil:
+		signOpts = append(
+			signOpts,
+			WithTaprootSignTweak(s.ctx.opts.taprootTweak),
+		)
+	case len(s.ctx.opts.tweaks) != 0:
+		signOpts = append(
+			signOpts, WithTweaks(s.ctx.opts.tweaks...),
+		)
+	}
+
+	partialSig, err := NestedSign(
+		s.localNonces.SecNonce, s.ctx.signingKey,
+		*s.combinedNonce, s.ctx.opts.topLevelKeys, msg,
+		s.ctx.opts.nestingLevels, signOpts...,
+	)
+
+	// Zero the nonces to prevent reuse regardless of whether signing
+	// succeeded.
+	s.localNonces = nil
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.msg = msg
+	s.ourSig = partialSig
+
+	return partialSig, nil
+}
+
+// VerifyPeerSig verifies a peer's nested partial signature using
+// VerifyNestedPartialSig. The peer must be at the same nesting level as this
+// signer.
+func (s *NestedSession) VerifyPeerSig(sig *PartialSignature,
+	peerNonce [PubNonceSize]byte,
+	peerKey *btcec.PublicKey) bool {
+
+	var signOpts []SignOption
+	switch {
+	case s.ctx.opts.bip86Tweak:
+		signOpts = append(signOpts, WithBip86SignTweak())
+	case s.ctx.opts.taprootTweak != nil:
+		signOpts = append(
+			signOpts,
+			WithTaprootSignTweak(s.ctx.opts.taprootTweak),
+		)
+	case len(s.ctx.opts.tweaks) != 0:
+		signOpts = append(
+			signOpts, WithTweaks(s.ctx.opts.tweaks...),
+		)
+	}
+
+	return VerifyNestedPartialSig(
+		sig, peerNonce, *s.combinedNonce,
+		s.ctx.opts.topLevelKeys, peerKey, s.msg,
+		s.ctx.opts.nestingLevels, signOpts...,
+	)
+}
+
+// CombinePeerSig accumulates a peer's partial signature. When all expected
+// peer signatures have been collected (numPeers - 1 peers plus our own sig),
+// it calls AggregateNestedPartialSigs and returns true.
+func (s *NestedSession) CombinePeerSig(
+	sig *PartialSignature) (bool, error) {
+
+	// We expect numPeers-1 peer sigs (our own is already stored).
+	expectedPeerSigs := s.numPeers - 1
+	if len(s.peerSigs) >= expectedPeerSigs {
+		return false, ErrAlreadyHaveAllPeerSigs
+	}
+
+	s.peerSigs = append(s.peerSigs, sig)
+
+	// Check if we now have all peer signatures.
+	if len(s.peerSigs) < expectedPeerSigs {
+		return false, nil
+	}
+
+	// We have all peer sigs. Combine them with our own signature.
+	allSigs := make([]*PartialSignature, 0, s.numPeers)
+	allSigs = append(allSigs, s.ourSig)
+	allSigs = append(allSigs, s.peerSigs...)
+
+	aggSig, err := AggregateNestedPartialSigs(allSigs)
+	if err != nil {
+		return false, err
+	}
+
+	s.aggregatedSig = aggSig
+
+	return true, nil
+}
+
+// AggregatedSig returns the group's aggregate partial signature. This is the
+// result of AggregateNestedPartialSigs and should be passed up to the parent
+// level for further aggregation or final combination.
+//
+// Returns nil if aggregation has not yet completed.
+func (s *NestedSession) AggregatedSig() *PartialSignature {
+	return s.aggregatedSig
+}

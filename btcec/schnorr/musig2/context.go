@@ -64,6 +64,25 @@ var (
 	// is called after public nonces have already been registered.
 	ErrCombinedNonceAfterPubNonces = fmt.Errorf("can't register combined " +
 		"nonce after public nonces")
+
+	// ErrNestedContextRequiresNestedSession is returned when NewSession is
+	// called on a context configured with WithNestedSigners. Use
+	// NewNestedSession instead.
+	ErrNestedContextRequiresNestedSession = fmt.Errorf("context " +
+		"configured for nested signing; use NewNestedSession")
+
+	// ErrNotNestedContext is returned when NewNestedSession is called on a
+	// context that was not configured with WithNestedSigners.
+	ErrNotNestedContext = fmt.Errorf("context not configured for " +
+		"nested signing")
+
+	// ErrNumPeersTooSmall is returned when NewNestedSession is called with
+	// a numPeers value less than 1.
+	ErrNumPeersTooSmall = fmt.Errorf("numPeers must be at least 1")
+
+	// ErrAlreadyHaveAllPeerSigs is returned when CombinePeerSig is called
+	// after all peer signatures have already been collected.
+	ErrAlreadyHaveAllPeerSigs = fmt.Errorf("already have all peer sigs")
 )
 
 // Context is a managed signing context for musig2. It takes care of things
@@ -131,6 +150,16 @@ type contextOptions struct {
 	// earlyNonce determines if a nonce should be generated during context
 	// creation, to be automatically passed to the created session.
 	earlyNonce bool
+
+	// topLevelKeys is the set of top-level (depth 0) public keys used in
+	// nested MuSig2 signing. This is only set when the context is
+	// configured with WithNestedSigners.
+	topLevelKeys []*btcec.PublicKey
+
+	// nestingLevels describes the path from depth 1 down to the signer's
+	// own level in a nested MuSig2 tree. This is only set when the
+	// context is configured with WithNestedSigners.
+	nestingLevels []NestingLevel
 }
 
 // defaultContextOptions returns the default context options.
@@ -195,6 +224,26 @@ func WithNumSigners(n int) ContextOption {
 func WithEarlyNonceGen() ContextOption {
 	return func(o *contextOptions) {
 		o.earlyNonce = true
+	}
+}
+
+// WithNestedSigners configures the context for nested MuSig2 signing. The
+// signers parameter is the signer's own-level key set (used for nonce
+// generation and aggregation coefficient computation). The topKeys are the
+// top-level (depth 0) key set, and nestingLevels describes the path from
+// depth 1 down to the signer's level.
+//
+// NOTE: When this option is used, NewSession() will return an error. Use
+// NewNestedSession() instead.
+func WithNestedSigners(signers []*btcec.PublicKey,
+	topKeys []*btcec.PublicKey,
+	nestingLevels []NestingLevel) ContextOption {
+
+	return func(o *contextOptions) {
+		o.keySet = signers
+		o.numSigners = len(signers)
+		o.topLevelKeys = topKeys
+		o.nestingLevels = nestingLevels
 	}
 }
 
@@ -400,6 +449,38 @@ func (c *Context) TaprootInternalKey() (*btcec.PublicKey, error) {
 	return c.combinedKey.PreTweakedKey, nil
 }
 
+// TopLevelCombinedKey returns the aggregated key at the top level of the
+// nested tree. This is only available when the context was created with
+// WithNestedSigners.
+func (c *Context) TopLevelCombinedKey() (*btcec.PublicKey, error) {
+	if c.opts.nestingLevels == nil {
+		return nil, ErrNotNestedContext
+	}
+
+	keyAggOpts := []KeyAggOption{}
+	switch {
+	case c.opts.bip86Tweak:
+		keyAggOpts = append(keyAggOpts, WithBIP86KeyTweak())
+	case c.opts.taprootTweak != nil:
+		keyAggOpts = append(
+			keyAggOpts, WithTaprootKeyTweak(c.opts.taprootTweak),
+		)
+	case len(c.opts.tweaks) != 0:
+		keyAggOpts = append(
+			keyAggOpts, WithKeyTweaks(c.opts.tweaks...),
+		)
+	}
+
+	topAggKey, _, _, err := AggregateKeys(
+		c.opts.topLevelKeys, c.shouldSort, keyAggOpts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return topAggKey.FinalKey, nil
+}
+
 // SessionOption is a functional option argument that allows callers to modify
 // the musig2 signing is done within a session.
 type SessionOption func(*sessionOptions)
@@ -451,7 +532,15 @@ type Session struct {
 }
 
 // NewSession creates a new musig2 signing session.
+//
+// NOTE: If the context was configured with WithNestedSigners, this method
+// returns ErrNestedContextRequiresNestedSession. Use NewNestedSession instead.
 func (c *Context) NewSession(options ...SessionOption) (*Session, error) {
+	// Guard: a nested-configured context must use NewNestedSession.
+	if c.opts.nestingLevels != nil {
+		return nil, ErrNestedContextRequiresNestedSession
+	}
+
 	opts := defaultSessionOptions()
 	for _, opt := range options {
 		opt(opts)

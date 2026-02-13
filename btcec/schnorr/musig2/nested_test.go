@@ -969,3 +969,709 @@ func TestNestedMuSig2WithTaprootTweak(t *testing.T) {
 		t.Fatalf("final signature is invalid!")
 	}
 }
+
+// TestNestedSessionSingleLevel tests the managed NestedSession API with a
+// single level of nesting. Alice and Bob form a nested group that, together
+// with a standard signer Carol, produces a valid Schnorr signature.
+func TestNestedSessionSingleLevel(t *testing.T) {
+	t.Parallel()
+
+	msg := sha256.Sum256([]byte("nested session single level"))
+
+	// Create the nested group: Alice and Bob.
+	alice := newNestedSigner(t)
+	bob := newNestedSigner(t)
+	nestedKeys := []*btcec.PublicKey{alice.pubKey, bob.pubKey}
+
+	// Create the regular signer: Carol.
+	carol := newNestedSigner(t)
+
+	// Aggregate the nested group's keys.
+	nestedAggKey, _, _, err := AggregateKeys(nestedKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested keys: %v", err)
+	}
+
+	topKeys := []*btcec.PublicKey{nestedAggKey.FinalKey, carol.pubKey}
+
+	// Aggregate nonces within the nested group.
+	nestedPubNonces := [][PubNonceSize]byte{
+		alice.nonces.PubNonce, bob.nonces.PubNonce,
+	}
+	nestedAggNonce, err := AggregateNonces(nestedPubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested nonces: %v", err)
+	}
+
+	nestingLevels := []NestingLevel{
+		{PubKeys: nestedKeys, AggNonce: nestedAggNonce},
+	}
+
+	// Create Alice's NestedSession via Context.
+	aliceCtx, err := NewContext(
+		alice.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+	)
+	if err != nil {
+		t.Fatalf("unable to create alice context: %v", err)
+	}
+
+	aliceSession, err := aliceCtx.NewNestedSession(
+		2, WithPreGeneratedNonce(alice.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create alice session: %v", err)
+	}
+
+	// Create Bob's NestedSession via Context.
+	bobCtx, err := NewContext(
+		bob.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+	)
+	if err != nil {
+		t.Fatalf("unable to create bob context: %v", err)
+	}
+
+	bobSession, err := bobCtx.NewNestedSession(
+		2, WithPreGeneratedNonce(bob.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create bob session: %v", err)
+	}
+
+	// Externalize the nested group's nonces and build the top-level
+	// aggregate nonce.
+	extNonce, err := ExternalizeNonces(
+		nestedAggNonce, nestedAggKey.FinalKey,
+	)
+	if err != nil {
+		t.Fatalf("unable to externalize nonces: %v", err)
+	}
+	topPubNonces := [][PubNonceSize]byte{
+		extNonce, carol.nonces.PubNonce,
+	}
+	topAggNonce, err := AggregateNonces(topPubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate top nonces: %v", err)
+	}
+
+	// Register the top-level combined nonce with both sessions.
+	if err := aliceSession.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("alice register nonce: %v", err)
+	}
+	if err := bobSession.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("bob register nonce: %v", err)
+	}
+
+	// Both signers produce their nested partial signatures. The session
+	// stores our own sig internally for aggregation.
+	_, err = aliceSession.Sign(msg)
+	if err != nil {
+		t.Fatalf("alice sign: %v", err)
+	}
+	bobSig, err := bobSession.Sign(msg)
+	if err != nil {
+		t.Fatalf("bob sign: %v", err)
+	}
+
+	// Alice verifies Bob's sig and accumulates it.
+	if !aliceSession.VerifyPeerSig(
+		bobSig, bob.nonces.PubNonce, bob.pubKey,
+	) {
+		t.Fatalf("alice could not verify bob's sig")
+	}
+	done, err := aliceSession.CombinePeerSig(bobSig)
+	if err != nil {
+		t.Fatalf("alice combine bob sig: %v", err)
+	}
+	if !done {
+		t.Fatalf("expected aggregation to be complete")
+	}
+
+	groupSig := aliceSession.AggregatedSig()
+	if groupSig == nil {
+		t.Fatalf("aggregated sig should not be nil")
+	}
+
+	// Carol signs normally using the standard Sign function.
+	carolSig, err := Sign(
+		carol.nonces.SecNonce, carol.privKey, topAggNonce,
+		topKeys, msg,
+	)
+	if err != nil {
+		t.Fatalf("carol unable to sign: %v", err)
+	}
+
+	// Combine and verify the final Schnorr signature.
+	finalSig := CombineSigs(
+		groupSig.R,
+		[]*PartialSignature{groupSig, carolSig},
+	)
+
+	topAggKey, _, _, err := AggregateKeys(topKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate top keys: %v", err)
+	}
+
+	if !finalSig.Verify(msg[:], topAggKey.FinalKey) {
+		t.Fatalf("final signature is invalid!")
+	}
+}
+
+// TestNestedSessionTwoLevels tests the managed NestedSession API with two
+// levels of nesting (3 total depths).
+func TestNestedSessionTwoLevels(t *testing.T) {
+	t.Parallel()
+
+	msg := sha256.Sum256([]byte("nested session two levels"))
+
+	// Create leaf signers at depth 2.
+	leaf1 := newNestedSigner(t)
+	leaf2 := newNestedSigner(t)
+	depth2Keys := []*btcec.PublicKey{leaf1.pubKey, leaf2.pubKey}
+
+	depth2AggKey, _, _, err := AggregateKeys(depth2Keys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate depth 2 keys: %v", err)
+	}
+
+	// Mid signer at depth 1.
+	mid := newNestedSigner(t)
+	depth1Keys := []*btcec.PublicKey{depth2AggKey.FinalKey, mid.pubKey}
+
+	depth1AggKey, _, _, err := AggregateKeys(depth1Keys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate depth 1 keys: %v", err)
+	}
+
+	// Top-level signer at depth 0.
+	top := newNestedSigner(t)
+	topKeys := []*btcec.PublicKey{depth1AggKey.FinalKey, top.pubKey}
+
+	// --- Nonce aggregation (bottom-up) ---
+	depth2PubNonces := [][PubNonceSize]byte{
+		leaf1.nonces.PubNonce, leaf2.nonces.PubNonce,
+	}
+	depth2AggNonce, err := AggregateNonces(depth2PubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate depth 2 nonces: %v", err)
+	}
+	depth2ExtNonce, err := ExternalizeNonces(
+		depth2AggNonce, depth2AggKey.FinalKey,
+	)
+	if err != nil {
+		t.Fatalf("unable to externalize depth 2 nonces: %v", err)
+	}
+
+	depth1PubNonces := [][PubNonceSize]byte{
+		depth2ExtNonce, mid.nonces.PubNonce,
+	}
+	depth1AggNonce, err := AggregateNonces(depth1PubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate depth 1 nonces: %v", err)
+	}
+	depth1ExtNonce, err := ExternalizeNonces(
+		depth1AggNonce, depth1AggKey.FinalKey,
+	)
+	if err != nil {
+		t.Fatalf("unable to externalize depth 1 nonces: %v", err)
+	}
+
+	topPubNonces := [][PubNonceSize]byte{
+		depth1ExtNonce, top.nonces.PubNonce,
+	}
+	topAggNonce, err := AggregateNonces(topPubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate top nonces: %v", err)
+	}
+
+	// --- Leaf signers (depth 2) use NestedSession with 2 nesting levels ---
+	nestingLevels2Deep := []NestingLevel{
+		{PubKeys: depth1Keys, AggNonce: depth1AggNonce},
+		{PubKeys: depth2Keys, AggNonce: depth2AggNonce},
+	}
+
+	leaf1Ctx, err := NewContext(
+		leaf1.privKey, false,
+		WithNestedSigners(depth2Keys, topKeys, nestingLevels2Deep),
+	)
+	if err != nil {
+		t.Fatalf("unable to create leaf1 context: %v", err)
+	}
+	leaf1Session, err := leaf1Ctx.NewNestedSession(
+		2, WithPreGeneratedNonce(leaf1.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create leaf1 session: %v", err)
+	}
+
+	leaf2Ctx, err := NewContext(
+		leaf2.privKey, false,
+		WithNestedSigners(depth2Keys, topKeys, nestingLevels2Deep),
+	)
+	if err != nil {
+		t.Fatalf("unable to create leaf2 context: %v", err)
+	}
+	leaf2Session, err := leaf2Ctx.NewNestedSession(
+		2, WithPreGeneratedNonce(leaf2.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create leaf2 session: %v", err)
+	}
+
+	// Register top-level combined nonce.
+	if err := leaf1Session.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("leaf1 register nonce: %v", err)
+	}
+	if err := leaf2Session.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("leaf2 register nonce: %v", err)
+	}
+
+	// Sign. The session stores our own sig internally for aggregation.
+	_, err = leaf1Session.Sign(msg)
+	if err != nil {
+		t.Fatalf("leaf1 sign: %v", err)
+	}
+	leaf2Sig, err := leaf2Session.Sign(msg)
+	if err != nil {
+		t.Fatalf("leaf2 sign: %v", err)
+	}
+
+	// Leaf1 accumulates leaf2's sig.
+	if !leaf1Session.VerifyPeerSig(
+		leaf2Sig, leaf2.nonces.PubNonce, leaf2.pubKey,
+	) {
+		t.Fatalf("leaf1 could not verify leaf2's sig")
+	}
+	done, err := leaf1Session.CombinePeerSig(leaf2Sig)
+	if err != nil {
+		t.Fatalf("leaf1 combine: %v", err)
+	}
+	if !done {
+		t.Fatalf("expected depth 2 aggregation to be complete")
+	}
+	depth2GroupSig := leaf1Session.AggregatedSig()
+
+	// --- Mid signer (depth 1) uses NestedSession with 1 nesting level ---
+	nestingLevels1Deep := []NestingLevel{
+		{PubKeys: depth1Keys, AggNonce: depth1AggNonce},
+	}
+	midCtx, err := NewContext(
+		mid.privKey, false,
+		WithNestedSigners(depth1Keys, topKeys, nestingLevels1Deep),
+	)
+	if err != nil {
+		t.Fatalf("unable to create mid context: %v", err)
+	}
+	midSession, err := midCtx.NewNestedSession(
+		2, WithPreGeneratedNonce(mid.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create mid session: %v", err)
+	}
+	if err := midSession.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("mid register nonce: %v", err)
+	}
+
+	midSig, err := midSession.Sign(msg)
+	if err != nil {
+		t.Fatalf("mid sign: %v", err)
+	}
+
+	// Aggregate depth 1 sigs (depth2 group + mid).
+	depth1GroupSig, err := AggregateNestedPartialSigs(
+		[]*PartialSignature{depth2GroupSig, midSig},
+	)
+	if err != nil {
+		t.Fatalf("unable to aggregate depth 1 sigs: %v", err)
+	}
+
+	// Top signer signs normally.
+	topSig, err := Sign(
+		top.nonces.SecNonce, top.privKey, topAggNonce,
+		topKeys, msg,
+	)
+	if err != nil {
+		t.Fatalf("top signer unable to sign: %v", err)
+	}
+
+	// Combine and verify.
+	finalSig := CombineSigs(
+		depth1GroupSig.R,
+		[]*PartialSignature{depth1GroupSig, topSig},
+	)
+
+	topAggKey, _, _, err := AggregateKeys(topKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate top keys: %v", err)
+	}
+
+	if !finalSig.Verify(msg[:], topAggKey.FinalKey) {
+		t.Fatalf("final signature is invalid!")
+	}
+}
+
+// TestNestedSessionWithTaprootTweak tests the NestedSession API with a BIP 86
+// taproot tweak applied at the top level.
+func TestNestedSessionWithTaprootTweak(t *testing.T) {
+	t.Parallel()
+
+	msg := sha256.Sum256([]byte("nested session taproot"))
+
+	// Create the nested group: Alice and Bob.
+	alice := newNestedSigner(t)
+	bob := newNestedSigner(t)
+	nestedKeys := []*btcec.PublicKey{alice.pubKey, bob.pubKey}
+
+	nestedAggKey, _, _, err := AggregateKeys(nestedKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested keys: %v", err)
+	}
+
+	// Regular top-level signer: Carol.
+	carol := newNestedSigner(t)
+	topKeys := []*btcec.PublicKey{nestedAggKey.FinalKey, carol.pubKey}
+
+	// Nonce aggregation.
+	nestedPubNonces := [][PubNonceSize]byte{
+		alice.nonces.PubNonce, bob.nonces.PubNonce,
+	}
+	nestedAggNonce, err := AggregateNonces(nestedPubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested nonces: %v", err)
+	}
+
+	nestingLevels := []NestingLevel{
+		{PubKeys: nestedKeys, AggNonce: nestedAggNonce},
+	}
+
+	extNonce, err := ExternalizeNonces(
+		nestedAggNonce, nestedAggKey.FinalKey,
+	)
+	if err != nil {
+		t.Fatalf("unable to externalize nonces: %v", err)
+	}
+	topPubNonces := [][PubNonceSize]byte{
+		extNonce, carol.nonces.PubNonce,
+	}
+	topAggNonce, err := AggregateNonces(topPubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate top nonces: %v", err)
+	}
+
+	// Create sessions with BIP 86 tweak.
+	aliceCtx, err := NewContext(
+		alice.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+		WithBip86TweakCtx(),
+	)
+	if err != nil {
+		t.Fatalf("unable to create alice context: %v", err)
+	}
+	aliceSession, err := aliceCtx.NewNestedSession(
+		2, WithPreGeneratedNonce(alice.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create alice session: %v", err)
+	}
+
+	bobCtx, err := NewContext(
+		bob.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+		WithBip86TweakCtx(),
+	)
+	if err != nil {
+		t.Fatalf("unable to create bob context: %v", err)
+	}
+	bobSession, err := bobCtx.NewNestedSession(
+		2, WithPreGeneratedNonce(bob.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create bob session: %v", err)
+	}
+
+	// Register combined nonces and sign.
+	if err := aliceSession.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("alice register nonce: %v", err)
+	}
+	if err := bobSession.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("bob register nonce: %v", err)
+	}
+
+	_, err = aliceSession.Sign(msg)
+	if err != nil {
+		t.Fatalf("alice sign: %v", err)
+	}
+	bobSig, err := bobSession.Sign(msg)
+	if err != nil {
+		t.Fatalf("bob sign: %v", err)
+	}
+
+	// Accumulate and aggregate.
+	if !aliceSession.VerifyPeerSig(
+		bobSig, bob.nonces.PubNonce, bob.pubKey,
+	) {
+		t.Fatalf("alice could not verify bob's sig")
+	}
+	done, err := aliceSession.CombinePeerSig(bobSig)
+	if err != nil {
+		t.Fatalf("combine: %v", err)
+	}
+	if !done {
+		t.Fatalf("expected aggregation to be complete")
+	}
+
+	groupSig := aliceSession.AggregatedSig()
+
+	// Carol signs with BIP 86 tweak.
+	carolSig, err := Sign(
+		carol.nonces.SecNonce, carol.privKey, topAggNonce,
+		topKeys, msg, WithBip86SignTweak(),
+	)
+	if err != nil {
+		t.Fatalf("carol unable to sign: %v", err)
+	}
+
+	// Combine with taproot tweak.
+	finalSig := CombineSigs(
+		groupSig.R,
+		[]*PartialSignature{groupSig, carolSig},
+		WithBip86TweakedCombine(msg, topKeys, false),
+	)
+
+	// Verify against the tweaked key.
+	topAggKey, _, _, err := AggregateKeys(
+		topKeys, false, WithBIP86KeyTweak(),
+	)
+	if err != nil {
+		t.Fatalf("unable to aggregate top keys: %v", err)
+	}
+
+	xOnlyKey, err := schnorr.ParsePubKey(
+		schnorr.SerializePubKey(topAggKey.FinalKey),
+	)
+	if err != nil {
+		t.Fatalf("unable to parse x-only key: %v", err)
+	}
+
+	if !finalSig.Verify(msg[:], xOnlyKey) {
+		t.Fatalf("final signature is invalid!")
+	}
+}
+
+// TestNestedSessionGuard tests that NewSession() returns an error when called
+// on a context configured with WithNestedSigners.
+func TestNestedSessionGuard(t *testing.T) {
+	t.Parallel()
+
+	alice := newNestedSigner(t)
+	bob := newNestedSigner(t)
+	nestedKeys := []*btcec.PublicKey{alice.pubKey, bob.pubKey}
+
+	nestedAggKey, _, _, err := AggregateKeys(nestedKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested keys: %v", err)
+	}
+
+	carol := newNestedSigner(t)
+	topKeys := []*btcec.PublicKey{nestedAggKey.FinalKey, carol.pubKey}
+
+	nestedAggNonce, err := AggregateNonces(
+		[][PubNonceSize]byte{
+			alice.nonces.PubNonce, bob.nonces.PubNonce,
+		},
+	)
+	if err != nil {
+		t.Fatalf("unable to aggregate nonces: %v", err)
+	}
+
+	nestingLevels := []NestingLevel{
+		{PubKeys: nestedKeys, AggNonce: nestedAggNonce},
+	}
+
+	ctx, err := NewContext(
+		alice.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+	)
+	if err != nil {
+		t.Fatalf("unable to create context: %v", err)
+	}
+
+	// NewSession should fail on a nested-configured context.
+	_, err = ctx.NewSession()
+	if err != ErrNestedContextRequiresNestedSession {
+		t.Fatalf("expected ErrNestedContextRequiresNestedSession, "+
+			"got: %v", err)
+	}
+}
+
+// TestNestedSessionNonceReuse tests that calling Sign() twice on the same
+// NestedSession returns ErrSigningContextReuse.
+func TestNestedSessionNonceReuse(t *testing.T) {
+	t.Parallel()
+
+	alice := newNestedSigner(t)
+	bob := newNestedSigner(t)
+	nestedKeys := []*btcec.PublicKey{alice.pubKey, bob.pubKey}
+
+	nestedAggKey, _, _, err := AggregateKeys(nestedKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested keys: %v", err)
+	}
+
+	carol := newNestedSigner(t)
+	topKeys := []*btcec.PublicKey{nestedAggKey.FinalKey, carol.pubKey}
+
+	nestedPubNonces := [][PubNonceSize]byte{
+		alice.nonces.PubNonce, bob.nonces.PubNonce,
+	}
+	nestedAggNonce, err := AggregateNonces(nestedPubNonces)
+	if err != nil {
+		t.Fatalf("unable to aggregate nonces: %v", err)
+	}
+
+	nestingLevels := []NestingLevel{
+		{PubKeys: nestedKeys, AggNonce: nestedAggNonce},
+	}
+
+	extNonce, err := ExternalizeNonces(
+		nestedAggNonce, nestedAggKey.FinalKey,
+	)
+	if err != nil {
+		t.Fatalf("unable to externalize nonces: %v", err)
+	}
+	topAggNonce, err := AggregateNonces(
+		[][PubNonceSize]byte{extNonce, carol.nonces.PubNonce},
+	)
+	if err != nil {
+		t.Fatalf("unable to aggregate top nonces: %v", err)
+	}
+
+	ctx, err := NewContext(
+		alice.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+	)
+	if err != nil {
+		t.Fatalf("unable to create context: %v", err)
+	}
+
+	session, err := ctx.NewNestedSession(
+		2, WithPreGeneratedNonce(alice.nonces),
+	)
+	if err != nil {
+		t.Fatalf("unable to create session: %v", err)
+	}
+
+	if err := session.RegisterCombinedNonce(topAggNonce); err != nil {
+		t.Fatalf("register nonce: %v", err)
+	}
+
+	msg := sha256.Sum256([]byte("nonce reuse test"))
+
+	// First sign should succeed.
+	_, err = session.Sign(msg)
+	if err != nil {
+		t.Fatalf("first sign: %v", err)
+	}
+
+	// Second sign should fail with nonce reuse error.
+	_, err = session.Sign(msg)
+	if err != ErrSigningContextReuse {
+		t.Fatalf("expected ErrSigningContextReuse, got: %v", err)
+	}
+}
+
+// TestNestedSessionNotNestedContext tests that NewNestedSession returns an
+// error when called on a context not configured with WithNestedSigners.
+func TestNestedSessionNotNestedContext(t *testing.T) {
+	t.Parallel()
+
+	alice := newNestedSigner(t)
+	bob := newNestedSigner(t)
+
+	ctx, err := NewContext(
+		alice.privKey, false,
+		WithKnownSigners(
+			[]*btcec.PublicKey{alice.pubKey, bob.pubKey},
+		),
+	)
+	if err != nil {
+		t.Fatalf("unable to create context: %v", err)
+	}
+
+	// NewNestedSession should fail on a non-nested context.
+	_, err = ctx.NewNestedSession(2)
+	if err != ErrNotNestedContext {
+		t.Fatalf("expected ErrNotNestedContext, got: %v", err)
+	}
+}
+
+// TestNestedSessionTopLevelCombinedKey tests the TopLevelCombinedKey method.
+func TestNestedSessionTopLevelCombinedKey(t *testing.T) {
+	t.Parallel()
+
+	alice := newNestedSigner(t)
+	bob := newNestedSigner(t)
+	nestedKeys := []*btcec.PublicKey{alice.pubKey, bob.pubKey}
+
+	nestedAggKey, _, _, err := AggregateKeys(nestedKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate nested keys: %v", err)
+	}
+
+	carol := newNestedSigner(t)
+	topKeys := []*btcec.PublicKey{nestedAggKey.FinalKey, carol.pubKey}
+
+	nestedAggNonce, err := AggregateNonces(
+		[][PubNonceSize]byte{
+			alice.nonces.PubNonce, bob.nonces.PubNonce,
+		},
+	)
+	if err != nil {
+		t.Fatalf("unable to aggregate nonces: %v", err)
+	}
+
+	nestingLevels := []NestingLevel{
+		{PubKeys: nestedKeys, AggNonce: nestedAggNonce},
+	}
+
+	ctx, err := NewContext(
+		alice.privKey, false,
+		WithNestedSigners(nestedKeys, topKeys, nestingLevels),
+	)
+	if err != nil {
+		t.Fatalf("unable to create context: %v", err)
+	}
+
+	// TopLevelCombinedKey should return the aggregated top-level key.
+	topCombined, err := ctx.TopLevelCombinedKey()
+	if err != nil {
+		t.Fatalf("unable to get top level combined key: %v", err)
+	}
+
+	// Compare against directly aggregating the top-level keys.
+	expected, _, _, err := AggregateKeys(topKeys, false)
+	if err != nil {
+		t.Fatalf("unable to aggregate top keys: %v", err)
+	}
+
+	if !topCombined.IsEqual(expected.FinalKey) {
+		t.Fatalf("top level combined key mismatch")
+	}
+
+	// TopLevelCombinedKey on a non-nested context should fail.
+	regularCtx, err := NewContext(
+		alice.privKey, false,
+		WithKnownSigners(
+			[]*btcec.PublicKey{alice.pubKey, bob.pubKey},
+		),
+	)
+	if err != nil {
+		t.Fatalf("unable to create regular context: %v", err)
+	}
+
+	_, err = regularCtx.TopLevelCombinedKey()
+	if err != ErrNotNestedContext {
+		t.Fatalf("expected ErrNotNestedContext, got: %v", err)
+	}
+}
