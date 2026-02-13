@@ -95,6 +95,14 @@ type Context struct {
 	// sessionNonce will be populated if the earlyNonce option is true.
 	// After the first session is created, this nonce will be blanked out.
 	sessionNonce *Nonces
+
+	// tree holds the cosigner tree if WithCosignerTree was used. nil for
+	// standard (non-nested) contexts.
+	tree *TreeNode
+
+	// signerPath holds the leaf signer's path through the cosigner tree.
+	// nil for standard (non-nested) contexts.
+	signerPath *SignerPath
 }
 
 // ContextOption is a functional option argument that allows callers to modify
@@ -131,6 +139,11 @@ type contextOptions struct {
 	// earlyNonce determines if a nonce should be generated during context
 	// creation, to be automatically passed to the created session.
 	earlyNonce bool
+
+	// cosignerTree specifies a cosigner tree for nested MuSig2 signing.
+	// When set, key aggregation is derived from the tree structure
+	// instead of a flat key list.
+	cosignerTree *TreeNode
 }
 
 // defaultContextOptions returns the default context options.
@@ -198,6 +211,19 @@ func WithEarlyNonceGen() ContextOption {
 	}
 }
 
+// WithCosignerTree specifies a cosigner tree for nested MuSig2 signing. When
+// set, the context computes the signer's path through the tree and derives key
+// aggregation from the tree structure instead of a flat key list. This replaces
+// WithKnownSigners for nested setups.
+//
+// The tree must already have been aggregated via AggregateTree before being
+// passed to this option.
+func WithCosignerTree(tree *TreeNode) ContextOption {
+	return func(o *contextOptions) {
+		o.cosignerTree = tree
+	}
+}
+
 // NewContext creates a new signing context with the passed singing key and set
 // of public keys for each of the other signers.
 //
@@ -221,10 +247,35 @@ func NewContext(signingKey *btcec.PrivateKey, shouldSort bool,
 	}
 
 	switch {
+	// A cosigner tree was specified, so we derive key aggregation and
+	// the signer's path from the tree structure.
+	case opts.cosignerTree != nil:
+		tree := opts.cosignerTree
 
-	// We know all the signers, so we can compute the aggregated key, along
-	// with all the other intermediate state we need to do signing and
-	// verification.
+		if tree.aggKey == nil {
+			return nil, ErrNodeNotAggregated
+		}
+
+		// Find the signer's path through the tree.
+		path, err := tree.FindPath(pubKey)
+		if err != nil {
+			return nil, fmt.Errorf("find signer path: %w", err)
+		}
+
+		ctx.tree = tree
+		ctx.signerPath = path
+		ctx.combinedKey = tree.aggKey
+		ctx.keysHash = tree.keysHash
+		ctx.uniqueKeyIndex = tree.uniqueKeyIdx
+
+		// Set numSigners to 1 so session creation doesn't require
+		// additional signer registration — the tree handles that.
+		opts.numSigners = 1
+		opts.keySet = []*btcec.PublicKey{pubKey}
+
+	// We know all the signers, so we can compute the aggregated key,
+	// along with all the other intermediate state we need to do signing
+	// and verification.
 	case opts.keySet != nil:
 		if err := ctx.combineSignerKeys(); err != nil {
 			return nil, err
@@ -622,6 +673,53 @@ func (s *Session) Sign(msg [32]byte,
 		return nil, ErrCombinedNonceUnavailable
 	}
 
+	// Parse sign options to check for nested coefficients.
+	opts := defaultSignOptions()
+	for _, option := range signOpts {
+		option(opts)
+	}
+
+	// If the context has a cosigner tree, always use the nested signing
+	// path. Even root-level signers need their tree-derived key
+	// coefficients. If no nested coefficients are provided, b_path is
+	// just b_0 (no extra multipliers).
+	if s.ctx.tree != nil {
+		// Compute b_0 (root nonce blinder).
+		b0 := ComputeNonceBlinder(
+			*s.combinedNonce, s.ctx.combinedKey.FinalKey, msg,
+		)
+
+		// Compute b_path = b_0 * product(nested b_d values).
+		bPath := new(btcec.ModNScalar).Set(b0)
+		for _, bd := range opts.nestedCoeffs {
+			bPath.Mul(bd)
+		}
+
+		// Get a_path and accumulated parity from the signer path.
+		aPath := s.ctx.signerPath.APath()
+		accParity := s.ctx.signerPath.AccumulatedParity()
+
+		partialSig, err := NestedSign(
+			s.localNonces.SecNonce, s.ctx.signingKey,
+			aPath, bPath, *s.combinedNonce,
+			s.ctx.combinedKey.FinalKey, msg, accParity,
+		)
+
+		// Blank out nonces to prevent reuse.
+		s.localNonces = nil
+
+		if err != nil {
+			return nil, err
+		}
+
+		s.msg = msg
+		s.ourSig = partialSig
+		s.sigs = append(s.sigs, partialSig)
+
+		return partialSig, nil
+	}
+
+	// Standard (non-nested) signing path.
 	switch {
 	case s.ctx.opts.bip86Tweak:
 		signOpts = append(
