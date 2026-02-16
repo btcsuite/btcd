@@ -23,10 +23,12 @@ const (
 	syncRaceProofWait   = 8 * time.Second
 )
 
-// fakePeerConn connects to the node at nodeAddr, performs the minimum version/verack
-// handshake so the node registers a peer (NewPeer) and then disconnects so the node
-// runs DonePeer. This simulates attacker traffic: many connections that complete
-// handshake then drop, stressing the sync manager's ordering of NewPeer/DonePeer.
+// fakePeerConn connects to the node at nodeAddr, performs the
+// minimum version/verack handshake so the node registers a peer
+// (NewPeer) and then disconnects so the node runs DonePeer. This
+// simulates attacker traffic: many connections that complete the
+// handshake then drop, stressing the sync manager's ordering of
+// NewPeer/DonePeer.
 func fakePeerConn(nodeAddr string) error {
 	conn, err := net.DialTimeout("tcp", nodeAddr, 5*time.Second)
 	if err != nil {
@@ -54,7 +56,10 @@ func fakePeerConn(nodeAddr string) error {
 	msgVersion := wire.NewMsgVersion(me, you, nonce, 0)
 	msgVersion.Services = wire.SFNodeNetwork | wire.SFNodeWitness
 
-	if err := wire.WriteMessage(conn, msgVersion, wire.ProtocolVersion, wire.SimNet); err != nil {
+	err = wire.WriteMessage(
+		conn, msgVersion, wire.ProtocolVersion, wire.SimNet,
+	)
+	if err != nil {
 		return err
 	}
 
@@ -66,7 +71,11 @@ func fakePeerConn(nodeAddr string) error {
 		switch msg.(type) {
 		case *wire.MsgVersion:
 			// Node's version; send verack.
-			if err := wire.WriteMessage(conn, wire.NewMsgVerAck(), wire.ProtocolVersion, wire.SimNet); err != nil {
+			err := wire.WriteMessage(
+				conn, wire.NewMsgVerAck(),
+				wire.ProtocolVersion, wire.SimNet,
+			)
+			if err != nil {
 				return err
 			}
 
@@ -83,12 +92,12 @@ func fakePeerConn(nodeAddr string) error {
 	}
 }
 
-// TestSyncManagerRaceCorruption stresses a single simnet node with many inbound
-// connections that complete the version/verack handshake then disconnect. It then
-// proves corruption without a dedicated RPC: connect a fresh node that generates
-// blocks; if the stressed node does not sync, it was stuck with a dead sync peer
-// (getpeerinfo returns 0 peers when all disconnected; in the corrupted state the
-// sync manager still has a dead peer as sync peer, so it ignores the new live one).
+// TestSyncManagerRaceCorruption stresses a single simnet node
+// with many inbound connections that complete the version/verack
+// handshake then disconnect. It then proves corruption: connect a
+// fresh node that generates blocks; if the stressed node does not
+// sync, it was stuck with a dead sync peer (the sync manager still
+// has a dead peer as sync peer, so it ignores the new live one).
 func TestSyncManagerRaceCorruption(t *testing.T) {
 	stressedHarness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
 	require.NoError(t, err)
@@ -117,8 +126,9 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 		iter += syncRaceConcurrency
 	}
 
-	// Prove corruption: connect a live node and generate blocks.
-	// If the stressed node was corrupted (dead sync peer, 0 connected peers per getpeerinfo), it will not sync from the new one.
+	// Prove corruption: connect a live node and generate blocks. If
+	// the stressed node was corrupted (dead sync peer, 0 connected
+	// peers), it will not sync from the new one.
 	newHarness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
 	require.NoError(t, err)
 	require.NoError(t, newHarness.SetUp(true, 0))
@@ -138,18 +148,23 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 	_, heightAfter, err := stressedHarness.Client.GetBestBlock()
 	require.NoError(t, err)
 
-	if heightAfter < heightBefore+int32(syncRaceProofBlocks) {
-		t.Fatalf("proved sync manager corruption after %d fake peer cycles: stressed node did not sync from new peer (height %d -> %d); it was stuck with a dead sync peer instead of the new live one",
-			done, heightBefore, heightAfter)
-	}
+	expected := heightBefore + int32(syncRaceProofBlocks)
+	require.GreaterOrEqualf(t, heightAfter, expected,
+		"sync manager corruption after %d fake "+
+			"peer cycles: node stuck with dead "+
+			"sync peer (height %d -> %d)",
+		done, heightBefore, heightAfter)
 
-	t.Logf("completed %d fake peer cycles; stressed node synced from new peer (height %d -> %d), no corruption observed", done, heightBefore, heightAfter)
+	t.Logf("completed %d fake peer cycles; "+
+		"node synced (height %d -> %d)",
+		done, heightBefore, heightAfter)
 }
 
-// TestPreVerackDisconnect verifies that a peer disconnecting before completing
-// the version/verack handshake does not corrupt the sync manager state. In this
-// case only a peerDone event is produced (no peerAdd), since AddPeer is only
-// called from OnVerAck. The node must remain healthy and able to sync afterward.
+// TestPreVerackDisconnect verifies that a peer disconnecting
+// before completing the version/verack handshake does not corrupt
+// the sync manager state. In this case only a peerDone event is
+// produced (no peerAdd), since peerLifecycleHandler only sends
+// peerAdd when verAckCh is closed. The node must remain healthy.
 func TestPreVerackDisconnect(t *testing.T) {
 	harness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
 	require.NoError(t, err)

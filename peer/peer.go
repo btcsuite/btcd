@@ -2477,6 +2477,13 @@ func (p *Peer) WaitForDisconnect() {
 	<-p.quit
 }
 
+// Done returns a channel that is closed when the peer has been
+// disconnected. This allows callers to select on peer disconnect
+// alongside other channels.
+func (p *Peer) Done() <-chan struct{} {
+	return p.quit
+}
+
 // ShouldDowngradeToV1 is called when we try to connect to a peer via v2 BIP324
 // transport and they hang up. In this case, we should reconnect with the
 // legacy transport.
