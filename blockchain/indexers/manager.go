@@ -668,6 +668,9 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 			}
 			return bucket.DeleteBucket(bucketName[len(bucketName)-1])
 		})
+		if err != nil {
+			return err
+		}
 	}
 
 	// Call extra index specific deinitialization for the transaction index.
