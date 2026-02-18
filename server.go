@@ -161,8 +161,10 @@ const (
 
 // peerLifecycleEvent represents a peer connection or disconnection
 // event. Both event types for a given peer are sent by a single
-// goroutine (peerLifecycleHandler), guaranteeing that peerAdd is
-// always enqueued before peerDone.
+// goroutine (peerLifecycleHandler), guaranteeing that if peerAdd is
+// sent, it is always enqueued before peerDone. peerAdd may be
+// skipped entirely when the peer disconnects before or concurrently
+// with verack.
 type peerLifecycleEvent struct {
 	action peerLifecycleAction
 	sp     *serverPeer
@@ -295,7 +297,8 @@ type serverPeer struct {
 	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
 	quit           chan struct{}
-	verAckCh       chan struct{} // closed when OnVerAck fires
+	// Closed when OnVerAck fires.
+	verAckCh chan struct{}
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
@@ -557,7 +560,13 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 // It signals the peer's lifecycle handler that the handshake is
 // complete so it can register the peer with the server.
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
-	close(sp.verAckCh)
+	select {
+	case <-sp.verAckCh:
+		peerLog.Errorf("OnVerAck called more than once "+
+			"for peer %v", sp)
+	default:
+		close(sp.verAckCh)
+	}
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
