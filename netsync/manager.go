@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"math/rand"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -364,19 +363,12 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	// Typically a peer is not a candidate for sync if it's not a full node,
 	// however regression test is special in that the regression tool is
 	// not a full node and still needs to be considered a sync candidate.
-	if sm.chainParams == &chaincfg.RegressionNetParams {
-		// The peer is not a candidate if it's not coming from localhost
-		// or the hostname can't be determined for some reason.
-		host, _, err := net.SplitHostPort(peer.Addr())
-		if err != nil {
-			return false
-		}
-
-		if host != "127.0.0.1" && host != "localhost" {
-			return false
-		}
-
-		// Candidate if all checks passed.
+	switch sm.chainParams.Name {
+	case chaincfg.RegressionNetParams.Name, chaincfg.SimNetParams.Name:
+		// In regtest/simnet mode, any peer is a valid sync candidate
+		// regardless of its address or service flags. This allows
+		// syncing from peers on non-localhost networks such as Docker
+		// bridge networks.
 		return true
 	}
 
@@ -715,7 +707,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		// the peer or ignore the block when we're in regression test
 		// mode in this case so the chain code is actually fed the
 		// duplicate blocks.
-		if sm.chainParams != &chaincfg.RegressionNetParams {
+		if sm.chainParams.Name != chaincfg.RegressionNetParams.Name {
 			log.Warnf("Got unrequested block %v from %s -- "+
 				"disconnecting", blockHash, peer.Addr())
 			peer.Disconnect()
