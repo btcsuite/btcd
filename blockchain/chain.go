@@ -1353,6 +1353,21 @@ func (b *BlockChain) BestHeader() (chainhash.Hash, int32) {
 	return best.hash, best.height
 }
 
+// BestChainHeaderForkHeight returns the height of the fork point between the
+// best chain and the best header chain.  This can be used to determine the
+// starting height for block downloads when the best header chain has diverged
+// from the best chain due to a reorg.
+func (b *BlockChain) BestChainHeaderForkHeight() int32 {
+	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
+
+	fork := b.bestChain.FindFork(b.bestHeader.Tip())
+	if fork == nil {
+		return 0
+	}
+	return fork.height
+}
+
 // TipStatus is the status of a chain tip.
 type TipStatus byte
 
