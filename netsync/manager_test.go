@@ -389,7 +389,7 @@ func TestBuildBlockRequestSkipsInflightBlocks(t *testing.T) {
 				syncPeerState.requestedBlocks[*hash] = struct{}{}
 			}
 
-			gdmsg := sm.buildBlockRequest()
+			gdmsg := sm.buildBlockRequest(syncPeer)
 
 			// Collect the hashes from the getdata message.
 			got := make(map[chainhash.Hash]struct{}, len(gdmsg.InvList))
