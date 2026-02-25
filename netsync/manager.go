@@ -979,7 +979,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	if !isCheckpointBlock {
 		if sm.startHeader != nil &&
 			len(state.requestedBlocks) < minInFlightBlocks {
-			sm.fetchHeaderBlocks()
+			sm.fetchHeaderBlocks(sm.syncPeer)
 		}
 		return
 	}
@@ -1020,12 +1020,17 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 }
 
-// fetchHeaderBlocks creates and sends a request to the syncPeer for the next
+// fetchHeaderBlocks creates and sends a request to the given peer for the next
 // list of blocks to be downloaded based on the current list of headers.
-func (sm *SyncManager) fetchHeaderBlocks() {
-	gdmsg := sm.buildBlockRequest()
+func (sm *SyncManager) fetchHeaderBlocks(peer *peerpkg.Peer) {
+	if peer == nil {
+		log.Warnf("fetchHeaderBlocks called with a nil peer")
+		return
+	}
+
+	gdmsg := sm.buildBlockRequest(peer)
 	if len(gdmsg.InvList) > 0 {
-		sm.syncPeer.QueueMessage(gdmsg, nil)
+		peer.QueueMessage(gdmsg, nil)
 	}
 }
 
@@ -1037,7 +1042,12 @@ func (sm *SyncManager) fetchHeaderBlocks() {
 // When the best header chain has diverged (e.g. due to a reorg),
 // blocks between the fork point and the current height on the new
 // chain are different and must also be downloaded.
-func (sm *SyncManager) buildBlockRequest() *wire.MsgGetData {
+func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
+	// Return early if the peer is nil.
+	if peer == nil {
+		return wire.NewMsgGetDataSizeHint(0)
+	}
+
 	_, bestHeaderHeight := sm.chain.BestHeader()
 	forkHeight := sm.chain.BestChainHeaderForkHeight()
 	if bestHeaderHeight < forkHeight {
@@ -1074,15 +1084,15 @@ func (sm *SyncManager) buildBlockRequest() *wire.MsgGetData {
 				continue
 			}
 
-			syncPeerState := sm.peerStates[sm.syncPeer]
+			peerState := sm.peerStates[peer]
 
 			sm.requestedBlocks[*hash] = struct{}{}
-			syncPeerState.requestedBlocks[*hash] = struct{}{}
+			peerState.requestedBlocks[*hash] = struct{}{}
 
 			// If we're fetching from a witness enabled peer
 			// post-fork, then ensure that we receive all the
 			// witness data in the blocks.
-			if sm.syncPeer.IsWitnessEnabled() {
+			if peer.IsWitnessEnabled() {
 				iv.Type = wire.InvTypeWitnessBlock
 			}
 
@@ -1154,7 +1164,7 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	log.Infof("downloaded headers to %v(%v) from peer %v "+
 		"-- now fetching blocks",
 		bestHeaderHash, bestHeaderHeight, hmsg.peer.String())
-	sm.fetchHeaderBlocks()
+	sm.fetchHeaderBlocks(peer)
 }
 
 // handleNotFoundMsg handles notfound messages from all peers.
