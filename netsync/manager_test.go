@@ -1099,3 +1099,45 @@ func syncStalledHeaderRecovery(t *testing.T, sm *SyncManager,
 	replacementState := sm.peerStates[replacementPeer]
 	require.Equal(t, wantRequested, replacementState.requestedBlocks)
 }
+
+// TestStartSyncBlockFallback verifies the startSync fallback path where
+// headers are already caught up but the block chain lags behind.  In this
+// case startSync should skip header download and directly request blocks.
+func TestStartSyncBlockFallback(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	// Process headers so the header chain is at numBlocks while the
+	// block chain stays at genesis.
+	const numBlocks = 11
+	blocks := generateTestBlocks(t, &params, numBlocks)
+	for _, block := range blocks {
+		_, err := sm.chain.ProcessBlockHeader(
+			&block.MsgBlock().Header, blockchain.BFNone, false)
+		require.NoError(t, err)
+	}
+
+	// Add a peer whose height equals the header height.
+	// fetchHigherPeers(bestHeaderHeight) returns nothing because
+	// the peer is not strictly higher than our headers.
+	// fetchHigherPeers(bestBlockHeight=0) returns the peer.
+	syncPeer := peer.NewInboundPeer(&peer.Config{})
+	syncPeer.UpdateLastBlockHeight(int32(numBlocks))
+	sm.peerStates[syncPeer] = &peerSyncState{
+		syncCandidate:   true,
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	sm.startSync()
+
+	require.NotNil(t, sm.syncPeer,
+		"sync peer should be set for block download")
+	require.NotEmpty(t, sm.requestedBlocks,
+		"blocks should be requested via fetchHeaderBlocks")
+}
