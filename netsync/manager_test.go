@@ -1169,3 +1169,47 @@ func TestStallNoDisconnectAtSameHeight(t *testing.T) {
 	require.Nil(t, sm.syncPeer,
 		"we should have nil syncPeer after handleStallSample")
 }
+
+// TestStartSyncChainCurrent verifies that startSync does not set syncPeer
+// or ibdMode when the chain is current and no peer is strictly higher.
+// isInIBDMode sees IsCurrent()==true with no higher peers, returns false,
+// and startSync exits immediately.
+func TestStartSyncChainCurrent(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	// Mine a single block with a recent timestamp so
+	// IsCurrent() returns true.
+	cb := createTestCoinbase(1, &params)
+	header := wire.BlockHeader{
+		Version:    1,
+		PrevBlock:  *params.GenesisHash,
+		MerkleRoot: cb.TxHash(),
+		Timestamp:  time.Now().Truncate(time.Second),
+		Bits:       params.PowLimitBits,
+	}
+	require.True(t, solveTestBlock(&header, &params))
+
+	block := btcutil.NewBlock(&wire.MsgBlock{
+		Header:       header,
+		Transactions: []*wire.MsgTx{cb},
+	})
+	_, _, err := sm.chain.ProcessBlock(block, blockchain.BFNone)
+	require.NoError(t, err)
+	require.True(t, sm.chain.IsCurrent())
+
+	// Peer at our height — not higher.
+	newSyncCandidate(t, sm, 1)
+
+	sm.startSync()
+
+	require.Nil(t, sm.syncPeer,
+		"syncPeer should not be set when chain is already current")
+	require.False(t, sm.ibdMode,
+		"ibdMode should not be activated when chain is already current")
+}
