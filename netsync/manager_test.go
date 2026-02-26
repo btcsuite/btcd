@@ -1141,3 +1141,31 @@ func TestStartSyncBlockFallback(t *testing.T) {
 	require.NotEmpty(t, sm.requestedBlocks,
 		"blocks should be requested via fetchHeaderBlocks")
 }
+
+// TestStallNoDisconnectAtSameHeight verifies that handleStallSample does
+// not disconnect a sync peer whose advertised height equals our own.
+func TestStallNoDisconnectAtSameHeight(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	p := peer.NewInboundPeer(&peer.Config{})
+	p.UpdateLastBlockHeight(0) // Same height as our genesis chain.
+	sm.peerStates[p] = &peerSyncState{}
+	sm.syncPeer = p
+	sm.ibdMode = true
+	sm.lastProgressTime = time.Now().Add(
+		-(maxStallDuration + time.Minute))
+
+	sm.handleStallSample()
+
+	_, tracked := sm.peerStates[p]
+	require.True(t, tracked,
+		"peer at same height should not be disconnected")
+	require.Nil(t, sm.syncPeer,
+		"we should have nil syncPeer after handleStallSample")
+}
