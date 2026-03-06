@@ -7,6 +7,7 @@ package wire
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"reflect"
@@ -346,6 +347,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 			ErrUnknownMessage,
 			24,
 		},
+
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -375,6 +377,54 @@ func TestReadMessageWireErrors(t *testing.T) {
 				continue
 			}
 		}
+	}
+}
+
+// TestReadMessageTrailingBytes verifies that a message with unconsumed
+// trailing bytes after BtcDecode is rejected with a MessageError.
+func TestReadMessageTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	pver := ProtocolVersion
+	btcnet := MainNet
+
+	me := &NetAddress{
+		Timestamp: time.Time{},
+		IP:        net.ParseIP("127.0.0.1"),
+		Port:      8333,
+	}
+	you := &NetAddress{
+		Timestamp: time.Time{},
+		IP:        net.ParseIP("192.168.0.1"),
+		Port:      8333,
+	}
+	verMsg := NewMsgVersion(me, you, 1, 0)
+
+	// Serialize the version message payload only (no wire header).
+	var payloadBuf bytes.Buffer
+	verMsg.BtcEncode(&payloadBuf, pver, BaseEncoding)
+	cleanPayload := payloadBuf.Bytes()
+
+	// Append garbage bytes to the valid payload.
+	garbage := []byte{0xde, 0xad, 0xbe, 0xef}
+	dirtyPayload := append(cleanPayload, garbage...)
+
+	// Build the wire frame: header + dirty payload with correct
+	// checksum over the full (dirty) payload.
+	checksum := chainhash.DoubleHashB(dirtyPayload)
+	hdr := makeHeader(btcnet, CmdVersion, uint32(len(dirtyPayload)), 0)
+	copy(hdr[20:], checksum[:4])
+	wireBytes := append(hdr, dirtyPayload...)
+
+	r := bytes.NewReader(wireBytes)
+	_, _, _, err := ReadMessageN(r, pver, btcnet)
+	if err == nil {
+		t.Fatal("expected error for message with trailing bytes")
+	}
+
+	var msgErr *MessageError
+	if !errors.As(err, &msgErr) {
+		t.Fatalf("expected MessageError, got: %T (%v)", err, err)
 	}
 }
 
