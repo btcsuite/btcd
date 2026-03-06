@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"bytes"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
@@ -67,6 +68,16 @@ func isOnionCatTor(ip net.IP) bool {
 		Mask: net.CIDRMask(48, 128),
 	}
 	return onionCatNet.Contains(ip)
+}
+
+// ipv4MappedPrefix is the prefix for IPv4-mapped IPv6 addresses (::ffff:0:0/96)
+// as defined by RFC 4291.
+var ipv4MappedPrefix = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff}
+
+// isIPv4Mapped returns whether a given 16-byte IPv6 address is actually an
+// IPv4-mapped IPv6 address (::ffff:0:0/96).
+func isIPv4Mapped(addr []byte) bool {
+	return bytes.HasPrefix(addr, ipv4MappedPrefix)
 }
 
 // NetAddressV2 defines information about a peer on the network including the
@@ -334,6 +345,12 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 		// BIP-155 says to ignore OnionCat addresses in addrv2
 		// messages.
 		if isOnionCatTor(addr.addr[:]) {
+			return ErrSkippedNetworkID
+		}
+
+		// Skip IPv4-mapped IPv6 addresses (RFC 4291). These addresses
+		// should use networkID 0x01 (IPv4), not 0x02 (IPv6).
+		if isIPv4Mapped(addr.addr[:]) {
 			return ErrSkippedNetworkID
 		}
 	case torv2:
