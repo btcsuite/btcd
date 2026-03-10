@@ -272,6 +272,23 @@ func (sm *SyncManager) fetchHigherPeers(height int32) []*peerpkg.Peer {
 	return higherPeers
 }
 
+// fetchSameHeightPeers returns all sync-candidate peers that advertise the
+// given block height.
+func (sm *SyncManager) fetchSameHeightPeers(height int32) []*peerpkg.Peer {
+	sameHeightPeers := make([]*peerpkg.Peer, 0, len(sm.peerStates))
+	for peer, state := range sm.peerStates {
+		if !state.syncCandidate {
+			continue
+		}
+
+		if peer.LastBlock() == height {
+			sameHeightPeers = append(sameHeightPeers, peer)
+		}
+	}
+
+	return sameHeightPeers
+}
+
 // startSync will choose the best peer among the available candidate peers to
 // download/sync the blockchain from.  When syncing is already running, it
 // simply returns.  It also examines the candidates for any which are no longer
