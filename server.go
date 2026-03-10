@@ -151,6 +151,25 @@ type updatePeerHeightsMsg struct {
 	originPeer *peer.Peer
 }
 
+// peerLifecycleAction describes the type of peer lifecycle event.
+type peerLifecycleAction uint8
+
+const (
+	peerAdd peerLifecycleAction = iota
+	peerDone
+)
+
+// peerLifecycleEvent represents a peer connection or disconnection
+// event. Both event types for a given peer are sent by a single
+// goroutine (peerLifecycleHandler), guaranteeing that if peerAdd is
+// sent, it is always enqueued before peerDone. peerAdd may be
+// skipped entirely when the peer disconnects before or concurrently
+// with verack.
+type peerLifecycleEvent struct {
+	action peerLifecycleAction
+	sp     *serverPeer
+}
+
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
@@ -218,8 +237,7 @@ type server struct {
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	p2pDowngrader        *peer.P2PDowngrader
-	newPeers             chan *serverPeer
-	donePeers            chan *serverPeer
+	peerLifecycle        chan peerLifecycleEvent
 	banPeers             chan *serverPeer
 	query                chan interface{}
 	relayInv             chan relayMsg
@@ -279,6 +297,8 @@ type serverPeer struct {
 	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
 	quit           chan struct{}
+	// Closed when OnVerAck fires.
+	verAckCh chan struct{}
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
@@ -293,6 +313,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		filter:         bloom.LoadFilter(nil),
 		knownAddresses: lru.NewCache(5000),
 		quit:           make(chan struct{}),
+		verAckCh:       make(chan struct{}),
 		txProcessed:    make(chan struct{}, 1),
 		blockProcessed: make(chan struct{}, 1),
 	}
@@ -535,10 +556,17 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	return nil
 }
 
-// OnVerAck is invoked when a peer receives a verack bitcoin message and is used
-// to kick start communication with them.
+// OnVerAck is invoked when a peer receives a verack bitcoin message.
+// It signals the peer's lifecycle handler that the handshake is
+// complete so it can register the peer with the server.
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
-	sp.server.AddPeer(sp)
+	select {
+	case <-sp.verAckCh:
+		peerLog.Errorf("OnVerAck called more than once "+
+			"for peer %v", sp)
+	default:
+		close(sp.verAckCh)
+	}
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
@@ -1907,7 +1935,19 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 		}
 		delete(list, sp.ID())
 		srvrLog.Debugf("Removed peer %s", sp)
-		return
+	}
+
+	// Notify the sync manager the peer is gone and evict any
+	// remaining orphans that were sent by the peer.
+	if sp.VerAckReceived() {
+		s.syncManager.DonePeer(sp.Peer)
+
+		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
+		if numEvicted > 0 {
+			txmpLog.Debugf("Evicted %d %s from peer %v (id %d)",
+				numEvicted, pickNoun(numEvicted, "orphan",
+					"orphans"), sp, sp.ID())
+		}
 	}
 }
 
@@ -2231,7 +2271,7 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
 	sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
 	sp.AssociateConnection(conn)
-	go s.peerDoneHandler(sp)
+	go s.peerLifecycleHandler(sp)
 }
 
 // outboundPeerConnected is invoked by the connection manager when a new
@@ -2273,38 +2313,44 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	sp.connReq = c
 	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
 	sp.AssociateConnection(conn)
-	go s.peerDoneHandler(sp)
+	go s.peerLifecycleHandler(sp)
 }
 
-// peerDoneHandler handles peer disconnects by notifying the server that it's
-// done along with other performing other desirable cleanup.
-func (s *server) peerDoneHandler(sp *serverPeer) {
+// peerLifecycleHandler is the sole sender of lifecycle events for a
+// given peer. It waits for either verack (handshake complete) or
+// disconnect (handshake failed/timed out), sends peerAdd if verack
+// was received, then waits for disconnect and sends peerDone.
+// Because both sends originate from this single goroutine,
+// peerAdd is always enqueued before peerDone.
+func (s *server) peerLifecycleHandler(sp *serverPeer) {
+	// Wait for the handshake to complete or the peer to
+	// disconnect, whichever comes first.
+	select {
+	case <-sp.verAckCh:
+		s.peerLifecycle <- peerLifecycleEvent{
+			action: peerAdd, sp: sp,
+		}
+
+	case <-sp.Peer.Done():
+		// Disconnected before verack; no peerAdd needed.
+	}
+
+	// Wait for full disconnect (may already be done).
 	sp.WaitForDisconnect()
 
-	// If this is an outbound peer and the shouldDowngradeToV1 bool is set
-	// on the underlying Peer, trigger a reconnect using the OG v1
-	// connection scheme.
+	// If this is an outbound peer and the shouldDowngradeToV1
+	// bool is set on the underlying Peer, trigger a reconnect
+	// using the OG v1 connection scheme.
 	if !sp.Inbound() && sp.Peer.ShouldDowngradeToV1() {
-		srvrLog.Infof("Peer %s indicated v2->v1 downgrade. "+
-			"Marking for next attempt as v1.", sp.Addr())
+		srvrLog.Infof("Peer %s indicated v2->v1 downgrade."+
+			" Marking for next attempt as v1.",
+			sp.Addr())
 
 		s.p2pDowngrader.MarkForDowngrade(sp.Addr())
 	}
 
-	// This is sent to a buffered channel, so it may not execute immediately.
-	s.donePeers <- sp
-
-	// Only tell sync manager we are gone if we ever told it we existed.
-	if sp.VerAckReceived() {
-		s.syncManager.DonePeer(sp.Peer)
-
-		// Evict any remaining orphans that were sent by the peer.
-		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
-		if numEvicted > 0 {
-			txmpLog.Debugf("Evicted %d %s from peer %v (id %d)",
-				numEvicted, pickNoun(numEvicted, "orphan",
-					"orphans"), sp, sp.ID())
-		}
+	s.peerLifecycle <- peerLifecycleEvent{
+		action: peerDone, sp: sp,
 	}
 	close(sp.quit)
 }
@@ -2348,13 +2394,15 @@ func (s *server) peerHandler() {
 out:
 	for {
 		select {
-		// New peers connected to the server.
-		case p := <-s.newPeers:
-			s.handleAddPeerMsg(state, p)
+		// Peer connected or disconnected.
+		case event := <-s.peerLifecycle:
+			switch event.action {
+			case peerAdd:
+				s.handleAddPeerMsg(state, event.sp)
 
-		// Disconnected peers.
-		case p := <-s.donePeers:
-			s.handleDonePeerMsg(state, p)
+			case peerDone:
+				s.handleDonePeerMsg(state, event.sp)
+			}
 
 		// Block accepted in mainchain or orphan, update peer height.
 		case umsg := <-s.peerHeightsUpdate:
@@ -2395,8 +2443,7 @@ out:
 cleanup:
 	for {
 		select {
-		case <-s.newPeers:
-		case <-s.donePeers:
+		case <-s.peerLifecycle:
 		case <-s.peerHeightsUpdate:
 		case <-s.relayInv:
 		case <-s.broadcast:
@@ -2407,11 +2454,6 @@ cleanup:
 	}
 	s.wg.Done()
 	srvrLog.Tracef("Peer handler done")
-}
-
-// AddPeer adds a new peer that has already been connected to the server.
-func (s *server) AddPeer(sp *serverPeer) {
-	s.newPeers <- sp
 }
 
 // BanPeer bans a peer that has already been connected to the server by ip.
@@ -2847,8 +2889,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	s := server{
 		chainParams:          chainParams,
 		addrManager:          amgr,
-		newPeers:             make(chan *serverPeer, cfg.MaxPeers),
-		donePeers:            make(chan *serverPeer, cfg.MaxPeers),
+		peerLifecycle:        make(chan peerLifecycleEvent, cfg.MaxPeers*2),
 		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
