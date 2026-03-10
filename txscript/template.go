@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"html/template"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 // ScriptTemplateOpt is a function type for configuring the script template.
@@ -102,7 +102,6 @@ func looksLikeInt(s string) bool {
 
 	return len(s) > 0
 }
-
 
 // processScript converts the template output to actual script bytes. We scan
 // each line, then go through each element one by one, deciding to either add a
