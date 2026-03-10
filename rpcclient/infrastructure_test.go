@@ -1,6 +1,9 @@
 package rpcclient
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -238,4 +241,45 @@ func TestNewHTTPClientWithSchemePrefix(t *testing.T) {
 			require.NotNil(t, client)
 		})
 	}
+}
+
+// TestIssue2464_SchemeInHostHTTPPost is a regression test for
+// https://github.com/btcsuite/btcd/issues/2464. It verifies that creating an
+// rpcclient with a scheme-prefixed Host in HTTP POST mode works correctly.
+// Before the fix, this would fail with "dial tcp [...:0]: connect: can't
+// assign requested address" because ParseAddressString couldn't handle the
+// scheme prefix.
+func TestIssue2464_SchemeInHostHTTPPost(t *testing.T) {
+	t.Parallel()
+
+	// Spin up a test HTTP server that returns a valid JSON-RPC response.
+	const rpcResponse = `{"jsonrpc":"1.0","id":1,"result":100,"error":null}`
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, rpcResponse)
+		},
+	))
+	defer srv.Close()
+
+	// The user's original code used a full URL with scheme as Host:
+	//   Host: "https://go.getblock.io/xxxx"
+	// We reproduce this with our test server's URL which starts with
+	// "http://".
+	connCfg := &ConnConfig{
+		Host:         srv.URL + "/myapikey",
+		User:         "user",
+		Pass:         "pass",
+		HTTPPostMode: true,
+		DisableTLS:   true,
+	}
+
+	client, err := New(connCfg, nil)
+	require.NoError(t, err, "New() should not fail with scheme-prefixed Host")
+	defer client.Shutdown()
+
+	// Make an actual RPC call to verify the full pipeline works.
+	blockCount, err := client.GetBlockCount()
+	require.NoError(t, err, "GetBlockCount() should succeed")
+	require.Equal(t, int64(100), blockCount)
 }
