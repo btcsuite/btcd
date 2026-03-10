@@ -1204,8 +1204,8 @@ func (c *Client) WaitForShutdown() {
 // ConnConfig describes the connection configuration parameters for the client.
 // This
 type ConnConfig struct {
-	// Host is the IP address and port of the RPC server you want to connect
-	// to.
+	// Host is the IP address and port, or Unix socket path, of the RPC server
+	// you want to connect to.
 	Host string
 
 	// Endpoint is the websocket endpoint on the RPC server.  This is
