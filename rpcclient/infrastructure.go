@@ -1348,7 +1348,13 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 		}
 	}
 
-	parsedDialAddr, err := ParseAddressString(config.Host)
+	// Strip any scheme prefix from the host since the scheme is determined
+	// by DisableTLS. Then extract just the host:port for dialing (ignoring
+	// any path component).
+	host := stripScheme(config.Host)
+	dialHost := extractHostPort(host)
+
+	parsedDialAddr, err := ParseAddressString(dialHost)
 	if err != nil {
 		return nil, err
 	}
@@ -1379,7 +1385,13 @@ func (config *ConnConfig) httpURL() (string, error) {
 		protocol = "https"
 	}
 
-	parsedAddr, err := ParseAddressString(config.Host)
+	// Strip any scheme prefix from the host since the scheme is determined
+	// by DisableTLS. This allows users to pass full URLs like
+	// "https://host.example/path" in the Host field.
+	host := stripScheme(config.Host)
+	dialHost := extractHostPort(host)
+
+	parsedAddr, err := ParseAddressString(dialHost)
 	if err != nil {
 		return "", fmt.Errorf("error parsing host '%v': %v",
 			config.Host, err)
@@ -1392,7 +1404,7 @@ func (config *ConnConfig) httpURL() (string, error) {
 		// The Unix domain socket is specified in the DialContext.
 		httpURL = protocol + "://unix"
 	default:
-		httpURL = protocol + "://" + config.Host
+		httpURL = protocol + "://" + host
 	}
 
 	return httpURL, nil
@@ -1781,6 +1793,34 @@ func cutPrefix(s, prefix string) (after string, found bool) {
 		return s, false
 	}
 	return s[len(prefix):], true
+}
+
+// stripScheme removes any http:// or https:// scheme prefix from the given
+// host string. This allows callers to pass full URLs in the Host field.
+func stripScheme(host string) string {
+	if after, ok := cutPrefix(host, "https://"); ok {
+		return after
+	}
+	if after, ok := cutPrefix(host, "http://"); ok {
+		return after
+	}
+	return host
+}
+
+// extractHostPort extracts just the host:port portion from a string that may
+// contain a path component (e.g. "host.example:8332/api/key" -> "host.example:8332").
+func extractHostPort(host string) string {
+	// Use url.Parse to reliably extract the host from a string that may
+	// contain a path. We prepend a dummy scheme so that url.Parse treats
+	// the input as a hierarchical URL.
+	u, err := url.Parse("dummy://" + host)
+	if err != nil {
+		return host
+	}
+	if u.Host != "" {
+		return u.Host
+	}
+	return host
 }
 
 // ParseAddressString converts an address in string format to a net.Addr that is
