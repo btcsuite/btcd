@@ -1166,3 +1166,68 @@ var multiWitnessTxEncodedNonZeroFlag = []byte{
 // multiTxPkScriptLocs is the location information for the public key scripts
 // located in multiWitnessTx.
 var multiWitnessTxPkScriptLocs = []int{58}
+
+// TestTxWitnessOverflowPanic ensures that decoding a witness tx where
+// cumulative witness item lengths exceed the script slab capacity
+// returns a decode error instead of panicking on an out-of-bounds
+// slice.
+func TestTxWitnessOverflowPanic(t *testing.T) {
+	// Build a minimal witness tx with one input, zero outputs,
+	// and two witness items whose combined claimed lengths
+	// exceed the scriptSlabSize (4 MiB) decode buffer.
+	//
+	// Item 1: 3 000 000 bytes  (fits in slab, < maxWitnessItemSize)
+	// Item 2: 2 000 000 bytes  (passes maxWitnessItemSize but
+	//         overflows remaining slab capacity of ~1.19 MiB)
+	const (
+		firstLen  = 3_000_000
+		secondLen = 2_000_000
+	)
+
+	var buf bytes.Buffer
+
+	// tx version = 2
+	buf.Write([]byte{0x02, 0x00, 0x00, 0x00})
+
+	// Segwit marker + flag
+	buf.WriteByte(TxFlagMarker)
+	buf.WriteByte(byte(WitnessFlag))
+
+	// 1 input
+	WriteVarInt(&buf, 0, 1)
+
+	// Previous outpoint: 32-byte zero hash + index 0
+	buf.Write(make([]byte, 32))
+	buf.Write([]byte{0x00, 0x00, 0x00, 0x00})
+
+	// Empty signature script
+	WriteVarInt(&buf, 0, 0)
+
+	// Sequence
+	buf.Write([]byte{0x00, 0x00, 0x00, 0x00})
+
+	// 0 outputs
+	WriteVarInt(&buf, 0, 0)
+
+	// Witness: 2 stack items for the single input
+	WriteVarInt(&buf, 0, 2)
+
+	// First witness item: firstLen bytes of zeros.
+	WriteVarInt(&buf, 0, firstLen)
+	buf.Write(make([]byte, firstLen))
+
+	// Second witness item: only write the varint claiming
+	// secondLen bytes. The actual data is irrelevant because
+	// the bounds check must reject before reading it.
+	WriteVarInt(&buf, 0, secondLen)
+
+	// No locktime needed; decoding should fail before that.
+
+	var msg MsgTx
+	r := bytes.NewReader(buf.Bytes())
+	err := msg.BtcDecode(r, ProtocolVersion, WitnessEncoding)
+	require.Error(t, err)
+
+	var msgErr *MessageError
+	require.ErrorAs(t, err, &msgErr)
+}

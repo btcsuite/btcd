@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -1435,12 +1436,20 @@ cleanup:
 // inHandler handles all incoming messages for the peer.  It must be run as a
 // goroutine.
 func (p *Peer) inHandler() {
+	// Must be first defer (runs last) to catch panics from
+	// everything, including other defers.
+	defer p.recoverFromPanic()
+	defer close(p.inQuit)
+	defer p.Disconnect()
+	defer log.Tracef("Peer input handler done for %s", p)
+
 	// The timer is stopped when a new message is received and reset after it
 	// is processed.
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		log.Warnf("Peer %s no answer for %s -- disconnecting", p, idleTimeout)
 		p.Disconnect()
 	})
+	defer idleTimer.Stop()
 
 out:
 	for atomic.LoadInt32(&p.disconnect) == 0 {
@@ -1663,15 +1672,6 @@ out:
 		// A message was received so reset the idle timer.
 		idleTimer.Reset(idleTimeout)
 	}
-
-	// Ensure the idle timer is stopped to avoid leaking the resource.
-	idleTimer.Stop()
-
-	// Ensure connection is closed.
-	p.Disconnect()
-
-	close(p.inQuit)
-	log.Tracef("Peer input handler done for %s", p)
 }
 
 // queueHandler handles the queuing of outgoing data for the peer. This runs as
@@ -1986,6 +1986,17 @@ func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 func (p *Peer) Connected() bool {
 	return atomic.LoadInt32(&p.connected) != 0 &&
 		atomic.LoadInt32(&p.disconnect) == 0
+}
+
+// recoverFromPanic catches any panic that occurs in a peer goroutine,
+// logs the error with a stack trace, and disconnects the peer. This
+// prevents a single malformed message from crashing the entire node.
+func (p *Peer) recoverFromPanic() {
+	if r := recover(); r != nil {
+		log.Errorf("Recovered panic in peer %s: %v\n%s",
+			p, r, debug.Stack())
+		p.Disconnect()
+	}
 }
 
 // Disconnect disconnects the peer by closing the connection.  Calling this
@@ -2395,6 +2406,8 @@ func (p *Peer) start() error {
 
 	negotiateErr := make(chan error, 1)
 	go func() {
+		defer p.recoverFromPanic()
+
 		if p.inbound {
 			negotiateErr <- p.negotiateInboundProtocol()
 		} else {
@@ -2412,6 +2425,8 @@ func (p *Peer) start() error {
 	case <-time.After(negotiateTimeout):
 		p.Disconnect()
 		return errors.New("protocol negotiation timeout")
+	case <-p.quit:
+		return errors.New("peer disconnected during negotiation")
 	}
 	log.Debugf("Connected to %s", p.Addr())
 

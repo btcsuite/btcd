@@ -1034,7 +1034,17 @@ func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
 	// upper bound on this count.
 	if count > maxWitnessItemSize {
 		str := fmt.Sprintf("%s is larger than the max allowed size "+
-			"[count %d, max %d]", fieldName, count, maxWitnessItemSize)
+			"[count %d, max %d]", fieldName, count,
+			maxWitnessItemSize)
+		return nil, messageError("readScript", str)
+	}
+
+	// Ensure the claimed script length fits in the remaining
+	// decode slab.
+	if count > uint64(len(s)) {
+		str := fmt.Sprintf("%s exceeds remaining buffer "+
+			"capacity [count %d, remaining %d]",
+			fieldName, count, len(s))
 		return nil, messageError("readScript", str)
 	}
 

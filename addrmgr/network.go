@@ -48,6 +48,10 @@ var (
 	// RFC4843 (2001:10::/28).
 	rfc4843Net = ipNet("2001:10::", 28, 128)
 
+	// rfc7343Net specifies the IPv6 ORCHIDv2 address block as defined by
+	// RFC7343 (2001:20::/28).
+	rfc7343Net = ipNet("2001:20::", 28, 128)
+
 	// rfc4862Net specifies the IPv6 stateless address autoconfiguration
 	// address block as defined by RFC4862 (FE80::/64).
 	rfc4862Net = ipNet("FE80::", 64, 128)
@@ -171,6 +175,12 @@ func IsRFC4843(na *wire.NetAddress) bool {
 	return rfc4843Net.Contains(na.IP)
 }
 
+// IsRFC7343 returns whether or not the passed address is part of the IPv6
+// ORCHIDv2 range as defined by RFC7343 (2001:20::/28).
+func IsRFC7343(na *wire.NetAddress) bool {
+	return rfc7343Net.Contains(na.IP)
+}
+
 // IsRFC4862 returns whether or not the passed address is part of the IPv6
 // stateless address autoconfiguration range as defined by RFC4862 (FE80::/64).
 func IsRFC4862(na *wire.NetAddress) bool {
@@ -233,8 +243,8 @@ func IsRoutable(na *wire.NetAddressV2) bool {
 	lna := na.ToLegacy()
 	return IsValid(lna) && !(IsRFC1918(lna) || IsRFC2544(lna) ||
 		IsRFC3927(lna) || IsRFC4862(lna) || IsRFC3849(lna) ||
-		IsRFC4843(lna) || IsRFC5737(lna) || IsRFC6598(lna) ||
-		IsLocal(lna) || (IsRFC4193(lna) &&
+		IsRFC4843(lna) || IsRFC7343(lna) || IsRFC5737(lna) ||
+		IsRFC6598(lna) || IsLocal(lna) || (IsRFC4193(lna) &&
 		!IsOnionCatTor(lna)))
 }
 
