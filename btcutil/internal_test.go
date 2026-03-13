@@ -94,6 +94,20 @@ func TstAddressTaproot(version byte, program [32]byte,
 	}
 }
 
+// TstAddressWitness creates an AddressWitness, initiating the fields as given.
+// This is used for witness versions 2-16.
+func TstAddressWitness(version byte, program []byte,
+	hrp string) *AddressWitness {
+
+	return &AddressWitness{
+		AddressSegWit{
+			hrp:            hrp,
+			witnessVersion: version,
+			witnessProgram: program,
+		},
+	}
+}
+
 // TstAddressPubKey makes an AddressPubKey, setting the unexported fields with
 // the parameters.
 func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
