@@ -147,6 +147,12 @@ type BlockChain struct {
 	nextCheckpoint *chaincfg.Checkpoint
 	checkpointNode *blockNode
 
+	// These fields are related to swift sync. Swift sync enables fast UTXO
+	// set bootstrapping using a precomputed bitmap of spent outputs.
+	swiftSync        *chaincfg.SwiftSyncData
+	swiftSyncBitIdx  uint64 // Current position in bitmap (persisted)
+	swiftSyncEnabled bool   // False if checkpoints disabled or no swift sync data
+
 	// The state is used as a fairly efficient way to cache information
 	// about the current best chain state that is returned to callers when
 	// requested.  It operates on the principle of MVCC such that any time a
@@ -578,10 +584,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			"that extends the main chain")
 	}
 
-	// Sanity check the correct number of stxos are provided.
-	if len(stxos) != countSpentOutputs(block) {
-		return AssertError("connectBlock called with inconsistent " +
-			"spent transaction out information")
+	if !b.isSwiftSyncActive(block.Height()) {
+		// Sanity check the correct number of stxos are provided.
+		if len(stxos) != countSpentOutputs(block) {
+			return AssertError("connectBlock called with inconsistent " +
+				"spent transaction out information")
+		}
 	}
 
 	// No warnings about unknown rules until the chain is current.
@@ -669,6 +677,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
 		if err != nil {
 			return err
+		}
+
+		// Save swift sync progress.
+		if b.isSwiftSyncActive(node.height) {
+			err = dbPutSwiftSyncBitIdx(dbTx, b.swiftSyncBitIdx)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Allow the index manager to call each of the currently active
@@ -1173,6 +1189,43 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	if parentHash.IsEqual(&b.bestChain.Tip().hash) {
 		// Skip checks if node has already been fully validated.
 		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
+
+		// Swift sync: use precomputed bitmap for fast UTXO bootstrapping.
+		// This skips all validation and uses the bitmap to directly
+		// construct the UTXO set.
+		if b.isSwiftSyncActive(node.height) {
+			// Add only unspent outputs to the UTXO cache using the bitmap.
+			err := b.utxoCache.swiftSyncConnectTransactions(b, block)
+			if err != nil {
+				return false, err
+			}
+
+			// Connect the block to the main chain. Pass nil for stxos
+			// since we don't need spend journal during swift sync.
+			err = b.connectBlock(node, block, nil)
+			if err != nil {
+				return false, err
+			}
+
+			b.index.SetStatusFlags(node, statusValid)
+			flushIndexState()
+
+			// At the swift sync boundary, verify the block hash matches
+			// the expected hash from the bitmap data. This ensures we're
+			// on the correct chain.
+			if node.height == b.swiftSync.Height {
+				if !block.Hash().IsEqual(b.swiftSync.Hash) {
+					return false, AssertError(fmt.Sprintf(
+						"swift sync hash mismatch at height %d: "+
+							"expected %v, got %v",
+						node.height, b.swiftSync.Hash, block.Hash()))
+				}
+				log.Infof("Swift sync completed at height %d, hash %v",
+					node.height, block.Hash())
+			}
+
+			return true, nil
+		}
 
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
@@ -2173,6 +2226,11 @@ func New(config *Config) (*BlockChain, error) {
 	targetTimespan := int64(params.TargetTimespan / time.Second)
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
+
+	// Determine if swift sync should be enabled. It requires both
+	// checkpoints and swift sync data to be present.
+	swiftSyncEnabled := len(config.Checkpoints) > 0 && params.SwiftSync != nil
+
 	b := BlockChain{
 		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
@@ -2193,6 +2251,8 @@ func New(config *Config) (*BlockChain, error) {
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 		pruneTarget:         config.Prune,
+		swiftSync:           params.SwiftSync,
+		swiftSyncEnabled:    swiftSyncEnabled,
 	}
 
 	// Ensure all the deployments are synchronized with our clock if
