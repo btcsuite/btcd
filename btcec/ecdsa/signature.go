@@ -18,6 +18,8 @@ import (
 var (
 	errNegativeValue          = errors.New("value may be interpreted as negative")
 	errExcessivelyPaddedValue = errors.New("value is excessively padded")
+	errHighS                  = errors.New("signature is not canonical due to unnecessarily high S value")
+	errNoHeaderMagic          = errors.New("malformed signature: no header magic")
 )
 
 // Signature is a type representing an ecdsa signature.
@@ -90,7 +92,7 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// 0x30
 	index := 0
 	if sigStr[index] != 0x30 {
-		return nil, errors.New("malformed signature: no header magic")
+		return nil, errNoHeaderMagic
 	}
 	index++
 	// length of remaining message
@@ -253,4 +255,21 @@ func RecoverCompact(signature, hash []byte) (*btcec.PublicKey, bool, error) {
 // and BIP0062.
 func Sign(key *btcec.PrivateKey, hash []byte) *Signature {
 	return secp_ecdsa.Sign(key, hash)
+}
+
+// VerifyLowS verifies that the given ECDSA signature is strictly DER-encoded
+// and uses a canonical low-S value. It returns nil if the signature is valid;
+// otherwise it returns the encountered error.
+func VerifyLowS(sigStr []byte) error {
+	sig, err := parseSig(sigStr, true)
+	if err != nil {
+		return err
+	}
+	sValue := sig.S()
+	if sValue.IsOverHalfOrder() {
+		// High-S, s > N/2.
+		return errHighS
+	}
+	// Low-S, s <= N/2.
+	return nil
 }
