@@ -80,12 +80,13 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 // are needed to pass along to maybeAcceptBlock.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) error {
+func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) (bool, error) {
 	// Start with processing at least the passed hash.  Leave a little room
 	// for additional orphan blocks that need to be processed without
 	// needing to grow the array in the common case.
 	processHashes := make([]*chainhash.Hash, 0, 10)
 	processHashes = append(processHashes, hash)
+	var isAnyProcessedOrphanInMainChain bool
 	for len(processHashes) > 0 {
 		// Pop the first hash to process from the slice.
 		processHash := processHashes[0]
@@ -115,9 +116,12 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 			i--
 
 			// Potentially accept the block into the block chain.
-			_, err := b.maybeAcceptBlock(orphan.block, flags)
+			isMainChain, err := b.maybeAcceptBlock(orphan.block, flags)
 			if err != nil {
-				return err
+				return false, err
+			}
+			if isMainChain {
+				isAnyProcessedOrphanInMainChain = true
 			}
 
 			// Add this block to the list of blocks to process so
@@ -126,7 +130,7 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 			processHashes = append(processHashes, orphanHash)
 		}
 	}
-	return nil
+	return isAnyProcessedOrphanInMainChain, nil
 }
 
 // ProcessBlock is the main workhorse for handling insertion of new blocks into
@@ -233,9 +237,15 @@ func (b *BlockChain) ProcessBlock(block *btcutil.Block, flags BehaviorFlags) (bo
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
-	err = b.processOrphans(blockHash, flags)
+	isAnyProcessedOrphanInMainChain, err := b.processOrphans(blockHash, flags)
 	if err != nil {
 		return false, false, err
+	}
+
+	// block is in main chain if an orphan that is dependant
+	// on it is in the main chain.
+	if isAnyProcessedOrphanInMainChain {
+		isMainChain = true
 	}
 
 	log.Debugf("Accepted block %v", blockHash)
