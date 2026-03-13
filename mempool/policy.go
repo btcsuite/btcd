@@ -53,6 +53,11 @@ const (
 	// in a multi-signature transaction output script for it to be
 	// considered standard.
 	maxStandardMultiSigKeys = 3
+
+	// MaxStandardTxVersion is the maximum transaction version that is
+	// considered standard and will be relayed and considered for inclusion
+	// in a block. This includes v3 transaction support.
+	MaxStandardTxVersion = 3
 )
 
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
