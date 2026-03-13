@@ -27,6 +27,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{database.ErrCorruption, "ErrCorruption"},
 		{database.ErrTxClosed, "ErrTxClosed"},
 		{database.ErrTxNotWritable, "ErrTxNotWritable"},
+		{database.ErrAvailableDiskSpace, "ErrAvailableDiskSpace"},
 		{database.ErrBucketNotFound, "ErrBucketNotFound"},
 		{database.ErrBucketExists, "ErrBucketExists"},
 		{database.ErrBucketNameRequired, "ErrBucketNameRequired"},
