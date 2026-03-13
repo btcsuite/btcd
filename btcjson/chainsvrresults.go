@@ -242,6 +242,17 @@ type GetBlockChainInfoResult struct {
 	*UnifiedSoftForks
 }
 
+// GetIndexInfoResult models the data returned from the getindexinfo command.
+type GetIndexInfoResult struct {
+	*TxIndex `json:"txindex,omitempty"`
+}
+
+// TxIndex describes the current txindex results from getindexinfo.
+type TxIndex struct {
+	Synced          bool  `json:"synced"`
+	BestBlockHeight int32 `json:"best_block_height"`
+}
+
 // GetBlockFilterResult models the data returned from the getblockfilter
 // command.
 type GetBlockFilterResult struct {
