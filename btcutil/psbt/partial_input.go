@@ -29,6 +29,11 @@ type PInput struct {
 	TaprootInternalKey     []byte
 	TaprootMerkleRoot      []byte
 	Unknowns               []*Unknown
+	PreviousTxid           []byte
+	OutputIndex            uint32
+	TimeLocktime           uint32
+	HeightLocktime         uint32
+	Sequence               uint32
 }
 
 // NewPsbtInput creates an instance of PsbtInput given either a nonWitnessUtxo
@@ -80,6 +85,7 @@ func (pi *PInput) deserialize(r io.Reader) error {
 		if err != nil {
 			return err
 		}
+		isUnknown := false
 
 		switch InputType(keyCode) {
 
@@ -363,7 +369,63 @@ func (pi *PInput) deserialize(r io.Reader) error {
 
 			pi.TaprootMerkleRoot = value
 
+		case PreviousTxid:
+			if pi.PreviousTxid != nil {
+				return ErrDuplicateKey
+			}
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if len(value) != 32 {
+				return ErrInvalidKeyData
+			}
+
+			if bytes.Equal(value, make([]byte, 32)) {
+				return ErrInvalidKeyData
+			}
+
+			pi.PreviousTxid = value
+		case OutputIndex:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if len(value) != 4 {
+				return ErrInvalidKeyData
+			}
+
+			pi.OutputIndex = binary.LittleEndian.Uint32(value)
+		case TimeLocktime:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if len(value) != 4 {
+				return ErrInvalidKeyData
+
+			}
+			pi.TimeLocktime = binary.LittleEndian.Uint32(value)
+
+		case HeightLocktime:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if len(value) != 4 {
+				return ErrInvalidKeyData
+			}
+			pi.HeightLocktime = binary.LittleEndian.Uint32(value)
+		case Sequence:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if len(value) != 4 {
+				return ErrInvalidKeyData
+			}
+			pi.Sequence = binary.LittleEndian.Uint32(value)
+
 		default:
+			isUnknown = true
+		}
+
+		if isUnknown {
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
 				[]byte{byte(keyCode)}, keyData...,
@@ -375,8 +437,7 @@ func (pi *PInput) deserialize(r io.Reader) error {
 
 			// Duplicate key+keyData are not allowed.
 			for _, x := range pi.Unknowns {
-				if bytes.Equal(x.Key, newUnknown.Key) &&
-					bytes.Equal(x.Value, newUnknown.Value) {
+				if bytes.Equal(x.Key, newUnknown.Key) {
 
 					return ErrDuplicateKey
 				}
@@ -390,7 +451,7 @@ func (pi *PInput) deserialize(r io.Reader) error {
 }
 
 // serialize attempts to serialize the target PInput into the passed io.Writer.
-func (pi *PInput) serialize(w io.Writer) error {
+func (pi *PInput) serialize(w io.Writer, version uint32) error {
 	if !pi.IsSane() {
 		return ErrInvalidPsbtFormat
 	}
@@ -421,6 +482,75 @@ func (pi *PInput) serialize(w io.Writer) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+
+	if pi.FinalScriptSig != nil {
+		err := serializeKVPairWithType(
+			w, uint8(FinalScriptSigType), nil, pi.FinalScriptSig,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if pi.FinalScriptWitness != nil {
+		err := serializeKVPairWithType(
+			w, uint8(FinalScriptWitnessType), nil, pi.FinalScriptWitness,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	if version == 2 {
+
+		if pi.PreviousTxid != nil {
+			err := serializeKVPairWithType(
+				w, uint8(PreviousTxid), nil, pi.PreviousTxid,
+			)
+			if err != nil {
+				return err
+			}
+
+		}
+		var outIndexByte [4]byte
+		binary.LittleEndian.PutUint32(outIndexByte[:], pi.OutputIndex)
+		err := serializeKVPairWithType(
+			w, uint8(OutputIndex), nil, outIndexByte[:],
+		)
+		if err != nil {
+			return err
+		}
+
+		if pi.Sequence != wire.MaxTxInSequenceNum {
+			var seqBytes [4]byte
+			binary.LittleEndian.PutUint32(seqBytes[:], pi.Sequence)
+			err := serializeKVPairWithType(w, uint8(Sequence), nil, seqBytes[:])
+			if err != nil {
+				return err
+			}
+		}
+
+		if pi.TimeLocktime != 0 {
+			var time_lockBytes [4]byte
+			binary.LittleEndian.PutUint32(time_lockBytes[:], pi.TimeLocktime)
+			err := serializeKVPairWithType(
+				w, uint8(TimeLocktime), nil, time_lockBytes[:],
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		if pi.HeightLocktime != 0 {
+			var height_lockBytes [4]byte
+			binary.LittleEndian.PutUint32(height_lockBytes[:], pi.HeightLocktime)
+			err := serializeKVPairWithType(
+				w, uint8(HeightLocktime), nil, height_lockBytes[:],
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -571,24 +701,6 @@ func (pi *PInput) serialize(w io.Writer) error {
 			if err != nil {
 				return err
 			}
-		}
-	}
-
-	if pi.FinalScriptSig != nil {
-		err := serializeKVPairWithType(
-			w, uint8(FinalScriptSigType), nil, pi.FinalScriptSig,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	if pi.FinalScriptWitness != nil {
-		err := serializeKVPairWithType(
-			w, uint8(FinalScriptWitnessType), nil, pi.FinalScriptWitness,
-		)
-		if err != nil {
-			return err
 		}
 	}
 

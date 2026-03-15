@@ -111,7 +111,16 @@ func isFinalizableLegacyInput(p *Packet, pInput *PInput, inIndex int) bool {
 
 	// Otherwise, we'll verify that we only have a RedeemScript if the prev
 	// output script is P2SH.
-	outIndex := p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	var outIndex uint32
+	if p.Version == 0 {
+		if p.UnsignedTx == nil {
+			return false
+		}
+		outIndex = p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	} else {
+		outIndex = pInput.OutputIndex
+	}
+
 	if txscript.IsPayToScriptHash(pInput.NonWitnessUtxo.TxOut[outIndex].PkScript) {
 		if pInput.RedeemScript == nil {
 			return false
@@ -186,7 +195,8 @@ func MaybeFinalize(p *Packet, inIndex int) (bool, error) {
 // MaybeFinalizeAll attempts to finalize all inputs of the psbt.Packet that are
 // not already finalized, and returns an error if it fails to do so.
 func MaybeFinalizeAll(p *Packet) error {
-	for i := range p.UnsignedTx.TxIn {
+	numInputs := len(p.Inputs)
+	for i := 0; i < numInputs; i++ {
 		success, err := MaybeFinalize(p, i)
 		if err != nil || !success {
 			return err
@@ -351,6 +361,15 @@ func finalizeNonWitnessInput(p *Packet, inIndex int) error {
 	newInput := NewPsbtInput(pInput.NonWitnessUtxo, nil)
 	newInput.FinalScriptSig = sigScript
 
+	if p.Version == 2 {
+		newInput.PreviousTxid = pInput.PreviousTxid
+		newInput.OutputIndex = pInput.OutputIndex
+		newInput.Sequence = pInput.Sequence
+		newInput.TimeLocktime = pInput.TimeLocktime
+		newInput.HeightLocktime = pInput.HeightLocktime
+	}
+	newInput.Unknowns = pInput.Unknowns
+
 	// Overwrite the entry in the input list at the correct index. Note
 	// that this removes all the other entries in the list for this input
 	// index.
@@ -493,6 +512,15 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 
 	newInput.FinalScriptWitness = serializedWitness
 
+	if p.Version == 2 {
+		newInput.PreviousTxid = pInput.PreviousTxid
+		newInput.OutputIndex = pInput.OutputIndex
+		newInput.Sequence = pInput.Sequence
+		newInput.TimeLocktime = pInput.TimeLocktime
+		newInput.HeightLocktime = pInput.HeightLocktime
+	}
+	newInput.Unknowns = pInput.Unknowns
+
 	// Finally, we overwrite the entry in the input list at the correct
 	// index.
 	p.Inputs[inIndex] = *newInput
@@ -589,6 +617,15 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 	// finalscriptwitness (08).
 	newInput := NewPsbtInput(nil, pInput.WitnessUtxo)
 	newInput.FinalScriptWitness = serializedWitness
+
+	if p.Version == 2 {
+		newInput.PreviousTxid = pInput.PreviousTxid
+		newInput.OutputIndex = pInput.OutputIndex
+		newInput.Sequence = pInput.Sequence
+		newInput.TimeLocktime = pInput.TimeLocktime
+		newInput.HeightLocktime = pInput.HeightLocktime
+	}
+	newInput.Unknowns = pInput.Unknowns
 
 	// Finally, we overwrite the entry in the input list at the correct
 	// index.
