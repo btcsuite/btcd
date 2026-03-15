@@ -1690,3 +1690,163 @@ func TestUnknowns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, packetWithUnknowns, encoded)
 }
+
+// TestPsbtV2LifeCycle ensures that the full lifecycle of a PSBTv2 (creating,
+// constructing, serializing, and extracting) works as expected.
+func TestPsbtV2LifeCycle(t *testing.T) {
+
+	// 1. Create a new V2 PSBT.
+	p, err := NewV2(2, 0, 0)
+	require.NoError(t, err)
+
+	// 2. Add an input with a specific sequence (e.g., 0 for RBF).
+	txid, _ := chainhash.NewHashFromStr("0102030405060708091011121314151617181920212223242526272829303132")
+
+	outPoint := wire.NewOutPoint(txid, 1)
+	err = p.AddInput(*outPoint, 0)
+	require.NoError(t, err)
+
+	// 3. Add an output.
+	script, _ := hex.DecodeString("76a914b6bc2c0ee5655a843d79afedd0ccc3f7dd64340988ac")
+	err = p.AddOutput(100000000, script)
+	require.NoError(t, err)
+
+	// 4. Serialize and Parse back.
+	var b bytes.Buffer
+	err = p.Serialize(&b)
+	require.NoError(t, err)
+
+	p2, err := NewFromRawBytes(&b, false)
+	require.NoError(t, err)
+
+	// 5. Verify fields survived the round-trip.
+	require.Equal(t, uint32(2), p2.TxVersion)
+	require.Equal(t, uint32(1), p2.InputCount)
+	require.Equal(t, txid[:], p2.Inputs[0].PreviousTxid)
+	require.Equal(t, uint32(0), p2.Inputs[0].Sequence)
+	require.Equal(t, uint64(100000000), p2.Outputs[0].Amount)
+
+	// 6. Extract the transaction and verify it works.
+	// (Note: For extraction to work, we need to bypass the IsComplete check
+	// or finalize it. Since we are testing construction, we can test
+	// GetUnsignedTx directly).
+	msgTx, err := p2.GetUnsignedTx()
+	require.NoError(t, err)
+	require.Equal(t, int32(2), msgTx.Version)
+	require.Equal(t, uint32(0), msgTx.TxIn[0].Sequence)
+	require.Equal(t, int64(100000000), msgTx.TxOut[0].Value)
+}
+
+// TestPsbtV2Validation verifies that PSBTv2 packets are validated correctly
+// for strict versioning rules and mandatory field combinations.
+func TestPsbtV2Validation(t *testing.T) {
+	t.Run("V2 cannot have global UnsignedTx", func(t *testing.T) {
+		// Construct raw bytes with both Version 2 AND UnsignedTx (0x00 forbidden in V2).
+		// Magic + Version (0xfb: 2) + UnsignedTx (0x00: minimal 1-byte tx)
+		raw := []byte{
+			0x70, 0x73, 0x62, 0x74, 0xff, // Magic
+			0x01, 0xfb, 0x04, 0x02, 0x00, 0x00, 0x00, // Version 2
+			0x01, 0x00, 0x01, 0x01, // UnsignedTx (keyCode 0x00, minimal value)
+			0x00, // Separator
+		}
+
+		_, err := NewFromRawBytes(bytes.NewReader(raw), false)
+		require.Error(t, err)
+	})
+
+	t.Run("V2 must have InputCount and OutputCount", func(t *testing.T) {
+		// Create a raw V2 serialization but manually omit counts.
+		// Magic + Version (0xfb: 2) + TxVersion (0x02: 2)
+		raw := []byte{
+			0x70, 0x73, 0x62, 0x74, 0xff, // Magic
+			0x01, 0xfb, 0x04, 0x02, 0x00, 0x00, 0x00, // Version 2
+			0x01, 0x02, 0x04, 0x02, 0x00, 0x00, 0x00, // TxVersion 2
+			0x00, // Separator
+		}
+
+		// parsing should fail because InputCount/OutputCount are missing for V2.
+		_, err := NewFromRawBytes(bytes.NewReader(raw), false)
+		require.Error(t, err)
+	})
+
+	t.Run("Unsupported version should fail", func(t *testing.T) {
+		// Version 3 (unsupported)
+		raw := []byte{
+			0x70, 0x73, 0x62, 0x74, 0xff, // Magic
+			0x01, 0xfb, 0x04, 0x03, 0x00, 0x00, 0x00, // Version 3
+			0x00, // Separator
+		}
+
+		_, err := NewFromRawBytes(bytes.NewReader(raw), false)
+		require.Error(t, err)
+	})
+}
+
+// TestPsbtV2Counts ensures that the number of inputs and outputs parsed
+// matches the InputCount and OutputCount global fields.
+func TestPsbtV2Counts(t *testing.T) {
+	// Create a V2 PSBT that claims 2 inputs but only provides 1.
+	p, err := NewV2(2, 0, 0)
+	require.NoError(t, err)
+
+	txid, _ := chainhash.NewHashFromStr("0102030405060708091011121314151617181920212223242526272829303132")
+	outPoint := wire.NewOutPoint(txid, 1)
+	err = p.AddInput(*outPoint, 0xffffffff)
+	require.NoError(t, err)
+
+	script, _ := hex.DecodeString("00")
+	err = p.AddOutput(1000, script)
+	require.NoError(t, err)
+
+	// Manually override counts to mismatch reality.
+	p.InputCount = 2
+	p.OutputCount = 1
+
+	var b bytes.Buffer
+	err = p.Serialize(&b)
+	require.NoError(t, err)
+
+	// Parsing should fail because we promised 2 inputs but only 1 followed.
+	_, err = NewFromRawBytes(&b, false)
+	require.Error(t, err)
+}
+
+// TestPsbtV2Locktimes verifies that PSBTv2 locktime fields are correctly handled.
+func TestPsbtV2Locktimes(t *testing.T) {
+	// Create a V2 PSBT with a fallback locktime.
+	p, err := NewV2(2, 500000, 0x01) // Fallback 500000, InputsModifiable
+	require.NoError(t, err)
+
+	txid, _ := chainhash.NewHashFromStr("0102030405060708091011121314151617181920212223242526272829303132")
+	outPoint := wire.NewOutPoint(txid, 1)
+	err = p.AddInput(*outPoint, 0xffffffff)
+	require.NoError(t, err)
+
+	p.Inputs[0].HeightLocktime = 600000
+
+	msgTx, err := p.GetUnsignedTx()
+	require.NoError(t, err)
+
+	// Since we have a height locktime in an input, it should take precedence.
+	require.Equal(t, uint32(600000), msgTx.LockTime)
+
+	// Now try with time locktime.
+	p.Inputs[0].HeightLocktime = 0
+	p.Inputs[0].TimeLocktime = 1600000000
+	msgTx, err = p.GetUnsignedTx()
+	require.NoError(t, err)
+	require.Equal(t, uint32(1600000000), msgTx.LockTime)
+
+	// Test combined locktimes (BIP suggests highest value for same type,
+	// but here we just check our extraction logic).
+	err = p.AddInput(*outPoint, 0xffffffff)
+	require.NoError(t, err)
+	p.Inputs[1].TimeLocktime = 1700000000
+
+	msgTx, err = p.GetUnsignedTx()
+	require.NoError(t, err)
+	require.Equal(t, uint32(1700000000), msgTx.LockTime)
+
+	// Test modifiability flag.
+	require.Equal(t, uint8(0x01), p.TxModifiable)
+}

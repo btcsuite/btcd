@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"sort"
 
@@ -18,6 +19,8 @@ type POutput struct {
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
 	Unknowns               []*Unknown
+	Amount                 uint64
+	Script                 []byte
 }
 
 // NewPsbtOutput creates an instance of PsbtOutput; the three parameters
@@ -50,6 +53,8 @@ func (po *POutput) deserialize(r io.Reader) error {
 		if err != nil {
 			return err
 		}
+
+		isUnknown := false
 
 		switch OutputType(keyCode) {
 
@@ -143,8 +148,27 @@ func (po *POutput) deserialize(r io.Reader) error {
 			po.TaprootBip32Derivation = append(
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
+		case Amount:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if len(value) != 8 {
+				return ErrInvalidKeyData
+			}
+			// It is an 8 byte little endian.
+			po.Amount = binary.LittleEndian.Uint64(value)
+
+		case Script:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			po.Script = value
 
 		default:
+			isUnknown = true
+		}
+
+		if isUnknown {
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
 				[]byte{byte(keyCode)}, keyData...,
@@ -156,8 +180,7 @@ func (po *POutput) deserialize(r io.Reader) error {
 
 			// Duplicate key+keyData are not allowed.
 			for _, x := range po.Unknowns {
-				if bytes.Equal(x.Key, newUnknown.Key) &&
-					bytes.Equal(x.Value, newUnknown.Value) {
+				if bytes.Equal(x.Key, newUnknown.Key) {
 
 					return ErrDuplicateKey
 				}
@@ -172,7 +195,7 @@ func (po *POutput) deserialize(r io.Reader) error {
 
 // serialize attempts to write out the target POutput into the passed
 // io.Writer.
-func (po *POutput) serialize(w io.Writer) error {
+func (po *POutput) serialize(w io.Writer, version uint32) error {
 	if po.RedeemScript != nil {
 		err := serializeKVPairWithType(
 			w, uint8(RedeemScriptOutputType), nil, po.RedeemScript,
@@ -202,6 +225,21 @@ func (po *POutput) serialize(w io.Writer) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+	if version == 2 {
+		var buf [8]byte
+		binary.LittleEndian.PutUint64(buf[:], po.Amount)
+		err := serializeKVPairWithType(w, uint8(Amount), nil, buf[:])
+		if err != nil {
+			return err
+		}
+
+		if po.Script != nil {
+			err := serializeKVPairWithType(w, uint8(Script), nil, po.Script)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
