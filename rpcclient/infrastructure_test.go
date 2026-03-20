@@ -596,3 +596,94 @@ func TestBatchSendErrorResolvesQueuedFutures(t *testing.T) {
 	assertFutureErr(f1)
 	assertFutureErr(f2)
 }
+
+// TestNewBatchSerializesPostSends ensures a batch client still serializes POST
+// sends through a single handler goroutine.
+func TestNewBatchSerializesPostSends(t *testing.T) {
+	connCfg := &ConnConfig{
+		Host:         "127.0.0.1:8332",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: true,
+	}
+
+	client, err := NewBatch(connCfg)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	var active int32
+	var maxActive int32
+	release := make(chan struct{})
+
+	client.httpClient.Transport = postRoundTripFunc(
+		func(*http.Request) (*http.Response, error) {
+			current := atomic.AddInt32(&active, 1)
+			for {
+				prev := atomic.LoadInt32(&maxActive)
+				if current <= prev {
+					break
+				}
+				if atomic.CompareAndSwapInt32(
+					&maxActive, prev, current,
+				) {
+					break
+				}
+			}
+
+			// Hold the request open so the test can observe if
+			// a second POST enters the transport concurrently.
+			<-release
+			atomic.AddInt32(&active, -1)
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(
+					`{"result":1,"error":null}`,
+				)),
+			}, nil
+		},
+	)
+
+	makeReq := func(id uint64) *jsonRequest {
+		return &jsonRequest{
+			id:     id,
+			method: "getblockcount",
+			marshalledJSON: []byte(
+				`{"jsonrpc":"1.0","id":1,` +
+					`"method":"getblockcount","params":[]}`,
+			),
+			responseChan: make(chan *Response, 1),
+		}
+	}
+
+	req1 := makeReq(1)
+	req2 := makeReq(2)
+	client.sendPostChan <- req1
+	client.sendPostChan <- req2
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&active) >= 1
+	}, time.Second, 5*time.Millisecond)
+
+	// Allow any extra send handler goroutines to start a second in-flight
+	// request.
+	time.Sleep(100 * time.Millisecond)
+	observedMax := atomic.LoadInt32(&maxActive)
+	close(release)
+
+	for i, req := range []*jsonRequest{req1, req2} {
+		select {
+		case resp := <-req.responseChan:
+			require.NoError(t, resp.err, "request %d failed", i)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for request %d response", i)
+		}
+	}
+
+	require.EqualValues(t, 1, observedMax, "POST sends must be serialized")
+}

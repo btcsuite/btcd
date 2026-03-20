@@ -1608,13 +1608,18 @@ func NewBatch(config *ConnConfig) (*Client, error) {
 	if !config.HTTPPostMode {
 		return nil, errors.New("http post mode is required to use batch client")
 	}
-	// notification parameter is nil since notifications are not supported in POST mode.
+
+	// The notification parameter is nil since notifications are not
+	// supported in POST mode.
 	client, err := New(config, nil)
 	if err != nil {
 		return nil, err
 	}
-	client.batch = true //copy the client with changed batch setting
-	client.start()
+
+	// New() already started the HTTP handlers, so only toggle batch
+	// semantics.
+	client.batch = true
+
 	return client, nil
 }
 
