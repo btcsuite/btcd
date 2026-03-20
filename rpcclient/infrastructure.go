@@ -1760,6 +1760,38 @@ func (c *Client) sendAsync() (FutureGetBulkResult, error) {
 	return responseChan, nil
 }
 
+// failBatchRequests resolves every queued batch request with the provided error
+// and clears all internal request tracking.
+//
+// This function is safe for concurrent access.
+func (c *Client) failBatchRequests(err error) {
+	c.requestLock.Lock()
+	defer c.requestLock.Unlock()
+
+	c.batchLock.Lock()
+	defer c.batchLock.Unlock()
+
+	for e := c.batchList.Front(); e != nil; e = e.Next() {
+		req := e.Value.(*jsonRequest)
+
+		// Resolve all pending futures on the first batch-level failure
+		// so callers waiting on Receive don't block indefinitely.
+		// Safe: batch-mode responseChan buffers are unwritten here,
+		// so this send won't block while locks are held. Batch-mode
+		// requests only use addRequest (not sendPostRequest), so each
+		// responseChan buffer is still empty.
+		req.responseChan <- &Response{err: err}
+	}
+
+	c.requestMap = make(map[uint64]*list.Element)
+	c.batchList = list.New()
+
+	// Batch-mode requests are tracked in batchList, so requestList should
+	// already be empty. Keep this defensive reset for invariants and future
+	// call paths.
+	c.requestList.Init()
+}
+
 // Marshall's bulk requests and sends to the server
 // creates a response channel to receive the response
 func (c *Client) Send() error {
@@ -1770,12 +1802,7 @@ func (c *Client) Send() error {
 
 	batchResp, err := future.Receive()
 	if err != nil {
-		// Clear batchlist in case of an error.
-
-		c.batchLock.Lock()
-		c.batchList = list.New()
-		c.batchLock.Unlock()
-
+		c.failBatchRequests(err)
 		return err
 	}
 

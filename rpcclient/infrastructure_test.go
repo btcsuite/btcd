@@ -536,3 +536,63 @@ func TestSendPostRequestShutdownPrioritizesFailure(t *testing.T) {
 		}
 	}
 }
+
+// TestBatchSendErrorResolvesQueuedFutures ensures a batch send failure resolves
+// all queued futures instead of leaving them blocked.
+func TestBatchSendErrorResolvesQueuedFutures(t *testing.T) {
+	connCfg := &ConnConfig{
+		Host:         "127.0.0.1:8332",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: true,
+	}
+
+	client, err := NewBatch(connCfg)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	client.httpClient.Transport = postRoundTripFunc(
+		func(*http.Request) (*http.Response, error) {
+			body := io.NopCloser(strings.NewReader("not-json"))
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       body,
+			}, nil
+		},
+	)
+
+	f1 := client.GetBlockCountAsync()
+	f2 := client.GetBlockCountAsync()
+
+	sendErr := client.Send()
+	require.Error(t, sendErr)
+
+	assertFutureErr := func(f FutureGetBlockCountResult) {
+		t.Helper()
+
+		done := make(chan error, 1)
+		go func() {
+			_, err := f.Receive()
+			done <- err
+		}()
+
+		select {
+		case err := <-done:
+			require.Error(t, err)
+			require.EqualError(t, err, sendErr.Error())
+
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for queued batch future " +
+				"to resolve")
+		}
+	}
+
+	assertFutureErr(f1)
+	assertFutureErr(f2)
+}
