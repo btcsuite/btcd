@@ -954,19 +954,32 @@ cleanup:
 // HTTP client associated with the client.  It is backed by a buffered channel,
 // so it will not block until the send channel is full.
 func (c *Client) sendPostRequest(jReq *jsonRequest) {
-	// Don't send the message if shutting down.
+	// Prefer shutdown when it is already closed so this path is
+	// deterministic. This mirrors addRequest and avoids post-shutdown
+	// enqueueing.
 	select {
 	case <-c.shutdown:
-		jReq.responseChan <- &Response{result: nil, err: ErrClientShutdown}
+		jReq.responseChan <- &Response{
+			result: nil,
+			err:    ErrClientShutdown,
+		}
+
+		return
+
 	default:
 	}
 
+	// Normal path: either enqueue, or fail if shutdown closes in the race
+	// window after the guard above.
 	select {
 	case c.sendPostChan <- jReq:
 		log.Tracef("Sent command [%s] with id %d", jReq.method, jReq.id)
 
 	case <-c.shutdown:
-		return
+		jReq.responseChan <- &Response{
+			result: nil,
+			err:    ErrClientShutdown,
+		}
 	}
 }
 
