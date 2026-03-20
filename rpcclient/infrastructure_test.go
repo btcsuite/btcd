@@ -478,3 +478,42 @@ func TestSendPostRequestAndRespondShutdown(t *testing.T) {
 		})
 	}
 }
+
+// TestSendPostRequestShutdownPrioritizesFailure ensures shutdown always wins
+// when it is already closed before sendPostRequest is called.
+func TestSendPostRequestShutdownPrioritizesFailure(t *testing.T) {
+	client := &Client{
+		sendPostChan: make(chan *jsonRequest, 1),
+		shutdown:     make(chan struct{}),
+	}
+
+	close(client.shutdown)
+
+	const attempts = 200
+	// The old single-select implementation chose randomly when both channels
+	// were ready, so repeat enough times to make an accidental enqueue show up.
+	for i := 0; i < attempts; i++ {
+		jReq := &jsonRequest{
+			id:           uint64(i),
+			method:       "getblockcount",
+			responseChan: make(chan *Response, 1),
+		}
+		client.sendPostRequest(jReq)
+
+		select {
+		case resp := <-jReq.responseChan:
+			require.ErrorIs(t, resp.err, ErrClientShutdown)
+		default:
+			t.Fatalf("request id=%d was not failed immediately",
+				jReq.id)
+		}
+
+		select {
+		case <-client.sendPostChan:
+			t.Fatalf("request id=%d was enqueued after shutdown",
+				jReq.id)
+
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
