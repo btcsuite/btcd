@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"sort"
 
@@ -18,6 +19,8 @@ type POutput struct {
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
 	Unknowns               []*Unknown
+	Amount                 int64
+	Script                 []byte
 }
 
 // NewPsbtOutput creates an instance of PsbtOutput; the three parameters
@@ -25,6 +28,7 @@ type POutput struct {
 // `nil`.
 func NewPsbtOutput(redeemScript []byte, witnessScript []byte,
 	bip32Derivation []*Bip32Derivation) *POutput {
+
 	return &POutput{
 		RedeemScript:    redeemScript,
 		WitnessScript:   witnessScript,
@@ -32,14 +36,43 @@ func NewPsbtOutput(redeemScript []byte, witnessScript []byte,
 	}
 }
 
+func (po *POutput) addUnknown(keyCode byte, keyData, value []byte) error {
+	keyCodeAndData := append([]byte{keyCode}, keyData...)
+	newUnknown := &Unknown{
+		Key:   keyCodeAndData,
+		Value: value,
+	}
+
+	// Duplicate key+keyData combinations are not allowed (per PSBT spec)
+	for _, x := range po.Unknowns {
+		if bytes.Equal(x.Key, newUnknown.Key) {
+
+			return ErrDuplicateKey
+		}
+	}
+	po.Unknowns = append(po.Unknowns, newUnknown)
+	return nil
+}
+
 // deserialize attempts to recode a new POutput from the passed io.Reader.
-func (po *POutput) deserialize(r io.Reader) error {
+func (po *POutput) deserialize(r io.Reader, version uint32) error {
+	var (
+		amountSeen bool
+		scriptSeen bool
+	)
 	for {
 		keyCode, keyData, err := getKey(r)
 		if err != nil {
 			return err
 		}
 		if keyCode == -1 {
+			switch version {
+			case PsbtVersion2:
+				if !amountSeen || !scriptSeen {
+					return ErrInvalidPsbtFormat
+				}
+			}
+
 			// Reached separator byte, this section is done.
 			break
 		}
@@ -51,6 +84,16 @@ func (po *POutput) deserialize(r io.Reader) error {
 			return err
 		}
 
+		// BIP-370: If the PSBT version is 0, PSBTv2-only fields
+		// (like amount and script) must not be present.
+		// If they are, the PSBT is invalid.
+		switch version {
+		case PsbtVersion0:
+			switch OutputType(keyCode) {
+			case AmountOutputType, ScriptOutputType:
+				return ErrInvalidPsbtFormat
+			}
+		}
 		switch OutputType(keyCode) {
 
 		case RedeemScriptOutputType:
@@ -89,8 +132,8 @@ func (po *POutput) deserialize(r io.Reader) error {
 				}
 			}
 
-			po.Bip32Derivation = append(po.Bip32Derivation,
-				&Bip32Derivation{
+			po.Bip32Derivation = append(
+				po.Bip32Derivation, &Bip32Derivation{
 					PubKey:               keyData,
 					MasterKeyFingerprint: master,
 					Bip32Path:            derivationPath,
@@ -144,27 +187,50 @@ func (po *POutput) deserialize(r io.Reader) error {
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
 
-		default:
-			// A fall through case for any proprietary types.
-			keyCodeAndData := append(
-				[]byte{byte(keyCode)}, keyData...,
-			)
-			newUnknown := &Unknown{
-				Key:   keyCodeAndData,
-				Value: value,
-			}
+		case AmountOutputType:
+			if keyData != nil {
+				if err := po.addUnknown(
+					byte(keyCode), keyData, value,
+				); err != nil {
 
-			// Duplicate key+keyData are not allowed.
-			for _, x := range po.Unknowns {
-				if bytes.Equal(x.Key, newUnknown.Key) &&
-					bytes.Equal(x.Value, newUnknown.Value) {
-
-					return ErrDuplicateKey
+					return err
 				}
+				break
 			}
+			if amountSeen {
+				return ErrDuplicateKey
+			}
+			if len(value) != 8 {
+				return ErrInvalidKeyData
+			}
+			po.Amount = int64(binary.LittleEndian.Uint64(value))
+			amountSeen = true
 
-			po.Unknowns = append(po.Unknowns, newUnknown)
+		case ScriptOutputType:
+			if keyData != nil {
+				if err := po.addUnknown(
+					byte(keyCode), keyData, value,
+				); err != nil {
+
+					return err
+				}
+				break
+			}
+			if scriptSeen {
+				return ErrDuplicateKey
+			}
+			po.Script = value
+			scriptSeen = true
+
+		default:
+			if err := po.addUnknown(
+				byte(keyCode), keyData, value,
+			); err != nil {
+
+				return err
+			}
 		}
+
 	}
 
 	return nil
@@ -172,7 +238,7 @@ func (po *POutput) deserialize(r io.Reader) error {
 
 // serialize attempts to write out the target POutput into the passed
 // io.Writer.
-func (po *POutput) serialize(w io.Writer) error {
+func (po *POutput) serialize(w io.Writer, version uint32) error {
 	if po.RedeemScript != nil {
 		err := serializeKVPairWithType(
 			w, uint8(RedeemScriptOutputType), nil, po.RedeemScript,
@@ -183,7 +249,8 @@ func (po *POutput) serialize(w io.Writer) error {
 	}
 	if po.WitnessScript != nil {
 		err := serializeKVPairWithType(
-			w, uint8(WitnessScriptOutputType), nil, po.WitnessScript,
+			w, uint8(WitnessScriptOutputType), nil,
+			po.WitnessScript,
 		)
 		if err != nil {
 			return err
@@ -192,13 +259,33 @@ func (po *POutput) serialize(w io.Writer) error {
 
 	sort.Sort(Bip32Sorter(po.Bip32Derivation))
 	for _, kd := range po.Bip32Derivation {
-		err := serializeKVPairWithType(w,
-			uint8(Bip32DerivationOutputType),
-			kd.PubKey,
+		err := serializeKVPairWithType(
+			w, uint8(Bip32DerivationOutputType), kd.PubKey,
 			SerializeBIP32Derivation(
 				kd.MasterKeyFingerprint,
 				kd.Bip32Path,
 			),
+		)
+		if err != nil {
+			return err
+		}
+	}
+	switch version {
+	case PsbtVersion2:
+		var amountBuf [8]byte
+		binary.LittleEndian.PutUint64(amountBuf[:], uint64(po.Amount))
+		err := serializeKVPairWithType(
+			w, uint8(AmountOutputType), nil, amountBuf[:],
+		)
+		if err != nil {
+			return err
+		}
+
+		if po.Script == nil {
+			return ErrInvalidPsbtFormat
+		}
+		err = serializeKVPairWithType(
+			w, uint8(ScriptOutputType), nil, po.Script,
 		)
 		if err != nil {
 			return err
@@ -217,8 +304,7 @@ func (po *POutput) serialize(w io.Writer) error {
 
 	if po.TaprootTapTree != nil {
 		err := serializeKVPairWithType(
-			w, uint8(TaprootTapTreeType), nil,
-			po.TaprootTapTree,
+			w, uint8(TaprootTapTreeType), nil, po.TaprootTapTree,
 		)
 		if err != nil {
 			return err
@@ -231,9 +317,7 @@ func (po *POutput) serialize(w io.Writer) error {
 		)
 	})
 	for _, derivation := range po.TaprootBip32Derivation {
-		value, err := SerializeTaprootBip32Derivation(
-			derivation,
-		)
+		value, err := SerializeTaprootBip32Derivation(derivation)
 		if err != nil {
 			return err
 		}
