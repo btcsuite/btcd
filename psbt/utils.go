@@ -314,7 +314,6 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 			// Non-witness UTXOs reference to the whole transaction
 			// the UTXO resides in.
 			utxOuts := in.NonWitnessUtxo.TxOut
-			txIn := packet.UnsignedTx.TxIn[idx]
 
 			// Check that utxOuts actually has enough space to
 			// contain the previous outpoint's index.
@@ -324,7 +323,7 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 					"TxOut field", idx)
 			}
 
-			inputSum += utxOuts[txIn.PreviousOutPoint.Index].Value
+			inputSum += utxOuts[opIdx].Value
 
 		default:
 			return 0, fmt.Errorf("input %d has no UTXO information",
