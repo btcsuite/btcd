@@ -4,12 +4,14 @@
 
 package psbt
 
-// signer encapsulates the role 'Signer' as specified in BIP174; it controls
-// the insertion of signatures; the Sign() function will attempt to insert
-// signatures using Updater.addPartialSignature, after first ensuring the Psbt
-// is in the correct state.
+// Signer encapsulates the role 'Signer' as specified in BIP174 and BIP0370;
+// it controls the insertion of signatures. The Sign() function will attempt to
+// insert signatures using Updater.addPartialSignature, after first ensuring
+// the Psbt is in the correct state.
 
 import (
+	"fmt"
+
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
@@ -73,6 +75,9 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 	//
 	// Case 1: if witnessScript is present, it must be of type witness;
 	// if not, signature insertion will of course fail.
+	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
+		return SignInvalid, fmt.Errorf("input index %d out of range", inIndex)
+	}
 	pInput := u.Upsbt.Inputs[inIndex]
 	switch {
 	case pInput.WitnessScript != nil:
@@ -115,8 +120,21 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 	// output.
 	default:
 		if pInput.WitnessUtxo == nil {
-			txIn := u.Upsbt.UnsignedTx.TxIn[inIndex]
-			outIndex := txIn.PreviousOutPoint.Index
+			if pInput.NonWitnessUtxo == nil {
+				return SignInvalid, fmt.Errorf("input %d is "+
+					"missing both WitnessUtxo and NonWitnessUtxo", inIndex)
+			}
+			outIndex, err := u.Upsbt.outIndex(inIndex)
+			if err != nil {
+				return SignInvalid, err
+			}
+			if outIndex >= uint32(
+				len(pInput.NonWitnessUtxo.TxOut),
+			) {
+
+				return SignInvalid, fmt.Errorf("input %d has "+
+					"malformed TxOut field", inIndex)
+			}
 			script := pInput.NonWitnessUtxo.TxOut[outIndex].PkScript
 
 			if txscript.IsWitnessProgram(script) {
@@ -141,7 +159,16 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 // NonWitnessUtxo field with a WitnessUtxo field. See
 // https://github.com/bitcoin/bitcoin/pull/14197.
 func nonWitnessToWitness(p *Packet, inIndex int) error {
-	outIndex := p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	if p.Inputs[inIndex].NonWitnessUtxo == nil {
+		return fmt.Errorf("input %d is missing NonWitnessUtxo", inIndex)
+	}
+	outIndex, err := p.outIndex(inIndex)
+	if err != nil {
+		return err
+	}
+	if outIndex >= uint32(len(p.Inputs[inIndex].NonWitnessUtxo.TxOut)) {
+		return fmt.Errorf("input %d has malformed TxOut field", inIndex)
+	}
 	txout := p.Inputs[inIndex].NonWitnessUtxo.TxOut[outIndex]
 
 	// TODO(guggero): For segwit v1, we'll want to remove the NonWitnessUtxo

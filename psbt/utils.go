@@ -326,7 +326,10 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 
 			// For v2, the output index is stored directly in the
 			// PInput. For v0, it comes from the unsigned tx.
-			opIdx := packet.outIndex(idx)
+			opIdx, err := packet.outIndex(idx)
+			if err != nil {
+				return 0, err
+			}
 			if opIdx >= uint32(len(utxOuts)) {
 				return 0, fmt.Errorf("input %d has malformed "+
 					"TxOut field", idx)
