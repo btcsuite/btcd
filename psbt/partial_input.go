@@ -87,9 +87,9 @@ func (pi *PInput) addUnknown(keyCode byte, keyData, value []byte) error {
 	return nil
 }
 
-// CopyInputFields copies all relevant input fields and unknowns from another
-// PInput. This preserves PSBTv2 transaction fields and unknown fields that must
-// be retained during finalization as mandated by BIP-370.
+// CopyInputFields copies all relevant input fields and unknowns from another PInput.
+// This preserves PSBTv2 transaction fields and unknown fields that must be retained
+// during finalization as mandated by BIP-370.
 //
 // For PSBTv0: Only unknowns are relevant (other fields are zero)
 // For PSBTv2: All fields contain important data that must be preserved
