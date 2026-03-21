@@ -10,10 +10,12 @@ package psbt
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"io"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -144,6 +146,27 @@ type Packet struct {
 
 	// Unknowns are the set of custom types (global only) within this PSBT.
 	Unknowns []*Unknown
+
+	// Version is the PSBT packet version (0 for BIP-174, 2 for BIP-370).
+	Version uint32
+
+	// FallbackLocktime is the transaction locktime to use if no input-specific
+	// locktime constraints exist (PSBTv2 only).
+	FallbackLocktime uint32
+
+	// InputCount is the number of inputs in this PSBT (PSBTv2 only).
+	InputCount uint32
+
+	// OutputCount is the number of outputs in this PSBT (PSBTv2 only).
+	OutputCount uint32
+
+	// TxVersion is the Bitcoin transaction version for the constructed
+	// transaction (PSBTv2 only).
+	TxVersion uint32
+
+	// TxModifiable is a bitfield indicating which parts of the transaction
+	// can be modified by subsequent updaters (PSBTv2 only).
+	TxModifiable uint8
 }
 
 // validateUnsignedTx returns true if the transaction is unsigned.  Note that
@@ -159,6 +182,129 @@ func validateUnsignedTX(tx *wire.MsgTx) bool {
 	return true
 }
 
+// DetermineLockTime implements the BIP-370 "Determining Lock Time" algorithm.
+// Per BIP-370: "the field chosen is the one which is supported by all of the inputs
+// which specify a locktime in either of those fields."
+//
+// Algorithm:
+// 1. If no inputs have locktime constraints, use PSBT_GLOBAL_FALLBACK_LOCKTIME
+// 2. Find the locktime type that ALL constrained inputs can satisfy:
+//   - Inputs with only TimeLocktime can ONLY be satisfied by time-based locks
+//   - Inputs with only HeightLocktime can ONLY be satisfied by height-based locks
+//   - Inputs with both (or neither) can be satisfied by either type
+//
+// 3. If both types are supported, BIP-370 mandates selecting height-based
+// 4. Return the maximum value of the selected type
+//
+// Reference: https://github.com/bitcoin/bips/blob/master/bip-0370.mediawiki#determining-lock-time
+func (p *Packet) DetermineLockTime() (uint32, error) {
+	var maxTime, maxHeight uint32
+	timeSupported := true
+	heightSupported := true
+	hasAnyInputLocktime := false
+
+	for _, pIn := range p.Inputs {
+		hasTimeReq := pIn.TimeLocktime != 0
+		hasHeightReq := pIn.HeightLocktime != 0
+
+		if !hasTimeReq && !hasHeightReq {
+			continue
+		}
+		hasAnyInputLocktime = true
+
+		// Update maximums
+		if pIn.TimeLocktime > maxTime {
+			maxTime = pIn.TimeLocktime
+		}
+		if pIn.HeightLocktime > maxHeight {
+			maxHeight = pIn.HeightLocktime
+		}
+
+		// An input with only PSBT_IN_REQUIRED_TIME_LOCKTIME (0x11) cannot
+		// be satisfied by a height-based lock; mark height as unsupported.
+		if hasTimeReq && !hasHeightReq {
+			heightSupported = false
+		}
+		// An input with only PSBT_IN_REQUIRED_HEIGHT_LOCKTIME (0x12) cannot
+		// be satisfied by a time-based lock; mark time as unsupported.
+		if hasHeightReq && !hasTimeReq {
+			timeSupported = false
+		}
+	}
+
+	// 1. Fallback Case: No inputs specified constraints
+	if !hasAnyInputLocktime {
+		if p.FallbackLocktime != 0 {
+			return p.FallbackLocktime, nil
+		}
+		return 0, nil
+	}
+
+	// 2. Conflict Case: One input requires Time, another requires Height
+	if !timeSupported && !heightSupported {
+		return 0, ErrInvalidPsbtFormat
+	}
+
+	// 3. Selection Case: BIP-370 tie-breaker mandates height-based when both supported
+	// "If a PSBT has both types of locktimes possible... then locktime determined
+	// by looking at the PSBT_IN_REQUIRED_HEIGHT_LOCKTIME fields of the inputs must be chosen"
+	if heightSupported {
+		return maxHeight, nil
+	}
+
+	// 4. Otherwise, use Time
+	return maxTime, nil
+}
+
+// GetUnsignedTx returns a copy of the underlying unsigned transaction for this
+// PSBT. For version 0 PSBTs, this is a copy of the parsed unsigned transaction.
+// For version 2 PSBTs, it dynamically constructs the transaction from the
+// individual parsing fields per BIP-0370.
+func (p *Packet) GetUnsignedTx() (*wire.MsgTx, error) {
+	if p.Version == 0 {
+		if p.UnsignedTx == nil {
+			return nil, ErrInvalidPsbtFormat
+		}
+		return p.UnsignedTx.Copy(), nil
+	}
+
+	if p.Version != 2 {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	tx := wire.NewMsgTx(int32(p.TxVersion))
+
+	for _, pIn := range p.Inputs {
+		if pIn.PreviousTxid == nil {
+			return nil, ErrInvalidPsbtFormat
+		}
+		hash, err := chainhash.NewHash(pIn.PreviousTxid)
+		if err != nil {
+			return nil, err
+		}
+
+		outPoint := wire.NewOutPoint(hash, pIn.OutputIndex)
+		txIn := wire.NewTxIn(outPoint, nil, nil)
+		txIn.Sequence = pIn.Sequence
+
+		tx.AddTxIn(txIn)
+
+	}
+
+	for _, pOut := range p.Outputs {
+		txOut := wire.NewTxOut(pOut.Amount, pOut.Script)
+		tx.AddTxOut(txOut)
+	}
+
+	lockTime, err := p.DetermineLockTime()
+	if err != nil {
+		return nil, err
+	}
+	tx.LockTime = lockTime
+
+	return tx, nil
+}
+
 // NewFromUnsignedTx creates a new Psbt struct, without any signatures (i.e.
 // only the global section is non-empty) using the passed unsigned transaction.
 func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
@@ -168,6 +314,12 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 
 	inSlice := make([]PInput, len(tx.TxIn))
 	outSlice := make([]POutput, len(tx.TxOut))
+	for i, txin := range tx.TxIn {
+		inSlice[i].PreviousTxid = txin.PreviousOutPoint.Hash[:]
+		inSlice[i].OutputIndex = txin.PreviousOutPoint.Index
+		inSlice[i].Sequence = txin.Sequence
+	}
+
 	xPubSlice := make([]XPub, 0)
 	unknownSlice := make([]*Unknown, 0)
 
@@ -206,49 +358,30 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		return nil, ErrInvalidMagicBytes
 	}
 
-	// Next we parse the GLOBAL section.  There is currently only 1 known
-	// key type, UnsignedTx.  We insist this exists first; unknowns are
-	// allowed, but only after.
-	keyCode, keyData, err := getKey(r)
-	if err != nil {
-		return nil, err
-	}
-	if GlobalType(keyCode) != UnsignedTxType || keyData != nil {
-		return nil, ErrInvalidPsbtFormat
-	}
-
-	// Now that we've verified the global type is present, we'll decode it
-	// into a proper unsigned transaction, and validate it.
-	value, err := wire.ReadVarBytes(
-		r, 0, MaxPsbtValueLength, "PSBT value",
-	)
-	if err != nil {
-		return nil, err
-	}
-	msgTx := wire.NewMsgTx(2)
-
-	// BIP-0174 states: "The transaction must be in the old serialization
-	// format (without witnesses)."
-	err = msgTx.DeserializeNoWitness(bytes.NewReader(value))
-	if err != nil {
-		return nil, err
-	}
-	if !validateUnsignedTX(msgTx) {
-		return nil, ErrInvalidRawTxSigned
-	}
-
-	// Next we parse any unknowns that may be present, making sure that we
-	// break at the separator.
+	// Next we parse the GLOBAL section.
 	var (
-		xPubSlice    []XPub
-		unknownSlice []*Unknown
+		xPubSlice            []XPub
+		unknownSlice         []*Unknown
+		msgTx                *wire.MsgTx
+		version              uint32
+		fallbackLocktime     uint32
+		inputCount           uint32
+		outputCount          uint32
+		txVersion            uint32
+		txModifiable         uint8
+		txVersionSeen        bool
+		inputCountSeen       bool
+		outputCountSeen      bool
+		fallbackLocktimeSeen bool
+		txModifiableSeen     bool
 	)
+
 	for {
-		keyint, keydata, err := getKey(r)
+		keyCode, keyData, err := getKey(r)
 		if err != nil {
 			return nil, ErrInvalidPsbtFormat
 		}
-		if keyint == -1 {
+		if keyCode == -1 {
 			break
 		}
 
@@ -259,26 +392,124 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			return nil, err
 		}
 
-		switch GlobalType(keyint) {
-		case XPubType:
-			xPub, err := ReadXPub(keydata, value)
+		isUnknown := false
+
+		switch GlobalType(keyCode) {
+		case UnsignedTxType:
+			if keyData != nil {
+				isUnknown = true
+				break
+			}
+			if msgTx != nil {
+				return nil, ErrDuplicateKey
+			}
+			msgTx = wire.NewMsgTx(2)
+			err = msgTx.DeserializeNoWitness(bytes.NewReader(value))
 			if err != nil {
 				return nil, err
 			}
+			if !validateUnsignedTX(msgTx) {
+				return nil, ErrInvalidRawTxSigned
+			}
 
-			// Duplicate keys are not allowed
+		case XPubType:
+			xPub, err := ReadXPub(keyData, value)
+			if err != nil {
+				return nil, err
+			}
 			for _, x := range xPubSlice {
 				if bytes.Equal(x.ExtendedKey, keyData) {
 					return nil, ErrDuplicateKey
 				}
 			}
-
 			xPubSlice = append(xPubSlice, *xPub)
 
-		default:
-			keyintanddata := []byte{byte(keyint)}
-			keyintanddata = append(keyintanddata, keydata...)
+		case VersionType:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if version != 0 {
+				return nil, ErrDuplicateKey
+			}
+			if len(value) != 4 {
+				return nil, ErrInvalidKeyData
+			}
+			version = binary.LittleEndian.Uint32(value)
 
+		case TxVersionGlobalType:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if txVersionSeen {
+				return nil, ErrDuplicateKey
+			}
+			if len(value) != 4 {
+				return nil, ErrInvalidKeyData
+			}
+			txVersion = binary.LittleEndian.Uint32(value)
+			txVersionSeen = true
+
+		case FallbackLocktimeGlobalType:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if fallbackLocktimeSeen {
+				return nil, ErrDuplicateKey
+			}
+			if len(value) != 4 {
+				return nil, ErrInvalidKeyData
+			}
+			fallbackLocktime = binary.LittleEndian.Uint32(value)
+			fallbackLocktimeSeen = true
+
+		case InputCountGlobalType:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if inputCountSeen {
+				return nil, ErrDuplicateKey
+			}
+			if len(value) > 8 {
+				return nil, ErrInvalidKeyData
+			}
+			num, _ := wire.ReadVarInt(bytes.NewReader(value), 0)
+			inputCount = uint32(num)
+			inputCountSeen = true
+
+		case OutputCountGlobalType:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if outputCountSeen {
+				return nil, ErrDuplicateKey
+			}
+			if len(value) > 8 {
+				return nil, ErrInvalidKeyData
+			}
+			num, _ := wire.ReadVarInt(bytes.NewReader(value), 0)
+			outputCount = uint32(num)
+			outputCountSeen = true
+
+		case TxModifiableGlobalType:
+			if !isSaneKey(keyData, &isUnknown) {
+				break
+			}
+			if txModifiableSeen {
+				return nil, ErrDuplicateKey
+			}
+			if len(value) != 1 {
+				return nil, ErrInvalidKeyData
+			}
+			txModifiable = value[0]
+			txModifiableSeen = true
+
+		default:
+			isUnknown = true
+		}
+
+		if isUnknown {
+			keyintanddata := []byte{byte(keyCode)}
+			keyintanddata = append(keyintanddata, keyData...)
 			newUnknown := &Unknown{
 				Key:   keyintanddata,
 				Value: value,
@@ -287,42 +518,79 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		}
 	}
 
+	switch version {
+	case 0:
+		if msgTx == nil {
+			return nil, ErrInvalidPsbtFormat
+		}
+
+	case 2:
+		if msgTx != nil {
+			return nil, ErrInvalidPsbtFormat
+		}
+		if !txVersionSeen || !inputCountSeen || !outputCountSeen {
+			return nil, ErrInvalidPsbtFormat
+		}
+
+	default:
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	var inCount, outCount int
+	if version == 0 {
+		inCount = len(msgTx.TxIn)
+		outCount = len(msgTx.TxOut)
+	} else {
+		inCount = int(inputCount)
+		outCount = int(outputCount)
+	}
+
 	// Next we parse the INPUT section.
-	inSlice := make([]PInput, len(msgTx.TxIn))
-	for i := range msgTx.TxIn {
-		input := PInput{}
-		err = input.deserialize(r)
+	inSlice := make([]PInput, inCount)
+	for i := 0; i < inCount; i++ {
+		input := PInput{Sequence: wire.MaxTxInSequenceNum}
+
+		err := input.deserialize(r, version)
 		if err != nil {
 			return nil, err
 		}
-
 		inSlice[i] = input
 	}
 
 	// Next we parse the OUTPUT section.
-	outSlice := make([]POutput, len(msgTx.TxOut))
-	for i := range msgTx.TxOut {
+	outSlice := make([]POutput, outCount)
+	for i := 0; i < outCount; i++ {
 		output := POutput{}
-		err = output.deserialize(r)
+		err := output.deserialize(r, version)
 		if err != nil {
 			return nil, err
 		}
-
 		outSlice[i] = output
+	}
+
+	if version == 2 && txVersion < 2 {
+		return nil, ErrInvalidPsbtFormat
 	}
 
 	// Populate the new Packet object.
 	newPsbt := Packet{
-		UnsignedTx: msgTx,
-		Inputs:     inSlice,
-		Outputs:    outSlice,
-		XPubs:      xPubSlice,
-		Unknowns:   unknownSlice,
+		UnsignedTx:       msgTx,
+		Inputs:           inSlice,
+		Outputs:          outSlice,
+		XPubs:            xPubSlice,
+		Unknowns:         unknownSlice,
+		Version:          version,
+		FallbackLocktime: fallbackLocktime,
+		InputCount:       inputCount,
+		OutputCount:      outputCount,
+		TxVersion:        txVersion,
+		TxModifiable:     txModifiable,
 	}
 
 	// Extended sanity checking is applied here to make sure the
 	// externally-passed Packet follows all the rules.
-	if err = newPsbt.SanityCheck(); err != nil {
+	err := newPsbt.SanityCheck()
+	if err != nil {
 		return nil, err
 	}
 
@@ -338,35 +606,115 @@ func (p *Packet) Serialize(w io.Writer) error {
 		return err
 	}
 
-	// Next we prep to write out the unsigned transaction by first
-	// serializing it into an intermediate buffer.
-	serializedTx := bytes.NewBuffer(
-		make([]byte, 0, p.UnsignedTx.SerializeSize()),
-	)
-	if err := p.UnsignedTx.SerializeNoWitness(serializedTx); err != nil {
-		return err
-	}
-
-	// Now that we have the serialized transaction, we'll write it out to
-	// the proper global type.
-	err := serializeKVPairWithType(
-		w, uint8(UnsignedTxType), nil, serializedTx.Bytes(),
-	)
-	if err != nil {
-		return err
-	}
-
-	// Serialize the global xPubs.
-	for _, xPub := range p.XPubs {
-		pathBytes := SerializeBIP32Derivation(
-			xPub.MasterKeyFingerprint, xPub.Bip32Path,
+	switch p.Version {
+	case 0:
+		// Next we prep to write out the unsigned transaction by first
+		// serializing it into an intermediate buffer.
+		if p.UnsignedTx == nil {
+			return ErrInvalidPsbtFormat
+		}
+		serializedTx := bytes.NewBuffer(
+			make([]byte, 0, p.UnsignedTx.SerializeSize()),
 		)
+		if err := p.UnsignedTx.SerializeNoWitness(serializedTx); err != nil {
+			return err
+		}
+		// Now that we have the serialized transaction, we'll write it out to
+		// the proper global type.
+		// Key 0x00: UnsignedTxType
 		err := serializeKVPairWithType(
-			w, uint8(XPubType), xPub.ExtendedKey, pathBytes,
+			w, uint8(UnsignedTxType), nil, serializedTx.Bytes(),
 		)
 		if err != nil {
 			return err
 		}
+
+		// Serialize the global xPubs.
+		// Key 0x01: XPubType
+		for _, xPub := range p.XPubs {
+			pathBytes := SerializeBIP32Derivation(
+				xPub.MasterKeyFingerprint, xPub.Bip32Path,
+			)
+			err := serializeKVPairWithType(
+				w, uint8(XPubType), xPub.ExtendedKey, pathBytes,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+	case 2:
+		// Serialize the global xPubs.
+		// Key 0x01: XPubType
+		for _, xPub := range p.XPubs {
+			pathBytes := SerializeBIP32Derivation(
+				xPub.MasterKeyFingerprint, xPub.Bip32Path,
+			)
+			err := serializeKVPairWithType(
+				w, uint8(XPubType), xPub.ExtendedKey, pathBytes,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		var buf [4]byte
+
+		// Key 0x02: TxVersion
+		binary.LittleEndian.PutUint32(buf[:], p.TxVersion)
+		err := serializeKVPairWithType(w, uint8(TxVersionGlobalType), nil, buf[:])
+		if err != nil {
+			return err
+		}
+
+		// Key 0x03: FallbackLocktime
+		if p.FallbackLocktime != 0 {
+			binary.LittleEndian.PutUint32(buf[:], p.FallbackLocktime)
+			err = serializeKVPairWithType(w, uint8(FallbackLocktimeGlobalType), nil, buf[:])
+			if err != nil {
+				return err
+			}
+		}
+
+		// Key 0x04: InputCount
+		// Input and Output counts are compact size uints
+		var countBuf bytes.Buffer
+		err = wire.WriteVarInt(&countBuf, 0, uint64(p.InputCount))
+		if err != nil {
+			return err
+		}
+		err = serializeKVPairWithType(w, uint8(InputCountGlobalType), nil, countBuf.Bytes())
+		if err != nil {
+			return err
+		}
+
+		// Key 0x05: OutputCount
+		countBuf.Reset()
+		err = wire.WriteVarInt(&countBuf, 0, uint64(p.OutputCount))
+		if err != nil {
+			return err
+		}
+		err = serializeKVPairWithType(w, uint8(OutputCountGlobalType), nil, countBuf.Bytes())
+		if err != nil {
+			return err
+		}
+
+		// Key 0x06: TxModifiable
+		if p.TxModifiable != 0 {
+			err = serializeKVPairWithType(w, uint8(TxModifiableGlobalType), nil, []byte{p.TxModifiable})
+			if err != nil {
+				return err
+			}
+		}
+
+		// Key 0xfb: PSBT Version
+		binary.LittleEndian.PutUint32(buf[:], 2)
+		if err := serializeKVPairWithType(w, uint8(VersionType), nil, buf[:]); err != nil {
+			return err
+		}
+
+	default:
+		return ErrInvalidPsbtFormat
 	}
 
 	// Unknown is a special case; we don't have a key type, only a key and
@@ -386,7 +734,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 	}
 
 	for _, pInput := range p.Inputs {
-		err := pInput.serialize(w)
+		err := pInput.serialize(w, p.Version)
 		if err != nil {
 			return err
 		}
@@ -397,7 +745,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 	}
 
 	for _, pOutput := range p.Outputs {
-		err := pOutput.serialize(w)
+		err := pOutput.serialize(w, p.Version)
 		if err != nil {
 			return err
 		}
@@ -426,7 +774,7 @@ func (p *Packet) B64Encode() (string, error) {
 // whether the final extraction to a network serialized signed
 // transaction will be possible.
 func (p *Packet) IsComplete() bool {
-	for i := 0; i < len(p.UnsignedTx.TxIn); i++ {
+	for i := 0; i < len(p.Inputs); i++ {
 		if !isFinalized(p, i) {
 			return false
 		}
@@ -434,11 +782,23 @@ func (p *Packet) IsComplete() bool {
 	return true
 }
 
-// SanityCheck checks conditions on a PSBT to ensure that it obeys the
-// rules of BIP174, and returns true if so, false if not.
+// SanityCheck checks conditions on a PSBT to ensure that it obeys the rules of
+// BIP174 and BIP0370, and returns an error if not.
 func (p *Packet) SanityCheck() error {
-	if !validateUnsignedTX(p.UnsignedTx) {
-		return ErrInvalidRawTxSigned
+	switch p.Version {
+	case 0:
+		if p.UnsignedTx == nil {
+			return ErrInvalidPsbtFormat
+		}
+		if !validateUnsignedTX(p.UnsignedTx) {
+			return ErrInvalidRawTxSigned
+		}
+	case 2:
+		if p.UnsignedTx != nil {
+			return ErrInvalidPsbtFormat
+		}
+	default:
+		return ErrInvalidPsbtFormat
 	}
 
 	for _, tin := range p.Inputs {
@@ -459,10 +819,50 @@ func (p *Packet) GetTxFee() (btcutil.Amount, error) {
 	}
 
 	var sumOutputs int64
-	for _, txOut := range p.UnsignedTx.TxOut {
-		sumOutputs += txOut.Value
+	for _, pout := range p.Outputs {
+		sumOutputs += pout.Amount
+	}
+	// fallback for v0 PSBTs, which don't have explicit input UTXO information;
+	if p.Version < 2 {
+		sumOutputs = 0
+		for _, txOut := range p.UnsignedTx.TxOut {
+			sumOutputs += txOut.Value
+		}
 	}
 
 	fee := sumInputs - sumOutputs
 	return btcutil.Amount(fee), nil
+}
+
+// isSaneKey is a helper function that checks if a key that is expected to have
+// no extra key data actually has some. If it does, it marks the key as unknown
+// so that it can be processed as an unknown field rather than causing a
+// validation error.
+func isSaneKey(keyData []byte, isUnknown *bool) bool {
+	if keyData != nil {
+		*isUnknown = true
+		return false
+	}
+	return true
+}
+
+// addUnknownField adds an unknown key-value pair to a slice after checking for duplicates.
+// This function is used by both PInput and POutput to handle unknown fields consistently.
+func addUnknownField(unknowns *[]*Unknown, keyCode byte, keyData, value []byte) error {
+	keyCodeAndData := append([]byte{keyCode}, keyData...)
+	newUnknown := &Unknown{
+		Key:   keyCodeAndData,
+		Value: value,
+	}
+
+	// Duplicate key+keyData combinations are not allowed (per PSBT spec)
+	for _, x := range *unknowns {
+		if bytes.Equal(x.Key, newUnknown.Key) &&
+			bytes.Equal(x.Value, newUnknown.Value) {
+			return ErrDuplicateKey
+		}
+	}
+
+	*unknowns = append(*unknowns, newUnknown)
+	return nil
 }
