@@ -111,7 +111,17 @@ func isFinalizableLegacyInput(p *Packet, pInput *PInput, inIndex int) bool {
 
 	// Otherwise, we'll verify that we only have a RedeemScript if the prev
 	// output script is P2SH.
-	outIndex := p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	var outIndex uint32
+	switch p.Version {
+	case 0:
+		if p.UnsignedTx == nil {
+			return false
+		}
+		outIndex = p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	default:
+		outIndex = pInput.OutputIndex
+	}
+
 	if txscript.IsPayToScriptHash(pInput.NonWitnessUtxo.TxOut[outIndex].PkScript) {
 		if pInput.RedeemScript == nil {
 			return false
@@ -186,7 +196,8 @@ func MaybeFinalize(p *Packet, inIndex int) (bool, error) {
 // MaybeFinalizeAll attempts to finalize all inputs of the psbt.Packet that are
 // not already finalized, and returns an error if it fails to do so.
 func MaybeFinalizeAll(p *Packet) error {
-	for i := range p.UnsignedTx.TxIn {
+	numInputs := len(p.Inputs)
+	for i := 0; i < numInputs; i++ {
 		success, err := MaybeFinalize(p, i)
 		if err != nil || !success {
 			return err
@@ -351,6 +362,9 @@ func finalizeNonWitnessInput(p *Packet, inIndex int) error {
 	newInput := NewPsbtInput(pInput.NonWitnessUtxo, nil)
 	newInput.FinalScriptSig = sigScript
 
+	// Preserve required PSBTv2 fields and unknowns as mandated by BIP-370
+	newInput.CopyInputFields(&pInput)
+
 	// Overwrite the entry in the input list at the correct index. Note
 	// that this removes all the other entries in the list for this input
 	// index.
@@ -493,6 +507,9 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 
 	newInput.FinalScriptWitness = serializedWitness
 
+	// Preserve required PSBTv2 fields and unknowns as mandated by BIP-370
+	newInput.CopyInputFields(&pInput)
+
 	// Finally, we overwrite the entry in the input list at the correct
 	// index.
 	p.Inputs[inIndex] = *newInput
@@ -589,6 +606,9 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 	// finalscriptwitness (08).
 	newInput := NewPsbtInput(nil, pInput.WitnessUtxo)
 	newInput.FinalScriptWitness = serializedWitness
+
+	// Preserve required PSBTv2 fields and unknowns as mandated by BIP-370
+	newInput.CopyInputFields(pInput)
 
 	// Finally, we overwrite the entry in the input list at the correct
 	// index.
