@@ -44,6 +44,31 @@ const (
 	//
 	// The value is any data as defined by the proprietary type user.
 	ProprietaryGlobalType = 0xFC
+
+	// TxVersion is the PSBT version number.
+	// The key is {0x02}.
+	// The value is a 32-bit little endian unsigned integer for the version number.
+	TxVersionGlobalType GlobalType = 0x02
+
+	// FallbackLocktime is the fallback locktime for the transaction.
+	// The key is {0x03}.
+	// The value is a 32-bit little endian unsigned integer.
+	FallbackLocktimeGlobalType GlobalType = 0x03
+
+	// InputCount is the number of inputs in this PSBT.
+	// The key is {0x04}.
+	// The value is a compact size unsigned integer.
+	InputCountGlobalType GlobalType = 0x04
+
+	// OutputCount is the number of outputs in this PSBT.
+	// The key is {0x05}.
+	// The value is a compact size unsigned integer.
+	OutputCountGlobalType GlobalType = 0x05
+
+	// TxModifiable is a bitfield denoting the modifiability of the transaction.
+	// The key is {0x06}.
+	// The value is an 8-bit unsigned integer.
+	TxModifiableGlobalType GlobalType = 0x06
 )
 
 // InputType is the set of types that are defined for each input included
@@ -159,6 +184,31 @@ const (
 	//
 	// The value is any value data as defined by the proprietary type user.
 	ProprietaryInputType InputType = 0xFC
+
+	// PreviousTxid is the txid of the previous transaction.
+	// The key is {0x0E}.
+	// The value is a 32-byte txid.
+	PreviousTxidInputType InputType = 0x0E
+
+	// OutputIndex is the output index of the previous transaction.
+	// The key is {0x0F}.
+	// The value is a 32-bit little endian unsigned integer.
+	OutputIndexInputType InputType = 0x0F
+
+	// TimeLocktime is the time-based locktime for this input.
+	// The key is {0x11}.
+	// The value is a 32-bit little endian unsigned integer.
+	TimeLocktimeInputType InputType = 0x11
+
+	// HeightLocktime is the height-based locktime for this input.
+	// The key is {0x12}.
+	// The value is a 32-bit little endian unsigned integer.
+	HeightLocktimeInputType InputType = 0x12
+
+	// Sequence is the sequence number for this input.
+	// The key is {0x10}.
+	// The value is a 32-bit little endian unsigned integer.
+	SequenceInputType InputType = 0x10
 )
 
 // OutputType is the set of types defined per output within the PSBT.
@@ -200,4 +250,14 @@ const (
 	// followed by said number of 32-byte leaf hashes. The rest of the value
 	// is then identical to the Bip32DerivationInputType value.
 	TaprootBip32DerivationOutputType OutputType = 7
+
+	// Amount is the value of this output.
+	// The key is {0x03}.
+	// The value is an 8-byte little endian unsigned integer.
+	AmountOutputType OutputType = 0x03
+
+	// Script is the locking script for this output.
+	// The key is {0x04}.
+	// The value is the scriptPubkey.
+	ScriptOutputType OutputType = 0x04
 )
