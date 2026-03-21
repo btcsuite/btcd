@@ -1250,6 +1250,167 @@ func TestCopyInputFieldsPreservesV2Fields(t *testing.T) {
 	require.NotEqual(t, src.Unknowns[0].Value[0], dst.Unknowns[0].Value[0])
 }
 
+// TestV2FinalizePreservesProtectedFields covers BIP-370's field-preservation
+// rule for the Input Finalizer: when an input is finalized it must keep
+// PSBT_IN_PREVIOUS_TXID, PSBT_IN_OUTPUT_INDEX, PSBT_IN_SEQUENCE,
+// PSBT_IN_REQUIRED_TIME_LOCKTIME and PSBT_IN_REQUIRED_HEIGHT_LOCKTIME,
+// while signature data is cleared per BIP-174. Exercises all three paths:
+// legacy p2pkh (NonWitnessUtxo), witness p2wkh and taproot p2tr key-spend
+// (WitnessUtxo).
+func TestV2FinalizePreservesProtectedFields(t *testing.T) {
+	// Fixed values for the five protected fields.
+	wantTxid := testTxid(0x01)
+	wantOutputIndex := uint32(2)
+	wantSequence := uint32(0xfffffffe)
+	wantTime := uint32(1600000000)
+	wantHeight := uint32(300000)
+
+	// Fixed key material: 33-byte "pubkey" and a 71-byte "sig" whose
+	// last byte is SIGHASH_ALL (what checkSigHashFlags looks for).
+	pubKey := bytes.Repeat([]byte{0x02}, 33)
+	sig := append(bytes.Repeat([]byte{0x30}, 70), 0x01)
+
+	// Scripts, decoded from hex to keep the layouts obvious:
+	//   p2pkh: OP_DUP OP_HASH160 <20> OP_EQUALVERIFY OP_CHECKSIG
+	//   p2wkh: OP_0 <20>
+	//   p2tr:  OP_1 <32>
+	mustHex := func(s string) []byte {
+		b, err := hex.DecodeString(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	p2pkh := mustHex("76a914" +
+		"1111111111111111111111111111111111111111" + "88ac")
+	p2wkh := mustHex("0014" +
+		"2222222222222222222222222222222222222222")
+	p2tr := mustHex("5120" +
+		"3333333333333333333333333333333333333333" +
+		"333333333333333333333333")
+
+	cases := []struct {
+		name string
+		// setup populates the UTXO + signature data for one path.
+		setup func(p *Packet)
+		// wantFinalSig / wantFinalWitness: which final field must
+		// exist after Finalize.
+		wantFinalSig     bool
+		wantFinalWitness bool
+	}{
+		{
+			name: "legacy p2pkh (NonWitnessUtxo)",
+			setup: func(p *Packet) {
+				prevTx := wire.NewMsgTx(2)
+				prevTx.AddTxIn(&wire.TxIn{
+					PreviousOutPoint: *wire.NewOutPoint(
+						testTxid(0xEE), 0,
+					),
+				})
+				// Three outputs so OutputIndex 2 is valid.
+				for i := 0; i < 3; i++ {
+					prevTx.AddTxOut(
+						wire.NewTxOut(
+							int64(1000*(i+1)),
+							p2pkh,
+						),
+					)
+				}
+				p.Inputs[0].NonWitnessUtxo = prevTx
+				p.Inputs[0].PartialSigs = []*PartialSig{{
+					PubKey:    pubKey,
+					Signature: sig,
+				}}
+			},
+			wantFinalSig: true,
+		},
+		{
+			name: "witness p2wkh (WitnessUtxo)",
+			setup: func(p *Packet) {
+				p.Inputs[0].WitnessUtxo = wire.NewTxOut(
+					50000, p2wkh,
+				)
+				p.Inputs[0].PartialSigs = []*PartialSig{{
+					PubKey:    pubKey,
+					Signature: sig,
+				}}
+			},
+			wantFinalWitness: true,
+		},
+		{
+			name: "taproot p2tr key-spend (WitnessUtxo)",
+			setup: func(p *Packet) {
+				p.Inputs[0].WitnessUtxo = wire.NewTxOut(
+					50000, p2tr,
+				)
+				// 64-byte schnorr sig; SighashType stays 0
+				// (SigHashDefault) so it's used as-is.
+				p.Inputs[0].TaprootKeySpendSig =
+					bytes.Repeat([]byte{0x11}, 64)
+			},
+			wantFinalWitness: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := NewV2(2, nil, ptrUint8(3))
+			require.NoError(t, err)
+
+			// The input carries all five protected fields.
+			require.NoError(t, p.AddInputV2(PInput{
+				PreviousTxid:   wantTxid[:],
+				OutputIndex:    wantOutputIndex,
+				Sequence:       wantSequence,
+				TimeLocktime:   wantTime,
+				HeightLocktime: wantHeight,
+			}))
+			require.NoError(t, p.AddOutputV2(POutput{
+				Amount: 1000, Script: []byte{0x51},
+			}))
+
+			tc.setup(p)
+
+			require.NoError(t, Finalize(p, 0))
+
+			in := p.Inputs[0]
+
+			// All five protected fields must survive.
+			require.True(t, bytes.Equal(
+				in.PreviousTxid, wantTxid[:],
+			), "PreviousTxid not preserved")
+			require.Equal(t, wantOutputIndex, in.OutputIndex,
+				"OutputIndex not preserved")
+			require.Equal(t, wantSequence, in.Sequence,
+				"Sequence not preserved")
+			require.Equal(t, wantTime, in.TimeLocktime,
+				"TimeLocktime not preserved")
+			require.Equal(t, wantHeight, in.HeightLocktime,
+				"HeightLocktime not preserved")
+
+			// Signature data must be cleared (BIP-174).
+			require.Empty(t, in.PartialSigs,
+				"PartialSigs not cleared")
+			require.Empty(t, in.TaprootKeySpendSig,
+				"TaprootKeySpendSig not cleared")
+
+			// The right final field must exist.
+			if tc.wantFinalSig {
+				require.NotEmpty(t, in.FinalScriptSig,
+					"FinalScriptSig missing")
+			}
+			if tc.wantFinalWitness {
+				require.NotEmpty(t, in.FinalScriptWitness,
+					"FinalScriptWitness missing")
+			}
+
+			// Packet must report complete.
+			require.True(t, p.IsComplete(),
+				"packet not complete after Finalize")
+		})
+	}
+}
+
 // ==========================================================================
 // 10. SanityCheck Tests
 // ==========================================================================

@@ -28,7 +28,8 @@ func Extract(p *Packet) (*wire.MsgTx, error) {
 	}
 
 	// First, we'll get a fresh copy of the underlying unsigned transaction
-	// (the initial template) so we don't mutate it during our activates below.
+	// (the initial template) so we don't mutate it during our activates
+	// below.
 	finalTx, err := p.GetUnsignedTx()
 	if err != nil {
 		return nil, err
