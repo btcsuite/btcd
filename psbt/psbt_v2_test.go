@@ -1367,6 +1367,223 @@ func TestV2OutputCountMismatchFails(t *testing.T) {
 }
 
 // ==========================================================================
+// 12b. Constructor add-path validation per BIP-370
+// ==========================================================================
+
+// TestV2AddInputV2RejectsBadFields covers BIP-370's required-txid rule
+// plus the locktime value ranges the parser enforces on the way in.
+func TestV2AddInputV2RejectsBadFields(t *testing.T) {
+	zeroTxid := make([]byte, 32)
+	shortTxid := make([]byte, 16)
+
+	tests := []struct {
+		name  string
+		input PInput
+	}{
+		{
+			name: "nil previous txid",
+			input: PInput{
+				OutputIndex: 0,
+				Sequence:    0xffffffff,
+			},
+		},
+		{
+			name: "short previous txid",
+			input: PInput{
+				PreviousTxid: shortTxid,
+				OutputIndex:  0,
+				Sequence:     0xffffffff,
+			},
+		},
+		{
+			name: "all-zero previous txid",
+			input: PInput{
+				PreviousTxid: zeroTxid,
+				OutputIndex:  0,
+				Sequence:     0xffffffff,
+			},
+		},
+		{
+			name: "time locktime below threshold",
+			input: PInput{
+				PreviousTxid: testTxid(0x01)[:],
+				OutputIndex:  0,
+				Sequence:     0xffffffff,
+				TimeLocktime: 100,
+			},
+		},
+		{
+			name: "height locktime at threshold",
+			input: PInput{
+				PreviousTxid:   testTxid(0x01)[:],
+				OutputIndex:    0,
+				Sequence:       0xffffffff,
+				HeightLocktime: 500000000,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := NewV2(2, ptrUint32(0), ptrUint8(3))
+			require.NoError(t, err)
+
+			err = p.AddInputV2(tc.input)
+			require.Error(t, err)
+
+			// A rejected add must leave the packet untouched.
+			require.Empty(t, p.Inputs)
+			require.Equal(t, uint32(0), p.InputCount)
+		})
+	}
+}
+
+// TestV2AddInputV2LocktimeRules covers BIP-370's locktime rules: incompatible
+// timelock rejected regardless of sigs; locktime change rejected only
+// when existing inputs carry signatures.
+func TestV2AddInputV2LocktimeRules(t *testing.T) {
+	// makeTimePkt returns a packet with one TIME-locked input, optionally
+	// carrying a partial signature.
+	makeTimePkt := func(withSig bool) *Packet {
+		p, err := NewV2(2, ptrUint32(0), ptrUint8(3))
+		require.NoError(t, err)
+
+		in := PInput{
+			PreviousTxid: testTxid(0x01)[:],
+			OutputIndex:  0,
+			Sequence:     0xffffffff,
+			TimeLocktime: 1600000000,
+		}
+		if withSig {
+			in.PartialSigs = []*PartialSig{
+				{PubKey: []byte{0x02}, Signature: []byte{0x30}},
+			}
+		}
+		require.NoError(t, p.AddInputV2(in))
+		return p
+	}
+
+	t.Run("incompatible timelock rejected, no sigs", func(t *testing.T) {
+		p := makeTimePkt(false)
+		err := p.AddInputV2(PInput{
+			PreviousTxid:   testTxid(0x02)[:],
+			OutputIndex:    0,
+			Sequence:       0xffffffff,
+			HeightLocktime: 300000,
+		})
+		require.ErrorIs(t, err, ErrLockTimeConflict)
+		require.Len(t, p.Inputs, 1)
+	})
+
+	t.Run("incompatible timelock rejected, with sigs", func(t *testing.T) {
+		p := makeTimePkt(true)
+		err := p.AddInputV2(PInput{
+			PreviousTxid:   testTxid(0x02)[:],
+			OutputIndex:    0,
+			Sequence:       0xffffffff,
+			HeightLocktime: 300000,
+		})
+		require.ErrorIs(t, err, ErrLockTimeConflict)
+		require.Len(t, p.Inputs, 1)
+	})
+
+	t.Run("locktime change rejected when sigs exist", func(t *testing.T) {
+		p := makeTimePkt(true)
+		// Second TIME input with a higher locktime would raise the
+		// determined locktime — forbidden while sigs exist.
+		err := p.AddInputV2(PInput{
+			PreviousTxid: testTxid(0x02)[:],
+			OutputIndex:  0,
+			Sequence:     0xffffffff,
+			TimeLocktime: 1700000000,
+		})
+		require.ErrorIs(t, err, ErrLockTimeImmutable)
+		require.Len(t, p.Inputs, 1)
+	})
+
+	t.Run("locktime change allowed without sigs", func(t *testing.T) {
+		p := makeTimePkt(false)
+		err := p.AddInputV2(PInput{
+			PreviousTxid: testTxid(0x02)[:],
+			OutputIndex:  0,
+			Sequence:     0xffffffff,
+			TimeLocktime: 1700000000,
+		})
+		require.NoError(t, err)
+		require.Len(t, p.Inputs, 2)
+
+		// Round-trip guarantee: an accepted add must serialize
+		// and reparse cleanly.
+		var buf bytes.Buffer
+		require.NoError(t, p.Serialize(&buf))
+		_, err = NewFromRawBytes(bytes.NewReader(buf.Bytes()), false)
+		require.NoError(t, err)
+	})
+
+	t.Run("non-locktime add allowed with sigs", func(t *testing.T) {
+		p := makeTimePkt(true)
+		err := p.AddInputV2(PInput{
+			PreviousTxid: testTxid(0x02)[:],
+			OutputIndex:  0,
+			Sequence:     0xffffffff,
+		})
+		require.NoError(t, err)
+		require.Len(t, p.Inputs, 2)
+	})
+}
+
+// TestV2AddOutputV2RejectsNilScript covers BIP-370's required-script rule.
+func TestV2AddOutputV2RejectsNilScript(t *testing.T) {
+	p, err := NewV2(2, ptrUint32(0), ptrUint8(3))
+	require.NoError(t, err)
+
+	err = p.AddOutputV2(POutput{Amount: 1000, Script: nil})
+	require.Error(t, err)
+	require.Empty(t, p.Outputs)
+	require.Equal(t, uint32(0), p.OutputCount)
+}
+
+// TestV2NilTxModifiableAllowsAdd covers BIP-370's rule that
+// PSBT_GLOBAL_TX_MODIFIABLE may be omitted when the Creator is also
+// the Constructor: with the field absent, AddInputV2 and AddOutputV2
+// must treat the packet as modifiable and succeed. Adds are still
+// rejected when the field is present with the relevant bit clear.
+func TestV2NilTxModifiableAllowsAdd(t *testing.T) {
+	p, err := NewV2(2, nil, nil)
+	require.NoError(t, err)
+	require.Nil(t, p.TxModifiable)
+
+	// Both adds must succeed with the field absent.
+	require.NoError(t, p.AddInputV2(PInput{
+		PreviousTxid: testTxid(0x01)[:],
+		OutputIndex:  0,
+		Sequence:     0xffffffff,
+	}))
+	require.NoError(t, p.AddOutputV2(POutput{
+		Amount: 1000, Script: []byte{0x51},
+	}))
+
+	require.Equal(t, uint32(1), p.InputCount)
+	require.Equal(t, uint32(1), p.OutputCount)
+
+	// Sanity: with the field present and the bit clear, adds are
+	// still rejected (the nil case is the exception, not the rule).
+	p2, err := NewV2(2, nil, ptrUint8(0))
+	require.NoError(t, err)
+	require.Error(t, p2.AddInputV2(PInput{
+		PreviousTxid: testTxid(0x01)[:],
+		OutputIndex:  0,
+		Sequence:     0xffffffff,
+	}), "bit-clear input must still be rejected")
+
+	p3, err := NewV2(2, nil, ptrUint8(0))
+	require.NoError(t, err)
+	require.Error(t, p3.AddOutputV2(POutput{
+		Amount: 1000, Script: []byte{0x51},
+	}), "bit-clear output must still be rejected")
+}
+
+// ==========================================================================
 // 13. Amount Type Tests
 // ==========================================================================
 
@@ -1922,7 +2139,7 @@ func TestV0RejectsV2InputFields(t *testing.T) {
 }
 
 // ==========================================================================
-// 14. BIP 370 Test Vectors
+// 14. BIP-370 Test Vectors
 // ==========================================================================
 
 func TestBIP370InvalidVectors(t *testing.T) {
