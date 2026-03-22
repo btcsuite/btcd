@@ -115,7 +115,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	// The algorithm for producing a BIP-340 signature is described in
 	// README.md and is reproduced here for reference:
 	//
-	// 1. Fail if m is not 32 bytes
+	// 1. Fail if m is not 32 bytes - skipped as no longer required
 	// 2. P = lift_x(int(pk)).
 	// 3. r = int(sig[0:32]); fail is r >= p.
 	// 4. s = int(sig[32:64]); fail if s >= n.
@@ -128,12 +128,12 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 
 	// Step 1.
 	//
-	// Fail if m is not 32 bytes
-	if len(hash) != scalarSize {
-		str := fmt.Sprintf("wrong size for message (got %v, want %v)",
-			len(hash), scalarSize)
-		return signatureError(ecdsa_schnorr.ErrInvalidHashLen, str)
-	}
+	// Fail if m is not 32 bytes - skipped as no longer required
+	// if len(hash) != scalarSize {
+	//	str := fmt.Sprintf("wrong size for message (got %v, want %v)",
+	//		len(hash), scalarSize)
+	//	return signatureError(ecdsa_schnorr.ErrInvalidHashLen, str)
+	// }
 
 	// Step 2.
 	//
@@ -259,7 +259,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// r, s = signature
 	//
 	// 1. d' = int(d)
-	// 2. Fail if m is not 32 bytes
+	// 2. Fail if m is not 32 bytes - skipped as no longer required
 	// 3. Fail if d = 0 or d >= n
 	// 4. P = d'*G
 	// 5. Negate d if P.y is odd
@@ -436,12 +436,12 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 
 	// Step 2.
 	//
-	// Fail if m is not 32 bytes
-	if len(hash) != scalarSize {
-		str := fmt.Sprintf("wrong size for message hash (got %v, want %v)",
-			len(hash), scalarSize)
-		return nil, signatureError(ecdsa_schnorr.ErrInvalidHashLen, str)
-	}
+	// Fail if m is not 32 bytes - skipped as no longer required
+	// if len(hash) != scalarSize {
+	//	str := fmt.Sprintf("wrong size for message hash (got %v, want %v)",
+	//		len(hash), scalarSize)
+	//	return nil, signatureError(ecdsa_schnorr.ErrInvalidHashLen, str)
+	// }
 
 	// Step 3.
 	//
