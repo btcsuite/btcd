@@ -798,12 +798,14 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		}
 
 		// Configure basic access authorization.
-		user, pass, err := c.config.getAuth()
-		if err != nil {
-			jReq.responseChan <- &Response{result: nil, err: err}
-			return
+		if !c.config.DisableAuth {
+			user, pass, err := c.config.getAuth()
+			if err != nil {
+				jReq.responseChan <- &Response{result: nil, err: err}
+				return
+			}
+			httpReq.SetBasicAuth(user, pass)
 		}
-		httpReq.SetBasicAuth(user, pass)
 
 		httpResponse, err = c.httpClient.Do(httpReq)
 
@@ -1276,6 +1278,12 @@ type ConnConfig struct {
 	// however, not all servers support the websocket extensions, so this
 	// flag can be set to true to use basic HTTP POST requests instead.
 	HTTPPostMode bool
+
+	// DisableAuth specifies that no authorization (Basic Auth or Cookie)
+	// should be sent when using HTTP POST mode. This is useful when
+	// connecting to third-party RPC providers that authenticate via
+	// API key in the URL path or other mechanisms.
+	DisableAuth bool
 
 	// ExtraHeaders specifies the extra headers when perform request. It's
 	// useful when RPC provider need customized headers.
