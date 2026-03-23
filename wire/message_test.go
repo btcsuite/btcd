@@ -203,7 +203,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 
 	// Wire encoded bytes for a message that exceeds max overall message
 	// length.
-	mpl := uint32(MaxMessagePayload)
+	mpl := uint32(MaxProtocolMessageLength)
 	exceedMaxPayloadBytes := makeHeader(btcnet, "getaddr", mpl+1, 0)
 
 	// Wire encoded bytes for a command which is invalid utf-8.
@@ -392,7 +392,7 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	encodeErrMsg := &fakeMessage{forceEncodeErr: true}
 
 	// Fake message that has payload which exceeds max overall message size.
-	exceedOverallPayload := make([]byte, MaxMessagePayload+1)
+	exceedOverallPayload := make([]byte, MaxProtocolMessageLength+1)
 	exceedOverallPayloadErrMsg := &fakeMessage{payload: exceedOverallPayload}
 
 	// Fake message that has payload which exceeds max allowed per message.
