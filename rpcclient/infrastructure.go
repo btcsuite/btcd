@@ -100,14 +100,15 @@ const (
 	defaultHTTPTimeout = time.Minute
 )
 
-// jsonRequest holds information about a json request that is used to properly
-// detect, interpret, and deliver a reply to it.
+// jsonRequest holds information about a json request that is used
+// to properly detect, interpret, and deliver a reply to it.
 type jsonRequest struct {
 	id             uint64
 	method         string
 	cmd            interface{}
 	marshalledJSON []byte
 	responseChan   chan *Response
+	ctx            context.Context
 }
 
 // Client represents a Bitcoin RPC client which allows easy access to the
@@ -786,7 +787,15 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		var httpReq *http.Request
 
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err = http.NewRequest("POST", httpURL, bodyReader)
+
+		reqCtx := context.Background()
+		if jReq.ctx != nil {
+			reqCtx = jReq.ctx
+		}
+
+		httpReq, err = http.NewRequestWithContext(
+			reqCtx, "POST", httpURL, bodyReader,
+		)
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
@@ -831,6 +840,12 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		case <-time.After(backoff):
 
 		case <-c.shutdown:
+			return
+
+		case <-reqCtx.Done():
+			jReq.responseChan <- &Response{
+				err: reqCtx.Err(),
+			}
 			return
 		}
 	}
@@ -1038,6 +1053,47 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 		cmd:            cmd,
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
+	}
+
+	c.sendRequest(jReq)
+
+	return responseChan
+}
+
+// SendCmdWithContext sends the passed command with the given context.
+// The context is used to cancel the underlying HTTP request in
+// HTTP POST mode. In websocket mode the context is currently
+// ignored. The returned channel delivers the response.
+func (c *Client) SendCmdWithContext(
+	ctx context.Context, cmd interface{},
+) chan *Response {
+
+	rpcVersion := btcjson.RpcVersion1
+	if c.batch {
+		rpcVersion = btcjson.RpcVersion2
+	}
+
+	method, err := btcjson.CmdMethod(cmd)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	id := c.NextID()
+	marshalledJSON, err := btcjson.MarshalCmd(
+		rpcVersion, id, cmd,
+	)
+	if err != nil {
+		return newFutureError(err)
+	}
+
+	responseChan := make(chan *Response, 1)
+	jReq := &jsonRequest{
+		id:             id,
+		method:         method,
+		cmd:            cmd,
+		marshalledJSON: marshalledJSON,
+		responseChan:   responseChan,
+		ctx:            ctx,
 	}
 
 	c.sendRequest(jReq)

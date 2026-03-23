@@ -7,6 +7,7 @@ package rpcclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 
@@ -302,10 +303,23 @@ func (c *Client) GetBlockCountAsync() FutureGetBlockCountResult {
 	return c.SendCmd(cmd)
 }
 
-// GetBlockCount returns the height of the most-work fully-validated chain.
-// The genesis block has height 0.
+// GetBlockCount returns the height of the most-work fully-validated
+// chain. The genesis block has height 0.
 func (c *Client) GetBlockCount() (int64, error) {
 	return c.GetBlockCountAsync().Receive()
+}
+
+// GetBlockCountWithContext is the context-aware variant of
+// GetBlockCount. The provided context controls the lifetime of
+// the underlying HTTP request in HTTP POST mode.
+func (c *Client) GetBlockCountWithContext(
+	ctx context.Context,
+) (int64, error) {
+
+	cmd := btcjson.NewGetBlockCountCmd()
+	return FutureGetBlockCountResult(
+		c.SendCmdWithContext(ctx, cmd),
+	).Receive()
 }
 
 // FutureGetChainTxStatsResult is a future promise to deliver the result of a
