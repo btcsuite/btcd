@@ -154,11 +154,15 @@ func (b *BlockChain) maybeAcceptBlockHeader(header *wire.BlockHeader,
 			return false, ruleError(ErrInvalidAncestorBlock, str)
 		}
 
-		// If the node is in the bestHeaders chainview, it's in the main chain.
-		// If it isn't, then we'll go through the verification process below.
+		// The header already exists in the block index and is not
+		// invalid.  If it is in the best header chain, report it as
+		// main chain.  Otherwise it is a known side-chain header and
+		// we can skip re-validation entirely.
 		if b.bestHeader.Contains(node) {
 			return true, nil
 		}
+
+		return false, nil
 	}
 
 	// Perform context-free sanity checks on the block header.
@@ -180,11 +184,9 @@ func (b *BlockChain) maybeAcceptBlockHeader(header *wire.BlockHeader,
 	// Note that the additional information for the actual transactions and
 	// witnesses in the block can't be populated until the full block data is
 	// known since that information is not available in the header.
-	if node == nil {
-		node = newBlockNode(header, prevNode)
-		node.status = statusHeaderStored
-		b.index.AddNode(node)
-	}
+	node = newBlockNode(header, prevNode)
+	node.status = statusHeaderStored
+	b.index.AddNode(node)
 
 	// Flush the block index to database at this point since we added the
 	// node.

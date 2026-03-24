@@ -137,13 +137,6 @@ type pauseMsg struct {
 	unpause <-chan struct{}
 }
 
-// headerNode is used as a node in a list of headers that are linked together
-// between checkpoints.
-type headerNode struct {
-	height int32
-	hash   *chainhash.Hash
-}
-
 // peerSyncState stores additional information that the SyncManager tracks
 // about a peer.
 type peerSyncState struct {
@@ -200,6 +193,12 @@ type SyncManager struct {
 	// The following fields are used for the initial block download mode.
 	ibdMode bool
 
+	// lastBlockRequested tracks the highest header height for which a
+	// block getdata request has been sent.  This allows buildBlockRequest
+	// to skip already-requested ranges instead of re-scanning from the
+	// fork point on every call.
+	lastBlockRequested int32
+
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
 }
@@ -234,15 +233,46 @@ func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoi
 
 // fetchHigherPeers returns all the peers that are at a higher block than the
 // given height.  The peers that are not sync candidates are omitted from the
-// returned list.
+// returned list.  When the segwit soft-fork is active, non-witness peers are
+// also skipped to ensure we only sync fully validated blockchain data.
+//
+// As a side effect, peers whose last advertised block is below the given
+// height are demoted from sync candidate status so they are not repeatedly
+// considered in future sync rounds.
 func (sm *SyncManager) fetchHigherPeers(height int32) []*peerpkg.Peer {
+	// Once segwit has activated, we must only sync from witness-enabled
+	// peers so that we fully validate all witness data.
+	segwitActive, err := sm.chain.IsDeploymentActive(
+		chaincfg.DeploymentSegwit,
+	)
+	if err != nil {
+		log.Errorf("Unable to query for segwit soft-fork state: %v",
+			err)
+	}
+
 	higherPeers := make([]*peerpkg.Peer, 0, len(sm.peerStates))
 	for peer, state := range sm.peerStates {
 		if !state.syncCandidate {
 			continue
 		}
 
-		if peer.LastBlock() <= height {
+		if segwitActive && !peer.IsWitnessEnabled() {
+			continue
+		}
+
+		// Demote peers that have fallen behind our height so they
+		// are not repeatedly considered in future sync attempts.
+		// NOTE: The < is intentional as opposed to <=.  While
+		// technically the peer doesn't have a later block when
+		// it's equal, it will likely have one soon so it is a
+		// reasonable choice.  It also allows the case where both
+		// are at 0 such as during regression test.
+		if peer.LastBlock() < height {
+			state.syncCandidate = false
+			continue
+		}
+
+		if peer.LastBlock() == height {
 			continue
 		}
 
@@ -250,6 +280,37 @@ func (sm *SyncManager) fetchHigherPeers(height int32) []*peerpkg.Peer {
 	}
 
 	return higherPeers
+}
+
+// fetchEqualPeers returns all sync-candidate peers whose advertised height
+// equals the given height.  This is used as a fallback when no peer is
+// strictly higher—for example, during regtest when both nodes start at
+// genesis.
+func (sm *SyncManager) fetchEqualPeers(height int32) []*peerpkg.Peer {
+	segwitActive, err := sm.chain.IsDeploymentActive(
+		chaincfg.DeploymentSegwit,
+	)
+	if err != nil {
+		log.Errorf("Unable to query for segwit soft-fork state: %v",
+			err)
+	}
+
+	equalPeers := make([]*peerpkg.Peer, 0, len(sm.peerStates))
+	for peer, state := range sm.peerStates {
+		if !state.syncCandidate {
+			continue
+		}
+
+		if segwitActive && !peer.IsWitnessEnabled() {
+			continue
+		}
+
+		if peer.LastBlock() == height {
+			equalPeers = append(equalPeers, peer)
+		}
+	}
+
+	return equalPeers
 }
 
 // isInIBDMode returns true if there's more blocks needed to be downloaded to
@@ -328,9 +389,14 @@ func (sm *SyncManager) startSync() {
 	best := sm.chain.BestSnapshot()
 	higherPeers := sm.fetchHigherPeers(best.Height)
 
-	// Pick randomly from the set of peers greater than our
-	// block height, falling back to a random peer of the same
-	// height if none are greater.
+	// Also collect peers at the same height as a fallback.  This handles
+	// the case where all peers are at the same height (e.g. two regtest
+	// nodes both at genesis), allowing sync to proceed.
+	equalPeers := sm.fetchEqualPeers(best.Height)
+
+	// Pick randomly from the set of peers greater than our block height,
+	// falling back to a random peer of the same height if none are
+	// greater.
 	//
 	// TODO(conner): Use a better algorithm to ranking peers based on
 	// observed metrics and/or sync in parallel.
@@ -338,6 +404,9 @@ func (sm *SyncManager) startSync() {
 	switch {
 	case len(higherPeers) > 0:
 		bestPeer = higherPeers[rand.Intn(len(higherPeers))]
+
+	case len(equalPeers) > 0:
+		bestPeer = equalPeers[rand.Intn(len(equalPeers))]
 	}
 
 	if bestPeer == nil {
@@ -550,6 +619,10 @@ func (sm *SyncManager) clearRequestedState(state *peerSyncState) {
 	for blockHash := range state.requestedBlocks {
 		delete(sm.requestedBlocks, blockHash)
 	}
+
+	// Reset the block request cursor so the replacement peer re-scans
+	// from the fork point and re-requests any cleared blocks.
+	sm.lastBlockRequested = 0
 }
 
 // updateSyncPeer choose a new sync peer to replace the current one. If
@@ -672,14 +745,11 @@ func (sm *SyncManager) checkHeadersList(blockHash *chainhash.Hash) (
 	isCheckpointBlock := false
 	behaviorFlags := blockchain.BFNone
 
-	// If we don't already know this is a valid header, return false and
-	// BFNone.
-	if !sm.chain.IsValidHeader(blockHash) {
-		return false, blockchain.BFNone
-	}
-
-	height, err := sm.chain.HeaderHeightByHash(*blockHash)
-	if err != nil {
+	// Use a single lookup to validate the header and get its height,
+	// avoiding the redundant index lookups that would result from
+	// calling IsValidHeader and HeaderHeightByHash separately.
+	height, valid := sm.chain.ValidHeaderHeight(blockHash)
+	if !valid {
 		return false, blockchain.BFNone
 	}
 
@@ -870,6 +940,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			"caught up to block %v(%v) -- now listening to blocks.",
 			bmsg.block.Hash(), bmsg.block.Height())
 		sm.ibdMode = false
+		sm.lastBlockRequested = 0
 	}
 }
 
@@ -896,26 +967,29 @@ func (sm *SyncManager) fetchHeaderBlocks(peer *peerpkg.Peer) {
 // blocks between the fork point and the current height on the new
 // chain are different and must also be downloaded.
 func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
-	// Return early if the peer is nil.
-	if peer == nil {
-		return wire.NewMsgGetDataSizeHint(0)
-	}
-
 	_, bestHeaderHeight := sm.chain.BestHeader()
 	forkHeight := sm.chain.BestChainHeaderForkHeight()
-	if bestHeaderHeight < forkHeight {
-		// Should never happen but we're guarding against the uint cast
-		// that happens below.
+
+	// Start scanning from the higher of the fork point and the last
+	// height we already requested.  This avoids re-scanning the entire
+	// header chain on every refill when most blocks have already been
+	// requested.
+	startHeight := forkHeight + 1
+	if sm.lastBlockRequested >= startHeight {
+		startHeight = sm.lastBlockRequested + 1
+	}
+
+	if bestHeaderHeight < startHeight {
 		return wire.NewMsgGetDataSizeHint(0)
 	}
-	length := bestHeaderHeight - forkHeight
+	length := bestHeaderHeight - startHeight + 1
 	gdmsg := wire.NewMsgGetDataSizeHint(uint(length))
 	numRequested := 0
-	for h := forkHeight + 1; h <= bestHeaderHeight; h++ {
+	for h := startHeight; h <= bestHeaderHeight; h++ {
 		hash, err := sm.chain.HeaderHashByHeight(h)
 		if err != nil {
-			log.Warnf("error while fetching the block hash for height %v -- %v",
-				h, err)
+			log.Warnf("error while fetching the block hash "+
+				"for height %v -- %v", h, err)
 			return gdmsg
 		}
 
@@ -928,11 +1002,7 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 		}
 		if !haveInv {
 			// Skip blocks that are already in-flight to avoid
-			// sending duplicate getdata requests. Duplicates
-			// cause the peer to send the block twice; the second
-			// copy arrives after the first has been processed and
-			// removed from requestedBlocks, triggering an
-			// "unrequested block" disconnect.
+			// sending duplicate getdata requests.
 			if _, exists := sm.requestedBlocks[*hash]; exists {
 				continue
 			}
@@ -953,6 +1023,10 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 			numRequested++
 		}
 
+		// Track the last height we've scanned so subsequent calls
+		// can skip this range.
+		sm.lastBlockRequested = h
+
 		if numRequested >= wire.MaxInvPerMsg {
 			break
 		}
@@ -961,8 +1035,10 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 }
 
 // handleHeadersMsg handles block header messages from all peers.  Headers are
-// requested when performing the ibd and are propagated by peers once the ibd
-// is complete.
+// requested when performing the ibd and are also propagated by peers via
+// BIP130 (sendheaders) once the ibd is complete.  Unlike the old
+// checkpoint-based code, headers from any peer are accepted at any time since
+// they are independently validated by ProcessBlockHeader.
 func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	peer := hmsg.peer
 	_, exists := sm.peerStates[peer]

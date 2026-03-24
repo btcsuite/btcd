@@ -58,7 +58,7 @@ func TestProcessBlockHeader(t *testing.T) {
 	chain, params, tearDown := utxoCacheTestChain("TestProcessBlockHeader")
 	defer tearDown()
 
-	// Generate and process the intial 10 block headers.
+	// Generate and process the initial 10 block headers.
 	//
 	// genesis -> 1  -> 2  -> ...  -> 10 (active)
 	headers := chainedHeaders(&params.GenesisBlock.Header, params, 0, 10)
