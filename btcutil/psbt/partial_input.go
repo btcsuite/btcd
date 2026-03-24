@@ -495,11 +495,17 @@ func (pi *PInput) serialize(w io.Writer) error {
 		}
 
 		sort.Slice(pi.TaprootScriptSpendSig, func(i, j int) bool {
+		if pi.TaprootScriptSpendSig[i] == nil || pi.TaprootScriptSpendSig[j] == nil {
+			return pi.TaprootScriptSpendSig[i] == nil
+		}
 			return pi.TaprootScriptSpendSig[i].SortBefore(
 				pi.TaprootScriptSpendSig[j],
 			)
 		})
 		for _, scriptSpend := range pi.TaprootScriptSpendSig {
+		if scriptSpend == nil {
+			continue
+		}
 			keyData := append([]byte{}, scriptSpend.XOnlyPubKey...)
 			keyData = append(keyData, scriptSpend.LeafHash...)
 			value := append([]byte{}, scriptSpend.Signature...)
@@ -516,11 +522,17 @@ func (pi *PInput) serialize(w io.Writer) error {
 		}
 
 		sort.Slice(pi.TaprootLeafScript, func(i, j int) bool {
+		if pi.TaprootLeafScript[i] == nil || pi.TaprootLeafScript[j] == nil {
+			return pi.TaprootLeafScript[i] == nil
+		}
 			return pi.TaprootLeafScript[i].SortBefore(
 				pi.TaprootLeafScript[j],
 			)
 		})
 		for _, leafScript := range pi.TaprootLeafScript {
+		if leafScript == nil {
+			continue
+		}
 			value := append([]byte{}, leafScript.Script...)
 			value = append(value, byte(leafScript.LeafVersion))
 			err := serializeKVPairWithType(
@@ -533,11 +545,17 @@ func (pi *PInput) serialize(w io.Writer) error {
 		}
 
 		sort.Slice(pi.TaprootBip32Derivation, func(i, j int) bool {
+		if pi.TaprootBip32Derivation[i] == nil || pi.TaprootBip32Derivation[j] == nil {
+			return pi.TaprootBip32Derivation[i] == nil
+		}
 			return pi.TaprootBip32Derivation[i].SortBefore(
 				pi.TaprootBip32Derivation[j],
 			)
 		})
 		for _, derivation := range pi.TaprootBip32Derivation {
+		if derivation == nil {
+			continue
+		}
 			value, err := SerializeTaprootBip32Derivation(
 				derivation,
 			)
