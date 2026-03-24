@@ -512,6 +512,12 @@ func (bi *blockIndex) flushToDB() error {
 	// if every dirty node is header-only, we can avoid opening a write
 	// transaction entirely.  This matters during header sync where every
 	// ProcessBlockHeader call would otherwise open a no-op write txn.
+	//
+	// NOTE: Because header-only nodes are never persisted, a crash or
+	// restart during the header sync phase will lose all header progress.
+	// The node will re-download and re-verify all headers on the next
+	// startup.  This is an acceptable trade-off since headers are small
+	// and validation is fast relative to full block processing.
 	needsWrite := false
 	for node := range bi.dirty {
 		if node.status.HaveData() {
