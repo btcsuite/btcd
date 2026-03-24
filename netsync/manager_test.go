@@ -293,6 +293,44 @@ func TestFetchHigherPeers(t *testing.T) {
 	}
 }
 
+// TestFetchHigherPeersDemotesStalePeers verifies that fetchHigherPeers sets
+// syncCandidate to false for peers whose last block is strictly below the
+// given height, preventing them from being repeatedly considered.
+func TestFetchHigherPeersDemotesStalePeers(t *testing.T) {
+	sm, tearDown := makeMockSyncManager(t, &chaincfg.MainNetParams)
+	defer tearDown()
+
+	stalePeer := peer.NewInboundPeer(&peer.Config{})
+	stalePeer.UpdateLastBlockHeight(5)
+	staleState := &peerSyncState{
+		syncCandidate:   true,
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	higherPeer := peer.NewInboundPeer(&peer.Config{})
+	higherPeer.UpdateLastBlockHeight(20)
+	higherState := &peerSyncState{
+		syncCandidate:   true,
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	sm.peerStates = map[*peer.Peer]*peerSyncState{
+		stalePeer:  staleState,
+		higherPeer: higherState,
+	}
+
+	peers := sm.fetchHigherPeers(10)
+
+	require.Len(t, peers, 1)
+	require.True(t, peers[0] == higherPeer)
+	require.False(t, staleState.syncCandidate,
+		"stale peer should be demoted from sync candidate")
+	require.True(t, higherState.syncCandidate,
+		"higher peer should remain a sync candidate")
+}
+
 // mockTimeSource is used to trick the BlockChain instance to think that we're
 // in the past.  This is so that we can force it to return true for isCurrent().
 type mockTimeSource struct {
@@ -1212,4 +1250,43 @@ func TestStartSyncChainCurrent(t *testing.T) {
 		"syncPeer should not be set when chain is already current")
 	require.False(t, sm.ibdMode,
 		"ibdMode should not be activated when chain is already current")
+}
+
+// TestStartSyncEqualPeersFallback verifies that when no peer is strictly
+// higher than our block height but peers at the same height exist, startSync
+// falls back to selecting one of those equal-height peers.  This is critical
+// for regtest where both nodes start at genesis (height 0).
+func TestStartSyncEqualPeersFallback(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	// Process headers so the header chain is ahead of the block chain,
+	// which puts us into IBD mode.
+	const numBlocks = 5
+	blocks := generateTestBlocks(t, &params, numBlocks)
+	for _, block := range blocks {
+		_, err := sm.chain.ProcessBlockHeader(
+			&block.MsgBlock().Header, blockchain.BFNone, false,
+		)
+		require.NoError(t, err)
+	}
+
+	// Add a peer at the same height as our headers.  fetchHigherPeers
+	// will return nothing since the peer is not strictly higher, but
+	// fetchEqualPeers should return it.
+	equalPeer := newSyncCandidate(t, sm, numBlocks)
+
+	sm.startSync()
+
+	require.NotNil(t, sm.syncPeer,
+		"syncPeer should be set via equalPeers fallback")
+	require.True(t, sm.syncPeer == equalPeer,
+		"syncPeer should be the equal-height peer")
+	require.True(t, sm.ibdMode,
+		"ibdMode should be on since blocks still need downloading")
 }
