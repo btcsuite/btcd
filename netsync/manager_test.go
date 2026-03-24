@@ -293,6 +293,52 @@ func TestFetchHigherPeers(t *testing.T) {
 	}
 }
 
+// TestDemoteStalePeers verifies that demoteStalePeers clears the sync
+// candidate flag of peers whose last block is strictly below the given
+// height, and that fetchHigherPeers itself never mutates peer state.
+func TestDemoteStalePeers(t *testing.T) {
+	sm, tearDown := makeMockSyncManager(t, &chaincfg.MainNetParams)
+	defer tearDown()
+
+	stalePeer := peer.NewInboundPeer(&peer.Config{})
+	stalePeer.UpdateLastBlockHeight(5)
+	staleState := &peerSyncState{
+		syncCandidate:   true,
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	higherPeer := peer.NewInboundPeer(&peer.Config{})
+	higherPeer.UpdateLastBlockHeight(20)
+	higherState := &peerSyncState{
+		syncCandidate:   true,
+		requestedTxns:   make(map[chainhash.Hash]struct{}),
+		requestedBlocks: make(map[chainhash.Hash]struct{}),
+	}
+
+	sm.peerStates = map[*peer.Peer]*peerSyncState{
+		stalePeer:  staleState,
+		higherPeer: higherState,
+	}
+
+	sm.demoteStalePeers(10)
+
+	require.False(t, staleState.syncCandidate,
+		"stale peer should be demoted from sync candidate")
+	require.True(t, higherState.syncCandidate,
+		"higher peer should remain a sync candidate")
+
+	// fetchHigherPeers must be a pure filter: querying at a height above
+	// every peer's advertised block must not demote anyone.  During IBD
+	// it is called with the best header height, which typically exceeds
+	// the advertised block of peers that can still serve all the blocks
+	// we are missing.
+	peers := sm.fetchHigherPeers(30)
+	require.Empty(t, peers)
+	require.True(t, higherState.syncCandidate,
+		"fetchHigherPeers should not demote peers")
+}
+
 // mockTimeSource is used to trick the BlockChain instance to think that we're
 // in the past.  This is so that we can force it to return true for isCurrent().
 type mockTimeSource struct {
@@ -640,6 +686,42 @@ func generateTestBlocks(
 	}
 
 	return blocks
+}
+
+// generateTestHeaders creates count solved headers chaining from the genesis
+// block of the given params.  The seed is mixed into each merkle root so
+// distinct seeds produce distinct chains, which allows tests to build
+// competing forks.
+func generateTestHeaders(t *testing.T, params *chaincfg.Params,
+	seed byte, count int) []*wire.BlockHeader {
+
+	t.Helper()
+
+	headers := make([]*wire.BlockHeader, 0, count)
+	prevHash := *params.GenesisHash
+	prevTime := params.GenesisBlock.Header.Timestamp
+
+	for h := int32(1); h <= int32(count); h++ {
+		merkleRoot := chainhash.HashH([]byte{seed, byte(h)})
+
+		header := wire.BlockHeader{
+			// Regtest enforces the BIP34/65/66 version floor from
+			// height 1.
+			Version:    4,
+			PrevBlock:  prevHash,
+			MerkleRoot: merkleRoot,
+			Timestamp:  prevTime.Add(time.Minute),
+			Bits:       params.PowLimitBits,
+		}
+		require.True(t, solveTestBlock(&header, params),
+			"failed to solve header at height %d", h)
+
+		headers = append(headers, &header)
+		prevHash = header.BlockHash()
+		prevTime = header.Timestamp
+	}
+
+	return headers
 }
 
 // TestSyncStateMachine exercises the end-to-end IBD sync flow:
@@ -1280,4 +1362,128 @@ func TestIsSyncCandidateRegtest(t *testing.T) {
 			require.Equal(t, tc.want, got)
 		})
 	}
+}
+
+// TestStartSyncEqualPeersFallback verifies that when no peer is strictly
+// higher than our block height but peers at the same height exist, startSync
+// falls back to selecting one of those equal-height peers.  This is the
+// situation on regtest where two fresh nodes both sit at genesis.
+func TestStartSyncEqualPeersFallback(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	// Register a peer at our exact height, with no headers processed so
+	// the block, header, and peer heights all agree.  fetchHigherPeers
+	// returns nothing since the peer is not strictly higher, so only the
+	// fetchEqualPeers fallback can select it.
+	equalPeer := newSyncCandidate(t, sm, 0)
+
+	sm.startSync()
+
+	require.NotNil(t, sm.syncPeer,
+		"syncPeer should be set via equalPeers fallback")
+	require.True(t, sm.syncPeer == equalPeer,
+		"syncPeer should be the equal-height peer")
+	require.True(t, sm.ibdMode,
+		"ibdMode should be on until blocks catch up to the network")
+}
+
+// TestBuildBlockRequestReorgResetsCursor verifies that the block request
+// cursor is invalidated when the best header chain reorgs beneath it.
+// Without the reset, blocks on the new branch below the cursor height would
+// never be requested since the cursor believes those heights were already
+// covered by requests made against the old branch.
+func TestBuildBlockRequestReorgResetsCursor(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	// Process headers for the initial chain A and request the blocks for
+	// it, which advances the cursor to the tip of chain A.
+	const chainALen = 5
+	chainA := generateTestHeaders(t, &params, 0x01, chainALen)
+	for _, header := range chainA {
+		_, err := sm.chain.ProcessBlockHeader(
+			header, blockchain.BFNone, false,
+		)
+		require.NoError(t, err)
+	}
+
+	syncPeer := newSyncCandidate(t, sm, chainALen)
+
+	gdmsg := sm.buildBlockRequest(syncPeer)
+	require.Len(t, gdmsg.InvList, chainALen)
+	require.Equal(t, int32(chainALen), sm.lastBlockRequested)
+
+	// Process headers for chain B, which forks at genesis and has more
+	// cumulative work, reorging the best header chain.
+	const chainBLen = chainALen + 1
+	chainB := generateTestHeaders(t, &params, 0x02, chainBLen)
+	for _, header := range chainB {
+		_, err := sm.chain.ProcessBlockHeader(
+			header, blockchain.BFNone, false,
+		)
+		require.NoError(t, err)
+	}
+
+	_, bestHeaderHeight := sm.chain.BestHeader()
+	require.Equal(t, int32(chainBLen), bestHeaderHeight,
+		"chain B should be the new best header chain")
+
+	// The next request must start over from the fork point and request
+	// every block on the new branch, not just the heights beyond the
+	// stale cursor.
+	gdmsg = sm.buildBlockRequest(syncPeer)
+	require.Len(t, gdmsg.InvList, chainBLen,
+		"all chain B blocks should be requested after the reorg")
+	require.Equal(t, int32(chainBLen), sm.lastBlockRequested)
+
+	for i, header := range chainB {
+		blockHash := header.BlockHash()
+		require.Equal(t, blockHash, gdmsg.InvList[i].Hash,
+			"inv %d should be the chain B block at height %d",
+			i, i+1)
+	}
+}
+
+// TestNotFoundResetsBlockRequestCursor verifies that a notfound message for
+// a requested block rewinds the block request cursor so the block can be
+// re-requested on the next refill instead of being skipped until the stall
+// handler fires.
+func TestNotFoundResetsBlockRequestCursor(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	syncPeer := newSyncCandidate(t, sm, 5)
+	state := sm.peerStates[syncPeer]
+
+	blockHash := chainhash.HashH([]byte{0x01})
+	state.requestedBlocks[blockHash] = struct{}{}
+	sm.requestedBlocks[blockHash] = struct{}{}
+	sm.lastBlockRequested = 5
+
+	notFound := wire.NewMsgNotFound()
+	err := notFound.AddInvVect(
+		wire.NewInvVect(wire.InvTypeBlock, &blockHash),
+	)
+	require.NoError(t, err)
+
+	sm.handleNotFoundMsg(&notFoundMsg{notFound: notFound, peer: syncPeer})
+
+	require.NotContains(t, sm.requestedBlocks, blockHash)
+	require.NotContains(t, state.requestedBlocks, blockHash)
+	require.Zero(t, sm.lastBlockRequested,
+		"cursor should be reset so the block is re-requested")
 }
