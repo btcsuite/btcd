@@ -816,9 +816,17 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 
 		httpResponse, err = c.httpClient.Do(httpReq)
 
-		// Quit the retry loop on success or if we can't retry anymore.
+		// Quit the retry loop on success or if we can't retry
+		// anymore.
 		if err == nil || i == tries-1 {
 			break
+		}
+
+		// If the context was cancelled, bail out immediately
+		// instead of retrying.
+		if reqCtx.Err() != nil {
+			jReq.responseChan <- &Response{err: reqCtx.Err()}
+			return
 		}
 
 		// Save the last error for the case where we backoff further,
@@ -1028,10 +1036,21 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) SendCmd(cmd interface{}) chan *Response {
+	return c.SendCmdWithContext(context.Background(), cmd)
+}
+
+// SendCmdWithContext sends the passed command with the given context.
+// The context is used to cancel the underlying HTTP request in
+// HTTP POST mode. In websocket mode the context is currently
+// ignored. The returned channel delivers the response.
+func (c *Client) SendCmdWithContext(ctx context.Context,
+	cmd interface{}) chan *Response {
+
 	rpcVersion := btcjson.RpcVersion1
 	if c.batch {
 		rpcVersion = btcjson.RpcVersion2
 	}
+
 	// Get the method associated with the command.
 	method, err := btcjson.CmdMethod(cmd)
 	if err != nil {
@@ -1045,47 +1064,8 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 		return newFutureError(err)
 	}
 
-	// Generate the request and send it along with a channel to respond on.
-	responseChan := make(chan *Response, 1)
-	jReq := &jsonRequest{
-		id:             id,
-		method:         method,
-		cmd:            cmd,
-		marshalledJSON: marshalledJSON,
-		responseChan:   responseChan,
-	}
-
-	c.sendRequest(jReq)
-
-	return responseChan
-}
-
-// SendCmdWithContext sends the passed command with the given context.
-// The context is used to cancel the underlying HTTP request in
-// HTTP POST mode. In websocket mode the context is currently
-// ignored. The returned channel delivers the response.
-func (c *Client) SendCmdWithContext(
-	ctx context.Context, cmd interface{},
-) chan *Response {
-
-	rpcVersion := btcjson.RpcVersion1
-	if c.batch {
-		rpcVersion = btcjson.RpcVersion2
-	}
-
-	method, err := btcjson.CmdMethod(cmd)
-	if err != nil {
-		return newFutureError(err)
-	}
-
-	id := c.NextID()
-	marshalledJSON, err := btcjson.MarshalCmd(
-		rpcVersion, id, cmd,
-	)
-	if err != nil {
-		return newFutureError(err)
-	}
-
+	// Generate the request and send it along with a channel to
+	// respond on.
 	responseChan := make(chan *Response, 1)
 	jReq := &jsonRequest{
 		id:             id,

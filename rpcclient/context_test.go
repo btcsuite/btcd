@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGetBlockCountWithContext_Success verifies that the context-
+// TestGetBlockCountWithContextSuccess verifies that the context-
 // aware GetBlockCountWithContext returns the correct block height.
-func TestGetBlockCountWithContext_Success(t *testing.T) {
+func TestGetBlockCountWithContextSuccess(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(
@@ -37,9 +37,9 @@ func TestGetBlockCountWithContext_Success(t *testing.T) {
 	require.Equal(t, int64(941874), count)
 }
 
-// TestGetBlockCountWithContext_CancelledContext verifies that a
+// TestGetBlockCountWithContextCancelledContext verifies that a
 // cancelled context stops the HTTP request and returns an error.
-func TestGetBlockCountWithContext_CancelledContext(t *testing.T) {
+func TestGetBlockCountWithContextCancelledContext(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(
@@ -74,10 +74,10 @@ func TestGetBlockCountWithContext_CancelledContext(t *testing.T) {
 	)
 }
 
-// TestSendCmdWithContext_RetryRespectsCancel verifies that context
+// TestSendCmdWithContextRetryRespectsCancel verifies that context
 // cancellation during the retry backoff terminates immediately
 // rather than waiting for all retry attempts.
-func TestSendCmdWithContext_RetryRespectsCancel(t *testing.T) {
+func TestSendCmdWithContextRetryRespectsCancel(t *testing.T) {
 	t.Parallel()
 
 	var attempts int
@@ -111,9 +111,9 @@ func TestSendCmdWithContext_RetryRespectsCancel(t *testing.T) {
 	)
 }
 
-// TestGetBlockCount_BackwardsCompatible verifies that the original
+// TestGetBlockCountBackwardsCompatible verifies that the original
 // GetBlockCount (without context) still works unchanged.
-func TestGetBlockCount_BackwardsCompatible(t *testing.T) {
+func TestGetBlockCountBackwardsCompatible(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(
@@ -135,7 +135,7 @@ func TestGetBlockCount_BackwardsCompatible(t *testing.T) {
 
 // TestSendCmdWithContext_NilContext verifies that passing a nil
 // request context field falls back to context.Background.
-func TestSendCmdWithContext_NilCtxField(t *testing.T) {
+func TestSendCmdWithContextNilCtxField(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(
@@ -157,9 +157,9 @@ func TestSendCmdWithContext_NilCtxField(t *testing.T) {
 	require.Equal(t, int64(500), count)
 }
 
-// TestGetBlockCountWithContext_RPCError verifies that JSON-RPC
+// TestGetBlockCountWithContextRPCError verifies that JSON-RPC
 // errors are properly propagated through the context path.
-func TestGetBlockCountWithContext_RPCError(t *testing.T) {
+func TestGetBlockCountWithContextRPCError(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(
