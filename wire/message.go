@@ -22,9 +22,15 @@ const MessageHeaderSize = 24
 // header.  Shorter commands must be zero padded.
 const CommandSize = 12
 
-// MaxMessagePayload is the maximum bytes a message can be regardless of other
-// individual limits imposed by messages themselves.
-const MaxMessagePayload = (1024 * 1024 * 4) // 4MB
+// MaxMessagePayload is the maximum payload size for any message on the wire,
+// regardless of other individual limits imposed by messages themselves. This
+// acts as a protocol-level envelope limit to prevent memory exhaustion from
+// untrusted peers, analogous to Bitcoin Core's MAX_PROTOCOL_MESSAGE_LENGTH
+// (32 MiB, 0x02000000). Individual message types enforce their own stricter
+// limits via MaxPayloadLength.
+//
+// See: https://github.com/bitcoin/bitcoin/pull/5843
+const MaxMessagePayload = 0x02000000 // 32 MiB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
