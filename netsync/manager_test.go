@@ -1213,3 +1213,52 @@ func TestStartSyncChainCurrent(t *testing.T) {
 	require.False(t, sm.ibdMode,
 		"ibdMode should not be activated when chain is already current")
 }
+
+// TestIsSyncCandidateRegtest verifies that isSyncCandidate accepts any peer
+// on regtest regardless of address, including non-localhost Docker bridge
+// addresses.
+func TestIsSyncCandidateRegtest(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	tests := []struct {
+		name string
+		addr string
+		want bool
+	}{
+		{
+			name: "localhost",
+			addr: "127.0.0.1:18444",
+			want: true,
+		},
+		{
+			name: "docker bridge ip",
+			addr: "172.18.0.2:18444",
+			want: true,
+		},
+		{
+			name: "remote ip",
+			addr: "93.184.216.34:18444",
+			want: true,
+		},
+		{
+			name: "ipv6 loopback",
+			addr: "[::1]:18444",
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := peer.NewInboundPeer(&peer.Config{
+				ChainParams: sm.chainParams,
+			})
+
+			got := sm.isSyncCandidate(p)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
