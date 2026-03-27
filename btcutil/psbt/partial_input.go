@@ -10,6 +10,20 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// filterNil removes nil pointer elements from a slice. This is used to
+// defensively filter taproot-specific PSBT fields before sorting and
+// serializing, preventing panics when users construct PInput with slices
+// containing nil elements.
+func filterNil[T any](slice []*T) []*T {
+	filtered := make([]*T, 0, len(slice))
+	for _, item := range slice {
+		if item != nil {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
 // PInput is a struct encapsulating all the data that can be attached to any
 // specific input of the PSBT.
 type PInput struct {
@@ -497,36 +511,9 @@ func (pi *PInput) serialize(w io.Writer) error {
 	// Filter nil entries from taproot-specific fields before sorting
 	// and serializing to prevent panics when users provide slices
 	// containing nil elements (fixes #2495).
-	{
-		filtered := make([]*TaprootScriptSpendSig, 0,
-			len(pi.TaprootScriptSpendSig))
-		for _, s := range pi.TaprootScriptSpendSig {
-			if s != nil {
-				filtered = append(filtered, s)
-			}
-		}
-		pi.TaprootScriptSpendSig = filtered
-	}
-	{
-		filtered := make([]*TaprootTapLeafScript, 0,
-			len(pi.TaprootLeafScript))
-		for _, s := range pi.TaprootLeafScript {
-			if s != nil {
-				filtered = append(filtered, s)
-			}
-		}
-		pi.TaprootLeafScript = filtered
-	}
-	{
-		filtered := make([]*TaprootBip32Derivation, 0,
-			len(pi.TaprootBip32Derivation))
-		for _, d := range pi.TaprootBip32Derivation {
-			if d != nil {
-				filtered = append(filtered, d)
-			}
-		}
-		pi.TaprootBip32Derivation = filtered
-	}
+	pi.TaprootScriptSpendSig = filterNil(pi.TaprootScriptSpendSig)
+	pi.TaprootLeafScript = filterNil(pi.TaprootLeafScript)
+	pi.TaprootBip32Derivation = filterNil(pi.TaprootBip32Derivation)
 
 	sort.Slice(pi.TaprootScriptSpendSig, func(i, j int) bool {
 		return pi.TaprootScriptSpendSig[i].SortBefore(
