@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	_ "github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/encpedpop"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/util"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/vss"
 	"github.com/stretchr/testify/require"
@@ -31,6 +31,9 @@ func TestChillDKG(ht *testing.T) {
 			func(ht *testing.T) {
 				for _, c := range util.GetDKGTests() {
 					name := c.Name
+					if c.Recovery {
+						name += "/recover"
+					}
 					if c.Investigation {
 						name += "/investigate"
 					}
@@ -38,6 +41,7 @@ func TestChillDKG(ht *testing.T) {
 						testCorrectness(
 							ht, p.t, p.n, c.SimFunc,
 							c.Investigation,
+							c.Recovery,
 						)
 					})
 				}
@@ -47,7 +51,7 @@ func TestChillDKG(ht *testing.T) {
 }
 
 func testCorrectness(ht *testing.T, t, n int, simFunc util.SimFunc,
-	investigate bool) {
+	investigate, recovery bool) {
 
 	seeds := make([][32]byte, n)
 	for i := range seeds {
@@ -67,6 +71,19 @@ func testCorrectness(ht *testing.T, t, n int, simFunc util.SimFunc,
 	require.Equal(ht, n+1, len(dkgOutputs))
 	require.Equal(ht, n+1, len(eqsOrRecs))
 	testCorrectnessDKGOutput(ht, t, n, dkgOutputs)
+
+	if !recovery {
+		return
+	}
+
+	rec := RecoveryData(eqsOrRecs[0])
+	for i := 1; i <= n; i++ {
+		hostSecKey, _, err := hostPubKeyGen(seeds[i-1][:])
+		require.NoError(ht, err)
+		recDkgOutput, _, err := Recover(hostSecKey, &rec)
+		require.NoError(ht, err)
+		require.EqualValues(ht, recDkgOutput, dkgOutputs[i])
+	}
 }
 
 func testCorrectnessDKGOutput(ht *testing.T, t, n int,
@@ -146,4 +163,154 @@ func recoverSecret(ht *testing.T, indices []int,
 	}
 
 	return util.SumScalars(interpolatedShares)
+}
+
+func TestRecoveryAcknowledgment(ht *testing.T) {
+	var (
+		err         error
+		seeds       [][32]byte
+		ackSigs     []*RecoveryAckMessage
+		t           = 2
+		n           = 3
+		hostSecKeys = make([]*btcec.PrivateKey, n)
+		hostPubKeys = make([]*btcec.PublicKey, n)
+	)
+
+	for i := range n {
+		randBytes, err := util.Rand32Int()
+		require.NoError(ht, err)
+
+		seeds = append(seeds, *randBytes)
+
+		hostSecKeys[i], hostPubKeys[i], err = hostPubKeyGen(
+			randBytes[:],
+		)
+	}
+
+	params := &SessionParams{
+		HostPubKeys: hostPubKeys,
+		T:           t,
+	}
+
+	_, recDatas := simulateChillDKG(ht, seeds, t, false)
+	recData := RecoveryData(recDatas[1])
+
+	for i := range n {
+		ackSig, err := ParticipantRecoveryAckSign(
+			hostSecKeys[i], &recData, params,
+			util.Rand32IntForTest(ht),
+		)
+		require.NoError(ht, err)
+
+		require.Equal(ht, 64, len(ackSig.Bytes()))
+
+		ackSigs = append(ackSigs, ackSig)
+	}
+
+	require.NoError(ht, ParticipantRecoveryAcksVerify(
+		&recData, params, ackSigs,
+	))
+
+	// SKIPPED: invalid HostPubKey in params (params contain parsed keys)
+
+	// Duplicate HostPubKey in params
+	invalidParams := &SessionParams{
+		HostPubKeys: []*btcec.PublicKey{hostPubKeys[0], hostPubKeys[0]},
+		T:           t,
+	}
+
+	sig, err := ParticipantRecoveryAckSign(
+		hostSecKeys[0], &recData, invalidParams,
+		util.Rand32IntForTest(ht),
+	)
+	require.Nil(ht, sig)
+	require.ErrorIs(ht, err, ErrDuplicateHostPubKey{0, 1})
+
+	// Invalid threshold in params
+	invalidParams = &SessionParams{
+		HostPubKeys: hostPubKeys,
+		T:           n + 1,
+	}
+	sig, err = ParticipantRecoveryAckSign(
+		hostSecKeys[0], &recData, invalidParams,
+		util.Rand32IntForTest(ht),
+	)
+	require.Nil(ht, sig)
+	require.ErrorIs(ht, err, ErrThresholdOrCount)
+
+	// Wrong hostSecKey
+	wrongSecKey, err := btcec.NewPrivateKey()
+	require.NoError(ht, err)
+	sig, err = ParticipantRecoveryAckSign(
+		wrongSecKey, &recData, params, util.Rand32IntForTest(ht),
+	)
+	require.Nil(ht, sig)
+	require.ErrorIs(ht, err, ErrHostSecKey("Host secret key does not "+
+		"match any host public key"))
+
+	// SKIPPED: invalid randomness length (we pass a [32]byte)
+
+	// Mismatched params
+	invalidParams = &SessionParams{
+		HostPubKeys: hostPubKeys,
+		T:           t + 1,
+	}
+	sig, err = ParticipantRecoveryAckSign(
+		hostSecKeys[0], &recData, invalidParams,
+		util.Rand32IntForTest(ht),
+	)
+	require.Nil(ht, sig)
+	require.ErrorIs(ht, err, ErrRecoveryData("Recovery data does not "+
+		"match the provided session parameters"))
+
+	err = ParticipantRecoveryAcksVerify(
+		&recData, invalidParams, ackSigs,
+	)
+	require.ErrorIs(ht, err, ErrRecoveryData("Recovery data does not "+
+		"match the provided session parameters"))
+
+	// Corrupted recovery data
+	corruptedRecoveryData := RecoveryData(make([]byte, len(recData)))
+	randLen, err := rand.Read(corruptedRecoveryData)
+	require.NoError(ht, err)
+	require.Equal(ht, len(recData), randLen)
+
+	sig, err = ParticipantRecoveryAckSign(
+		hostSecKeys[0], &corruptedRecoveryData, params,
+		util.Rand32IntForTest(ht),
+	)
+	require.Nil(ht, sig)
+	require.ErrorIs(ht, err, ErrRecoveryData("Failed to deserialize "+
+		"recovery data"))
+
+	err = ParticipantRecoveryAcksVerify(
+		&corruptedRecoveryData, params, ackSigs,
+	)
+	require.ErrorIs(ht, err, ErrRecoveryData("Failed to deserialize "+
+		"recovery data"))
+
+	// Invalid signature
+	invalidAckSigs := make([]*RecoveryAckMessage, len(ackSigs))
+	copy(invalidAckSigs, ackSigs)
+
+	invalidAckSig, err := schnorr.Sign(hostSecKeys[0], ackSigs[0].Bytes())
+	require.NoError(ht, err)
+
+	invalidAckSigs[1] = &RecoveryAckMessage{invalidAckSig}
+
+	err = ParticipantRecoveryAcksVerify(
+		&recData, params, invalidAckSigs,
+	)
+	require.ErrorIs(ht, err, ErrInvalidRecoveryAck{
+		Participant: 1,
+	})
+
+	// SKIPPED: invalid signature length (we pass already-parsed sigs)
+
+	// Wrong number of signatures
+	invalidAckSigs = ackSigs[:len(ackSigs)-1]
+	err = ParticipantRecoveryAcksVerify(
+		&recData, params, invalidAckSigs,
+	)
+	require.Error(ht, err)
 }
