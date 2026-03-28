@@ -35,3 +35,17 @@ func (e ErrFaultyParticipantOrCoordinator) Error() string {
 
 	return e.Msg
 }
+
+type ErrFaultyParticipant struct {
+	Msg         string
+	Participant int
+}
+
+func (e ErrFaultyParticipant) Error() string {
+
+	if e.Msg == "" {
+		return "Faulty participant error"
+	}
+
+	return e.Msg
+}
