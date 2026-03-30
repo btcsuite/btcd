@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	_ "github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/simplpedpop"
+	_ "github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/encpedpop"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/util"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr/threshold/vss"
 	"github.com/stretchr/testify/require"

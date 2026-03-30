@@ -4,6 +4,13 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
+)
+
+const (
+	// TODO(aakselrod): Move to chainhash package?
+
+	ENC_DECKEY_MSG_TAG = BIP_DKG_TAG + "encpedpop deckey"
 )
 
 type DKGOutput struct {
@@ -62,4 +69,9 @@ func GetDKGTests() []DKGTestCase {
 	}
 
 	return testCases
+}
+
+func EncPedPopTestKeys(seed [32]byte) (*btcec.PrivateKey, *btcec.PublicKey) {
+	keyHash := chainhash.TaggedHash([]byte(ENC_DECKEY_MSG_TAG), seed[:])
+	return btcec.PrivKeyFromBytes(keyHash[:])
 }
