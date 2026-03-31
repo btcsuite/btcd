@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
@@ -14,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
+	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -23,19 +25,25 @@ import (
 func newTestRPCChain(t *testing.T) (*blockchain.BlockChain, func()) {
 	t.Helper()
 
+	paramsCopy := chaincfg.MainNetParams
+	return newTestRPCChainWithParams(t, &paramsCopy)
+}
+
+func newTestRPCChainWithParams(t *testing.T, params *chaincfg.Params) (*blockchain.BlockChain, func()) {
+	t.Helper()
+
 	// These tests construct chain instances directly without going through the
 	// normal btcd startup path that initializes the global log rotator.
 	blockchain.DisableLog()
 	database.DisableLog()
 
 	dbPath := filepath.Join(t.TempDir(), "rpcserver")
-	db, err := database.Create("ffldb", dbPath, wire.MainNet)
+	db, err := database.Create("ffldb", dbPath, params.Net)
 	require.NoError(t, err)
 
-	paramsCopy := chaincfg.MainNetParams
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
-		ChainParams: &paramsCopy,
+		ChainParams: params,
 		TimeSource:  blockchain.NewMedianTime(),
 		SigCache:    txscript.NewSigCache(1000),
 	})
@@ -500,6 +508,43 @@ func TestHandleGetTxOutProof(t *testing.T) {
 
 	result, err := handleGetTxOutProof(s, btcjson.NewGetTxOutProofCmd(
 		[]string{txHash}, &blockHash,
+	), make(chan struct{}))
+	require.NoError(err)
+
+	proofHex, ok := result.(string)
+	require.True(ok)
+	require.NotEmpty(proofHex)
+
+	verified, err := handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd(proofHex), make(chan struct{}))
+	require.NoError(err)
+	require.Equal([]string{txHash}, verified)
+}
+
+func TestHandleGetTxOutProofWithoutBlockHash(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	paramsCopy := chaincfg.RegressionNetParams
+	chain, teardown := newTestRPCChainWithParams(t, &paramsCopy)
+	defer teardown()
+	s := &rpcServer{cfg: rpcserverConfig{Chain: chain}}
+
+	miningAddr, err := btcutil.NewAddressPubKeyHash(make([]byte, 20), &paramsCopy)
+	require.NoError(err)
+
+	block, err := rpctest.CreateBlock(nil, nil, 1, time.Time{}, miningAddr, nil, &paramsCopy)
+	require.NoError(err)
+
+	isMainChain, isOrphan, err := chain.ProcessBlock(block, blockchain.BFNone)
+	require.NoError(err)
+	require.True(isMainChain)
+	require.False(isOrphan)
+
+	txHash := block.Transactions()[0].Hash().String()
+
+	result, err := handleGetTxOutProof(s, btcjson.NewGetTxOutProofCmd(
+		[]string{txHash}, nil,
 	), make(chan struct{}))
 	require.NoError(err)
 
