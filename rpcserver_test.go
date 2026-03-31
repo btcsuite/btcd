@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	disableRPCChainLogsOnce sync.Once
+)
+
 func newTestRPCChain(t *testing.T) (*blockchain.BlockChain, func()) {
 	t.Helper()
 
@@ -34,16 +39,29 @@ func newTestRPCChainWithParams(t *testing.T, params *chaincfg.Params) (*blockcha
 
 	// These tests construct chain instances directly without going through the
 	// normal btcd startup path that initializes the global log rotator.
-	blockchain.DisableLog()
-	database.DisableLog()
+	disableRPCChainLogsOnce.Do(func() {
+		blockchain.DisableLog()
+		database.DisableLog()
+	})
 
 	dbPath := filepath.Join(t.TempDir(), "rpcserver")
 	db, err := database.Create("ffldb", dbPath, params.Net)
 	require.NoError(t, err)
 
+	paramsCopy := *params
+	for i := range paramsCopy.Deployments {
+		deployment := &paramsCopy.Deployments[i]
+		if starter, ok := deployment.DeploymentStarter.(*chaincfg.MedianTimeDeploymentStarter); ok {
+			deployment.DeploymentStarter = chaincfg.NewMedianTimeDeploymentStarter(starter.StartTime())
+		}
+		if ender, ok := deployment.DeploymentEnder.(*chaincfg.MedianTimeDeploymentEnder); ok {
+			deployment.DeploymentEnder = chaincfg.NewMedianTimeDeploymentEnder(ender.EndTime())
+		}
+	}
+
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
-		ChainParams: params,
+		ChainParams: &paramsCopy,
 		TimeSource:  blockchain.NewMedianTime(),
 		SigCache:    txscript.NewSigCache(1000),
 	})
