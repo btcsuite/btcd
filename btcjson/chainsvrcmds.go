@@ -929,8 +929,9 @@ func NewSetGenerateCmd(generate bool, genProcLimit *int) *SetGenerateCmd {
 
 // SignMessageWithPrivKeyCmd defines the signmessagewithprivkey JSON-RPC command.
 type SignMessageWithPrivKeyCmd struct {
-	PrivKey string // base 58 Wallet Import format private key
-	Message string // Message to sign
+	PrivKey string  // base 58 Wallet Import format private key
+	Message string  // Message to sign
+	Address *string // optional address for BIP-322 signing
 }
 
 // NewSignMessageWithPrivKey returns a new instance which can be used to issue a
@@ -938,10 +939,13 @@ type SignMessageWithPrivKeyCmd struct {
 //
 // The first parameter is a private key in base 58 Wallet Import format.
 // The second parameter is the message to sign.
-func NewSignMessageWithPrivKey(privKey, message string) *SignMessageWithPrivKeyCmd {
+// The optional third parameter is an address for BIP-322 signing.  Passing nil
+// will use the default legacy signing method.
+func NewSignMessageWithPrivKey(privKey, message string, address *string) *SignMessageWithPrivKeyCmd {
 	return &SignMessageWithPrivKeyCmd{
 		PrivKey: privKey,
 		Message: message,
+		Address: address,
 	}
 }
 
