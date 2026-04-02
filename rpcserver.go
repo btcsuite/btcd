@@ -31,6 +31,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/bip322"
 	"github.com/btcsuite/btcd/btcutil/message"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -3590,7 +3591,24 @@ func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-cha
 		}
 	}
 
-
+	// If an address was provided, use BIP-322 signing.
+	if c.Address != nil {
+		addr, err := btcutil.DecodeAddress(*c.Address, s.cfg.ChainParams)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "Invalid address: " + err.Error(),
+			}
+		}
+		sig, err := bip322.Sign(wif.PrivKey, addr, c.Message)
+		if err != nil {
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidParameter,
+				Message: "BIP-322 signing failed: " + err.Error(),
+			}
+		}
+		return sig, nil
+	}
 
 	sig := ecdsa.SignCompact(wif.PrivKey, message.Hash(c.Message), wif.CompressPubKey)
 	return base64.StdEncoding.EncodeToString(sig), nil
@@ -3756,53 +3774,32 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		}
 	}
 
-	// Only P2PKH addresses are valid for signing.
-	if _, ok := addr.(*btcutil.AddressPubKeyHash); !ok {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCType,
-			Message: "Address is not a pay-to-pubkey-hash address",
-		}
+	// Try legacy (BIP-137) verification first.
+	valid, err := message.Verify(addr, c.Message, c.Signature)
+	if err == nil {
+		return valid, nil
 	}
 
-	// Decode base64 signature.
-	sig, err := base64.StdEncoding.DecodeString(c.Signature)
+	// Try BIP-322 verification.
+	valid, err = bip322.Verify(addr, c.Message, c.Signature)
 	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCParse.Code,
-			Message: "Malformed base64 encoding: " + err.Error(),
+		switch {
+		case errors.Is(err, bip322.ErrInconclusive):
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCInvalidAddressOrKey,
+				Message: "Invalid signature: " + err.Error(),
+			}
+		case errors.Is(err, bip322.ErrMalformedSignature):
+			return nil, &btcjson.RPCError{
+				Code:    btcjson.ErrRPCParse.Code,
+				Message: "Malformed base64 encoding: " + err.Error(),
+			}
 		}
-	}
 
-	// Validate the signature - this just shows that it was valid at all.
-	// we will compare it with the key next.
-	var buf bytes.Buffer
-	wire.WriteVarString(&buf, 0, messageSignatureHeader)
-	wire.WriteVarString(&buf, 0, c.Message)
-	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
-	pk, wasCompressed, err := ecdsa.RecoverCompact(sig,
-		expectedMessageHash)
-	if err != nil {
-		// Mirror Bitcoin Core behavior, which treats error in
-		// RecoverCompact as invalid signature.
 		return false, nil
 	}
 
-	// Reconstruct the pubkey hash.
-	var serializedPK []byte
-	if wasCompressed {
-		serializedPK = pk.SerializeCompressed()
-	} else {
-		serializedPK = pk.SerializeUncompressed()
-	}
-	address, err := btcutil.NewAddressPubKey(serializedPK, params)
-	if err != nil {
-		// Again mirror Bitcoin Core behavior, which treats error in public key
-		// reconstruction as invalid signature.
-		return false, nil
-	}
-
-	// Return boolean if addresses match.
-	return address.EncodeAddress() == c.Address, nil
+	return valid, nil
 }
 
 // handleVersion implements the version command.
