@@ -31,6 +31,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/btcutil/message"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
@@ -3564,10 +3565,6 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return nil, nil
 }
 
-// Text used to signify that a signed message follows and to prevent
-// inadvertently signing a transaction.
-const messageSignatureHeader = "Bitcoin Signed Message:\n"
-
 // handleSignMessageWithPrivKey implements the signmessagewithprivkey command.
 func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.SignMessageWithPrivKeyCmd)
@@ -3593,13 +3590,9 @@ func handleSignMessageWithPrivKey(s *rpcServer, cmd interface{}, closeChan <-cha
 		}
 	}
 
-	var buf bytes.Buffer
-	wire.WriteVarString(&buf, 0, messageSignatureHeader)
-	wire.WriteVarString(&buf, 0, c.Message)
-	messageHash := chainhash.DoubleHashB(buf.Bytes())
 
-	sig := ecdsa.SignCompact(wif.PrivKey, messageHash, wif.CompressPubKey)
 
+	sig := ecdsa.SignCompact(wif.PrivKey, message.Hash(c.Message), wif.CompressPubKey)
 	return base64.StdEncoding.EncodeToString(sig), nil
 }
 

@@ -3,9 +3,11 @@ module github.com/btcsuite/btcd
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5
 	github.com/btcsuite/btcd/btcutil v1.1.5
+	github.com/btcsuite/btcd/btcutil/bip322 v0.0.0
+	github.com/btcsuite/btcd/btcutil/psbt v1.1.10
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/btcsuite/btcd/v2transport v1.0.1
-	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
+	github.com/btcsuite/btclog v1.0.0
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
 	github.com/btcsuite/winsvc v1.0.0
@@ -17,8 +19,8 @@ require (
 	github.com/jrick/logrotate v1.0.0
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	golang.org/x/crypto v0.25.0
-	golang.org/x/sys v0.22.0
+	golang.org/x/crypto v0.33.0
+	golang.org/x/sys v0.30.0
 	pgregory.net/rapid v1.2.0
 )
 
@@ -64,5 +66,11 @@ retract (
 	v0.13.0-beta2
 	v0.13.0-beta
 )
+
+replace github.com/btcsuite/btcd/btcutil => ./btcutil
+
+replace github.com/btcsuite/btcd/btcutil/bip322 => ./btcutil/bip322
+
+replace github.com/btcsuite/btcd/btcutil/psbt => ./btcutil/psbt
 
 go 1.23.2
