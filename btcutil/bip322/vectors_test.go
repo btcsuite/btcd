@@ -1,6 +1,7 @@
 package bip322
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
 )
 
@@ -234,5 +236,341 @@ func TestBIP322EdgeCases(t *testing.T) {
 		toSign, err := BuildToSignTx(toSpend.TxHash(), scriptPubKey)
 		require.NoError(t, err)
 		require.Equal(t, int32(0), toSign.Version, "to_sign must be version 0")
+	})
+}
+
+func TestBIP322NegativeVerification(t *testing.T) {
+	wif, err := btcutil.DecodeWIF("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k")
+	require.NoError(t, err)
+	privKey := wif.PrivKey
+	pubKeyBytes := privKey.PubKey().SerializeCompressed()
+
+	// Derive from the first key.
+	p2wpkhAddr, err := btcutil.DecodeAddress(
+		"bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+		&chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	taprootKey := txscript.ComputeTaprootKeyNoScript(privKey.PubKey())
+	p2trAddr, err := btcutil.NewAddressTaproot(
+		schnorr.SerializePubKey(taprootKey), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	redeemScript, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_0).
+		AddData(btcutil.Hash160(pubKeyBytes)).
+		Script()
+	require.NoError(t, err)
+	p2shAddr, err := btcutil.NewAddressScriptHash(
+		redeemScript, &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	p2pkhAddr, err := btcutil.NewAddressPubKeyHash(
+		btcutil.Hash160(pubKeyBytes), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	// Derive from the second key.
+	otherWif, err := btcutil.DecodeWIF(
+		"KwTbAxmBXjoZM3bzbXixEr9nxLhyYSM4vp2swet58i19bw9sqk5z",
+	)
+	require.NoError(t, err)
+	otherPub := otherWif.PrivKey.PubKey().SerializeCompressed()
+
+	otherP2wpkhAddr, err := btcutil.NewAddressWitnessPubKeyHash(
+		btcutil.Hash160(otherPub), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	otherTaprootKey := txscript.ComputeTaprootKeyNoScript(otherWif.PrivKey.PubKey())
+	otherP2trAddr, err := btcutil.NewAddressTaproot(
+		schnorr.SerializePubKey(otherTaprootKey), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	otherRedeemScript, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_0).
+		AddData(btcutil.Hash160(otherPub)).
+		Script()
+	require.NoError(t, err)
+	otherP2shAddr, err := btcutil.NewAddressScriptHash(
+		otherRedeemScript, &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	otherP2pkhAddr, err := btcutil.NewAddressPubKeyHash(
+		btcutil.Hash160(otherPub), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	cases := []struct {
+		name      string
+		addr      btcutil.Address
+		otherAddr btcutil.Address
+	}{
+		{"p2wpkh", p2wpkhAddr, otherP2wpkhAddr},
+		{"p2tr", p2trAddr, otherP2trAddr},
+		{"p2sh-p2wpkh", p2shAddr, otherP2shAddr},
+		{"p2pkh", p2pkhAddr, otherP2pkhAddr},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+"/wrong_message", func(t *testing.T) {
+			sig, err := Sign(privKey, tc.addr, "Hello World")
+			require.NoError(t, err)
+			valid, _ := Verify(tc.addr, "Different Message", sig)
+			require.False(t, valid, "signature must not verify against wrong message")
+		})
+
+		t.Run(tc.name+"/wrong_address", func(t *testing.T) {
+			sig, err := Sign(privKey, tc.addr, "Hello World")
+			require.NoError(t, err)
+			valid, _ := Verify(tc.otherAddr, "Hello World", sig)
+			require.False(t, valid, "signature must not verify against wrong address")
+		})
+	}
+}
+
+func TestBIP322ScriptSpendP2TRRejection(t *testing.T) {
+	addr, wif := deriveTaprootAddr(t, testPrivKeyWIF)
+
+	sig, err := SignP2TR(wif.PrivKey, addr, "Hello World")
+	require.NoError(t, err)
+
+	witness, err := DecodeSimple(sig)
+	require.NoError(t, err)
+	require.Len(t, witness, 1, "key-path P2TR witness must have exactly 1 element")
+
+	scriptPathWitness := wire.TxWitness{
+		witness[0],
+		{txscript.OP_TRUE},
+		make([]byte, 33),
+	}
+
+	encoded, err := EncodeSimple(scriptPathWitness)
+	require.NoError(t, err)
+
+	valid, _ := VerifyP2TR(addr, "Hello World", encoded)
+	require.False(t, valid, "script-path spend must be rejected for key-path-only address")
+}
+
+func TestBIP322TamperedSignatures(t *testing.T) {
+	wif, err := btcutil.DecodeWIF("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k")
+	require.NoError(t, err)
+	privKey := wif.PrivKey
+	pubKeyBytes := privKey.PubKey().SerializeCompressed()
+
+	taprootKey := txscript.ComputeTaprootKeyNoScript(privKey.PubKey())
+	p2trAddr, err := btcutil.NewAddressTaproot(
+		schnorr.SerializePubKey(taprootKey), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	redeemScript, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_0).
+		AddData(btcutil.Hash160(pubKeyBytes)).
+		Script()
+	require.NoError(t, err)
+	p2shAddr, err := btcutil.NewAddressScriptHash(
+		redeemScript, &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	p2pkhAddr, err := btcutil.NewAddressPubKeyHash(
+		btcutil.Hash160(pubKeyBytes), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	cases := []struct {
+		name string
+		addr btcutil.Address
+	}{
+		{"p2tr", p2trAddr},
+		{"p2sh-p2wpkh", p2shAddr},
+		{"p2pkh", p2pkhAddr},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sig, err := Sign(privKey, tc.addr, "Hello World")
+			require.NoError(t, err)
+			decoded, err := base64.StdEncoding.DecodeString(sig)
+			require.NoError(t, err)
+			require.True(t, len(decoded) > 5)
+			decoded[5] ^= 0xFF
+			tampered := base64.StdEncoding.EncodeToString(decoded)
+			valid, _ := Verify(tc.addr, "Hello World", tampered)
+			require.False(t, valid, "tampered %s signature must be invalid", tc.name)
+		})
+	}
+}
+
+func TestBIP322P2WSHNegative(t *testing.T) {
+	wif, err := btcutil.DecodeWIF("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k")
+	require.NoError(t, err)
+
+	pubKey := wif.PrivKey.PubKey()
+	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
+
+	witnessScript, err := txscript.NewScriptBuilder().
+		AddOp(txscript.OP_DUP).
+		AddOp(txscript.OP_HASH160).
+		AddData(pubKeyHash).
+		AddOp(txscript.OP_EQUALVERIFY).
+		AddOp(txscript.OP_CHECKSIG).
+		Script()
+	require.NoError(t, err)
+
+	// Builds a BIP-322 P2WSH witness since Sign does not support P2WSH
+	buildP2WSHSig := func(msg string) (btcutil.Address, string) {
+		t.Helper()
+		scriptHash := sha256.Sum256(witnessScript)
+		addr, err := btcutil.NewAddressWitnessScriptHash(
+			scriptHash[:], &chaincfg.MainNetParams,
+		)
+		require.NoError(t, err)
+
+		scriptPubKey, err := txscript.PayToAddrScript(addr)
+		require.NoError(t, err)
+		toSpend, err := BuildToSpendTx(msg, scriptPubKey)
+		require.NoError(t, err)
+		toSign, err := BuildToSignTx(toSpend.TxHash(), scriptPubKey)
+		require.NoError(t, err)
+
+		prevFetcher := txscript.NewCannedPrevOutputFetcher(scriptPubKey, 0)
+		sigHashes := txscript.NewTxSigHashes(toSign, prevFetcher)
+		sig, err := txscript.RawTxInWitnessSignature(
+			toSign, sigHashes, 0, 0, witnessScript,
+			txscript.SigHashAll, wif.PrivKey,
+		)
+		require.NoError(t, err)
+
+		witness := wire.TxWitness{sig, pubKey.SerializeCompressed(), witnessScript}
+		encoded, err := EncodeSimple(witness)
+		require.NoError(t, err)
+		return addr, encoded
+	}
+
+	t.Run("wrong message", func(t *testing.T) {
+		addr, sig := buildP2WSHSig("Hello World")
+		valid, err := VerifyP2WSH(addr, "Different", sig)
+		require.NoError(t, err)
+		require.False(t, valid)
+	})
+
+	t.Run("wrong address", func(t *testing.T) {
+		_, sig := buildP2WSHSig("Hello World")
+
+		otherWif, err := btcutil.DecodeWIF(
+			"KwTbAxmBXjoZM3bzbXixEr9nxLhyYSM4vp2swet58i19bw9sqk5z",
+		)
+		require.NoError(t, err)
+		otherPubHash := btcutil.Hash160(
+			otherWif.PrivKey.PubKey().SerializeCompressed(),
+		)
+		otherWitnessScript, err := txscript.NewScriptBuilder().
+			AddOp(txscript.OP_DUP).
+			AddOp(txscript.OP_HASH160).
+			AddData(otherPubHash).
+			AddOp(txscript.OP_EQUALVERIFY).
+			AddOp(txscript.OP_CHECKSIG).
+			Script()
+		require.NoError(t, err)
+		otherHash := sha256.Sum256(otherWitnessScript)
+		otherAddr, err := btcutil.NewAddressWitnessScriptHash(
+			otherHash[:], &chaincfg.MainNetParams,
+		)
+		require.NoError(t, err)
+
+		valid, err := VerifyP2WSH(otherAddr, "Hello World", sig)
+		require.NoError(t, err)
+		require.False(t, valid)
+	})
+
+	t.Run("tampered", func(t *testing.T) {
+		addr, sig := buildP2WSHSig("Hello World")
+		decoded, err := base64.StdEncoding.DecodeString(sig)
+		require.NoError(t, err)
+		decoded[5] ^= 0xFF
+		tampered := base64.StdEncoding.EncodeToString(decoded)
+		valid, _ := VerifyP2WSH(addr, "Hello World", tampered)
+		require.False(t, valid)
+	})
+}
+
+func TestBIP322P2PKHStructureValidation(t *testing.T) {
+	wif, err := btcutil.DecodeWIF("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k")
+	require.NoError(t, err)
+	pubKeyBytes := wif.PrivKey.PubKey().SerializeCompressed()
+	p2pkhAddr, err := btcutil.NewAddressPubKeyHash(
+		btcutil.Hash160(pubKeyBytes), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	sig, err := SignP2PKH(wif.PrivKey, p2pkhAddr, "Hello World")
+	require.NoError(t, err)
+
+	toSign, err := DecodeFull(sig)
+	require.NoError(t, err)
+
+	t.Run("version not zero", func(t *testing.T) {
+		tx := toSign.Copy()
+		tx.Version = 2
+		encoded, err := EncodeFull(tx)
+		require.NoError(t, err)
+		valid, _ := VerifyP2PKH(p2pkhAddr, "Hello World", encoded)
+		require.False(t, valid)
+	})
+
+	t.Run("locktime not zero", func(t *testing.T) {
+		tx := toSign.Copy()
+		tx.LockTime = 500000
+		encoded, err := EncodeFull(tx)
+		require.NoError(t, err)
+		valid, _ := VerifyP2PKH(p2pkhAddr, "Hello World", encoded)
+		require.False(t, valid)
+	})
+
+	t.Run("output value not zero", func(t *testing.T) {
+		tx := toSign.Copy()
+		tx.TxOut[0].Value = 1000
+		encoded, err := EncodeFull(tx)
+		require.NoError(t, err)
+		valid, _ := VerifyP2PKH(p2pkhAddr, "Hello World", encoded)
+		require.False(t, valid)
+	})
+}
+
+func TestBIP322MalformedSignatures(t *testing.T) {
+	p2wpkhAddr, err := btcutil.DecodeAddress(
+		"bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+		&chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+
+	t.Run("empty string", func(t *testing.T) {
+		_, err := Verify(p2wpkhAddr, "Hello World", "")
+		require.Error(t, err)
+	})
+
+	t.Run("valid base64 but garbage content", func(t *testing.T) {
+		garbage := base64.StdEncoding.EncodeToString([]byte("not a real signature"))
+		valid, _ := Verify(p2wpkhAddr, "Hello World", garbage)
+		require.False(t, valid)
+	})
+
+	t.Run("truncated witness", func(t *testing.T) {
+		wif, err := btcutil.DecodeWIF("L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k")
+		require.NoError(t, err)
+		sig, err := Sign(wif.PrivKey, p2wpkhAddr, "Hello World")
+		require.NoError(t, err)
+		decoded, err := base64.StdEncoding.DecodeString(sig)
+		require.NoError(t, err)
+		truncated := base64.StdEncoding.EncodeToString(decoded[:len(decoded)/2])
+		valid, _ := Verify(p2wpkhAddr, "Hello World", truncated)
+		require.False(t, valid)
 	})
 }
