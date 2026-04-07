@@ -44,6 +44,59 @@ func TestBIP322CrossLibraryVectors(t *testing.T) {
 				"BCPMVPwVIVJqO4XCsMvViHI=",
 			valid: true,
 		},
+		// P2TR. Key: L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k
+		{
+			name:      "p2tr empty message",
+			address:   "bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3",
+			message:   "",
+			signature: "AUENaEN08MvLbhHu5+JxE0z2cwjClb3Mt3Nv9IT4/4CLdMYMpIhLQlTTAkYK6WO/Ew4yC05Z9WHCipKnl2SfoengAQ==",
+			valid:     true,
+		},
+		{
+			name:      "p2tr hello world",
+			address:   "bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3",
+			message:   "Hello World",
+			signature: "AUFylEJD/8Arqu9J/uTde49VdZDCP/Bv9J9XDdmJc9Tdy/83yvVggexMchQJ+9teYj5bo+gdW8l98PO+JZ1mS1WLAQ==",
+			valid:     true,
+		},
+		// P2SH-P2WPKH. Key: L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k
+		{
+			name:    "p2sh-p2wpkh empty message (key1)",
+			address: "37qyp7jQAzqb2rCBpMvVtLDuuzKAUCVnJb",
+			message: "",
+			signature: "AkgwRQIhAJFXl+/g7w+UDxvGex2KulmFJshHi02gQZXGRpZ+9bapAiB5Q/ik" +
+				"azTS7FMewqVFil3RLkEErUZ25k6f/xYThoQXogEhAsfxIAMZZEKUPYWI4Bru" +
+				"hAQjzFT8FSFSajuFwrDL1Yhy",
+			valid: true,
+		},
+		{
+			name:    "p2sh-p2wpkh hello world (key1)",
+			address: "37qyp7jQAzqb2rCBpMvVtLDuuzKAUCVnJb",
+			message: "Hello World",
+			signature: "AkcwRAIgRfq2Gfv9guFcXAf2vQEJSHX8FP5OuiHs1DSK1I0wk/0CIGPzqm6Q" +
+				"NPTDJuki148OQ2DbJtXyrr71s4xYPwogQUupASECx/EgAxlkQpQ9hYjgGu6E" +
+				"BCPMVPwVIVJqO4XCsMvViHI=",
+			valid: true,
+		},
+		// P2SH-P2WPKH. Key: KwTbAxmBXjoZM3bzbXixEr9nxLhyYSM4vp2swet58i19bw9sqk5z
+		{
+			name:    "p2sh-p2wpkh hello world (key2)",
+			address: "3HSVzEhCFuH9Z3wvoWTexy7BMVVp3PjS6f",
+			message: "Hello World",
+			signature: "AkgwRQIhAMd2wZSY3x0V9Kr/NClochoTXcgDaGl3OObOR17yx3QQAiBV" +
+				"WxqNSS+CKen7bmJTG6YfJjsggQ4Fa2RHKgBKrdQQ+gEhAxa5UDdQCHSQ" +
+				"HfKQv14ybcYm1C9y6b12xAuukWzSnS+w",
+			valid: true,
+		},
+		// P2TR SIGHASH_ALL (65-byte Schnorr sig). Key: L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k
+		{
+			name:    "p2tr hello world sighash_all",
+			address: "bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3",
+			message: "Hello World",
+			signature: "AUHd69PrJQEv+oKTfZ8l+WROBHuy9HKrbFCJu7U1iK2iiEy1vMU5EfMtjc+V" +
+				"SHM7aU0SDbak5IUZRVno2P5mjSafAQ==",
+			valid: true,
+		},
 		// Invalid: signature for "Hello World" verified against different message
 		{
 			name:    "wrong message",
