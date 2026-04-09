@@ -594,6 +594,7 @@ var helpDescsEnUS = map[string]string{
 	"signmessagewithprivkey--synopsis": "Sign a message with the private key of an address",
 	"signmessagewithprivkey-privkey":   "The private key to sign the message with",
 	"signmessagewithprivkey-message":   "The message to create a signature of",
+	"signmessagewithprivkey-address":   "The optional address for BIP-322 signing (default=legacy signing)",
 	"signmessagewithprivkey--result0":  "The signature of the message encoded in base 64",
 
 	// StopCmd help.

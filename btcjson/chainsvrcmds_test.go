@@ -1304,12 +1304,27 @@ func TestChainSvrCmds(t *testing.T) {
 				return btcjson.NewCmd("signmessagewithprivkey", "5Hue", "Hey")
 			},
 			staticCmd: func() interface{} {
-				return btcjson.NewSignMessageWithPrivKey("5Hue", "Hey")
+				return btcjson.NewSignMessageWithPrivKey("5Hue", "Hey", nil)
 			},
 			marshalled: `{"jsonrpc":"1.0","method":"signmessagewithprivkey","params":["5Hue","Hey"],"id":1}`,
 			unmarshalled: &btcjson.SignMessageWithPrivKeyCmd{
 				PrivKey: "5Hue",
 				Message: "Hey",
+			},
+		},
+		{
+			name: "signmessagewithprivkey - with address",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("signmessagewithprivkey", "5Hue", "Hey", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewSignMessageWithPrivKey("5Hue", "Hey", btcjson.String("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"))
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"signmessagewithprivkey","params":["5Hue","Hey","1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"],"id":1}`,
+			unmarshalled: &btcjson.SignMessageWithPrivKeyCmd{
+				PrivKey: "5Hue",
+				Message: "Hey",
+				Address: btcjson.String("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"),
 			},
 		},
 		{
