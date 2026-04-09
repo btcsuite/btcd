@@ -1,7 +1,11 @@
 package rpcclient
 
 import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/require"
 )
 
 var upgrader = websocket.Upgrader{}
@@ -252,6 +258,134 @@ func TestClientConnectedToWSServerRunner(t *testing.T) {
 			t.Fatalf("timeout exceeded for: %s", testCase.Name)
 		}
 	}
+}
+
+// TestJSONStringParsing tests the old vs. the two new methods for parsing a
+// JSON string.
+func TestJSONStringParsing(t *testing.T) {
+	testCases := []string{
+		"\"\"",
+		"\"foo\"",
+		"\"5152dcbe2d94dd2c66008b1281157ff44156d146c83bf3a182ba5b32ce" +
+			"e79f5d\"",
+		"\"010000004860eb18bf1b1620e37e9490fc8a427514416fd75159ab8668" +
+			"8e9a8300000000d5fdcc541e25de1c7a5addedf24858b8bb665c" +
+			"9f36ef744ee42c316022c90f9bb0bc6649ffff001d08d2bd6101" +
+			"0100000001000000000000000000000000000000000000000000" +
+			"0000000000000000000000ffffffff0704ffff001d010bffffff" +
+			"ff0100f2052a010000004341047211a824f55b505228e4c3d519" +
+			"4c1fcfaa15a456abdf37f9b9d97a4040afc073dee6c89064984f" +
+			"03385237d92167c13e236446b417ab79a0fcae412ae3316b77ac" +
+			"00000000\"",
+	}
+
+	oldMethod := func(res []byte) (string, error) {
+		// Unmarshal result as a string.
+		var resultStr string
+		err := json.Unmarshal(res, &resultStr)
+		if err != nil {
+			return "", err
+		}
+
+		return resultStr, nil
+	}
+	newMethod := func(res []byte) (string, error) {
+		return parseJSONString(res), nil
+	}
+	newMethodReader := func(res []byte) (string, error) {
+		allBytes, err := io.ReadAll(parseJSONStringReader(res))
+		if err != nil {
+			return "", err
+		}
+
+		return string(allBytes), nil
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase, func(t *testing.T) {
+			oldResult, err := oldMethod([]byte(testCase))
+			require.NoError(t, err)
+
+			newResult, err := newMethod([]byte(testCase))
+			require.NoError(t, err)
+
+			require.Equal(t, oldResult, newResult)
+
+			newResult2, err := newMethodReader([]byte(testCase))
+			require.NoError(t, err)
+
+			require.Equal(t, oldResult, newResult2)
+		})
+	}
+}
+
+// BenchmarkParseJSONString benchmarks the old vs. the two new methods for
+// parsing a JSON string.
+func BenchmarkParseJSONString(b *testing.B) {
+	// This is block 2 from mainnet.
+	payload := []byte(
+		"\"010000004860eb18bf1b1620e37e9490fc8a427514416fd75159ab8668" +
+			"8e9a8300000000d5fdcc541e25de1c7a5addedf24858b8bb665c" +
+			"9f36ef744ee42c316022c90f9bb0bc6649ffff001d08d2bd6101" +
+			"0100000001000000000000000000000000000000000000000000" +
+			"0000000000000000000000ffffffff0704ffff001d010bffffff" +
+			"ff0100f2052a010000004341047211a824f55b505228e4c3d519" +
+			"4c1fcfaa15a456abdf37f9b9d97a4040afc073dee6c89064984f" +
+			"03385237d92167c13e236446b417ab79a0fcae412ae3316b77ac" +
+			"00000000\"",
+	)
+
+	b.ResetTimer()
+	b.Run("unmarshal", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			var s string
+			if err := json.Unmarshal(payload, &s); err != nil {
+				b.Fatal(err)
+			}
+
+			serializedBlock, err := hex.DecodeString(s)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			var msgBlock wire.MsgBlock
+			err = msgBlock.Deserialize(bytes.NewReader(
+				serializedBlock,
+			))
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("parseJSONString", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			s := parseJSONString(payload)
+
+			var msgBlock wire.MsgBlock
+			err := msgBlock.Deserialize(hex.NewDecoder(
+				strings.NewReader(s)),
+			)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("parseJSONStringReader", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			r := parseJSONStringReader(payload)
+
+			var msgBlock wire.MsgBlock
+			err := msgBlock.Deserialize(hex.NewDecoder(r))
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 func makeClient(t *testing.T) (*Client, chan string, func()) {
