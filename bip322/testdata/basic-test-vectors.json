@@ -62,6 +62,202 @@
       "bip322_signatures": [
         "smpBQBHMEQCIFX9aaqPJWq2Ff2kpen5bFDTid+ehgUOpHV0LfjncXy4AiA3GNicF7aKPzdpa9PCpmaYQs3pHd+qbvvhXdxOCKCAMAFIMEUCIQD/ELXg6CNYyUQijCg96JtgvgjZb9dsl1Ctof4QAeyTcQIgVM/1AAblFl/DCt6A1gJg+T/i2qU5SQD09+chFJzolRwBSDBFAiEAlqRfSFyWNVQhvaCnmeV5tyneiCWMTcFbuujoD/pFa3wCIGnZjfQb8NolSYq9asV+ZeBSkCGHJcqnaV4JYS5MYPEGAWlTIQJ1aLEfEi/4p7wcV+XHZCBVvGGJZ7L3v+jhH+mZA8lN0yECCovfec+kIdllXpKCgA8RX/HZ2x5yHOtCSKP8/sf6pnwhAwxSng6kCgCXXSAmJOOZFdr3vdK3HzGqCFloOHgc5fM6U64="
       ]
+    },
+    {
+      "message": "No prefix fallback",
+      "private_keys": [
+        "KyrSGCFPhqZMjCe5fNTYddiLMp4tMj4gLKuJ26TsB2rvr1VJGPbt"
+      ],
+      "address": "bc1pss0zhytly75awhm6x2hhvd5lnzv3vssgrf9axfheq8ldyzn88ges79fler",
+      "type": "p2tr",
+      "witness_script": "",
+      "bip322_signatures": [
+        "AUCJYOwOjxYAvatTAGYaVlNXBVyFuc4MwNQkOuK2tl8xhfKDONd0NjfYyNSYcRqeCp8hsAnCEPHAVEkO9h6vbQ/R"
+      ]
+    }
+  ],
+  "valid": [
+    {
+      "description": "valid P2TR tapscript (HTLC) spend whose preimage resembles a 65-byte Schnorr signature",
+      "message": "Hello World",
+      "address": "bc1prcjws24grzqyatm0h24xpr0t7h57rhprty4ewzgn9zh8r85qgwes0vjpr5",
+      "signature": "smpBUDFyv0qSSuNwHwxyMs064kILVtcCgnx4wXoYoRONmDYwjiS2d2hncDXPBIbh2jqNzeuzMPKYs1pGwJtJzmkXhwZQQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0ACAQFvY6ggc9cCfr9GRSq4DoYv9ZUX2DDVRcctvXDM/4YAmN55fUyIIO7HJF1rfSzLMDgL++KjZIzXqUJlP1qjQO3OofKDaGYZrGcC9AGxdSAkZT6sQ0SIACzAa7+38Q/hiZHjX5/kMC2+ptI1PcCrHKxoIcB/MevFRiwf3OG3N+z/UtN9dd6kPOEcdNJaopcWX6ogBw=="
+    },
+    {
+      "description": "valid P2WSH script (HTLC) spend whose preimage resembles a DER-encoded ECDSA signature",
+      "message": "Hello World",
+      "address": "bc1q9zgd3xcxanse37y7365zty493qf725rhw5mjpqm36f62vltvcwssrp6vul",
+      "signature": "smpBEgwRQIhAIdOUJUBtWvNlc6fAJ5RNU6NN9XbByNFLc3Cf4yGQXnJAiAX0Mj6w6Ur4am4LHZzhCQPntXvBKcB+NJqA/hXrI3TTgEgMB0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIBAXFjqCAgx8lbUGza5gB08FceetY5oFOgaOzdSA3MhtO/vUMalYghA7r3aJwKNVj7YEWJA2qNHktoXZCfbg4sYBihQEmuZOwmrGcC9AGxdSECnB9YWqgHYvn0RY9oBpeLe++0bHtor4LTmWMHk/8aK1CsaA=="
+    }
+  ],
+  "error": [
+    {
+      "description": "invalid base64 encoding",
+      "message": "",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "not-valid-base64!!!",
+      "error_substr": "base64"
+    },
+    {
+      "description": "empty signature",
+      "message": "",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "",
+      "error_substr": "signature too short"
+    },
+    {
+      "description": "wrong message for valid simple p2wpkh signature (empty message was signed)",
+      "message": "Wrong message that was not signed",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "smpAkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong address for valid simple p2wpkh signature (signed for different address)",
+      "message": "",
+      "address": "bc1qp0ahvfh83088w49k405szqgg4f3pptr7p2g06tdxfjcd40z4lh4q95lsz9",
+      "signature": "smpAkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "empty witness stack (single zero byte)",
+      "message": "",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "smpAA==",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong message for valid simple p2wsh 3-of-3 multisig signature",
+      "message": "This is not the message that was signed",
+      "address": "bc1qp0ahvfh83088w49k405szqgg4f3pptr7p2g06tdxfjcd40z4lh4q95lsz9",
+      "signature": "smpBQBHMEQCIFX9aaqPJWq2Ff2kpen5bFDTid+ehgUOpHV0LfjncXy4AiA3GNicF7aKPzdpa9PCpmaYQs3pHd+qbvvhXdxOCKCAMAFIMEUCIQD/ELXg6CNYyUQijCg96JtgvgjZb9dsl1Ctof4QAeyTcQIgVM/1AAblFl/DCt6A1gJg+T/i2qU5SQD09+chFJzolRwBSDBFAiEAlqRfSFyWNVQhvaCnmeV5tyneiCWMTcFbuujoD/pFa3wCIGnZjfQb8NolSYq9asV+ZeBSkCGHJcqnaV4JYS5MYPEGAWlTIQJ1aLEfEi/4p7wcV+XHZCBVvGGJZ7L3v+jhH+mZA8lN0yECCovfec+kIdllXpKCgA8RX/HZ2x5yHOtCSKP8/sf6pnwhAwxSng6kCgCXXSAmJOOZFdr3vdK3HzGqCFloOHgc5fM6U64=",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "invalid signature prefix",
+      "message": "",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fooAA==",
+      "error_substr": "error decoding signature as base64"
+    },
+    {
+      "description": "incorrect prefix type",
+      "message": "incorrect prefix",
+      "address": "bc1pyrgrm6cu6n54jrvkdjd9rvyd3xfyu84s2623awu2srn6mxhscwpsm5644w",
+      "signature": "fulAUDZwFXUp+adN+/UZj5dVrGAbB3zKs1Vcalz5fCF9srxS63eSWNGvH1NYbrBkPt1BJDUyWUz9zgUxfc63/QheT6M",
+      "error_substr": "error parsing signature as full variant"
+    },
+    {
+      "description": "wrong first input prev outpoint (not to_spend.txid)",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABAefgOV4T7eH9omMAYEh6usEbN3XsHUAEWZO6hYxpaBffAAAAAAAAAAAAAQAAAAAAAAAAAWoCRzBEAiAgE8y4jECU7FwFLPCvrQoE8TZrrfUt51hP55swxsaCvQIgRNrC4iRRYjw3C7FMt625ui9R8fpmQirSUmhr/uQP57sBIQLH8SADGWRClD2FiOAa7oQEI8xU/BUhUmo7hcKwy9WIcgAAAAA=",
+      "error_substr": "does not match to_spend txid"
+    },
+    {
+      "description": "to_sign has more than one output",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAgAAAAAAAAAAAWoAAAAAAAAAAAFqAkgwRQIhAJU6h3iXWbvNYmcUkBvuMlNw2QuSElQaXuHoKZDG/01iAiBSvxO21J1OY7+SA0XpepI6wdPyeuWUBj9RQZozDUlc1gEhAsfxIAMZZEKUPYWI4BruhAQjzFT8FSFSajuFwrDL1YhyAAAAAA==",
+      "error_substr": "to_sign must have exactly one output"
+    },
+    {
+      "description": "to_sign output scriptPubKey is not OP_RETURN",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQAAAAAAAAAAAXYCSDBFAiEA+C6IExKqNl4xTKrT3RE5yoUD8fuCIAh3MmWgp/LphTkCIEopcLx0+uZAzttqhOT/hr+x1oyKlTIybR1qEKabHQ7FASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHIAAAAA",
+      "error_substr": "to_sign output scriptPubKey must be a single OP_RETURN byte"
+    },
+    {
+      "description": "to_sign output value is non-zero",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQEAAAAAAAAAAWoCSDBFAiEAvB0R/Tuyyn19FfZEhfOqDz7dt39ez130ltFwIoihpMsCIBGGwEct2Di7NKTdkXWtMv8uBKAI7fz4WNTjE8cgsKeVASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHIAAAAA",
+      "error_substr": "to_sign output value must be 0"
+    },
+    {
+      "description": "to_sign has tx version 1 (must be 0 or 2)",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAQAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQAAAAAAAAAAAWoCSDBFAiEAt3+tQT2ohV4qdGYyYUtvjb0huVHDYYapZMtBLvMtPQMCIFPE0tz79jasG9W0ptM0V5uLaI85jhNyU0UD3xE8fGjaASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHIAAAAA",
+      "error_substr": "inconclusive: to_sign tx version must be 0 or 2"
+    },
+    {
+      "description": "to_sign has tx version 3 (must be 0 or 2)",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAwAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQAAAAAAAAAAAWoCSDBFAiEA1+uw/ICOtLbY+d3UDnoFpbCUW+B2W7ZbzXYG20PAsoACIEDVw194aGEZum0DtWw0FzCy2IGFFkxRRrn0cI9EyaynASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHIAAAAA",
+      "error_substr": "inconclusive: to_sign tx version must be 0 or 2"
+    },
+    {
+      "description": "ECDSA signature with sighash flag SIGHASH_NONE (must be SIGHASH_ALL)",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQAAAAAAAAAAAWoCRzBEAiAO6q+NrtgkK9FKOwkfNd7BLr4QVqqc9wtPhTIl5P/H3gIgbieR7UiA+SuQM6bdn4dF9J+AAr0shhlcanEiJkF495YCIQLH8SADGWRClD2FiOAa7oQEI8xU/BUhUmo7hcKwy9WIcgAAAAA=",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "ECDSA signature with sighash flag SIGHASH_SINGLE (must be SIGHASH_ALL)",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQAAAAAAAAAAAWoCSDBFAiEApP1p14ZOAWklkPF1atoOCCFmBp/dtjhMQU4P43VZGEICIEMG4eprl9nS9AXVT/P/O9fGVU8DJys0juITXvMb6DKhAyECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHIAAAAA",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "ECDSA signature with sighash flag SIGHASH_ALL|ANYONECANPAY (must be SIGHASH_ALL)",
+      "message": "Hello World",
+      "address": "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+      "signature": "fulAAAAAAABASs1A9aiYU3q8XFsIzJcU+BRS0r8mBAcdxdSrUBnGZ23AAAAAAAAAAAAAQAAAAAAAAAAAWoCRzBEAiAinWb6HWWl1jBphd4FBc1Bisy2azxbhdN0/r8yt1M7uwIgRePkKdg+kAlUmOVSq+CkT22B1FoFzw1bkYG7kzlRWxGBIQLH8SADGWRClD2FiOAa7oQEI8xU/BUhUmo7hcKwy9WIcgAAAAA=",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "P2TR Schnorr signature with incorrect explicit sighash byte (must be SIGHASH_DEFAULT or SIGHASH_ALL)",
+      "message": "Hello World",
+      "address": "bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3",
+      "signature": "fulAAAAAAABAQZ52yMWanylo3mYung2wzGYu6l1UmV7Eo2xCNKfbmYhAAAAAAAAAAAAAQAAAAAAAAAAAWoBQeWGTijlm2zsFP/scDgJ1Z9oJGXI04hbwDN0aSYV6dduty9fJukSljKih3NhPLm+rR8nrHfymhOThSP/NTC+NgsCAAAAAA==",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "OP_CODESEPARATOR in a P2WSH witness script is forbidden",
+      "message": "Hello World",
+      "address": "bc1q00yx5wpnln4c2ya097u0cu3ae4auxcglk4rwkyvs58ayv2lnsvwqj7h0zr",
+      "signature": "smpAQKrUQ==",
+      "error_substr": "OP_CODESEPARATOR is forbidden"
+    },
+    {
+      "description": "OP_CODESEPARATOR in a P2TR tapscript (script-path spend) is forbidden",
+      "message": "Hello World",
+      "address": "bc1psncxkzalrhfwlssw6enn6n6nje9gm2cvujqdkg8zm0jrzr4nfuyqsvu5mh",
+      "signature": "smpAgKrUSHBTzVb3LfMCvco7zzOuWFdkGhLtbLKX4WasPC3BAdYcao=",
+      "error_substr": "OP_CODESEPARATOR is forbidden"
+    },
+    {
+      "description": "P2TR tapscript signature with disallowed sighash flag SIGHASH_SINGLE (must be SIGHASH_DEFAULT or SIGHASH_ALL)",
+      "message": "Hello World",
+      "address": "bc1pfqwdte9y4k4su0pnngk3uz5qku5gpq8gtrcuxc0n6fd05w8dzkpqr45pea",
+      "signature": "smpBUF71zyYilHdnJwf9jjUEQtK/He6SNyyzEbP4r4tlSzP+dmQvcfKICfjuDLbPTdf8Ld5eXvWebl3t6OG3ZvjnYo+AyABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAEBb2OoIK4hbC71JHo3gsE176J5o+TNxhCUJw9dK+WMYgS3phLJiCCNdQDdTBJoXR9Wi0wrUEjoU0uHMxnzqNqmErRpEy7H96xnAvQBsXUgRm1/yuVj5csJoNGHC7WANEgEYXh5oUlJzyIoXxuuPyesaCHA4R9Ar2tB9JS/vCfEeheM5XLouMpofMZ+EphRSGGsXkg=",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "P2WSH multisig signature with disallowed sighash flag SIGHASH_SINGLE (must be SIGHASH_ALL)",
+      "message": "Hello World",
+      "address": "bc1qrhfzums6ve0ftkdr8fltwwu0udv5hcyx9m94j5kl9md95y0447kq58rxyu",
+      "signature": "smpBABHMEQCIH4Vxgnaif9dJoJqXOcrREwo68vOrueuniF9FMMrQsjTAiAklN3WWQCTYyWFs2Kg3OlYl+SaNxGUkqmD4lyG36nfrgFHMEQCIAM/gld3ksCnpFqOF84RhvnPWGbeO4N16eGkC7ZMIHusAiBwbwuQc9O+OKkM6TgGPrQyd2/DZ5LPKh2jGNVFcn6BKgNHUiEDaTD0bdCxbYZtWdEFSqYymLNXSZzRhi7xbz9V8cr864IhApCZnbv0MDS/+x3VPqwetMM6TqHE9Iulhc/eODCEDwVVUq4=",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "reserved upgradeable NOP (OP_NOP5) in witness script is inconclusive",
+      "message": "Hello World",
+      "address": "bc1qqv2jj3l8f73fkcqj3dwgduc2dfur30u3mgk5n4zm8dupl8jq5lhqmjjpa3",
+      "signature": "smpAQK0UQ==",
+      "error_substr": "inconclusive"
+    },
+    {
+      "description": "tx version 1 is inconclusive",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "fulAQAAAAABAWYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAAQAAAAAAAAAAAWoBAVEAAAAA",
+      "error_substr": "inconclusive"
     }
   ]
 }
