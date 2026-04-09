@@ -100,10 +100,6 @@ func genesisProof() (*wire.MsgMerkleBlock, string) {
 	return proof, txHash.String()
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func requireRPCErrorCode(t *testing.T, err error, want btcjson.RPCErrorCode) {
 	t.Helper()
 
@@ -525,7 +521,7 @@ func TestHandleGetTxOutProof(t *testing.T) {
 	blockHash := genesis.BlockHash().String()
 
 	result, err := handleGetTxOutProof(s, btcjson.NewGetTxOutProofCmd(
-		[]string{txHash}, &blockHash,
+		[]string{txHash}, btcjson.String(blockHash),
 	), make(chan struct{}))
 	require.NoError(err)
 
@@ -606,7 +602,7 @@ func TestHandleGetTxOutProofErrors(t *testing.T) {
 		},
 		{
 			name:            "invalid block hash",
-			cmd:             btcjson.NewGetTxOutProofCmd([]string{genesisTxID}, strPtr("nope")),
+			cmd:             btcjson.NewGetTxOutProofCmd([]string{genesisTxID}, btcjson.String("nope")),
 			expectedErrCode: btcjson.ErrRPCDecodeHexString,
 		},
 	}
