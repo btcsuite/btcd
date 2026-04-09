@@ -5,6 +5,8 @@
 package bloom
 
 import (
+	"fmt"
+
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -78,9 +80,7 @@ func (m *merkleBlock) traverseAndBuild(height, pos uint32) {
 	}
 }
 
-// NewMerkleBlock returns a new *wire.MsgMerkleBlock and an array of the matched
-// transaction index numbers based on the passed block and filter.
-func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []uint32) {
+func newMerkleBlock(block *btcutil.Block, matchesTx func(*btcutil.Tx) bool) (*wire.MsgMerkleBlock, []uint32) {
 	numTx := uint32(len(block.Transactions()))
 	mBlock := merkleBlock{
 		numTx:       numTx,
@@ -91,7 +91,7 @@ func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 	// Find and keep track of any transactions that match the filter.
 	var matchedIndices []uint32
 	for txIndex, tx := range block.Transactions() {
-		if filter.MatchTxAndUpdate(tx) {
+		if matchesTx(tx) {
 			mBlock.matchedBits = append(mBlock.matchedBits, 0x01)
 			matchedIndices = append(matchedIndices, uint32(txIndex))
 		} else {
@@ -123,4 +123,42 @@ func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock,
 		msgMerkleBlock.Flags[i/8] |= mBlock.bits[i] << (i % 8)
 	}
 	return &msgMerkleBlock, matchedIndices
+}
+
+// NewMerkleBlock returns a new *wire.MsgMerkleBlock and an array of the matched
+// transaction index numbers based on the passed block and filter.
+func NewMerkleBlock(block *btcutil.Block, filter *Filter) (*wire.MsgMerkleBlock, []uint32) {
+	return newMerkleBlock(block, filter.MatchTxAndUpdate)
+}
+
+// NewMerkleBlockFromTxHashes returns a new *wire.MsgMerkleBlock and the matched
+// transaction indexes for the provided transaction hashes.
+func NewMerkleBlockFromTxHashes(block *btcutil.Block, txHashes []*chainhash.Hash) (*wire.MsgMerkleBlock, []uint32, error) {
+	remaining := make(map[chainhash.Hash]struct{}, len(txHashes))
+	for _, txHash := range txHashes {
+		if txHash == nil {
+			return nil, nil, fmt.Errorf("nil transaction hash")
+		}
+		if _, ok := remaining[*txHash]; ok {
+			return nil, nil, fmt.Errorf("duplicate transaction %s", txHash)
+		}
+
+		remaining[*txHash] = struct{}{}
+	}
+
+	merkleBlock, matchedIndices := newMerkleBlock(block, func(tx *btcutil.Tx) bool {
+		txHash := tx.Hash()
+		if _, ok := remaining[*txHash]; !ok {
+			return false
+		}
+
+		delete(remaining, *txHash)
+		return true
+	})
+
+	for txHash := range remaining {
+		return nil, nil, fmt.Errorf("transaction %s not found in block", &txHash)
+	}
+
+	return merkleBlock, matchedIndices, nil
 }
