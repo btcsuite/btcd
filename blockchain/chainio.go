@@ -71,6 +71,11 @@ var (
 	// unspent transaction output set.
 	utxoSetBucketName = []byte("utxosetv2")
 
+	// swiftSyncBitIdxKeyName is the name of the db key used to store the
+	// current bit index for swift sync. This is used to resume swift sync
+	// after a restart.
+	swiftSyncBitIdxKeyName = []byte("swiftsyncbitidx")
+
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
 	byteOrder = binary.LittleEndian
@@ -1068,6 +1073,24 @@ func dbFetchUtxoStateConsistency(dbTx database.Tx) []byte {
 	return nil
 }
 
+// dbPutSwiftSyncBitIdx uses an existing database transaction to store the
+// swift sync bit index. This is used to resume swift sync after a restart.
+func dbPutSwiftSyncBitIdx(dbTx database.Tx, bitIdx uint64) error {
+	var buf [8]byte
+	byteOrder.PutUint64(buf[:], bitIdx)
+	return dbTx.Metadata().Put(swiftSyncBitIdxKeyName, buf[:])
+}
+
+// dbFetchSwiftSyncBitIdx uses an existing database transaction to retrieve the
+// swift sync bit index from the database. Returns 0 if not found.
+func dbFetchSwiftSyncBitIdx(dbTx database.Tx) uint64 {
+	data := dbTx.Metadata().Get(swiftSyncBitIdxKeyName)
+	if data == nil || len(data) != 8 {
+		return 0
+	}
+	return byteOrder.Uint64(data)
+}
+
 // createChainState initializes both the database and the chain state to the
 // genesis block.  This includes creating the necessary buckets and inserting
 // the genesis block, so it must only be called on an uninitialized database.
@@ -1308,6 +1331,23 @@ func (b *BlockChain) initChainState() error {
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, CalcPastMedianTime(tip))
+
+		// Load swift sync state if swift sync is enabled.
+		if b.swiftSyncEnabled {
+			b.swiftSyncBitIdx = dbFetchSwiftSyncBitIdx(dbTx)
+			log.Infof("Swift sync enabled: height=%d, bit index=%d",
+				b.swiftSync.Height, b.swiftSyncBitIdx)
+
+			// If the chain already has blocks but swift sync bit index is 0,
+			// this means the user started syncing without swift sync and then
+			// enabled it. In this case, disable swift sync to avoid corruption.
+			if tip.height > 0 && b.swiftSyncBitIdx == 0 {
+				log.Warnf("Swift sync disabled: chain already has blocks " +
+					"but no swift sync progress. Use a fresh database " +
+					"for swift sync.")
+				b.swiftSyncEnabled = false
+			}
+		}
 
 		return nil
 	})
