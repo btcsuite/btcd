@@ -1672,6 +1672,20 @@ func (c *Client) ListAccountsMinConf(minConfirms int) (map[string]btcutil.Amount
 	return c.ListAccountsMinConfAsync(minConfirms).Receive()
 }
 
+// ListLabels returns the list of labels from the wallet.
+func (c *Client) ListLabels() ([]string, error) {
+	res, err := c.RawRequest("listlabels", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var labels []string
+	if err := json.Unmarshal(res, &labels); err != nil {
+		return nil, err
+	}
+	return labels, nil
+}
+
 // FutureGetBalanceResult is a future promise to deliver the result of a
 // GetBalanceAsync or GetBalanceMinConfAsync RPC invocation (or an applicable
 // error).
