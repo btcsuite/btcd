@@ -110,17 +110,16 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 	deadline := time.Now().Add(syncRaceRunDuration)
 	iter := 0
 	var done int
-	doneCh := make(chan struct{}, syncRaceConcurrency*2)
+	errCh := make(chan error, syncRaceConcurrency*2)
 
 	for time.Now().Before(deadline) && iter < syncRaceIterations {
 		for i := 0; i < syncRaceConcurrency; i++ {
 			go func() {
-				_ = fakePeerConn(nodeAddr)
-				doneCh <- struct{}{}
+				errCh <- fakePeerConn(nodeAddr)
 			}()
 		}
 		for i := 0; i < syncRaceConcurrency; i++ {
-			<-doneCh
+			require.NoError(t, <-errCh)
 			done++
 		}
 		iter += syncRaceConcurrency
@@ -160,6 +159,45 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 		done, heightBefore, heightAfter)
 }
 
+// dialAndSendVersion connects to nodeAddr and sends a version
+// message, returning the open connection. The caller is
+// responsible for closing it.
+func dialAndSendVersion(
+	t *testing.T, nodeAddr string,
+) net.Conn {
+
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", nodeAddr, 5*time.Second)
+	require.NoError(t, err)
+
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	nodeTCP, err := net.ResolveTCPAddr("tcp", nodeAddr)
+	require.NoError(t, err)
+
+	you := wire.NewNetAddress(
+		nodeTCP, wire.SFNodeNetwork|wire.SFNodeWitness,
+	)
+	me := wire.NewNetAddress(
+		&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0},
+		wire.SFNodeNetwork|wire.SFNodeWitness,
+	)
+	you.Timestamp = time.Time{}
+	me.Timestamp = time.Time{}
+
+	nonce := uint64(rand.Int63())
+	msgVersion := wire.NewMsgVersion(me, you, nonce, 0)
+	msgVersion.Services = wire.SFNodeNetwork | wire.SFNodeWitness
+
+	err = wire.WriteMessage(
+		conn, msgVersion, wire.ProtocolVersion, wire.SimNet,
+	)
+	require.NoError(t, err)
+
+	return conn
+}
+
 // TestPreVerackDisconnect verifies that a peer disconnecting
 // before completing the version/verack handshake does not corrupt
 // the sync manager state. In this case only a peerDone event is
@@ -174,41 +212,12 @@ func TestPreVerackDisconnect(t *testing.T) {
 	nodeAddr := harness.P2PAddress()
 
 	// Connect and send version, then disconnect before receiving or
-	// sending verack. This produces a peerDone without a preceding
-	// peerAdd in the lifecycle channel.
-	for i := 0; i < 50; i++ {
-		conn, err := net.DialTimeout("tcp", nodeAddr, 5*time.Second)
-		if err != nil {
-			continue
-		}
+	// sending verack. This is expected to produce a peerDone without
+	// a preceding peerAdd in the lifecycle channel.
+	const preVerackAttempts = 50
 
-		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
-
-		nodeTCP, err := net.ResolveTCPAddr("tcp", nodeAddr)
-		if err != nil {
-			conn.Close()
-			continue
-		}
-
-		you := wire.NewNetAddress(
-			nodeTCP, wire.SFNodeNetwork|wire.SFNodeWitness,
-		)
-		me := wire.NewNetAddress(
-			&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0},
-			wire.SFNodeNetwork|wire.SFNodeWitness,
-		)
-		you.Timestamp = time.Time{}
-		me.Timestamp = time.Time{}
-
-		nonce := uint64(rand.Int63())
-		msgVersion := wire.NewMsgVersion(me, you, nonce, 0)
-		msgVersion.Services = wire.SFNodeNetwork | wire.SFNodeWitness
-
-		_ = wire.WriteMessage(
-			conn, msgVersion, wire.ProtocolVersion, wire.SimNet,
-		)
-
-		// Close immediately without completing the handshake.
+	for i := 0; i < preVerackAttempts; i++ {
+		conn := dialAndSendVersion(t, nodeAddr)
 		conn.Close()
 	}
 
@@ -238,6 +247,7 @@ func TestPreVerackDisconnect(t *testing.T) {
 	require.GreaterOrEqual(t, heightAfter, heightBefore+3,
 		"node failed to sync after pre-verack disconnects")
 
-	t.Logf("node healthy after 50 pre-verack disconnects (height %d -> %d)",
-		heightBefore, heightAfter)
+	t.Logf("node healthy after %d pre-verack disconnects "+
+		"(height %d -> %d)",
+		preVerackAttempts, heightBefore, heightAfter)
 }
