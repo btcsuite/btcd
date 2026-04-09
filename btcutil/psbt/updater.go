@@ -256,6 +256,22 @@ func (u *Updater) AddInRedeemScript(redeemScript []byte,
 	return nil
 }
 
+// AddInTaprootInternalKey adds the taproot internal key information for an
+// input. The taproot internal key is passed serialized, as a byte slice, along
+// with the index of the input. An error is returned if addition of this
+// key-value pair to the Psbt fails.
+func (u *Updater) AddInTaprootInternalKey(tapRootInternalKey []byte,
+	inIndex int) error {
+
+	u.Upsbt.Inputs[inIndex].TaprootInternalKey = tapRootInternalKey
+
+	if err := u.Upsbt.SanityCheck(); err != nil {
+		return ErrInvalidPsbtFormat
+	}
+
+	return nil
+}
+
 // AddInWitnessScript adds the witness script information for an input.  The
 // witness script is passed serialized, as a byte slice, along with the index
 // of the input. An error is returned if addition of this key-value pair to the
