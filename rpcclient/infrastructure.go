@@ -798,12 +798,14 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		}
 
 		// Configure basic access authorization.
-		user, pass, err := c.config.getAuth()
-		if err != nil {
-			jReq.responseChan <- &Response{result: nil, err: err}
-			return
+		if !c.config.DisableAuth {
+			user, pass, err := c.config.getAuth()
+			if err != nil {
+				jReq.responseChan <- &Response{result: nil, err: err}
+				return
+			}
+			httpReq.SetBasicAuth(user, pass)
 		}
-		httpReq.SetBasicAuth(user, pass)
 
 		httpResponse, err = c.httpClient.Do(httpReq)
 
@@ -1284,6 +1286,12 @@ type ConnConfig struct {
 	// EnableBCInfoHacks is an option provided to enable compatibility hacks
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
+
+	// DisableAuth instructs the client to skip setting the Authorization
+	// header on RPC requests. This is useful when connecting to third-party
+	// RPC providers that authenticate via API key in the URL path and
+	// reject requests containing an Authorization header with 401 errors.
+	DisableAuth bool
 }
 
 // getAuth returns the username and passphrase that will actually be used for
@@ -1430,16 +1438,20 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 		dialer.NetDial = proxy.Dial
 	}
 
-	// The RPC server requires basic authorization, so create a custom
-	// request header with the Authorization header set.
-	user, pass, err := config.getAuth()
-	if err != nil {
-		return nil, err
-	}
-	login := user + ":" + pass
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+	// Configure basic access authorization. When DisableAuth is set, skip
+	// setting the Authorization header entirely. This is useful for
+	// third-party RPC providers that authenticate via API key in the URL
+	// path and reject requests containing an Authorization header.
 	requestHeader := make(http.Header)
-	requestHeader.Add("Authorization", auth)
+	if !config.DisableAuth {
+		user, pass, err := config.getAuth()
+		if err != nil {
+			return nil, err
+		}
+		login := user + ":" + pass
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+		requestHeader.Add("Authorization", auth)
+	}
 	for key, value := range config.ExtraHeaders {
 		requestHeader.Add(key, value)
 	}
