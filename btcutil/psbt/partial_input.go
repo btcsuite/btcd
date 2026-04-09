@@ -515,6 +515,11 @@ func (pi *PInput) serialize(w io.Writer) error {
 			}
 		}
 
+		for _, leafScript := range pi.TaprootLeafScript {
+			if leafScript == nil {
+				return ErrInvalidPsbtFormat
+			}
+		}
 		sort.Slice(pi.TaprootLeafScript, func(i, j int) bool {
 			return pi.TaprootLeafScript[i].SortBefore(
 				pi.TaprootLeafScript[j],
