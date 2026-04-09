@@ -118,7 +118,13 @@ func signInputWitness(packet *psbt.Packet, idx int, script []byte,
 		if txIn.PreviousOutPoint.Index >= uint32(len(prevTx.TxOut)) {
 			return fmt.Errorf("input %d has no UTXO", idx)
 		}
-		return fmt.Errorf("input %d has no witness UTXO", idx)
+
+		if prevTx.TxHash() != txIn.PreviousOutPoint.Hash {
+			return fmt.Errorf("non witness utxo does not match " +
+				"input prevout")
+		}
+
+		utxo = prevTx.TxOut[txIn.PreviousOutPoint.Index]
 	}
 
 	prevOutFetcher := PsbtPrevOutputFetcher(packet)
