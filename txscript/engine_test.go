@@ -426,3 +426,113 @@ func TestCheckSignatureEncoding(t *testing.T) {
 		}
 	}
 }
+
+// TestCodeSepUnexecutedBranch ensures that OP_CODESEPARATOR is rejected in
+// non-segwit scripts even when inside an unexecuted OP_IF branch, when the
+// ScriptVerifyConstScriptCode flag is set. This matches Bitcoin Core's
+// behavior where the SCRIPT_VERIFY_CONST_SCRIPTCODE check fires
+// unconditionally before the branch execution gate.
+func TestCodeSepUnexecutedBranch(t *testing.T) {
+	t.Parallel()
+
+	// A minimal transaction for script execution.
+	tx := &wire.MsgTx{
+		Version: 1,
+		TxIn: []*wire.TxIn{{
+			PreviousOutPoint: wire.OutPoint{
+				Hash: chainhash.Hash([32]byte{
+					0xc9, 0x97, 0xa5, 0xe5,
+					0x6e, 0x10, 0x41, 0x02,
+					0xfa, 0x20, 0x9c, 0x6a,
+					0x85, 0x2d, 0xd9, 0x06,
+					0x60, 0xa2, 0x0b, 0x2d,
+					0x9c, 0x35, 0x24, 0x23,
+					0xed, 0xce, 0x25, 0x85,
+					0x7f, 0xcd, 0x37, 0x04,
+				}),
+				Index: 0,
+			},
+			SignatureScript: mustParseShortForm("TRUE"),
+			Sequence:        4294967295,
+		}},
+		TxOut: []*wire.TxOut{{
+			Value:    1000000000,
+			PkScript: nil,
+		}},
+		LockTime: 0,
+	}
+
+	tests := []struct {
+		name    string
+		script  string
+		flags   ScriptFlags
+		wantErr bool
+		errCode ErrorCode
+	}{
+		{
+			// OP_CODESEPARATOR inside an unexecuted branch with
+			// the const scriptcode flag set should be rejected.
+			name:    "codesep in unexecuted IF with const scriptcode",
+			script:  "0 IF CODESEPARATOR ENDIF TRUE",
+			flags:   ScriptVerifyConstScriptCode,
+			wantErr: true,
+			errCode: ErrCodeSeparator,
+		},
+		{
+			// Without the flag, OP_CODESEPARATOR in an unexecuted
+			// branch should be fine (consensus behavior).
+			name:    "codesep in unexecuted IF without const scriptcode",
+			script:  "0 IF CODESEPARATOR ENDIF TRUE",
+			flags:   0,
+			wantErr: false,
+		},
+		{
+			// OP_CODESEPARATOR in an executed branch with the
+			// const scriptcode flag should also be rejected.
+			name:    "codesep in executed branch with const scriptcode",
+			script:  "CODESEPARATOR TRUE",
+			flags:   ScriptVerifyConstScriptCode,
+			wantErr: true,
+			errCode: ErrCodeSeparator,
+		},
+		{
+			// Nested unexecuted branches should still be caught.
+			name:    "codesep in nested unexecuted IF with const scriptcode",
+			script:  "0 IF 1 IF CODESEPARATOR ENDIF ENDIF TRUE",
+			flags:   ScriptVerifyConstScriptCode,
+			wantErr: true,
+			errCode: ErrCodeSeparator,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pkScript := mustParseShortForm(test.script)
+			vm, err := NewEngine(
+				pkScript, tx, 0, test.flags, nil, nil,
+				-1, nil,
+			)
+			if err != nil {
+				t.Fatalf("failed to create engine: %v", err)
+			}
+
+			err = vm.Execute()
+
+			switch {
+			case test.wantErr && err == nil:
+				t.Fatal("expected error but execution " +
+					"succeeded")
+
+			case !test.wantErr && err != nil:
+				t.Fatalf("unexpected error: %v", err)
+
+			case test.wantErr && err != nil:
+				if !IsErrorCode(err, test.errCode) {
+					t.Fatalf("expected error code "+
+						"%v, got: %v",
+						test.errCode, err)
+				}
+			}
+		})
+	}
+}
