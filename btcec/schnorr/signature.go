@@ -114,7 +114,15 @@ func (sig Signature) IsEqual(otherSig *Signature) bool {
 // This differs from the exported Verify method in that it returns a specific
 // error to support better testing while the exported method simply returns a
 // bool indicating success or failure.
-func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
+func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte,
+	signOpts ...SignOption) error {
+
+	// First, parse the set of optional signing options.
+	opts := defaultSignOptions()
+	for _, option := range signOpts {
+		option(opts)
+	}
+
 	// The algorithm for producing a BIP-340 signature is described in
 	// README.md and is reproduced here for reference:
 	//
@@ -162,7 +170,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	pBytes := SerializePubKey(pubKey)
 
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
+		opts.tagChallenge, rBytes[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
@@ -221,6 +229,15 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 func (sig *Signature) Verify(hash []byte, pubKey *btcec.PublicKey) bool {
 	pubkeyBytes := SerializePubKey(pubKey)
 	return schnorrVerify(sig, hash, pubkeyBytes) == nil
+}
+
+// VerifyCustom returns whether or not the signature is valid for the provided
+// hash and secp256k1 public key, and accepts custom options.
+func (sig *Signature) VerifyCustom(hash []byte, pubKey *btcec.PublicKey,
+	signOpts ...SignOption) bool {
+
+	pubkeyBytes := SerializePubKey(pubKey)
+	return schnorrVerify(sig, hash, pubkeyBytes, signOpts...) == nil
 }
 
 // zeroArray zeroes the memory of a scalar array.
@@ -297,7 +314,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m) mod n
 	pBytes := SerializePubKey(pubKey)
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, R.X.Bytes()[:], pBytes, hash,
+		opts.tagChallenge, R.X.Bytes()[:], pBytes, hash,
 	)
 
 	var e btcec.ModNScalar
@@ -319,7 +336,8 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	//
 	// If Verify(bytes(P), m, sig) fails, abort.
 	if !opts.fastSign {
-		if err := schnorrVerify(sig, hash, pBytes); err != nil {
+		err := schnorrVerify(sig, hash, pBytes, opts.verifyOpts...)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -344,11 +362,44 @@ type signOptions struct {
 	// authNonce allows the user to pass in their own nonce information, which
 	// is useful for schemes like mu-sig.
 	authNonce *[32]byte
+
+	// tagNonce is the BIP nonce tag used for signing and verification
+	tagNonce []byte
+
+	//tagChallenge is the BIP challenge tag used for signing and verification
+	tagChallenge []byte
+
+	// tagAux is the BIP nonce tag used for signing and verification
+	tagAux []byte
+
+	// verifyOpts is a way for options to add themselves for post-signing
+	// verification checks.
+	verifyOpts []SignOption
 }
 
 // defaultSignOptions returns the default set of signing operations.
 func defaultSignOptions() *signOptions {
-	return &signOptions{}
+	return &signOptions{
+		tagAux:       chainhash.TagBIP0340Aux,
+		tagNonce:     chainhash.TagBIP0340Nonce,
+		tagChallenge: chainhash.TagBIP0340Challenge,
+	}
+}
+
+// CustomNonConsensusBIPTag allows non-consensus BIPs to specify a tag prefix
+// other than that used for BIP 340 to prevent signatures being acceped
+// on-chain. Useful for e.g. ChillDKG.
+func CustomNonConsensusBIPTag(baseTag string) SignOption {
+	opt := func(o *signOptions) {
+		o.tagChallenge = []byte(baseTag + "/challenge")
+		o.tagNonce = []byte(baseTag + "/nonce")
+		o.tagAux = []byte(baseTag + "/aux")
+	}
+
+	return func(o *signOptions) {
+		opt(o)
+		o.verifyOpts = append(o.verifyOpts, opt)
+	}
 }
 
 // FastSign forces signing to skip the extra verification step at the end.
@@ -458,7 +509,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		// t = bytes(d) xor tagged_hash("BIP0340/aux", a)
 		privBytes := privKeyScalar.Bytes()
 		t := chainhash.TaggedHash(
-			chainhash.TagBIP0340Aux, (*opts.authNonce)[:],
+			opts.tagAux, (*opts.authNonce)[:],
 		)
 		for i := 0; i < len(t); i++ {
 			t[i] ^= privBytes[i]
@@ -471,7 +522,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		// We snip off the first byte of the serialized pubkey, as we
 		// only need the x coordinate and not the market byte.
 		rand := chainhash.TaggedHash(
-			chainhash.TagBIP0340Nonce, t[:], pubKeyBytes[1:], hash,
+			opts.tagNonce, t[:], pubKeyBytes[1:], hash,
 		)
 
 		// Step 7.
