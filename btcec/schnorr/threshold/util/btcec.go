@@ -131,3 +131,15 @@ func DeriveInterpolatingValue(ids []int, id int) (*btcec.ModNScalar,
 	num.Mul(deno)
 	return num, nil
 }
+
+func ParsePrivKeyNonZeroChecked(b []byte) (*btcec.PrivateKey, error) {
+	scalar := new(btcec.ModNScalar)
+
+	if scalar.SetByteSlice(b) || scalar.IsZero() {
+		return nil, fmt.Errorf("private key out of range")
+	}
+
+	defer scalar.Zero()
+
+	return btcec.PrivKeyFromScalar(scalar), nil
+}
