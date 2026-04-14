@@ -1410,6 +1410,7 @@ func TestInvalidateBlock(t *testing.T) {
 						"invalidate-once")
 				// Grab the tip of the chain.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 
 				// Create a chain with 11 blocks.
 				_, _, err := addBlocks(11, chain, tip, []*testhelper.SpendableOut{})
@@ -1433,6 +1434,7 @@ func TestInvalidateBlock(t *testing.T) {
 				chain, params, tearDown := utxoCacheTestChain("TestInvalidateBlock-invalidate-twice")
 				// Grab the tip of the chain.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 
 				// Create a chain with 11 blocks.
 				_, spendableOuts, err := addBlocks(11, chain, tip, []*testhelper.SpendableOut{})
@@ -1479,6 +1481,7 @@ func TestInvalidateBlock(t *testing.T) {
 			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
 				chain, params, tearDown := utxoCacheTestChain("TestInvalidateBlock-invalidate-side-branch")
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 
 				// Grab the tip of the chain.
 				tip, err := chain.BlockByHash(&chain.bestChain.Tip().hash)
@@ -1661,6 +1664,7 @@ func TestReconsiderBlock(t *testing.T) {
 
 				// Create a chain with 101 blocks.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, _, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1683,6 +1687,7 @@ func TestReconsiderBlock(t *testing.T) {
 
 				// Create a chain with 101 blocks.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1715,6 +1720,7 @@ func TestReconsiderBlock(t *testing.T) {
 
 				// Create a chain with 101 blocks.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1744,6 +1750,7 @@ func TestReconsiderBlock(t *testing.T) {
 				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-reconsider-an-invalid-side-branch-higher")
 
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1778,6 +1785,7 @@ func TestReconsiderBlock(t *testing.T) {
 				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-reconsider-an-invalid-side-branch-lower")
 
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
