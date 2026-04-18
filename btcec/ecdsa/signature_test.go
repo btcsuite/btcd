@@ -11,7 +11,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -557,13 +556,14 @@ var recoveryTests = []struct {
 		// Invalid curve point recovered.
 		msg: "00c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c",
 		sig: "0100b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75f00b940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
-		err: fmt.Errorf("signature is not for a valid curve point"),
+		err: fmt.Errorf("invalid signature: not for a valid curve point"),
 	},
 	{
 		// Point at infinity recovered
 		msg: "6b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
 		sig: "0079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817986b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
-		err: fmt.Errorf("recovered pubkey is the point at infinity"),
+		err: fmt.Errorf("invalid signature: recovered pubkey is the " +
+			"point at infinity"),
 	},
 	{
 		// Low R and S values.
@@ -577,7 +577,8 @@ var recoveryTests = []struct {
 		// Test case contributed by Ethereum Swarm: GH-1651
 		msg: "3060d2c77c1e192d62ad712fb400e04e6f779914a6876328ff3b213fa85d2012",
 		sig: "65000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037a3",
-		err: fmt.Errorf("invalid compact signature recovery code"),
+		err: fmt.Errorf("invalid signature: public key recovery code " +
+			"128 is not in the valid range [27, 34]"),
 	},
 	{
 		// Zero R value
@@ -585,26 +586,37 @@ var recoveryTests = []struct {
 		// Test case contributed by Ethereum Swarm: GH-1651
 		msg: "2bcebac60d8a78e520ae81c2ad586792df495ed429bd730dcd897b301932d054",
 		sig: "060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007c",
-		err: fmt.Errorf("signature R is 0"),
+		err: fmt.Errorf("invalid signature: R is 0"),
 	},
 	{
 		// R = N (curve order of secp256k1)
 		msg: "2bcebac60d8a78e520ae81c2ad586792df495ed429bd730dcd897b301932d054",
 		sig: "65fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd036414100000000000000000000000000000000000000000000000000000000000037a3",
-		err: fmt.Errorf("invalid compact signature recovery code"),
+		err: fmt.Errorf("invalid signature: public key recovery code " +
+			"128 is not in the valid range [27, 34]"),
 	},
 	{
 		// Zero S value
 		msg: "ce0677bb30baa8cf067c88db9811f4333d131bf8bcf12fe7065d211dce971008",
 		sig: "0190f27b8b488db00b00606796d2987f6a5f59ae62ea05effe84fef5b8b0e549980000000000000000000000000000000000000000000000000000000000000000",
-		err: fmt.Errorf("signature S is 0"),
+		err: fmt.Errorf("invalid signature: S is 0"),
 	},
 	{
 		// S = N (curve order of secp256k1)
 		msg: "ce0677bb30baa8cf067c88db9811f4333d131bf8bcf12fe7065d211dce971008",
 		sig: "0190f27b8b488db00b00606796d2987f6a5f59ae62ea05effe84fef5b8b0e54998fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-		err: fmt.Errorf("signature S is >= curve order"),
+		err: fmt.Errorf("invalid signature: S >= group order"),
 	},
+}
+
+func errorStringEqual(expected, current error) bool {
+	if expected == nil && current == nil {
+		return true
+	}
+	if !(expected != nil && current != nil) {
+		return false
+	}
+	return expected.Error() == current.Error()
 }
 
 func TestRecoverCompact(t *testing.T) {
@@ -618,7 +630,7 @@ func TestRecoverCompact(t *testing.T) {
 		pub, _, err := RecoverCompact(sig, msg)
 
 		// Verify that returned error matches as expected.
-		if !reflect.DeepEqual(test.err, err) {
+		if !errorStringEqual(test.err, err) {
 			t.Errorf("unexpected error returned from pubkey "+
 				"recovery #%d: wanted %v, got %v",
 				i, test.err, err)
