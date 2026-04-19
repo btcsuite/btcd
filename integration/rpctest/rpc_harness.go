@@ -405,9 +405,9 @@ func (h *Harness) ConfirmedBalance() btcutil.Amount {
 //
 // This function is safe for concurrent access.
 func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
-	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+	feeRate btcutil.Amount, options ...CreateTxOption) (*chainhash.Hash, error) {
 
-	return h.wallet.SendOutputs(targetOutputs, feeRate)
+	return h.wallet.SendOutputs(targetOutputs, feeRate, options...)
 }
 
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
@@ -416,9 +416,9 @@ func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
-	feeRate btcutil.Amount) (*chainhash.Hash, error) {
+	feeRate btcutil.Amount, options ...CreateTxOption) (*chainhash.Hash, error) {
 
-	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate)
+	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate, options...)
 }
 
 // CreateTransaction returns a fully signed transaction paying to the specified
@@ -433,9 +433,9 @@ func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
-	feeRate btcutil.Amount, change bool) (*wire.MsgTx, error) {
+	feeRate btcutil.Amount, change bool, options ...CreateTxOption) (*wire.MsgTx, error) {
 
-	return h.wallet.CreateTransaction(targetOutputs, feeRate, change)
+	return h.wallet.CreateTransaction(targetOutputs, feeRate, change, options...)
 }
 
 // UnlockOutputs unlocks any outputs which were previously marked as
