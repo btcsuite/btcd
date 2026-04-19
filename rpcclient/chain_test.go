@@ -103,6 +103,61 @@ func TestUnmarshalGetBlockChainInfoResultSoftForks(t *testing.T) {
 	}
 }
 
+// TestUnmarshalGetIndexInfoResult ensures that the Txindex of GetIndexInfoResult
+// are properly unmarshaled.
+func TestUnmarshalGetIndexInfoResult(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		res         []byte
+		enabled     bool
+		blockHeight int32
+	}{
+		{
+			name:        "txindex synced and best block height valid",
+			res:         []byte(`{"txindex": {"synced": true, "best_block_height": 3522710}}`),
+			enabled:     true,
+			blockHeight: 3522710,
+		},
+		{
+			name:        "txindex not enabled",
+			res:         []byte(`{}`),
+			enabled:     false,
+			blockHeight: 0,
+		},
+	}
+
+	for _, test := range tests {
+		success := t.Run(test.name, func(t *testing.T) {
+			// We'll start by unmarshalling the JSON into a struct.
+			info, err := unmarshalPartialGetIndexInfoResult(test.res)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if test.enabled {
+				if info.TxIndex == nil {
+					t.Fatalf("unable to unmarshal txindex: %v", err)
+				}
+				if info.TxIndex.Synced == false {
+					t.Fatalf("expected TxIndex.Synced to be true")
+				}
+				if info.TxIndex.BestBlockHeight != test.blockHeight {
+					t.Fatalf("expected TxIndex.BestBlockHeight to be equal")
+				}
+			} else {
+				if info.TxIndex != nil {
+					t.Fatalf("expected TxIndex to be empty")
+				}
+			}
+		})
+		if !success {
+			return
+		}
+	}
+}
+
 func TestFutureGetBlockCountResultReceiveErrors(t *testing.T) {
 	responseChan := FutureGetBlockCountResult(make(chan *Response))
 	response := Response{
