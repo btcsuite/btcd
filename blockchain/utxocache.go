@@ -183,7 +183,11 @@ const (
 	// when the flush mode FlushPeriodic is used.  This is used when the initial
 	// block download is complete and it's useful to flush periodically in case
 	// of unforeseen shutdowns.
-	utxoFlushPeriodicInterval = time.Minute * 5
+	//
+	// We'll be flushing every 2 days.  Re-indexing 288 blocks is pretty
+	// quick and it won't put too much overhead on the flushes while the
+	// node is caught up.
+	utxoFlushPeriodicInterval = time.Hour * 48
 )
 
 // FlushMode is used to indicate the different urgency types for a flush.
