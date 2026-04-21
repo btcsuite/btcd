@@ -22,19 +22,40 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+const (
+	scriptTestSigScriptOffset = iota
+	scriptTestPkScriptOffset
+	scriptTestFlagsOffset
+	scriptTestExpectedOffset
+	scriptTestCommentOffset
+)
+
+// scriptTestWitnessOffset returns the field offset caused by optional witness
+// data at the beginning of a script_tests.json entry.
+func scriptTestWitnessOffset(test []interface{}) int {
+	if len(test) == 0 {
+		return 0
+	}
+
+	if _, ok := test[0].([]interface{}); ok {
+		return 1
+	}
+
+	return 0
+}
+
 // scriptTestName returns a descriptive test name for the given reference script
 // test data.
 func scriptTestName(test []interface{}) (string, error) {
 	// Account for any optional leading witness data.
-	var witnessOffset int
-	if _, ok := test[0].([]interface{}); ok {
-		witnessOffset++
-	}
+	witnessOffset := scriptTestWitnessOffset(test)
 
 	// In addition to the optional leading witness data, the test must
 	// consist of at least a signature script, public key script, flags,
 	// and expected error.  Finally, it may optionally contain a comment.
-	if len(test) < witnessOffset+4 || len(test) > witnessOffset+5 {
+	if len(test) < witnessOffset+scriptTestExpectedOffset+1 ||
+		len(test) > witnessOffset+scriptTestCommentOffset+1 {
+
 		return "", fmt.Errorf("invalid test length %d", len(test))
 	}
 
@@ -42,11 +63,14 @@ func scriptTestName(test []interface{}) (string, error) {
 	// construct the name based on the signature script, public key script,
 	// and flags.
 	var name string
-	if len(test) == witnessOffset+5 {
-		name = fmt.Sprintf("test (%s)", test[witnessOffset+4])
+	if len(test) == witnessOffset+scriptTestCommentOffset+1 {
+		name = fmt.Sprintf("test (%s)",
+			test[witnessOffset+scriptTestCommentOffset])
 	} else {
-		name = fmt.Sprintf("test ([%s, %s, %s])", test[witnessOffset],
-			test[witnessOffset+1], test[witnessOffset+2])
+		name = fmt.Sprintf("test ([%s, %s, %s])",
+			test[witnessOffset+scriptTestSigScriptOffset],
+			test[witnessOffset+scriptTestPkScriptOffset],
+			test[witnessOffset+scriptTestFlagsOffset])
 	}
 	return name, nil
 }
@@ -205,6 +229,22 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 	return flags, nil
 }
 
+// hasTaprootScriptTest returns whether the reference script test is one of the
+// newer taproot cases embedded in script_tests.json. Those vectors rely on
+// Bitcoin Core-specific placeholder macros, while btcd covers taproot via the
+// dedicated data/taproot-ref harness in TestTaprootReferenceTests.
+func hasTaprootScriptTest(test []interface{}) bool {
+	// Account for any optional leading witness data.
+	witnessOffset := scriptTestWitnessOffset(test)
+
+	if len(test) < witnessOffset+scriptTestFlagsOffset+1 {
+		return false
+	}
+
+	flags, ok := test[witnessOffset+scriptTestFlagsOffset].(string)
+	return ok && strings.Contains(flags, "TAPROOT")
+}
+
 // parseExpectedResult parses the provided expected result string into allowed
 // script error codes.  An error is returned if the expected result string is
 // not supported.
@@ -228,6 +268,8 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrEvalFalse, ErrEmptyStack}, nil
 	case "EQUALVERIFY":
 		return []ErrorCode{ErrEqualVerify}, nil
+	case "NUMEQUALVERIFY":
+		return []ErrorCode{ErrNumEqualVerify}, nil
 	case "NULLFAIL":
 		return []ErrorCode{ErrNullFail}, nil
 	case "SIG_HIGH_S":
@@ -269,6 +311,8 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrInvalidSignatureCount}, nil
 	case "MINIMALDATA":
 		return []ErrorCode{ErrMinimalData}, nil
+	case "SCRIPTNUM":
+		return []ErrorCode{ErrNumberTooBig, ErrMinimalData}, nil
 	case "NEGATIVE_LOCKTIME":
 		return []ErrorCode{ErrNegativeLockTime}, nil
 	case "UNSATISFIED_LOCKTIME":
@@ -349,6 +393,13 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 			continue
 		}
 
+		// Taproot entries in the latest Bitcoin Core script_tests.json rely on
+		// placeholder macros (for example #SCRIPT# and #CONTROLBLOCK#).  btcd
+		// validates taproot separately via TestTaprootReferenceTests.
+		if hasTaprootScriptTest(test) {
+			continue
+		}
+
 		// Construct a name for the test based on the comment and test
 		// data.
 		name, err := scriptTestName(test)
@@ -364,9 +415,9 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 
 		// When the first field of the test data is a slice it contains
 		// witness data and everything else is offset by 1 as a result.
-		witnessOffset := 0
-		if witnessData, ok := test[0].([]interface{}); ok {
-			witnessOffset++
+		witnessOffset := scriptTestWitnessOffset(test)
+		if witnessOffset != 0 {
+			witnessData := test[0].([]interface{})
 
 			// If this is a witness test, then the final element
 			// within the slice is the input amount, so we ignore
@@ -379,7 +430,9 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 				continue
 			}
 
-			inputAmt, err = btcutil.NewAmount(witnessData[len(witnessData)-1].(float64))
+			inputAmt, err = btcutil.NewAmount(
+				witnessData[len(witnessData)-1].(float64),
+			)
 			if err != nil {
 				t.Errorf("%s: can't parse input amt: %v",
 					name, err)
@@ -389,7 +442,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the signature script from the test fields.
-		scriptSigStr, ok := test[witnessOffset].(string)
+		scriptSigIdx := witnessOffset + scriptTestSigScriptOffset
+		scriptSigStr, ok := test[scriptSigIdx].(string)
 		if !ok {
 			t.Errorf("%s: signature script is not a string", name)
 			continue
@@ -402,7 +456,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the public key script from the test fields.
-		scriptPubKeyStr, ok := test[witnessOffset+1].(string)
+		scriptPubKeyIdx := witnessOffset + scriptTestPkScriptOffset
+		scriptPubKeyStr, ok := test[scriptPubKeyIdx].(string)
 		if !ok {
 			t.Errorf("%s: public key script is not a string", name)
 			continue
@@ -415,7 +470,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the script flags from the test fields.
-		flagsStr, ok := test[witnessOffset+2].(string)
+		flagsIdx := witnessOffset + scriptTestFlagsOffset
+		flagsStr, ok := test[flagsIdx].(string)
 		if !ok {
 			t.Errorf("%s: flags field is not a string", name)
 			continue
@@ -433,7 +489,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		// fine grained with its errors than the reference test data, so
 		// some of the reference test data errors map to more than one
 		// possibility.
-		resultStr, ok := test[witnessOffset+3].(string)
+		resultIdx := witnessOffset + scriptTestExpectedOffset
+		resultStr, ok := test[resultIdx].(string)
 		if !ok {
 			t.Errorf("%s: result field is not a string", name)
 			continue
