@@ -30,6 +30,29 @@ const (
 	scriptTestCommentOffset
 )
 
+// allScriptFlags is the set of all currently defined script flags.
+const allScriptFlags = ScriptBip16 |
+	ScriptStrictMultiSig |
+	ScriptDiscourageUpgradableNops |
+	ScriptVerifyCheckLockTimeVerify |
+	ScriptVerifyCheckSequenceVerify |
+	ScriptVerifyCleanStack |
+	ScriptVerifyDERSignatures |
+	ScriptVerifyLowS |
+	ScriptVerifyMinimalData |
+	ScriptVerifyNullFail |
+	ScriptVerifySigPushOnly |
+	ScriptVerifyStrictEncoding |
+	ScriptVerifyWitness |
+	ScriptVerifyDiscourageUpgradeableWitnessProgram |
+	ScriptVerifyMinimalIf |
+	ScriptVerifyWitnessPubKeyType |
+	ScriptVerifyTaproot |
+	ScriptVerifyDiscourageUpgradeableTaprootVersion |
+	ScriptVerifyDiscourageOpSuccess |
+	ScriptVerifyDiscourageUpgradeablePubkeyType |
+	ScriptVerifyConstScriptCode
+
 // scriptTestWitnessOffset returns the field offset caused by optional witness
 // data at the beginning of a script_tests.json entry.
 func scriptTestWitnessOffset(test []interface{}) int {
@@ -227,6 +250,17 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 		}
 	}
 	return flags, nil
+}
+
+// parseTxValidTestFlags parses the tx_valid flag field. Modern Bitcoin Core
+// tx_valid vectors encode flags to exclude from the full set of script flags.
+func parseTxValidTestFlags(flagStr string) (ScriptFlags, error) {
+	excluded, err := parseScriptFlags(flagStr)
+	if err != nil {
+		return 0, err
+	}
+
+	return allScriptFlags &^ excluded, nil
 }
 
 // hasTaprootScriptTest returns whether the reference script test is one of the
@@ -790,7 +824,7 @@ testloop:
 			continue
 		}
 
-		flags, err := parseScriptFlags(verifyFlags)
+		flags, err := parseTxValidTestFlags(verifyFlags)
 		if err != nil {
 			t.Errorf("bad test %d: %v", i, err)
 			continue
