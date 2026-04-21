@@ -1993,6 +1993,10 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 	// This only applies if tapscript verification isn't active, as this
 	// check is done within the sighash itself.
 	if vm.taprootCtx == nil && len(fullSigBytes) < 1 {
+		if err := vm.checkPubKeyEncoding(pkBytes); err != nil {
+			return err
+		}
+
 		vm.dstack.PushBool(false)
 		return nil
 	}
