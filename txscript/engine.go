@@ -766,11 +766,12 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 
 		return scriptError(ErrDiscourageUpgradableWitnessProgram, errStr)
 	default:
-		// If we encounter an unknown witness program version and we
-		// aren't discouraging future unknown witness based soft-forks,
-		// then we de-activate the segwit behavior within the VM for
-		// the remainder of execution.
-		vm.witnessProgram = nil
+		// Unknown witness versions are anyone-can-spend under the current
+		// rules when the discourage flag is not set. Make the remainder of
+		// execution succeed with a clean true stack instead of falling back to
+		// legacy scriptPubKey pushes, which would incorrectly trip CLEANSTACK.
+		vm.SetStack([][]byte{{1}})
+		return nil
 	}
 
 	// TODO(roasbeef): other sanity checks here
