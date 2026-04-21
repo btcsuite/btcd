@@ -23,6 +23,12 @@ import (
 )
 
 const (
+	// maxTxBaseSize mirrors blockchain.MaxBlockBaseSize so checkTxSanity can
+	// enforce the same stripped-size limit without importing blockchain.
+	maxTxBaseSize = 1000000
+)
+
+const (
 	scriptTestSigScriptOffset = iota
 	scriptTestPkScriptOffset
 	scriptTestFlagsOffset
@@ -261,6 +267,119 @@ func parseTxValidTestFlags(flagStr string) (ScriptFlags, error) {
 	}
 
 	return allScriptFlags &^ excluded, nil
+}
+
+// parseTxInvalidTestFlags parses the tx_invalid flag field. Those vectors
+// still use the legacy included-flags convention plus the special BADTX marker
+// for context-free transaction-sanity failures.
+func parseTxInvalidTestFlags(flagStr string) (ScriptFlags, bool, error) {
+	badTx := false
+
+	parts := strings.Split(flagStr, ",")
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "BADTX" {
+			badTx = true
+			continue
+		}
+
+		filtered = append(filtered, part)
+	}
+
+	flags, err := parseScriptFlags(strings.Join(filtered, ","))
+	if err != nil {
+		return 0, false, err
+	}
+
+	return flags, badTx, nil
+}
+
+// checkTxSanity performs the subset of context-free transaction checks needed
+// by the tx_invalid BADTX vectors without importing blockchain and creating an
+// import cycle from txscript tests.
+func checkTxSanity(tx *btcutil.Tx) error {
+	msgTx := tx.MsgTx()
+
+	if len(msgTx.TxIn) == 0 {
+		return errors.New("transaction has no inputs")
+	}
+	if len(msgTx.TxOut) == 0 {
+		return errors.New("transaction has no outputs")
+	}
+	if msgTx.SerializeSizeStripped() > maxTxBaseSize {
+		return errors.New("transaction exceeds max base size")
+	}
+
+	var totalSatoshi int64
+	for _, txOut := range msgTx.TxOut {
+		satoshi := txOut.Value
+		if satoshi < 0 {
+			return errors.New("negative output value")
+		}
+		if satoshi > btcutil.MaxSatoshi {
+			return errors.New("output exceeds max satoshi")
+		}
+
+		totalSatoshi += satoshi
+		if totalSatoshi < 0 || totalSatoshi > btcutil.MaxSatoshi {
+			return errors.New("total output exceeds max satoshi")
+		}
+	}
+
+	seen := make(map[wire.OutPoint]struct{}, len(msgTx.TxIn))
+	for _, txIn := range msgTx.TxIn {
+		if _, ok := seen[txIn.PreviousOutPoint]; ok {
+			return errors.New("duplicate inputs")
+		}
+		seen[txIn.PreviousOutPoint] = struct{}{}
+	}
+
+	if isCoinBaseTx(tx) {
+		slen := len(msgTx.TxIn[0].SignatureScript)
+		if slen < 2 || slen > 100 {
+			return errors.New("coinbase script length out of range")
+		}
+		return nil
+	}
+
+	for _, txIn := range msgTx.TxIn {
+		if isNullOutpoint(&txIn.PreviousOutPoint) {
+			return errors.New("null outpoint in non-coinbase tx")
+		}
+	}
+
+	return nil
+}
+
+func isCoinBaseTx(tx *btcutil.Tx) bool {
+	msgTx := tx.MsgTx()
+	if len(msgTx.TxIn) != 1 {
+		return false
+	}
+
+	return isNullOutpoint(&msgTx.TxIn[0].PreviousOutPoint)
+}
+
+func isNullOutpoint(outpoint *wire.OutPoint) bool {
+	return outpoint.Index == ^uint32(0) && outpoint.Hash == (chainhash.Hash{})
+}
+
+func TestCheckTxSanityTooBig(t *testing.T) {
+	t.Parallel()
+
+	tx := wire.NewMsgTx(wire.TxVersion)
+	outpoint := wire.OutPoint{
+		Hash:  chainhash.Hash{0: 1},
+		Index: 0,
+	}
+	tx.AddTxIn(wire.NewTxIn(
+		&outpoint, bytes.Repeat([]byte{0x01}, maxTxBaseSize), nil,
+	))
+	tx.AddTxOut(wire.NewTxOut(0, nil))
+
+	if err := checkTxSanity(btcutil.NewTx(tx)); err == nil {
+		t.Fatal("expected oversized transaction to fail sanity checks")
+	}
 }
 
 // hasTaprootScriptTest returns whether the reference script test is one of the
@@ -667,9 +786,18 @@ testloop:
 			continue
 		}
 
-		flags, err := parseScriptFlags(verifyFlags)
+		flags, badTx, err := parseTxInvalidTestFlags(verifyFlags)
 		if err != nil {
 			t.Errorf("bad test %d: %v", i, err)
+			continue
+		}
+		if badTx {
+			if err := checkTxSanity(tx); err != nil {
+				continue
+			}
+
+			t.Errorf("test (%d:%v) passed sanity when should fail",
+				i, test)
 			continue
 		}
 
