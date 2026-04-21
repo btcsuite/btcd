@@ -910,7 +910,7 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	// compatibility with BIP16.
 	if finalScript && vm.isWitnessVersionActive(BaseSegwitWitnessVersion) &&
 		vm.dstack.Depth() != 1 {
-		return scriptError(ErrEvalFalse, "witness program must "+
+		return scriptError(ErrCleanStack, "witness program must "+
 			"have clean stack")
 	}
 
