@@ -69,7 +69,22 @@ func (pi *PInput) IsSane() bool {
 }
 
 func (pi *PInput) addUnknown(keyCode byte, keyData, value []byte) error {
-	return addUnknownField(&pi.Unknowns, keyCode, keyData, value)
+	keyCodeAndData := append([]byte{keyCode}, keyData...)
+	newUnknown := &Unknown{
+		Key:   keyCodeAndData,
+		Value: value,
+	}
+
+	// Duplicate key+keyData combinations are not allowed (per PSBT spec)
+	for _, x := range pi.Unknowns {
+		if bytes.Equal(x.Key, newUnknown.Key) &&
+			bytes.Equal(x.Value, newUnknown.Value) {
+			return ErrDuplicateKey
+		}
+	}
+
+	pi.Unknowns = append(pi.Unknowns, newUnknown)
+	return nil
 }
 
 // CopyInputFields copies all relevant input fields and unknowns from another PInput.
@@ -99,8 +114,8 @@ func (pi *PInput) CopyInputFields(from *PInput) {
 		pi.Unknowns = make([]*Unknown, len(from.Unknowns))
 		for i, u := range from.Unknowns {
 			pi.Unknowns[i] = &Unknown{
-				Key:   append([]byte(nil), u.Key...),
-				Value: append([]byte(nil), u.Value...),
+				Key:   bytes.Clone(u.Key),
+				Value: bytes.Clone(u.Value),
 			}
 		}
 	}

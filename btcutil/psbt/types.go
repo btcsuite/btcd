@@ -45,27 +45,27 @@ const (
 	// The value is any data as defined by the proprietary type user.
 	ProprietaryGlobalType = 0xFC
 
-	// TxVersion is the PSBT version number.
+	// TxVersionGlobalType is the PSBT version number.
 	// The key is {0x02}.
 	// The value is a 32-bit little endian unsigned integer for the version number.
 	TxVersionGlobalType GlobalType = 0x02
 
-	// FallbackLocktime is the fallback locktime for the transaction.
+	// FallbackLocktimeGlobalType is the fallback locktime for the transaction.
 	// The key is {0x03}.
 	// The value is a 32-bit little endian unsigned integer.
 	FallbackLocktimeGlobalType GlobalType = 0x03
 
-	// InputCount is the number of inputs in this PSBT.
+	// InputCountGlobalType is the number of inputs in this PSBT.
 	// The key is {0x04}.
 	// The value is a compact size unsigned integer.
 	InputCountGlobalType GlobalType = 0x04
 
-	// OutputCount is the number of outputs in this PSBT.
+	// OutputCountGlobalType is the number of outputs in this PSBT.
 	// The key is {0x05}.
 	// The value is a compact size unsigned integer.
 	OutputCountGlobalType GlobalType = 0x05
 
-	// TxModifiable is a bitfield denoting the modifiability of the transaction.
+	// TxModifiableGlobalType is a bitfield denoting the modifiability of the transaction.
 	// The key is {0x06}.
 	// The value is an 8-bit unsigned integer.
 	TxModifiableGlobalType GlobalType = 0x06

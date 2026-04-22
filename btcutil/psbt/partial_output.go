@@ -36,7 +36,21 @@ func NewPsbtOutput(redeemScript []byte, witnessScript []byte,
 }
 
 func (po *POutput) addUnknown(keyCode byte, keyData, value []byte) error {
-	return addUnknownField(&po.Unknowns, keyCode, keyData, value)
+	keyCodeAndData := append([]byte{keyCode}, keyData...)
+	newUnknown := &Unknown{
+		Key:   keyCodeAndData,
+		Value: value,
+	}
+	
+	// Duplicate key+keyData combinations are not allowed (per PSBT spec)
+	for _, x := range po.Unknowns {
+		if bytes.Equal(x.Key, newUnknown.Key) &&
+			bytes.Equal(x.Value, newUnknown.Value) {
+			return ErrDuplicateKey
+		}
+	}
+	po.Unknowns = append(po.Unknowns, newUnknown)
+	return nil
 }
 
 // deserialize attempts to recode a new POutput from the passed io.Reader.

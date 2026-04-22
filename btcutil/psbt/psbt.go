@@ -198,10 +198,12 @@ func validateUnsignedTX(tx *wire.MsgTx) bool {
 //
 // Reference: https://github.com/bitcoin/bips/blob/master/bip-0370.mediawiki#determining-lock-time
 func (p *Packet) DetermineLockTime() (uint32, error) {
-	var maxTime, maxHeight uint32
-	timeSupported := true
-	heightSupported := true
-	hasAnyInputLocktime := false
+	var (
+		maxTime, maxHeight uint32
+		timeSupported = true
+		heightSupported = true
+		hasAnyInputLocktime = false
+	)
 
 	for _, pIn := range p.Inputs {
 		hasTimeReq := pIn.TimeLocktime != 0
@@ -284,11 +286,11 @@ func (p *Packet) GetUnsignedTx() (*wire.MsgTx, error) {
 		}
 
 		outPoint := wire.NewOutPoint(hash, pIn.OutputIndex)
-		txIn := wire.NewTxIn(outPoint, nil, nil)
-		txIn.Sequence = pIn.Sequence
-
+		txIn := &wire.TxIn{
+			PreviousOutPoint: *outPoint,
+			Sequence:         pIn.Sequence,
+		}
 		tx.AddTxIn(txIn)
-
 	}
 
 	for _, pOut := range p.Outputs {
@@ -425,7 +427,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			xPubSlice = append(xPubSlice, *xPub)
 
 		case VersionType:
-			if !isSaneKey(keyData, &isUnknown) {
+			if keyData != nil {
+				isUnknown = true
 				break
 			}
 			if version != 0 {
@@ -437,7 +440,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			version = binary.LittleEndian.Uint32(value)
 
 		case TxVersionGlobalType:
-			if !isSaneKey(keyData, &isUnknown) {
+			if keyData != nil {
+				isUnknown = true
 				break
 			}
 			if txVersionSeen {
@@ -450,7 +454,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			txVersionSeen = true
 
 		case FallbackLocktimeGlobalType:
-			if !isSaneKey(keyData, &isUnknown) {
+			if keyData != nil {
+				isUnknown = true
 				break
 			}
 			if fallbackLocktimeSeen {
@@ -463,7 +468,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			fallbackLocktimeSeen = true
 
 		case InputCountGlobalType:
-			if !isSaneKey(keyData, &isUnknown) {
+			if keyData != nil {
+				isUnknown = true
 				break
 			}
 			if inputCountSeen {
@@ -477,7 +483,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			inputCountSeen = true
 
 		case OutputCountGlobalType:
-			if !isSaneKey(keyData, &isUnknown) {
+			if keyData != nil {
+				isUnknown = true
 				break
 			}
 			if outputCountSeen {
@@ -491,7 +498,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			outputCountSeen = true
 
 		case TxModifiableGlobalType:
-			if !isSaneKey(keyData, &isUnknown) {
+			if keyData != nil {
+				isUnknown = true
 				break
 			}
 			if txModifiableSeen {
@@ -518,11 +526,16 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		}
 	}
 
+	var inCount, outCount int
+
 	switch version {
 	case 0:
 		if msgTx == nil {
 			return nil, ErrInvalidPsbtFormat
 		}
+
+		inCount = len(msgTx.TxIn)
+		outCount = len(msgTx.TxOut)
 
 	case 2:
 		if msgTx != nil {
@@ -531,19 +544,17 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		if !txVersionSeen || !inputCountSeen || !outputCountSeen {
 			return nil, ErrInvalidPsbtFormat
 		}
+		if txVersion < 2 {
+			return nil, ErrInvalidPsbtFormat
+		}
+
+		inCount = int(inputCount)
+		outCount = int(outputCount)
 
 	default:
 		return nil, ErrInvalidPsbtFormat
 	}
 
-	var inCount, outCount int
-	if version == 0 {
-		inCount = len(msgTx.TxIn)
-		outCount = len(msgTx.TxOut)
-	} else {
-		inCount = int(inputCount)
-		outCount = int(outputCount)
-	}
 
 	// Next we parse the INPUT section.
 	inSlice := make([]PInput, inCount)
@@ -568,9 +579,6 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		outSlice[i] = output
 	}
 
-	if version == 2 && txVersion < 2 {
-		return nil, ErrInvalidPsbtFormat
-	}
 
 	// Populate the new Packet object.
 	newPsbt := Packet{
@@ -613,6 +621,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 		if p.UnsignedTx == nil {
 			return ErrInvalidPsbtFormat
 		}
+
 		serializedTx := bytes.NewBuffer(
 			make([]byte, 0, p.UnsignedTx.SerializeSize()),
 		)
@@ -644,6 +653,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 		}
 
 	case 2:
+
 		// Serialize the global xPubs.
 		// Key 0x01: XPubType
 		for _, xPub := range p.XPubs {
@@ -683,6 +693,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 		if err != nil {
 			return err
 		}
+
 		err = serializeKVPairWithType(w, uint8(InputCountGlobalType), nil, countBuf.Bytes())
 		if err != nil {
 			return err
@@ -694,6 +705,7 @@ func (p *Packet) Serialize(w io.Writer) error {
 		if err != nil {
 			return err
 		}
+
 		err = serializeKVPairWithType(w, uint8(OutputCountGlobalType), nil, countBuf.Bytes())
 		if err != nil {
 			return err
@@ -774,7 +786,7 @@ func (p *Packet) B64Encode() (string, error) {
 // whether the final extraction to a network serialized signed
 // transaction will be possible.
 func (p *Packet) IsComplete() bool {
-	for i := 0; i < len(p.Inputs); i++ {
+	for i := range p.Inputs {
 		if !isFinalized(p, i) {
 			return false
 		}
@@ -795,6 +807,9 @@ func (p *Packet) SanityCheck() error {
 		}
 	case 2:
 		if p.UnsignedTx != nil {
+			return ErrInvalidPsbtFormat
+		}
+		if p.TxVersion < 2 {
 			return ErrInvalidPsbtFormat
 		}
 	default:
@@ -834,35 +849,3 @@ func (p *Packet) GetTxFee() (btcutil.Amount, error) {
 	return btcutil.Amount(fee), nil
 }
 
-// isSaneKey is a helper function that checks if a key that is expected to have
-// no extra key data actually has some. If it does, it marks the key as unknown
-// so that it can be processed as an unknown field rather than causing a
-// validation error.
-func isSaneKey(keyData []byte, isUnknown *bool) bool {
-	if keyData != nil {
-		*isUnknown = true
-		return false
-	}
-	return true
-}
-
-// addUnknownField adds an unknown key-value pair to a slice after checking for duplicates.
-// This function is used by both PInput and POutput to handle unknown fields consistently.
-func addUnknownField(unknowns *[]*Unknown, keyCode byte, keyData, value []byte) error {
-	keyCodeAndData := append([]byte{keyCode}, keyData...)
-	newUnknown := &Unknown{
-		Key:   keyCodeAndData,
-		Value: value,
-	}
-
-	// Duplicate key+keyData combinations are not allowed (per PSBT spec)
-	for _, x := range *unknowns {
-		if bytes.Equal(x.Key, newUnknown.Key) &&
-			bytes.Equal(x.Value, newUnknown.Value) {
-			return ErrDuplicateKey
-		}
-	}
-
-	*unknowns = append(*unknowns, newUnknown)
-	return nil
-}

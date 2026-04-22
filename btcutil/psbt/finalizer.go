@@ -196,8 +196,7 @@ func MaybeFinalize(p *Packet, inIndex int) (bool, error) {
 // MaybeFinalizeAll attempts to finalize all inputs of the psbt.Packet that are
 // not already finalized, and returns an error if it fails to do so.
 func MaybeFinalizeAll(p *Packet) error {
-	numInputs := len(p.Inputs)
-	for i := 0; i < numInputs; i++ {
+	for i := range p.Inputs {
 		success, err := MaybeFinalize(p, i)
 		if err != nil || !success {
 			return err
