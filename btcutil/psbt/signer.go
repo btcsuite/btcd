@@ -4,7 +4,7 @@
 
 package psbt
 
-// signer encapsulates the role 'Signer' as specified in BIP174; it controls
+// signer encapsulates the role 'Signer' as specified in BIP174 and BIP0370; it controls
 // the insertion of signatures; the Sign() function will attempt to insert
 // signatures using Updater.addPartialSignature, after first ensuring the Psbt
 // is in the correct state.
@@ -115,8 +115,13 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 	// output.
 	default:
 		if pInput.WitnessUtxo == nil {
-			txIn := u.Upsbt.UnsignedTx.TxIn[inIndex]
-			outIndex := txIn.PreviousOutPoint.Index
+			var outIndex uint32
+			switch u.Upsbt.Version {
+			case 2:
+				outIndex = pInput.OutputIndex
+			default:
+				outIndex = u.Upsbt.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+			}
 			script := pInput.NonWitnessUtxo.TxOut[outIndex].PkScript
 
 			if txscript.IsWitnessProgram(script) {
@@ -141,7 +146,12 @@ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
 // NonWitnessUtxo field with a WitnessUtxo field. See
 // https://github.com/bitcoin/bitcoin/pull/14197.
 func nonWitnessToWitness(p *Packet, inIndex int) error {
-	outIndex := p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	var outIndex uint32
+	if p.Version == 2 {
+		outIndex = p.Inputs[inIndex].OutputIndex
+	} else {
+		outIndex = p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
+	}
 	txout := p.Inputs[inIndex].NonWitnessUtxo.TxOut[outIndex]
 
 	// TODO(guggero): For segwit v1, we'll want to remove the NonWitnessUtxo
