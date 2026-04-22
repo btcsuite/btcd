@@ -6,6 +6,7 @@ package txscript
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"reflect"
@@ -450,6 +451,23 @@ func TestCalcScriptInfo(t *testing.T) {
 			},
 		},
 		{
+			// Segwit being enabled must not change legacy P2SH analysis.
+			name: "p2sh standard script with segwit",
+			sigScript: "1 81 DATA_25 DUP HASH160 DATA_20 0x010203" +
+				"0405060708090a0b0c0d0e0f1011121314 EQUALVERIFY " +
+				"CHECKSIG",
+			pkScript: "HASH160 DATA_20 0xfe441065b6532231de2fac56" +
+				"3152205ec4f59c74 EQUAL",
+			bip16:  true,
+			segwit: true,
+			scriptInfo: ScriptInfo{
+				PkScriptClass:  ScriptHashTy,
+				NumInputs:      3,
+				ExpectedInputs: 3, // nonstandard p2sh.
+				SigOps:         1,
+			},
+		},
+		{
 			// from 567a53d1ce19ce3d07711885168484439965501536d0d0294c5d46d46c10e53b
 			// from the blockchain.
 			name: "p2sh nonstandard script",
@@ -584,6 +602,101 @@ func TestCalcScriptInfo(t *testing.T) {
 				test.scriptInfo)
 			continue
 		}
+	}
+}
+
+// TestCalcScriptInfoFakeNestedP2WPKH ensures CalcScriptInfo treats a P2SH
+// sigScript that merely resembles a nested v0 key-hash witness program as a
+// legacy P2SH redeem script instead.
+func TestCalcScriptInfoFakeNestedP2WPKH(t *testing.T) {
+	t.Parallel()
+
+	redeem, err := hex.DecodeString("7551616161616161616161616161616161616161")
+	if err != nil {
+		t.Fatalf("hex decode: %v", err)
+	}
+
+	// The leading one-byte push makes the following bytes resemble a witness
+	// program, but the actual redeem script remains non-witness legacy P2SH.
+	sigScript := []byte{0x01, 0x00, 0x14}
+	sigScript = append(sigScript, redeem...)
+
+	pkScript, err := payToScriptHashScript(btcutil.Hash160(redeem))
+	if err != nil {
+		t.Fatalf("payToScriptHashScript: %v", err)
+	}
+
+	got, err := CalcScriptInfo(sigScript, pkScript, nil, true, true)
+	if err != nil {
+		t.Fatalf("CalcScriptInfo failed: %v", err)
+	}
+
+	want := &ScriptInfo{
+		PkScriptClass:  ScriptHashTy,
+		NumInputs:      2,
+		ExpectedInputs: -1,
+		SigOps:         0,
+	}
+	if *got != *want {
+		t.Fatalf("scriptinfo doesn't match expected. got: %q expected %q",
+			*got, *want)
+	}
+}
+
+// TestCalcScriptInfoNestedP2WSH ensures CalcScriptInfo includes both the outer
+// redeem-script layer and the inner witness-script arguments for nested P2WSH
+// spends.
+func TestCalcScriptInfoNestedP2WSH(t *testing.T) {
+	t.Parallel()
+
+	witnessScript, err := hex.DecodeString(
+		"76a914064977cb7b4a2e0c9680df0ef696e9e0e296b39988ac",
+	)
+	if err != nil {
+		t.Fatalf("hex decode: %v", err)
+	}
+
+	witnessScriptHash := sha256.Sum256(witnessScript)
+	redeemScript, err := payToWitnessScriptHashScript(witnessScriptHash[:])
+	if err != nil {
+		t.Fatalf("payToWitnessScriptHashScript: %v", err)
+	}
+
+	sigScript := append([]byte{byte(len(redeemScript))}, redeemScript...)
+	pkScript, err := payToScriptHashScript(btcutil.Hash160(redeemScript))
+	if err != nil {
+		t.Fatalf("payToScriptHashScript: %v", err)
+	}
+
+	// The final witness element is the witness script, so ExpectedInputs must
+	// account for both the outer redeem-script push and the inner script args.
+	witness := wire.TxWitness{
+		hexToBytes(
+			"3045022100cb1c2ac1ff1d57ddb98f7bdead905f8bf5bcc8641" +
+				"b029ce8eef25c75a9e22a4702203be621b5c86b771288706b" +
+				"e5a7eee1db4fceabf9afb7583c1cc6ee3f8297b21201",
+		),
+		hexToBytes(
+			"03f0000d0639a22bfaf217e4c94289c2b0cc7fa1036f7fd5d9f6" +
+				"1a9d6ec153100e",
+		),
+		witnessScript,
+	}
+
+	got, err := CalcScriptInfo(sigScript, pkScript, witness, true, true)
+	if err != nil {
+		t.Fatalf("CalcScriptInfo failed: %v", err)
+	}
+
+	want := &ScriptInfo{
+		PkScriptClass:  ScriptHashTy,
+		NumInputs:      4,
+		ExpectedInputs: 4,
+		SigOps:         1,
+	}
+	if *got != *want {
+		t.Fatalf("scriptinfo doesn't match expected. got: %q expected %q",
+			*got, *want)
 	}
 }
 
