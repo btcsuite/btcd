@@ -11,10 +11,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/stretchr/testify/require"
 )
 
 type signatureTest struct {
@@ -557,13 +558,13 @@ var recoveryTests = []struct {
 		// Invalid curve point recovered.
 		msg: "00c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c",
 		sig: "0100b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75f00b940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
-		err: fmt.Errorf("signature is not for a valid curve point"),
+		err: secp_ecdsa.ErrPointNotOnCurve,
 	},
 	{
 		// Point at infinity recovered
 		msg: "6b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
 		sig: "0079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817986b8d2c81b11b2d699528dde488dbdf2f94293d0d33c32e347f255fa4a6c1f0a9",
-		err: fmt.Errorf("recovered pubkey is the point at infinity"),
+		err: secp_ecdsa.ErrPointNotOnCurve,
 	},
 	{
 		// Low R and S values.
@@ -577,7 +578,7 @@ var recoveryTests = []struct {
 		// Test case contributed by Ethereum Swarm: GH-1651
 		msg: "3060d2c77c1e192d62ad712fb400e04e6f779914a6876328ff3b213fa85d2012",
 		sig: "65000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037a3",
-		err: fmt.Errorf("invalid compact signature recovery code"),
+		err: secp_ecdsa.ErrSigInvalidRecoveryCode,
 	},
 	{
 		// Zero R value
@@ -585,25 +586,25 @@ var recoveryTests = []struct {
 		// Test case contributed by Ethereum Swarm: GH-1651
 		msg: "2bcebac60d8a78e520ae81c2ad586792df495ed429bd730dcd897b301932d054",
 		sig: "060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007c",
-		err: fmt.Errorf("signature R is 0"),
+		err: secp_ecdsa.ErrSigRIsZero,
 	},
 	{
 		// R = N (curve order of secp256k1)
 		msg: "2bcebac60d8a78e520ae81c2ad586792df495ed429bd730dcd897b301932d054",
 		sig: "65fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd036414100000000000000000000000000000000000000000000000000000000000037a3",
-		err: fmt.Errorf("invalid compact signature recovery code"),
+		err: secp_ecdsa.ErrSigInvalidRecoveryCode,
 	},
 	{
 		// Zero S value
 		msg: "ce0677bb30baa8cf067c88db9811f4333d131bf8bcf12fe7065d211dce971008",
 		sig: "0190f27b8b488db00b00606796d2987f6a5f59ae62ea05effe84fef5b8b0e549980000000000000000000000000000000000000000000000000000000000000000",
-		err: fmt.Errorf("signature S is 0"),
+		err: secp_ecdsa.ErrSigSIsZero,
 	},
 	{
 		// S = N (curve order of secp256k1)
 		msg: "ce0677bb30baa8cf067c88db9811f4333d131bf8bcf12fe7065d211dce971008",
 		sig: "0190f27b8b488db00b00606796d2987f6a5f59ae62ea05effe84fef5b8b0e54998fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
-		err: fmt.Errorf("signature S is >= curve order"),
+		err: secp_ecdsa.ErrSigSTooBig,
 	},
 }
 
@@ -618,11 +619,10 @@ func TestRecoverCompact(t *testing.T) {
 		pub, _, err := RecoverCompact(sig, msg)
 
 		// Verify that returned error matches as expected.
-		if !reflect.DeepEqual(test.err, err) {
-			t.Errorf("unexpected error returned from pubkey "+
-				"recovery #%d: wanted %v, got %v",
-				i, test.err, err)
-			continue
+		if test.err != nil {
+			require.ErrorIs(t, err, test.err)
+		} else {
+			require.NoError(t, err)
 		}
 
 		// If check succeeded because a proper error was returned, we
@@ -798,5 +798,34 @@ func TestPrivKeys(t *testing.T) {
 			t.Errorf("%s unexpected serialized bytes - got: %x, "+
 				"want: %x", test.name, serializedKey, test.key)
 		}
+	}
+}
+
+func TestVerifyLowS(t *testing.T) {
+	signatureTests := []struct {
+		name    string
+		sig     []byte
+		wantErr error
+	}{
+		{
+			name:    "Low S value",
+			sig:     hexToBytes("3045022100af340daf02cc15c8d5d08d7735dfe6b98a474ed373bdb5fbecf7571be52b384202205009fb27f37034a9b24b707b7c6b79ca23ddef9e25f7282e8a797efe53a8f124"),
+			wantErr: nil,
+		},
+		{
+			name:    "High S value",
+			sig:     hexToBytes("304502200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errHighS,
+		},
+		{
+			name:    "Invalid signature format",
+			sig:     hexToBytes("404502200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errNoHeaderMagic,
+		},
+	}
+
+	for _, test := range signatureTests {
+		err := VerifyLowS(test.sig)
+		require.ErrorIs(t, err, test.wantErr)
 	}
 }
