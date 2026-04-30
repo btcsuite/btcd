@@ -303,9 +303,16 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		script, _ := signMultiSig(tx, idx, subScript, hashType,
 			addresses, nrequired, kdb)
 		return script, class, addresses, nrequired, nil
+
 	case NullDataTy:
 		return nil, class, nil, 0,
 			errors.New("can't sign NULLDATA transactions")
+
+	case PayToAnchorTy:
+		// P2A outputs require no signing - they're anyone-can-spend.
+		// Return an empty script.
+		return []byte{}, class, addresses, nrequired, nil
+
 	default:
 		return nil, class, nil, 0,
 			errors.New("can't sign unknown transactions")
