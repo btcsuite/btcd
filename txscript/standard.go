@@ -656,6 +656,87 @@ type ScriptInfo struct {
 	SigOps int
 }
 
+// calcP2SHScriptInfo returns ScriptInfo fields for spends whose pkScript class
+// is pay-to-script-hash.  It handles both cases hidden behind P2SH:
+// - ordinary legacy P2SH, where sigScript reveals a redeem script that executes
+// directly.
+// - nested witness spends, where sigScript reveals a redeem script that is
+// itself a witness program.
+//
+// The caller has already initialized si.ExpectedInputs from the outer pkScript,
+// so this helper is responsible for folding in any additional inputs required
+// by the redeem script layer and, for nested P2WSH, the inner witness script
+// layer as well.
+func calcP2SHScriptInfo(scriptVersion uint16, sigScript, pkScript []byte,
+	witness wire.TxWitness, numInputs, expectedInputCount int,
+	segwit bool) (int, int, int) {
+
+	// For P2SH, the consensus-visible redeem script is the final data push in
+	// sigScript. This is the script that will ultimately execute for legacy
+	// P2SH, and it is also the script we must inspect to decide whether the
+	// spend is actually nested witness.
+	redeemScript := finalOpcodeData(scriptVersion, sigScript)
+
+	// Classify the revealed redeem script so we can account for both its script
+	// shape and the number of stack elements it expects from the spending
+	// input.
+	redeemClass := typeOfScript(scriptVersion, redeemScript)
+
+	// Fold the redeem-script layer into ExpectedInputs. A return value of -1
+	// means the helper cannot determine the count for this script shape, so the
+	// entire overall ExpectedInputs value becomes unknown as well.
+	rsInputs := expectedInputs(redeemScript, redeemClass)
+	if rsInputs == -1 {
+		expectedInputCount = -1
+	} else {
+		expectedInputCount += rsInputs
+	}
+
+	// If segwit is active and the actual redeem script is itself a witness
+	// program, then this is a nested witness spend such as P2SH-P2WPKH or
+	// P2SH-P2WSH. The key point is that this decision is based on the actual
+	// redeem script revealed by sigScript.
+	if segwit && IsWitnessProgram(redeemScript) {
+		// Nested P2WSH adds one more layer of indirection: the witness program
+		// commits to a witness script, and the final witness element carries
+		// the serialized witness script itself.  That inner script can require
+		// its own stack arguments, so ExpectedInputs must include them too.
+		if redeemClass == WitnessV0ScriptHashTy && len(witness) > 0 {
+			// In P2WSH, the last witness item is the witness script being
+			// executed.
+			witnessScript := witness[len(witness)-1]
+
+			// Classify the inner witness script and ask how many stack elements
+			// it expects from the preceding witness items.
+			witnessScriptClass := typeOfScript(scriptVersion, witnessScript)
+			wsInputs := expectedInputs(witnessScript, witnessScriptClass)
+
+			// Preserve the same unknown-count behavior as above: once any inner
+			// layer reports an unknown expected-input count, the overall answer
+			// is unknown.  Otherwise, add the inner witness-script contribution
+			// on top of the already-counted outer P2SH and redeem-script
+			// layers.
+			if wsInputs == -1 {
+				expectedInputCount = -1
+			} else if expectedInputCount != -1 {
+				expectedInputCount += wsInputs
+			}
+		}
+
+		// Once the spend is known to be nested witness, sigops must be counted
+		// with witness-aware rules, and the provided input items are the total
+		// of the pushed sigScript items plus the witness stack items.
+		sigOps := GetWitnessSigOpCount(sigScript, pkScript, witness)
+		return expectedInputCount, sigOps, len(witness) + numInputs
+	}
+
+	// Otherwise this is ordinary legacy P2SH.  The revealed redeem script
+	// executes directly, so sigops are counted from that script using legacy
+	// rules, and the only provided inputs are the pushed items from sigScript.
+	sigOps := countSigOpsV0(redeemScript, true)
+	return expectedInputCount, sigOps, numInputs
+}
+
 // CalcScriptInfo returns a structure providing data about the provided script
 // pair.  It will error if the pair is in someway invalid such that they can not
 // be analysed, i.e. if they do not parse or the pkScript is not a push-only
@@ -700,21 +781,11 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 
 	switch {
 	// Count sigops taking into account pay-to-script-hash.
-	case si.PkScriptClass == ScriptHashTy && bip16 && !segwit:
-		// The redeem script is the final data push of the signature script.
-		redeemScript := finalOpcodeData(scriptVersion, sigScript)
-		reedeemClass := typeOfScript(scriptVersion, redeemScript)
-		rsInputs := expectedInputs(redeemScript, reedeemClass)
-		if rsInputs == -1 {
-			si.ExpectedInputs = -1
-		} else {
-			si.ExpectedInputs += rsInputs
-		}
-		si.SigOps = countSigOpsV0(redeemScript, true)
-
-		// All entries pushed to stack (or are OP_RESERVED and exec
-		// will fail).
-		si.NumInputs = numInputs
+	case si.PkScriptClass == ScriptHashTy && bip16:
+		si.ExpectedInputs, si.SigOps, si.NumInputs = calcP2SHScriptInfo(
+			scriptVersion, sigScript, pkScript, witness, numInputs,
+			si.ExpectedInputs, segwit,
+		)
 
 	// If segwit is active, and this is a regular p2wkh output, then we'll
 	// treat the script as a p2pkh output in essence.
@@ -722,26 +793,6 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 
 		si.SigOps = GetWitnessSigOpCount(sigScript, pkScript, witness)
 		si.NumInputs = len(witness)
-
-	// We'll attempt to detect the nested p2sh case so we can accurately
-	// count the signature operations involved.
-	case si.PkScriptClass == ScriptHashTy &&
-		IsWitnessProgram(sigScript[1:]) && bip16 && segwit:
-
-		// Extract the pushed witness program from the sigScript so we
-		// can determine the number of expected inputs.
-		redeemClass := typeOfScript(scriptVersion, sigScript[1:])
-		shInputs := expectedInputs(sigScript[1:], redeemClass)
-		if shInputs == -1 {
-			si.ExpectedInputs = -1
-		} else {
-			si.ExpectedInputs += shInputs
-		}
-
-		si.SigOps = GetWitnessSigOpCount(sigScript, pkScript, witness)
-
-		si.NumInputs = len(witness)
-		si.NumInputs += numInputs
 
 	// If segwit is active, and this is a p2wsh output, then we'll need to
 	// examine the witness script to generate accurate script info.

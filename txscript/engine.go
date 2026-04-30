@@ -485,6 +485,26 @@ func (vm *Engine) executeOpcode(op *opcode, data []byte) error {
 		return scriptError(ErrElementTooBig, str)
 	}
 
+	// With ScriptVerifyConstScriptCode, OP_CODESEPARATOR in a non-segwit
+	// script is rejected even in an unexecuted branch. The script is
+	// non-segwit when neither a witness program nor a taproot execution
+	// context has been recorded on the engine: vm.witnessProgram is set
+	// for v0/v1 native witness spends and nested P2SH-witness spends,
+	// and vm.taprootCtx is set once the engine has recursed into the
+	// taproot script-path layer. Both nil means we are still executing
+	// a legacy script (scriptSig + scriptPubKey, or a P2SH redeem
+	// script), which is the only case the const-scriptcode rule
+	// applies to. The check is performed here, before the branch
+	// execution gate below, so it fires unconditionally on every
+	// OP_CODESEPARATOR encountered during script iteration.
+	if op.value == OP_CODESEPARATOR && vm.taprootCtx == nil &&
+		vm.witnessProgram == nil &&
+		vm.hasFlag(ScriptVerifyConstScriptCode) {
+
+		str := "OP_CODESEPARATOR used in non-segwit script"
+		return scriptError(ErrCodeSeparator, str)
+	}
+
 	// Nothing left to do when this is not a conditional opcode and it is
 	// not in an executing branch.
 	if !vm.isBranchExecuting() && !isOpcodeConditional(op.value) {
@@ -520,6 +540,21 @@ func (vm *Engine) checkValidPC() error {
 // the specified version.
 func (vm *Engine) isWitnessVersionActive(version uint) bool {
 	return vm.witnessProgram != nil && uint(vm.witnessVersion) == version
+}
+
+// witnessProgramAcceptStack collapses the data stack down to a single element
+// for witness programs that succeed without inner script execution. The
+// running pkScript must have left a truthy top item; the stack is then reduced
+// to one element so the cleanstack accounting is consistent regardless of how
+// many items the outer pkScript template pushed.
+func (vm *Engine) witnessProgramAcceptStack() error {
+	topIdx := len(vm.dstack.stk) - 1
+	if topIdx < 0 || !asBool(vm.dstack.stk[topIdx]) {
+		return scriptError(ErrEvalFalse,
+			"witness program produced false result")
+	}
+	vm.dstack.stk = vm.dstack.stk[:1]
+	return nil
 }
 
 // verifyWitnessProgram validates the stored witness program using the passed
@@ -766,11 +801,9 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 
 		return scriptError(ErrDiscourageUpgradableWitnessProgram, errStr)
 	default:
-		// If we encounter an unknown witness program version and we
-		// aren't discouraging future unknown witness based soft-forks,
-		// then we de-activate the segwit behavior within the VM for
-		// the remainder of execution.
-		vm.witnessProgram = nil
+		if err := vm.witnessProgramAcceptStack(); err != nil {
+			return err
+		}
 	}
 
 	// TODO(roasbeef): other sanity checks here
@@ -890,7 +923,7 @@ func (vm *Engine) CheckErrorCondition(finalScript bool) error {
 	// compatibility with BIP16.
 	if finalScript && vm.isWitnessVersionActive(BaseSegwitWitnessVersion) &&
 		vm.dstack.Depth() != 1 {
-		return scriptError(ErrEvalFalse, "witness program must "+
+		return scriptError(ErrCleanStack, "witness program must "+
 			"have clean stack")
 	}
 
@@ -1459,6 +1492,71 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 	setStack(&vm.astack, data)
 }
 
+// buildWitnessProgram detects native and nested P2SH witness programs for the
+// current input, records the extracted witness version/program on the engine,
+// and rejects stray witness data on non-witness spends.
+func (vm *Engine) buildWitnessProgram(scriptSig, scriptPubKey []byte,
+	hasWitness bool) error {
+
+	var witProgram []byte
+
+	switch {
+	case IsWitnessProgram(scriptPubKey):
+		// The scriptSig must be *empty* for all native witness programs,
+		// otherwise we introduce malleability.
+		if len(scriptSig) != 0 {
+			errStr := "native witness program cannot also have a signature " +
+				"script"
+			return scriptError(ErrWitnessMalleated, errStr)
+		}
+
+		witProgram = scriptPubKey
+
+	case vm.bip16:
+		// Mirror Bitcoin Core's nested-P2SH-witness detection: the candidate
+		// witness program is the actual redeem script, which is the final
+		// pushed element of the push-only scriptSig. Detection must be
+		// independent of whether the witness stack is empty.
+		if len(scriptSig) == 0 || !IsPushOnlyScript(scriptSig) {
+			break
+		}
+		redeem := finalOpcodeData(0, scriptSig)
+		if len(redeem) == 0 || !IsWitnessProgram(redeem) {
+			break
+		}
+
+		// scriptSig must be exactly one canonical push of the redeem script;
+		// otherwise we reintroduce malleability.
+		canonical, err := NewScriptBuilder().AddData(redeem).Script()
+		if err != nil || !bytes.Equal(scriptSig, canonical) {
+			errStr := "signature script for witness nested p2sh is not " +
+				"canonical"
+			return scriptError(ErrWitnessMalleatedP2SH, errStr)
+		}
+
+		witProgram = redeem
+	}
+
+	if witProgram == nil {
+		// If we didn't find a witness program in either the pkScript or as a
+		// datapush within the sigScript, then there MUST NOT be any witness
+		// data associated with the input being validated.
+		if hasWitness {
+			errStr := "non-witness inputs cannot have a witness"
+			return scriptError(ErrWitnessUnexpected, errStr)
+		}
+
+		return nil
+	}
+
+	var err error
+	vm.witnessVersion, vm.witnessProgram, err = ExtractWitnessProgramInfo(
+		witProgram,
+	)
+
+	return err
+}
+
 // NewEngine returns a new script engine for the provided public key script,
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
@@ -1572,55 +1670,11 @@ func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags
 			return nil, scriptError(ErrInvalidFlags, errStr)
 		}
 
-		var witProgram []byte
-
-		switch {
-		case IsWitnessProgram(vm.scripts[1]):
-			// The scriptSig must be *empty* for all native witness
-			// programs, otherwise we introduce malleability.
-			if len(scriptSig) != 0 {
-				errStr := "native witness program cannot " +
-					"also have a signature script"
-				return nil, scriptError(ErrWitnessMalleated, errStr)
-			}
-
-			witProgram = scriptPubKey
-		case len(tx.TxIn[txIdx].Witness) != 0 && vm.bip16:
-			// The sigScript MUST be *exactly* a single canonical
-			// data push of the witness program, otherwise we
-			// reintroduce malleability.
-			sigPops := vm.scripts[0]
-			if len(sigPops) > 2 &&
-				isCanonicalPush(sigPops[0], sigPops[1:]) &&
-				IsWitnessProgram(sigPops[1:]) {
-
-				witProgram = sigPops[1:]
-			} else {
-				errStr := "signature script for witness " +
-					"nested p2sh is not canonical"
-				return nil, scriptError(ErrWitnessMalleatedP2SH, errStr)
-			}
+		hasWitness := len(tx.TxIn[txIdx].Witness) != 0
+		err := vm.buildWitnessProgram(scriptSig, scriptPubKey, hasWitness)
+		if err != nil {
+			return nil, err
 		}
-
-		if witProgram != nil {
-			var err error
-			vm.witnessVersion, vm.witnessProgram, err = ExtractWitnessProgramInfo(
-				witProgram,
-			)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			// If we didn't find a witness program in either the
-			// pkScript or as a datapush within the sigScript, then
-			// there MUST NOT be any witness data associated with
-			// the input being validated.
-			if vm.witnessProgram == nil && len(tx.TxIn[txIdx].Witness) != 0 {
-				errStr := "non-witness inputs cannot have a witness"
-				return nil, scriptError(ErrWitnessUnexpected, errStr)
-			}
-		}
-
 	}
 
 	// Setup the current tokenizer used to parse through the script one opcode

@@ -22,19 +22,69 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+const (
+	// maxTxBaseSize mirrors blockchain.MaxBlockBaseSize so checkTxSanity can
+	// enforce the same stripped-size limit without importing blockchain.
+	maxTxBaseSize = 1000000
+)
+
+const (
+	scriptTestSigScriptOffset = iota
+	scriptTestPkScriptOffset
+	scriptTestFlagsOffset
+	scriptTestExpectedOffset
+	scriptTestCommentOffset
+)
+
+// allScriptFlags is the set of all currently defined script flags.
+const allScriptFlags = ScriptBip16 |
+	ScriptStrictMultiSig |
+	ScriptDiscourageUpgradableNops |
+	ScriptVerifyCheckLockTimeVerify |
+	ScriptVerifyCheckSequenceVerify |
+	ScriptVerifyCleanStack |
+	ScriptVerifyDERSignatures |
+	ScriptVerifyLowS |
+	ScriptVerifyMinimalData |
+	ScriptVerifyNullFail |
+	ScriptVerifySigPushOnly |
+	ScriptVerifyStrictEncoding |
+	ScriptVerifyWitness |
+	ScriptVerifyDiscourageUpgradeableWitnessProgram |
+	ScriptVerifyMinimalIf |
+	ScriptVerifyWitnessPubKeyType |
+	ScriptVerifyTaproot |
+	ScriptVerifyDiscourageUpgradeableTaprootVersion |
+	ScriptVerifyDiscourageOpSuccess |
+	ScriptVerifyDiscourageUpgradeablePubkeyType |
+	ScriptVerifyConstScriptCode
+
+// scriptTestWitnessOffset returns the field offset caused by optional witness
+// data at the beginning of a script_tests.json entry.
+func scriptTestWitnessOffset(test []interface{}) int {
+	if len(test) == 0 {
+		return 0
+	}
+
+	if _, ok := test[0].([]interface{}); ok {
+		return 1
+	}
+
+	return 0
+}
+
 // scriptTestName returns a descriptive test name for the given reference script
 // test data.
 func scriptTestName(test []interface{}) (string, error) {
 	// Account for any optional leading witness data.
-	var witnessOffset int
-	if _, ok := test[0].([]interface{}); ok {
-		witnessOffset++
-	}
+	witnessOffset := scriptTestWitnessOffset(test)
 
 	// In addition to the optional leading witness data, the test must
 	// consist of at least a signature script, public key script, flags,
 	// and expected error.  Finally, it may optionally contain a comment.
-	if len(test) < witnessOffset+4 || len(test) > witnessOffset+5 {
+	if len(test) < witnessOffset+scriptTestExpectedOffset+1 ||
+		len(test) > witnessOffset+scriptTestCommentOffset+1 {
+
 		return "", fmt.Errorf("invalid test length %d", len(test))
 	}
 
@@ -42,11 +92,14 @@ func scriptTestName(test []interface{}) (string, error) {
 	// construct the name based on the signature script, public key script,
 	// and flags.
 	var name string
-	if len(test) == witnessOffset+5 {
-		name = fmt.Sprintf("test (%s)", test[witnessOffset+4])
+	if len(test) == witnessOffset+scriptTestCommentOffset+1 {
+		name = fmt.Sprintf("test (%s)",
+			test[witnessOffset+scriptTestCommentOffset])
 	} else {
-		name = fmt.Sprintf("test ([%s, %s, %s])", test[witnessOffset],
-			test[witnessOffset+1], test[witnessOffset+2])
+		name = fmt.Sprintf("test ([%s, %s, %s])",
+			test[witnessOffset+scriptTestSigScriptOffset],
+			test[witnessOffset+scriptTestPkScriptOffset],
+			test[witnessOffset+scriptTestFlagsOffset])
 	}
 	return name, nil
 }
@@ -205,6 +258,146 @@ func parseScriptFlags(flagStr string) (ScriptFlags, error) {
 	return flags, nil
 }
 
+// parseTxValidTestFlags parses the tx_valid flag field. Modern Bitcoin Core
+// tx_valid vectors encode flags to exclude from the full set of script flags.
+func parseTxValidTestFlags(flagStr string) (ScriptFlags, error) {
+	excluded, err := parseScriptFlags(flagStr)
+	if err != nil {
+		return 0, err
+	}
+
+	return allScriptFlags &^ excluded, nil
+}
+
+// parseTxInvalidTestFlags parses the tx_invalid flag field. Those vectors
+// still use the legacy included-flags convention plus the special BADTX marker
+// for context-free transaction-sanity failures.
+func parseTxInvalidTestFlags(flagStr string) (ScriptFlags, bool, error) {
+	badTx := false
+
+	parts := strings.Split(flagStr, ",")
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "BADTX" {
+			badTx = true
+			continue
+		}
+
+		filtered = append(filtered, part)
+	}
+
+	flags, err := parseScriptFlags(strings.Join(filtered, ","))
+	if err != nil {
+		return 0, false, err
+	}
+
+	return flags, badTx, nil
+}
+
+// checkTxSanity performs the subset of context-free transaction checks needed
+// by the tx_invalid BADTX vectors without importing blockchain and creating an
+// import cycle from txscript tests.
+func checkTxSanity(tx *btcutil.Tx) error {
+	msgTx := tx.MsgTx()
+
+	if len(msgTx.TxIn) == 0 {
+		return errors.New("transaction has no inputs")
+	}
+	if len(msgTx.TxOut) == 0 {
+		return errors.New("transaction has no outputs")
+	}
+	if msgTx.SerializeSizeStripped() > maxTxBaseSize {
+		return errors.New("transaction exceeds max base size")
+	}
+
+	var totalSatoshi int64
+	for _, txOut := range msgTx.TxOut {
+		satoshi := txOut.Value
+		if satoshi < 0 {
+			return errors.New("negative output value")
+		}
+		if satoshi > btcutil.MaxSatoshi {
+			return errors.New("output exceeds max satoshi")
+		}
+
+		totalSatoshi += satoshi
+		if totalSatoshi < 0 || totalSatoshi > btcutil.MaxSatoshi {
+			return errors.New("total output exceeds max satoshi")
+		}
+	}
+
+	seen := make(map[wire.OutPoint]struct{}, len(msgTx.TxIn))
+	for _, txIn := range msgTx.TxIn {
+		if _, ok := seen[txIn.PreviousOutPoint]; ok {
+			return errors.New("duplicate inputs")
+		}
+		seen[txIn.PreviousOutPoint] = struct{}{}
+	}
+
+	if isCoinBaseTx(tx) {
+		slen := len(msgTx.TxIn[0].SignatureScript)
+		if slen < 2 || slen > 100 {
+			return errors.New("coinbase script length out of range")
+		}
+		return nil
+	}
+
+	for _, txIn := range msgTx.TxIn {
+		if isNullOutpoint(&txIn.PreviousOutPoint) {
+			return errors.New("null outpoint in non-coinbase tx")
+		}
+	}
+
+	return nil
+}
+
+func isCoinBaseTx(tx *btcutil.Tx) bool {
+	msgTx := tx.MsgTx()
+	if len(msgTx.TxIn) != 1 {
+		return false
+	}
+
+	return isNullOutpoint(&msgTx.TxIn[0].PreviousOutPoint)
+}
+
+func isNullOutpoint(outpoint *wire.OutPoint) bool {
+	return outpoint.Index == ^uint32(0) && outpoint.Hash == (chainhash.Hash{})
+}
+
+func TestCheckTxSanityTooBig(t *testing.T) {
+	t.Parallel()
+
+	tx := wire.NewMsgTx(wire.TxVersion)
+	outpoint := wire.OutPoint{
+		Hash:  chainhash.Hash{0: 1},
+		Index: 0,
+	}
+	tx.AddTxIn(wire.NewTxIn(
+		&outpoint, bytes.Repeat([]byte{0x01}, maxTxBaseSize), nil,
+	))
+	tx.AddTxOut(wire.NewTxOut(0, nil))
+
+	if err := checkTxSanity(btcutil.NewTx(tx)); err == nil {
+		t.Fatal("expected oversized transaction to fail sanity checks")
+	}
+}
+
+// hasTaprootScriptTest returns whether the reference script test is one of the
+// newer taproot cases embedded in script_tests.json. Those vectors rely on
+// Bitcoin Core-specific placeholder macros, while btcd covers taproot via the
+// dedicated data/taproot-ref harness in TestTaprootReferenceTests.
+func hasTaprootScriptTest(test []interface{}) bool {
+	// Account for any optional leading witness data.
+	witnessOffset := scriptTestWitnessOffset(test)
+
+	if len(test) < witnessOffset+scriptTestFlagsOffset+1 {
+		return false
+	}
+
+	flags, ok := test[witnessOffset+scriptTestFlagsOffset].(string)
+	return ok && strings.Contains(flags, "TAPROOT")
+}
+
 // parseExpectedResult parses the provided expected result string into allowed
 // script error codes.  An error is returned if the expected result string is
 // not supported.
@@ -228,6 +421,8 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrEvalFalse, ErrEmptyStack}, nil
 	case "EQUALVERIFY":
 		return []ErrorCode{ErrEqualVerify}, nil
+	case "NUMEQUALVERIFY":
+		return []ErrorCode{ErrNumEqualVerify}, nil
 	case "NULLFAIL":
 		return []ErrorCode{ErrNullFail}, nil
 	case "SIG_HIGH_S":
@@ -269,6 +464,8 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrInvalidSignatureCount}, nil
 	case "MINIMALDATA":
 		return []ErrorCode{ErrMinimalData}, nil
+	case "SCRIPTNUM":
+		return []ErrorCode{ErrNumberTooBig, ErrMinimalData}, nil
 	case "NEGATIVE_LOCKTIME":
 		return []ErrorCode{ErrNegativeLockTime}, nil
 	case "UNSATISFIED_LOCKTIME":
@@ -349,6 +546,13 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 			continue
 		}
 
+		// Taproot entries in the latest Bitcoin Core script_tests.json rely on
+		// placeholder macros (for example #SCRIPT# and #CONTROLBLOCK#).  btcd
+		// validates taproot separately via TestTaprootReferenceTests.
+		if hasTaprootScriptTest(test) {
+			continue
+		}
+
 		// Construct a name for the test based on the comment and test
 		// data.
 		name, err := scriptTestName(test)
@@ -364,9 +568,9 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 
 		// When the first field of the test data is a slice it contains
 		// witness data and everything else is offset by 1 as a result.
-		witnessOffset := 0
-		if witnessData, ok := test[0].([]interface{}); ok {
-			witnessOffset++
+		witnessOffset := scriptTestWitnessOffset(test)
+		if witnessOffset != 0 {
+			witnessData := test[0].([]interface{})
 
 			// If this is a witness test, then the final element
 			// within the slice is the input amount, so we ignore
@@ -379,7 +583,9 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 				continue
 			}
 
-			inputAmt, err = btcutil.NewAmount(witnessData[len(witnessData)-1].(float64))
+			inputAmt, err = btcutil.NewAmount(
+				witnessData[len(witnessData)-1].(float64),
+			)
 			if err != nil {
 				t.Errorf("%s: can't parse input amt: %v",
 					name, err)
@@ -389,7 +595,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the signature script from the test fields.
-		scriptSigStr, ok := test[witnessOffset].(string)
+		scriptSigIdx := witnessOffset + scriptTestSigScriptOffset
+		scriptSigStr, ok := test[scriptSigIdx].(string)
 		if !ok {
 			t.Errorf("%s: signature script is not a string", name)
 			continue
@@ -402,7 +609,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the public key script from the test fields.
-		scriptPubKeyStr, ok := test[witnessOffset+1].(string)
+		scriptPubKeyIdx := witnessOffset + scriptTestPkScriptOffset
+		scriptPubKeyStr, ok := test[scriptPubKeyIdx].(string)
 		if !ok {
 			t.Errorf("%s: public key script is not a string", name)
 			continue
@@ -415,7 +623,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		}
 
 		// Extract and parse the script flags from the test fields.
-		flagsStr, ok := test[witnessOffset+2].(string)
+		flagsIdx := witnessOffset + scriptTestFlagsOffset
+		flagsStr, ok := test[flagsIdx].(string)
 		if !ok {
 			t.Errorf("%s: flags field is not a string", name)
 			continue
@@ -433,7 +642,8 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 		// fine grained with its errors than the reference test data, so
 		// some of the reference test data errors map to more than one
 		// possibility.
-		resultStr, ok := test[witnessOffset+3].(string)
+		resultIdx := witnessOffset + scriptTestExpectedOffset
+		resultStr, ok := test[resultIdx].(string)
 		if !ok {
 			t.Errorf("%s: result field is not a string", name)
 			continue
@@ -576,9 +786,18 @@ testloop:
 			continue
 		}
 
-		flags, err := parseScriptFlags(verifyFlags)
+		flags, badTx, err := parseTxInvalidTestFlags(verifyFlags)
 		if err != nil {
 			t.Errorf("bad test %d: %v", i, err)
+			continue
+		}
+		if badTx {
+			if err := checkTxSanity(tx); err != nil {
+				continue
+			}
+
+			t.Errorf("test (%d:%v) passed sanity when should fail",
+				i, test)
 			continue
 		}
 
@@ -733,7 +952,7 @@ testloop:
 			continue
 		}
 
-		flags, err := parseScriptFlags(verifyFlags)
+		flags, err := parseTxValidTestFlags(verifyFlags)
 		if err != nil {
 			t.Errorf("bad test %d: %v", i, err)
 			continue
