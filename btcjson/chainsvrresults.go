@@ -226,18 +226,19 @@ type UnifiedSoftForks struct {
 // GetBlockChainInfoResult models the data returned from the getblockchaininfo
 // command.
 type GetBlockChainInfoResult struct {
-	Chain                string  `json:"chain"`
-	Blocks               int32   `json:"blocks"`
-	Headers              int32   `json:"headers"`
-	BestBlockHash        string  `json:"bestblockhash"`
-	Difficulty           float64 `json:"difficulty"`
-	MedianTime           int64   `json:"mediantime"`
-	VerificationProgress float64 `json:"verificationprogress,omitempty"`
-	InitialBlockDownload bool    `json:"initialblockdownload,omitempty"`
-	Pruned               bool    `json:"pruned"`
-	PruneHeight          int32   `json:"pruneheight,omitempty"`
-	ChainWork            string  `json:"chainwork,omitempty"`
-	SizeOnDisk           int64   `json:"size_on_disk,omitempty"`
+	Chain                string        `json:"chain"`
+	Blocks               int32         `json:"blocks"`
+	Headers              int32         `json:"headers"`
+	BestBlockHash        string        `json:"bestblockhash"`
+	Difficulty           float64       `json:"difficulty"`
+	MedianTime           int64         `json:"mediantime"`
+	VerificationProgress float64       `json:"verificationprogress,omitempty"`
+	InitialBlockDownload bool          `json:"initialblockdownload,omitempty"`
+	Pruned               bool          `json:"pruned"`
+	PruneHeight          int32         `json:"pruneheight,omitempty"`
+	ChainWork            string        `json:"chainwork,omitempty"`
+	SizeOnDisk           int64         `json:"size_on_disk,omitempty"`
+	Warnings             StringOrArray `json:"warnings"`
 	*SoftForks
 	*UnifiedSoftForks
 }
@@ -371,7 +372,9 @@ type StringOrArray []string
 
 // MarshalJSON implements the json.Marshaler interface.
 func (h StringOrArray) MarshalJSON() ([]byte, error) {
-	return json.Marshal(h)
+	// Convert to []string to avoid infinite recursion since calling
+	// json.Marshal on StringOrArray would invoke MarshalJSON again.
+	return json.Marshal([]string(h))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
