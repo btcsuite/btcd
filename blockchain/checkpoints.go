@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -250,10 +251,8 @@ func (b *BlockChain) IsCheckpointCandidate(block *btcutil.Block) (bool, error) {
 
 	// A checkpoint must have transactions that only contain standard
 	// scripts.
-	for _, tx := range block.Transactions() {
-		if isNonstandardTransaction(tx) {
-			return false, nil
-		}
+	if slices.ContainsFunc(block.Transactions(), isNonstandardTransaction) {
+		return false, nil
 	}
 
 	// All of the checks passed, so the block is a candidate.
