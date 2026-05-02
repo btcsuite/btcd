@@ -30,6 +30,30 @@ func mustParseShortForm(script string) []byte {
 	return s
 }
 
+// buildLargeNullDataScript creates a null data script with the specified
+// number of data bytes. Uses PUSHDATA2 for larger data sizes.
+func buildLargeNullDataScript(dataSize int) string {
+	// For PUSHDATA2, the format is:
+	// OP_RETURN OP_PUSHDATA2 <2-byte little-endian length> <data>
+	// Total overhead: 1 (OP_RETURN) + 1 (OP_PUSHDATA2) + 2 (length) = 4 bytes
+	// But we're using hex representation in the test format.
+
+	// Build the data bytes (all zeros for simplicity).
+	data := make([]byte, dataSize)
+
+	// Build the script manually:
+	// OP_RETURN (0x6a) + OP_PUSHDATA2 (0x4d) + length (2 bytes LE) + data
+	script := make([]byte, 1+1+2+dataSize)
+	script[0] = OP_RETURN
+	script[1] = OP_PUSHDATA2
+	script[2] = byte(dataSize & 0xff)
+	script[3] = byte((dataSize >> 8) & 0xff)
+	copy(script[4:], data)
+
+	// Convert to hex string for the test framework
+	return hex.EncodeToString(script)
+}
+
 // newAddressPubKey returns a new btcutil.AddressPubKey from the provided
 // serialized public key.  It panics if an error occurs.  This is only used in
 // the tests as a helper since the only way it can fail is if there is an error
@@ -1022,20 +1046,47 @@ var scriptClassTests = []struct {
 		class: NullDataTy,
 	},
 	{
-		// Nulldata with more than max allowed data to be considered
-		// standard (so therefore nonstandard)
-		name: "nulldata exceed max standard push",
+		// Nulldata with 81 bytes of data (now allowed since the limit
+		// is on total script size, not individual push size).
+		name: "nulldata 81-byte push",
 		script: "RETURN PUSHDATA1 0x51 0x046708afdb0fe5548271967f1a67" +
 			"130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3" +
 			"046708afdb0fe5548271967f1a67130b7105cd6a828e03909a67" +
 			"962e0ea1f61deb649f6bc3f4cef308",
-		class: NonStandardTy,
+		class: NullDataTy,
 	},
 	{
-		// Almost nulldata, but add an additional opcode after the data
-		// to make it nonstandard.
-		name:   "almost nulldata",
+		// Nulldata with multiple data pushes (now allowed as of Bitcoin
+		// Core v0.12.0 which removed the single push restriction).
+		name:   "nulldata multiple pushes",
 		script: "RETURN 4 TRUE",
+		class:  NullDataTy,
+	},
+	{
+		// Nulldata with many data pushes using various push opcodes.
+		name: "nulldata many pushes",
+		script: "RETURN 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 " +
+			"DATA_8 0x0102030405060708",
+		class: NullDataTy,
+	},
+	{
+		// Nulldata with non-push opcode after OP_RETURN (nonstandard).
+		name:   "nulldata non-push opcode",
+		script: "RETURN DATA_4 0x01020304 DUP",
+		class:  NonStandardTy,
+	},
+	{
+		// Nulldata with large data push (9996 bytes, within 10000 byte limit).
+		// Total: 1 (OP_RETURN) + 1 (OP_PUSHDATA2) + 2 (length) + 9996 (data) = 10000
+		name:   "nulldata large within limit",
+		script: buildLargeNullDataScript(9996),
+		class:  NullDataTy,
+	},
+	{
+		// Nulldata exceeding the 10000 byte script size limit.
+		// Total: 1 (OP_RETURN) + 1 (OP_PUSHDATA2) + 2 (length) + 9997 (data) = 10001
+		name:   "nulldata exceeds script size limit",
+		script: buildLargeNullDataScript(9997),
 		class:  NonStandardTy,
 	},
 
