@@ -371,6 +371,82 @@ func TestMerkleBlockOverflowErrors(t *testing.T) {
 	}
 }
 
+func TestMerkleBlockExtractMatches(t *testing.T) {
+	t.Parallel()
+
+	proof := merkleBlockOne
+	proof.Flags = []byte{0x01}
+
+	matches, err := proof.ExtractMatches()
+	if err != nil {
+		t.Fatalf("ExtractMatches: unexpected error: %v", err)
+	}
+
+	if len(matches) != 1 {
+		t.Fatalf("ExtractMatches: unexpected match count %d", len(matches))
+	}
+	if matches[0] != *merkleBlockOne.Hashes[0] {
+		t.Fatalf("ExtractMatches: unexpected match %v", matches[0])
+	}
+}
+
+func TestMerkleBlockExtractMatchesErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		msg  MsgMerkleBlock
+	}{
+		{
+			name: "missing flags",
+			msg: func() MsgMerkleBlock {
+				msg := merkleBlockOne
+				msg.Flags = nil
+				return msg
+			}(),
+		},
+		{
+			name: "missing hashes",
+			msg: func() MsgMerkleBlock {
+				msg := merkleBlockOne
+				msg.Flags = []byte{0x01}
+				msg.Hashes = nil
+				return msg
+			}(),
+		},
+		{
+			name: "tampered merkle root",
+			msg: func() MsgMerkleBlock {
+				msg := merkleBlockOne
+				msg.Flags = []byte{0x01}
+				msg.Header.MerkleRoot[0] ^= 0xff
+				return msg
+			}(),
+		},
+		{
+			name: "invalid transaction count",
+			msg: func() MsgMerkleBlock {
+				msg := merkleBlockOne
+				msg.Flags = []byte{0x01}
+				msg.Transactions = 0
+				return msg
+			}(),
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := test.msg.ExtractMatches()
+			if err == nil {
+				t.Fatalf("ExtractMatches: expected error")
+			}
+		})
+	}
+}
+
 // merkleBlockOne is a merkle block created from block one of the block chain
 // where the first transaction matches.
 var merkleBlockOne = MsgMerkleBlock{

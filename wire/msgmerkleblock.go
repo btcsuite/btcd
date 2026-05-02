@@ -28,6 +28,134 @@ type MsgMerkleBlock struct {
 	Flags        []byte
 }
 
+type merkleBlockExtractor struct {
+	numTx     uint32
+	hashes    []*chainhash.Hash
+	flags     []byte
+	hashIndex uint32
+	flagIndex uint32
+}
+
+// calcTreeWidth calculates and returns the number of nodes (width) in a
+// merkle tree at the given depth-first height.
+func (m *merkleBlockExtractor) calcTreeWidth(height uint32) uint32 {
+	return (m.numTx + (1 << height) - 1) >> height
+}
+
+func (m *merkleBlockExtractor) nextFlag() (bool, error) {
+	if m.flagIndex/8 >= uint32(len(m.flags)) {
+		return false, messageError("MsgMerkleBlock.ExtractMatches",
+			"ran out of flag bits while extracting matches")
+	}
+
+	flag := m.flags[m.flagIndex/8]&(1<<(m.flagIndex%8)) != 0
+	m.flagIndex++
+	return flag, nil
+}
+
+func (m *merkleBlockExtractor) nextHash() (*chainhash.Hash, error) {
+	if m.hashIndex >= uint32(len(m.hashes)) {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"ran out of hashes while extracting matches")
+	}
+
+	hash := m.hashes[m.hashIndex]
+	m.hashIndex++
+	return hash, nil
+}
+
+func (m *merkleBlockExtractor) extract(height, pos uint32, matches *[]chainhash.Hash) (*chainhash.Hash, error) {
+	parentOfMatch, err := m.nextFlag()
+	if err != nil {
+		return nil, err
+	}
+
+	if height == 0 || !parentOfMatch {
+		hash, err := m.nextHash()
+		if err != nil {
+			return nil, err
+		}
+
+		if height == 0 && parentOfMatch {
+			*matches = append(*matches, *hash)
+		}
+		return hash, nil
+	}
+
+	left, err := m.extract(height-1, pos*2, matches)
+	if err != nil {
+		return nil, err
+	}
+
+	var right *chainhash.Hash
+	if pos*2+1 < m.calcTreeWidth(height-1) {
+		right, err = m.extract(height-1, pos*2+1, matches)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		right = left
+	}
+
+	merged := chainhash.DoubleHashRaw(func(w io.Writer) error {
+		if _, err := w.Write(left[:]); err != nil {
+			return err
+		}
+
+		_, err := w.Write(right[:])
+		return err
+	})
+	return &merged, nil
+}
+
+// ExtractMatches validates the partial merkle tree, reconstructs the matched
+// transaction hashes, and ensures the extracted merkle root matches the block
+// header.
+func (msg *MsgMerkleBlock) ExtractMatches() ([]chainhash.Hash, error) {
+	if msg.Transactions == 0 {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"merkle block contains no transactions")
+	}
+	if len(msg.Hashes) == 0 {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"merkle block contains no hashes")
+	}
+	if len(msg.Flags) == 0 {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"merkle block contains no flag bytes")
+	}
+
+	height := uint32(0)
+	extractor := merkleBlockExtractor{
+		numTx:  msg.Transactions,
+		hashes: msg.Hashes,
+		flags:  msg.Flags,
+	}
+	for extractor.calcTreeWidth(height) > 1 {
+		height++
+	}
+
+	matches := make([]chainhash.Hash, 0)
+	merkleRoot, err := extractor.extract(height, 0, &matches)
+	if err != nil {
+		return nil, err
+	}
+	if extractor.hashIndex != uint32(len(msg.Hashes)) {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"merkle block has unused hashes")
+	}
+	if (extractor.flagIndex+7)/8 != uint32(len(msg.Flags)) {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"merkle block has unused flag bits")
+	}
+	if !merkleRoot.IsEqual(&msg.Header.MerkleRoot) {
+		return nil, messageError("MsgMerkleBlock.ExtractMatches",
+			"merkle root mismatch")
+	}
+
+	return matches, nil
+}
+
 // AddTxHash adds a new transaction hash to the message.
 func (msg *MsgMerkleBlock) AddTxHash(hash *chainhash.Hash) error {
 	if len(msg.Hashes)+1 > maxTxPerBlock {
