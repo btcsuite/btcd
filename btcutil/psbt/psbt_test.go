@@ -21,6 +21,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestSerializeNilTaprootLeafScript tests that serializing a PSBT with a nil
+// entry in TaprootLeafScript returns an error instead of panicking.
+// Regression test for https://github.com/btcsuite/btcd/issues/2495
+func TestSerializeNilTaprootLeafScript(t *testing.T) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  chainhash.Hash{},
+			Index: 0,
+		},
+	})
+	tx.AddTxOut(&wire.TxOut{Value: 1000})
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	packet.Inputs[0].TaprootLeafScript = []*TaprootTapLeafScript{nil}
+
+	_, err = packet.B64Encode()
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
 // Test vectors from:
 // // https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#test-vectors
 
