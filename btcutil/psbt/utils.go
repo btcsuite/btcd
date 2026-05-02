@@ -295,12 +295,15 @@ func readTxOut(txout []byte) (*wire.TxOut, error) {
 // UTXO fields of the PSBT. An error is returned if an input is specified that
 // does not contain any UTXO information.
 func SumUtxoInputValues(packet *Packet) (int64, error) {
-	// We take the TX ins of the unsigned TX as the truth for how many
-	// inputs there should be, as the fields in the extra data part of the
-	// PSBT can be empty.
-	if len(packet.UnsignedTx.TxIn) != len(packet.Inputs) {
-		return 0, fmt.Errorf("TX input length doesn't match PSBT " +
-			"input length")
+	// For v0 PSBTs we cross-check against the unsigned transaction.
+	if packet.Version < 2 {
+		if packet.UnsignedTx == nil {
+			return 0, fmt.Errorf("v0 PSBT missing unsigned tx")
+		}
+		if len(packet.UnsignedTx.TxIn) != len(packet.Inputs) {
+			return 0, fmt.Errorf("TX input length doesn't match " +
+				"PSBT input length")
+		}
 	}
 
 	inputSum := int64(0)
@@ -314,17 +317,22 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 			// Non-witness UTXOs reference to the whole transaction
 			// the UTXO resides in.
 			utxOuts := in.NonWitnessUtxo.TxOut
-			txIn := packet.UnsignedTx.TxIn[idx]
 
-			// Check that utxOuts actually has enough space to
-			// contain the previous outpoint's index.
-			opIdx := txIn.PreviousOutPoint.Index
+			// For v2, the output index is stored directly in the
+			// PInput. For v0, it comes from the unsigned tx.
+			var opIdx uint32
+			if packet.Version >= 2 {
+				opIdx = in.OutputIndex
+			} else {
+				opIdx = packet.UnsignedTx.TxIn[idx].PreviousOutPoint.Index
+			}
+
 			if opIdx >= uint32(len(utxOuts)) {
 				return 0, fmt.Errorf("input %d has malformed "+
 					"TxOut field", idx)
 			}
 
-			inputSum += utxOuts[txIn.PreviousOutPoint.Index].Value
+			inputSum += utxOuts[opIdx].Value
 
 		default:
 			return 0, fmt.Errorf("input %d has no UTXO information",

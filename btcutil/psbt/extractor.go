@@ -27,9 +27,12 @@ func Extract(p *Packet) (*wire.MsgTx, error) {
 		return nil, ErrIncompletePSBT
 	}
 
-	// First, we'll make a copy of the underlying unsigned transaction (the
-	// initial template) so we don't mutate it during our activates below.
-	finalTx := p.UnsignedTx.Copy()
+	// First, we'll get a fresh copy of the underlying unsigned transaction
+	// (the initial template) so we don't mutate it during our activates below.
+	finalTx, err := p.GetUnsignedTx()
+	if err != nil {
+		return nil, err
+	}
 
 	// For each input, we'll now populate any relevant witness and
 	// sigScript data.

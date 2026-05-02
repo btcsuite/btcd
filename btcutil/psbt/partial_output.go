@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"sort"
 
@@ -18,6 +19,8 @@ type POutput struct {
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
 	Unknowns               []*Unknown
+	Amount                 int64
+	Script                 []byte
 }
 
 // NewPsbtOutput creates an instance of PsbtOutput; the three parameters
@@ -32,8 +35,26 @@ func NewPsbtOutput(redeemScript []byte, witnessScript []byte,
 	}
 }
 
+func (po *POutput) addUnknown(keyCode byte, keyData, value []byte) error {
+	keyCodeAndData := append([]byte{keyCode}, keyData...)
+	newUnknown := &Unknown{
+		Key:   keyCodeAndData,
+		Value: value,
+	}
+	
+	// Duplicate key+keyData combinations are not allowed (per PSBT spec)
+	for _, x := range po.Unknowns {
+		if bytes.Equal(x.Key, newUnknown.Key) &&
+			bytes.Equal(x.Value, newUnknown.Value) {
+			return ErrDuplicateKey
+		}
+	}
+	po.Unknowns = append(po.Unknowns, newUnknown)
+	return nil
+}
+
 // deserialize attempts to recode a new POutput from the passed io.Reader.
-func (po *POutput) deserialize(r io.Reader) error {
+func (po *POutput) deserialize(r io.Reader, version uint32) error {
 	for {
 		keyCode, keyData, err := getKey(r)
 		if err != nil {
@@ -50,7 +71,15 @@ func (po *POutput) deserialize(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-
+		if version == 0 {
+			switch OutputType(keyCode) {
+			case AmountOutputType, ScriptOutputType:
+				if err := po.addUnknown(byte(keyCode), keyData, value); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		switch OutputType(keyCode) {
 
 		case RedeemScriptOutputType:
@@ -143,28 +172,34 @@ func (po *POutput) deserialize(r io.Reader) error {
 			po.TaprootBip32Derivation = append(
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
+		case AmountOutputType:
+			if keyData != nil {
+				if err := po.addUnknown(byte(keyCode), keyData, value); err != nil {
+					return err
+				}
+				break
+			}
+			if len(value) != 8 {
+				return ErrInvalidKeyData
+			}
+			// BIP-370: 64-bit signed little endian integer.
+			po.Amount = int64(binary.LittleEndian.Uint64(value))
+
+		case ScriptOutputType:
+			if keyData != nil {
+				if err := po.addUnknown(byte(keyCode), keyData, value); err != nil {
+					return err
+				}
+				break
+			}
+			po.Script = value
 
 		default:
-			// A fall through case for any proprietary types.
-			keyCodeAndData := append(
-				[]byte{byte(keyCode)}, keyData...,
-			)
-			newUnknown := &Unknown{
-				Key:   keyCodeAndData,
-				Value: value,
+			if err := po.addUnknown(byte(keyCode), keyData, value); err != nil {
+				return err
 			}
-
-			// Duplicate key+keyData are not allowed.
-			for _, x := range po.Unknowns {
-				if bytes.Equal(x.Key, newUnknown.Key) &&
-					bytes.Equal(x.Value, newUnknown.Value) {
-
-					return ErrDuplicateKey
-				}
-			}
-
-			po.Unknowns = append(po.Unknowns, newUnknown)
 		}
+
 	}
 
 	return nil
@@ -172,7 +207,7 @@ func (po *POutput) deserialize(r io.Reader) error {
 
 // serialize attempts to write out the target POutput into the passed
 // io.Writer.
-func (po *POutput) serialize(w io.Writer) error {
+func (po *POutput) serialize(w io.Writer, version uint32) error {
 	if po.RedeemScript != nil {
 		err := serializeKVPairWithType(
 			w, uint8(RedeemScriptOutputType), nil, po.RedeemScript,
@@ -202,6 +237,21 @@ func (po *POutput) serialize(w io.Writer) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+	if version == 2 {
+		var buf [8]byte
+		binary.LittleEndian.PutUint64(buf[:], uint64(po.Amount))
+		err := serializeKVPairWithType(w, uint8(AmountOutputType), nil, buf[:])
+		if err != nil {
+			return err
+		}
+
+		if po.Script != nil {
+			err := serializeKVPairWithType(w, uint8(ScriptOutputType), nil, po.Script)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
