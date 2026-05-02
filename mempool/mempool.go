@@ -106,6 +106,8 @@ type Config struct {
 	// This can be nil if the address index is not enabled.
 	AddrIndex *indexers.AddrIndex
 
+	ScriptHashIndex *indexers.ScriptHashIndex
+
 	// FeeEstimator provides a feeEstimator. If it is not nil, the mempool
 	// records all new transactions it observes into the feeEstimator.
 	FeeEstimator *FeeEstimator
@@ -196,6 +198,9 @@ type TxPool struct {
 	// the scan will only run when an orphan is added to the pool as opposed
 	// to on an unconditional timer.
 	nextExpireScan time.Time
+
+	notificationsLock sync.RWMutex
+	notifications     []NotificationCallback
 }
 
 // Ensure the TxPool type implements the mining.TxSource interface.
@@ -495,6 +500,12 @@ func (mp *TxPool) removeTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 			mp.cfg.AddrIndex.RemoveUnconfirmedTx(txHash)
 		}
 
+		if mp.cfg.ScriptHashIndex != nil {
+			mp.cfg.ScriptHashIndex.RemoveUnconfirmedTxEntry(txHash)
+		}
+
+		mp.sendNotification(NTTxRemoved, txHash)
+
 		// Mark the referenced outpoints as unspent by the pool.
 		for _, txIn := range txDesc.Tx.MsgTx().TxIn {
 			delete(mp.outpoints, txIn.PreviousOutPoint)
@@ -568,10 +579,21 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *btcutil
 		mp.cfg.AddrIndex.AddUnconfirmedTx(tx, utxoView)
 	}
 
+	if mp.cfg.ScriptHashIndex != nil {
+		mp.cfg.ScriptHashIndex.MapUnconfirmedTx(tx, utxoView)
+	}
+
 	// Record this tx for fee estimation if enabled.
 	if mp.cfg.FeeEstimator != nil {
 		mp.cfg.FeeEstimator.ObserveTransaction(txD)
 	}
+
+	log.Infof("send notifiction for tx %v", tx.Hash())
+	mp.sendNotification(NTTxAccepted,
+		&NTTxAcceptedData{
+			Tx:       tx,
+			UtxoView: utxoView,
+		})
 
 	return txD
 }
@@ -826,6 +848,19 @@ func (mp *TxPool) FetchTransaction(txHash *chainhash.Hash) (*btcutil.Tx, error) 
 
 	if exists {
 		return txDesc.Tx, nil
+	}
+
+	return nil, fmt.Errorf("transaction is not in the pool")
+}
+
+func (mp *TxPool) FetchTransactionDescriptor(txHash *chainhash.Hash) (*TxDesc, error) {
+	// Protect concurrent access.
+	mp.mtx.RLock()
+	txDesc, exists := mp.pool[*txHash]
+	mp.mtx.RUnlock()
+
+	if exists {
+		return txDesc, nil
 	}
 
 	return nil, fmt.Errorf("transaction is not in the pool")
