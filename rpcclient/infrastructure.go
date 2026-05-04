@@ -771,12 +771,13 @@ out:
 // result, unmarshalling it, and delivering the unmarshalled result to the
 // provided response channel.
 func (c *Client) handleSendPostMessage(ctx context.Context, jReq *jsonRequest) {
-	c.handleSendPostMessageWithRetry(ctx, jReq, sendPostRequestTries)
+	c.sendPostRequestAndRespond(ctx, jReq, sendPostRequestTries)
 }
 
-// handleSendPostMessageWithRetry performs HTTP POST retries and decodes the
-// response result.
-func handleSendPostMessageWithRetry(ctx context.Context, jReq *jsonRequest,
+// sendPostRequestWithRetry performs HTTP POST retries and decodes the response
+// result. It returns the raw transport error so callers can decide how to map
+// shutdown-driven cancellation.
+func sendPostRequestWithRetry(ctx context.Context, jReq *jsonRequest,
 	tries int, httpClient *http.Client, config *ConnConfig,
 	batch bool) ([]byte, error) {
 
@@ -842,6 +843,7 @@ retryloop:
 		case <-time.After(backoff):
 
 		case <-ctx.Done():
+			// Stop retrying as soon as shutdown cancels the request context.
 			err = ctx.Err()
 			break retryloop
 		}
@@ -891,17 +893,17 @@ retryloop:
 	return resp.result()
 }
 
-// handleSendPostMessageWithRetry runs handleSendPostMessage using the provided
-// retry count. It exists so tests can exercise retry edge cases quickly.
-func (c *Client) handleSendPostMessageWithRetry(ctx context.Context,
+// sendPostRequestAndRespond runs the retrying POST path and sends the final
+// result to the waiting response channel.
+func (c *Client) sendPostRequestAndRespond(ctx context.Context,
 	jReq *jsonRequest, tries int) {
 
-	res, err := handleSendPostMessageWithRetry(
+	res, err := sendPostRequestWithRetry(
 		ctx, jReq, tries, c.httpClient, c.config, c.batch,
 	)
 
-	// Preserves the client contract that shutdown-related cancellations are
-	// surfaced as ErrClientShutdown.
+	// Preserve the client contract that shutdown-related cancellations surface
+	// as ErrClientShutdown, even when the transport reports context.Canceled.
 	if errors.Is(err, context.Canceled) &&
 		errors.Is(context.Cause(ctx), ErrClientShutdown) {
 

@@ -184,7 +184,7 @@ func TestParseAddressString(t *testing.T) {
 }
 
 // TestHandleSendPostMessageWithRetrySuccess ensures that
-// handleSendPostMessageWithRetry returns a decoded result and no error on
+// sendPostRequestWithRetry returns a decoded result and no error on
 // a successful response.
 func TestHandleSendPostMessageWithRetrySuccess(t *testing.T) {
 	client := newPostModeTestClient(postRoundTripFunc(
@@ -200,7 +200,7 @@ func TestHandleSendPostMessageWithRetrySuccess(t *testing.T) {
 	))
 	jReq := newPostTestRequest()
 
-	result, err := handleSendPostMessageWithRetry(
+	result, err := sendPostRequestWithRetry(
 		context.Background(), jReq, 1, client.httpClient, client.config,
 		false,
 	)
@@ -209,7 +209,7 @@ func TestHandleSendPostMessageWithRetrySuccess(t *testing.T) {
 }
 
 // TestHandleSendPostMessageWithRetryShutdownDuringRetryBackoff ensures
-// that handleSendPostMessageWithRetry returns context cancellation from the
+// that sendPostRequestWithRetry returns context cancellation from the
 // retry-backoff path.
 func TestHandleSendPostMessageWithRetryShutdownDuringRetryBackoff(
 	t *testing.T) {
@@ -227,7 +227,7 @@ func TestHandleSendPostMessageWithRetryShutdownDuringRetryBackoff(
 	))
 	jReq := newPostTestRequest()
 
-	result, err := handleSendPostMessageWithRetry(
+	result, err := sendPostRequestWithRetry(
 		ctx, jReq, 2, client.httpClient, client.config, false,
 	)
 	require.Nil(t, result)
@@ -236,7 +236,7 @@ func TestHandleSendPostMessageWithRetryShutdownDuringRetryBackoff(
 }
 
 // TestHandleSendPostMessageWithRetryShutdownOnFinalRetry ensures that
-// handleSendPostMessageWithRetry returns context cancellation from the final
+// sendPostRequestWithRetry returns context cancellation from the final
 // retry attempt path.
 func TestHandleSendPostMessageWithRetryShutdownOnFinalRetry(t *testing.T) {
 	var attempts int32
@@ -256,7 +256,7 @@ func TestHandleSendPostMessageWithRetryShutdownOnFinalRetry(t *testing.T) {
 	))
 	jReq := newPostTestRequest()
 
-	result, err := handleSendPostMessageWithRetry(
+	result, err := sendPostRequestWithRetry(
 		ctx, jReq, 2, client.httpClient, client.config, false,
 	)
 	require.Nil(t, result)
@@ -265,7 +265,7 @@ func TestHandleSendPostMessageWithRetryShutdownOnFinalRetry(t *testing.T) {
 }
 
 // TestHandleSendPostMessageWithRetryShutdownOnBodyRead ensures that
-// handleSendPostMessageWithRetry returns the body read error when cancellation
+// sendPostRequestWithRetry returns the body read error when cancellation
 // arrives during io.ReadAll.
 func TestHandleSendPostMessageWithRetryShutdownOnBodyRead(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -290,7 +290,7 @@ func TestHandleSendPostMessageWithRetryShutdownOnBodyRead(t *testing.T) {
 		cancel(ErrClientShutdown)
 	}()
 
-	result, err := handleSendPostMessageWithRetry(
+	result, err := sendPostRequestWithRetry(
 		ctx, jReq, 1, client.httpClient, client.config, false,
 	)
 	require.Nil(t, result)
@@ -412,7 +412,7 @@ func TestHandleSendPostMessageShutdownDuringRetryBackoff(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	jReq := newPostTestRequest()
 
-	go client.handleSendPostMessageWithRetry(ctx, jReq, 2)
+	go client.sendPostRequestAndRespond(ctx, jReq, 2)
 
 	select {
 	case <-attemptStarted:
@@ -450,7 +450,7 @@ func TestHandleSendPostMessageShutdownOnFinalRetry(t *testing.T) {
 	))
 	jReq := newPostTestRequest()
 
-	go client.handleSendPostMessageWithRetry(ctx, jReq, 2)
+	go client.sendPostRequestAndRespond(ctx, jReq, 2)
 
 	select {
 	case resp := <-jReq.responseChan:
@@ -482,7 +482,7 @@ func TestHandleSendPostMessageShutdownDuringBodyRead(t *testing.T) {
 	))
 	jReq := newPostTestRequest()
 
-	go client.handleSendPostMessageWithRetry(ctx, jReq, 1)
+	go client.sendPostRequestAndRespond(ctx, jReq, 1)
 
 	select {
 	case <-readStarted:
