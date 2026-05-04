@@ -708,9 +708,28 @@ func NewKeyFromString(key string) (*ExtendedKey, error) {
 	chainCode := payload[13:45]
 	keyData := payload[45:78]
 
+	var zeroFP [4]byte
+	if depth == 0 && (!bytes.Equal(parentFP, zeroFP[:]) || childNum != 0) {
+		return nil, ErrInvalidChild
+	}
 	// The key data is a private key if it starts with 0x00.  Serialized
 	// compressed pubkeys either start with 0x02 or 0x03.
 	isPrivate := keyData[0] == 0x00
+	// Validate version bytes match key type.
+	_, privErr := chaincfg.HDPrivateKeyToPublicKeyID(version)
+	_, pubErr := chaincfg.HDPublicKeyToPrivateKeyID(version)
+
+	switch {
+	case privErr == nil && pubErr == nil:
+		// should never happen, but treat as mismatch
+		return nil, ErrInvalidChild
+	case privErr == nil && !isPrivate:
+		return nil, ErrInvalidChild
+	case pubErr == nil && isPrivate:
+		return nil, ErrInvalidChild
+	case privErr != nil && pubErr != nil:
+		return nil, chaincfg.ErrUnknownHDKeyID
+	}
 	if isPrivate {
 		// Ensure the private key is valid.  It must be within the range
 		// of the order of the secp256k1 curve and not be 0.
