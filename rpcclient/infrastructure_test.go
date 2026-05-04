@@ -3,6 +3,7 @@ package rpcclient
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -32,6 +33,8 @@ type cancelOnReadBody struct {
 	ctx context.Context
 	// readStarted is closed when the first read call starts.
 	readStarted chan struct{}
+	// stage names the part of the request flow waiting on cancellation.
+	stage string
 }
 
 // Read blocks until the request context is canceled, then returns that error.
@@ -42,9 +45,7 @@ func (b *cancelOnReadBody) Read(_ []byte) (int, error) {
 		close(b.readStarted)
 	}
 
-	<-b.ctx.Done()
-
-	return 0, b.ctx.Err()
+	return 0, waitForRequestContextCancellation(b.ctx, b.stage)
 }
 
 // Close implements io.Closer for the test body.
@@ -80,6 +81,126 @@ func newPostTestRequest() *jsonRequest {
 		marshalledJSON: []byte(body),
 		responseChan:   make(chan *Response, 1),
 	}
+}
+
+// waitForRequestContextCancellation bounds shutdown waits so a missing request
+// context propagation becomes a symptomatic test failure instead of a hang.
+func waitForRequestContextCancellation(
+	ctx context.Context, stage string) error {
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+
+	case <-time.After(100 * time.Millisecond):
+		return fmt.Errorf("request context was not canceled during %s",
+			stage)
+	}
+}
+
+// sendPostShutdownScenario describes one shutdown path that should fail if the
+// request stops honoring shutdown cancellation.
+type sendPostShutdownScenario struct {
+	// name is the subtest name for the shutdown path.
+	name string
+
+	// tries is the retry count passed to the POST send helper under test.
+	tries int
+
+	// newClient builds a POST-mode client whose transport triggers the
+	// shutdown path for this scenario.
+	newClient func(context.CancelCauseFunc, *int32) *Client
+
+	// wantAttempts is the expected number of transport attempts before the
+	// scenario terminates.
+	wantAttempts int32
+
+	// wantErrContains is an optional substring that must appear in the raw
+	// helper error for this scenario.
+	wantErrContains string
+}
+
+// sendPostShutdownScenarios enumerates the shutdown-triggered regression
+// scenarios shared by the helper-level and wrapper-level POST tests.
+var sendPostShutdownScenarios = []sendPostShutdownScenario{
+	{
+		name:  "during_retry_backoff",
+		tries: 2,
+		newClient: func(cancel context.CancelCauseFunc,
+			attempts *int32) *Client {
+
+			return newPostModeTestClient(postRoundTripFunc(
+				func(*http.Request) (*http.Response, error) {
+					if atomic.AddInt32(attempts, 1) == 1 {
+						cancel(ErrClientShutdown)
+					}
+
+					return nil, errors.New(
+						"transient transport error",
+					)
+				},
+			))
+		},
+		wantAttempts: 1,
+	},
+	{
+		name:  "on_final_retry",
+		tries: 2,
+		newClient: func(cancel context.CancelCauseFunc,
+			attempts *int32) *Client {
+
+			return newPostModeTestClient(postRoundTripFunc(
+				func(req *http.Request) (*http.Response, error) {
+					current := atomic.AddInt32(attempts, 1)
+					if current == 1 {
+						return nil, errors.New(
+							"transient transport error",
+						)
+					}
+
+					// This keeps the case tied to request-context
+					// propagation instead of injecting context.Canceled
+					// directly from the fake transport.
+					cancel(ErrClientShutdown)
+					return nil, waitForRequestContextCancellation(
+						req.Context(), "final retry",
+					)
+				},
+			))
+		},
+		wantAttempts: 2,
+	},
+	{
+		name:  "during_body_read",
+		tries: 1,
+		newClient: func(cancel context.CancelCauseFunc,
+			attempts *int32) *Client {
+
+			readStarted := make(chan struct{})
+			go func() {
+				<-readStarted
+				cancel(ErrClientShutdown)
+			}()
+
+			return newPostModeTestClient(postRoundTripFunc(
+				func(req *http.Request) (*http.Response, error) {
+					atomic.AddInt32(attempts, 1)
+
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body: &cancelOnReadBody{
+							ctx:         req.Context(),
+							readStarted: readStarted,
+							stage:       "body read",
+						},
+					}, nil
+				},
+			))
+		},
+		wantAttempts:    1,
+		wantErrContains: "error reading json reply",
+	},
 }
 
 // TestParseAddressString checks different variation of supported and
@@ -183,10 +304,10 @@ func TestParseAddressString(t *testing.T) {
 	}
 }
 
-// TestHandleSendPostMessageWithRetrySuccess ensures that
+// TestSendPostRequestWithRetrySuccess ensures that
 // sendPostRequestWithRetry returns a decoded result and no error on
 // a successful response.
-func TestHandleSendPostMessageWithRetrySuccess(t *testing.T) {
+func TestSendPostRequestWithRetrySuccess(t *testing.T) {
 	client := newPostModeTestClient(postRoundTripFunc(
 		func(*http.Request) (*http.Response, error) {
 			return &http.Response{
@@ -208,94 +329,29 @@ func TestHandleSendPostMessageWithRetrySuccess(t *testing.T) {
 	require.Equal(t, []byte("1"), result)
 }
 
-// TestHandleSendPostMessageWithRetryShutdownDuringRetryBackoff ensures
-// that sendPostRequestWithRetry returns context cancellation from the
-// retry-backoff path.
-func TestHandleSendPostMessageWithRetryShutdownDuringRetryBackoff(
-	t *testing.T) {
+// TestSendPostRequestWithRetryShutdown keeps the shutdown regression cases in
+// one table while preserving a distinct symptomatic failure for each path.
+func TestSendPostRequestWithRetryShutdown(t *testing.T) {
+	for _, tc := range sendPostShutdownScenarios {
+		t.Run(tc.name, func(t *testing.T) {
+			var attempts int32
+			ctx, cancel := context.WithCancelCause(context.Background())
+			client := tc.newClient(cancel, &attempts)
+			jReq := newPostTestRequest()
 
-	var attempts int32
-	ctx, cancel := context.WithCancelCause(context.Background())
-
-	client := newPostModeTestClient(postRoundTripFunc(
-		func(*http.Request) (*http.Response, error) {
-			if atomic.AddInt32(&attempts, 1) == 1 {
-				cancel(ErrClientShutdown)
+			result, err := sendPostRequestWithRetry(
+				ctx, jReq, tc.tries, client.httpClient, client.config,
+				false,
+			)
+			require.Nil(t, result)
+			require.ErrorIs(t, err, context.Canceled)
+			if tc.wantErrContains != "" {
+				require.ErrorContains(t, err, tc.wantErrContains)
 			}
-			return nil, errors.New("transient transport error")
-		},
-	))
-	jReq := newPostTestRequest()
-
-	result, err := sendPostRequestWithRetry(
-		ctx, jReq, 2, client.httpClient, client.config, false,
-	)
-	require.Nil(t, result)
-	require.ErrorIs(t, err, context.Canceled)
-	require.EqualValues(t, 1, atomic.LoadInt32(&attempts))
-}
-
-// TestHandleSendPostMessageWithRetryShutdownOnFinalRetry ensures that
-// sendPostRequestWithRetry returns context cancellation from the final
-// retry attempt path.
-func TestHandleSendPostMessageWithRetryShutdownOnFinalRetry(t *testing.T) {
-	var attempts int32
-	ctx, cancel := context.WithCancelCause(context.Background())
-
-	client := newPostModeTestClient(postRoundTripFunc(
-		func(*http.Request) (*http.Response, error) {
-			current := atomic.AddInt32(&attempts, 1)
-			if current == 1 {
-				return nil, errors.New("transient transport " +
-					"error")
-			}
-
-			cancel(ErrClientShutdown)
-			return nil, context.Canceled
-		},
-	))
-	jReq := newPostTestRequest()
-
-	result, err := sendPostRequestWithRetry(
-		ctx, jReq, 2, client.httpClient, client.config, false,
-	)
-	require.Nil(t, result)
-	require.ErrorIs(t, err, context.Canceled)
-	require.EqualValues(t, 2, atomic.LoadInt32(&attempts))
-}
-
-// TestHandleSendPostMessageWithRetryShutdownOnBodyRead ensures that
-// sendPostRequestWithRetry returns the body read error when cancellation
-// arrives during io.ReadAll.
-func TestHandleSendPostMessageWithRetryShutdownOnBodyRead(t *testing.T) {
-	ctx, cancel := context.WithCancelCause(context.Background())
-	readStarted := make(chan struct{})
-
-	client := newPostModeTestClient(postRoundTripFunc(
-		func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     make(http.Header),
-				Body: &cancelOnReadBody{
-					ctx:         req.Context(),
-					readStarted: readStarted,
-				},
-			}, nil
-		},
-	))
-	jReq := newPostTestRequest()
-
-	go func() {
-		<-readStarted
-		cancel(ErrClientShutdown)
-	}()
-
-	result, err := sendPostRequestWithRetry(
-		ctx, jReq, 1, client.httpClient, client.config, false,
-	)
-	require.Nil(t, result)
-	require.ErrorContains(t, err, "error reading json reply")
-	require.ErrorIs(t, err, context.Canceled)
+			require.EqualValues(t, tc.wantAttempts,
+				atomic.LoadInt32(&attempts))
+		})
+	}
 }
 
 // TestHTTPPostShutdownInterruptsPendingRequest ensures that a client operating
