@@ -5,6 +5,7 @@
 package chaincfg
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -560,8 +561,8 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires.
 			),
-			MinActivationHeight: 0,
-			AlwaysActiveHeight:  1,
+			MinActivationHeight:       0,
+			AlwaysActiveHeight:        1,
 			CustomActivationThreshold: 108, // Only needs 75% hash rate.
 		},
 	},
@@ -1256,6 +1257,24 @@ func HDPrivateKeyToPublicKeyID(id []byte) ([]byte, error) {
 	}
 
 	return pubBytes, nil
+}
+
+// HDPublicKeyToPrivateKeyID accepts a public hierarchical deterministic
+// extended key id and returns the associated private key id. When the provided
+// id is not registered, the ErrUnknownHDKeyID error will be returned.
+func HDPublicKeyToPrivateKeyID(id []byte) ([]byte, error) {
+	if len(id) != 4 {
+		return nil, ErrUnknownHDKeyID
+	}
+
+	for priv, pub := range hdPrivToPubKeyIDs {
+		if bytes.Equal(pub, id) {
+			privBytes := priv[:] // copy to []byte
+			return privBytes, nil
+		}
+	}
+
+	return nil, ErrUnknownHDKeyID
 }
 
 // newHashFromStr converts the passed big-endian hex string into a
