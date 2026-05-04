@@ -490,6 +490,8 @@ func TestSendPostRequestShutdownPrioritizesFailure(t *testing.T) {
 	close(client.shutdown)
 
 	const attempts = 200
+	// The old single-select implementation chose randomly when both channels
+	// were ready, so repeat enough times to make an accidental enqueue show up.
 	for i := 0; i < attempts; i++ {
 		jReq := &jsonRequest{
 			id:           uint64(i),
