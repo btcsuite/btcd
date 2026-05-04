@@ -452,107 +452,30 @@ func TestHTTPPostShutdownInterruptsPendingRequest(t *testing.T) {
 	require.ErrorContains(t, err, ErrClientShutdown.Error())
 }
 
-// TestHandleSendPostMessageShutdownDuringRetryBackoff ensures shutdown
-// cancellation interrupts retry backoff and remaps to ErrClientShutdown.
-func TestHandleSendPostMessageShutdownDuringRetryBackoff(t *testing.T) {
-	var attempts int32
-	attemptStarted := make(chan struct{}, 1)
-	client := newPostModeTestClient(postRoundTripFunc(
-		func(*http.Request) (*http.Response, error) {
-			atomic.AddInt32(&attempts, 1)
-			attemptStarted <- struct{}{}
-			return nil, errors.New("transient transport error")
-		},
-	))
+// TestSendPostRequestAndRespondShutdown reuses the helper-level shutdown cases
+// to verify the client-facing contract: each one must surface
+// ErrClientShutdown on the response channel.
+func TestSendPostRequestAndRespondShutdown(t *testing.T) {
+	for _, tc := range sendPostShutdownScenarios {
+		t.Run(tc.name, func(t *testing.T) {
+			var attempts int32
+			ctx, cancel := context.WithCancelCause(context.Background())
+			client := tc.newClient(cancel, &attempts)
+			jReq := newPostTestRequest()
 
-	ctx, cancel := context.WithCancelCause(context.Background())
-	jReq := newPostTestRequest()
+			go client.sendPostRequestAndRespond(ctx, jReq, tc.tries)
 
-	go client.sendPostRequestAndRespond(ctx, jReq, 2)
-
-	select {
-	case <-attemptStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("first attempt did not start")
-	}
-
-	cancel(ErrClientShutdown)
-
-	select {
-	case resp := <-jReq.responseChan:
-		require.ErrorIs(t, resp.err, ErrClientShutdown)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for response")
-	}
-}
-
-// TestHandleSendPostMessageShutdownOnFinalRetry ensures cancellation on the
-// final retry attempt is still remapped to ErrClientShutdown.
-func TestHandleSendPostMessageShutdownOnFinalRetry(t *testing.T) {
-	var attempts int32
-	ctx, cancel := context.WithCancelCause(context.Background())
-
-	client := newPostModeTestClient(postRoundTripFunc(
-		func(*http.Request) (*http.Response, error) {
-			current := atomic.AddInt32(&attempts, 1)
-			if current == 1 {
-				return nil, errors.New("transient transport " +
-					"error")
+			select {
+			case resp := <-jReq.responseChan:
+				require.ErrorIs(t, resp.err, ErrClientShutdown)
+				require.Nil(t, resp.result)
+			case <-time.After(2 * time.Second):
+				t.Fatal("timed out waiting for response")
 			}
 
-			cancel(ErrClientShutdown)
-			return nil, context.Canceled
-		},
-	))
-	jReq := newPostTestRequest()
-
-	go client.sendPostRequestAndRespond(ctx, jReq, 2)
-
-	select {
-	case resp := <-jReq.responseChan:
-		require.ErrorIs(t, resp.err, ErrClientShutdown)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for response")
-	}
-
-	require.EqualValues(t, 2, atomic.LoadInt32(&attempts))
-}
-
-// TestHandleSendPostMessageShutdownDuringBodyRead ensures cancellation while
-// reading a response body is remapped to ErrClientShutdown.
-func TestHandleSendPostMessageShutdownDuringBodyRead(t *testing.T) {
-	ctx, cancel := context.WithCancelCause(context.Background())
-	readStarted := make(chan struct{})
-
-	client := newPostModeTestClient(postRoundTripFunc(
-		func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Header:     make(http.Header),
-				Body: &cancelOnReadBody{
-					ctx:         req.Context(),
-					readStarted: readStarted,
-				},
-			}, nil
-		},
-	))
-	jReq := newPostTestRequest()
-
-	go client.sendPostRequestAndRespond(ctx, jReq, 1)
-
-	select {
-	case <-readStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("response body read did not start")
-	}
-
-	cancel(ErrClientShutdown)
-
-	select {
-	case resp := <-jReq.responseChan:
-		require.ErrorIs(t, resp.err, ErrClientShutdown)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for response")
+			require.EqualValues(t, tc.wantAttempts,
+				atomic.LoadInt32(&attempts))
+		})
 	}
 }
 
