@@ -649,6 +649,8 @@ func TestNewBatchSerializesPostSends(t *testing.T) {
 	client.sendPostChan <- req1
 	client.sendPostChan <- req2
 
+	// Wait until one request is definitely in flight before checking whether
+	// a duplicate handler can start a second concurrent POST.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&active) >= 1
 	}, time.Second, 5*time.Millisecond)
