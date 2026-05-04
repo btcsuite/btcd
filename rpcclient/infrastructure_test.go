@@ -558,6 +558,8 @@ func TestBatchSendErrorResolvesQueuedFutures(t *testing.T) {
 		t.Helper()
 
 		done := make(chan error, 1)
+		// Receive is the blocking caller-facing path. The old bug surfaced here
+		// by never resolving the future, so bound it with a timeout.
 		go func() {
 			_, err := f.Receive()
 			done <- err
