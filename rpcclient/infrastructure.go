@@ -140,6 +140,11 @@ type Client struct {
 	// POST mode.
 	httpClient *http.Client
 
+	// httpURL is the request URL used for every HTTP POST. It depends only
+	// on the configured Host and DisableTLS, both of which are immutable
+	// after New, so it is computed once at construction time and reused.
+	httpURL string
+
 	// backendVersion is the version of the backend the client is currently
 	// connected to. This should be retrieved through GetVersion.
 	backendVersionMu sync.Mutex
@@ -771,22 +776,15 @@ func (c *Client) handleSendPostMessage(jReq *jsonRequest) {
 		lastErr      error
 		backoff      time.Duration
 		httpResponse *http.Response
+		err          error
 	)
-
-	httpURL, err := c.config.httpURL()
-	if err != nil {
-		jReq.responseChan <- &Response{
-			err: fmt.Errorf("failed to parse address %v", err),
-		}
-		return
-	}
 
 	tries := 10
 	for i := 0; i < tries; i++ {
 		var httpReq *http.Request
 
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
-		httpReq, err = http.NewRequest("POST", httpURL, bodyReader)
+		httpReq, err = http.NewRequest("POST", c.httpURL, bodyReader)
 		if err != nil {
 			jReq.responseChan <- &Response{result: nil, err: err}
 			return
@@ -1372,30 +1370,22 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 	return &client, nil
 }
 
-// httpURL returns the URL to use for HTTP POST requests.
-func (config *ConnConfig) httpURL() (string, error) {
+// httpURL returns the URL for HTTP POST requests. The Unix-socket case
+// returns a placeholder, since the path is dialed by the Transport's
+// DialContext. config.Host is not validated here, because newHTTPClient
+// already validates it via ParseAddressString.
+func (config *ConnConfig) httpURL() string {
 	protocol := "http"
 	if !config.DisableTLS {
 		protocol = "https"
 	}
 
-	parsedAddr, err := ParseAddressString(config.Host)
-	if err != nil {
-		return "", fmt.Errorf("error parsing host '%v': %v",
-			config.Host, err)
+	if strings.HasPrefix(config.Host, "unix://") ||
+		strings.HasPrefix(config.Host, "unixpacket://") {
+		return protocol + "://unix"
 	}
 
-	var httpURL string
-	switch parsedAddr.Network() {
-	case "unix", "unixpacket":
-		// Using a placeholder URL because a non-empty URL is required.
-		// The Unix domain socket is specified in the DialContext.
-		httpURL = protocol + "://unix"
-	default:
-		httpURL = protocol + "://" + config.Host
-	}
-
-	return httpURL, nil
+	return protocol + "://" + config.Host
 }
 
 // dial opens a websocket connection using the passed connection configuration
@@ -1482,6 +1472,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 	// when running in HTTP POST mode.
 	var wsConn *websocket.Conn
 	var httpClient *http.Client
+	var httpURL string
 	connEstablished := make(chan struct{})
 	var start bool
 	if config.HTTPPostMode {
@@ -1493,6 +1484,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		if err != nil {
 			return nil, err
 		}
+		httpURL = config.httpURL()
 	} else {
 		if !config.DisableConnectOnNew {
 			var err error
@@ -1508,6 +1500,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		config:          config,
 		wsConn:          wsConn,
 		httpClient:      httpClient,
+		httpURL:         httpURL,
 		requestMap:      make(map[uint64]*list.Element),
 		requestList:     list.New(),
 		batch:           false,
