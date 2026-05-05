@@ -144,6 +144,11 @@ type Client struct {
 	// POST mode.
 	httpClient *http.Client
 
+	// httpURL is the request URL used for every HTTP POST. It depends only
+	// on the configured Host and DisableTLS, both of which are immutable
+	// after New, so it is computed once at construction time and reused.
+	httpURL string
+
 	// backendVersion is the version of the backend the client is currently
 	// connected to. This should be retrieved through GetVersion.
 	backendVersionMu sync.Mutex
@@ -779,7 +784,7 @@ func (c *Client) handleSendPostMessage(ctx context.Context, jReq *jsonRequest) {
 // shutdown-driven cancellation.
 func sendPostRequestWithRetry(ctx context.Context, jReq *jsonRequest,
 	tries int, httpClient *http.Client, config *ConnConfig,
-	batch bool) ([]byte, error) {
+	httpURL string, batch bool) ([]byte, error) {
 
 	var (
 		lastErr      error
@@ -787,11 +792,6 @@ func sendPostRequestWithRetry(ctx context.Context, jReq *jsonRequest,
 		httpResponse *http.Response
 		err          error
 	)
-
-	httpURL, err := config.httpURL()
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse address %v", err)
-	}
 
 retryloop:
 	for i := 0; i < tries; i++ {
@@ -899,7 +899,7 @@ func (c *Client) sendPostRequestAndRespond(ctx context.Context,
 	jReq *jsonRequest, tries int) {
 
 	res, err := sendPostRequestWithRetry(
-		ctx, jReq, tries, c.httpClient, c.config, c.batch,
+		ctx, jReq, tries, c.httpClient, c.config, c.httpURL, c.batch,
 	)
 
 	// Preserve the client contract that shutdown-related cancellations surface
@@ -1418,30 +1418,23 @@ func newHTTPClient(config *ConnConfig) (*http.Client, error) {
 	return &client, nil
 }
 
-// httpURL returns the URL to use for HTTP POST requests.
-func (config *ConnConfig) httpURL() (string, error) {
+// httpURL returns the URL for HTTP POST requests. The Unix-socket case
+// returns a placeholder, since the path is dialed by the Transport's
+// DialContext. config.Host is not validated here, because newHTTPClient
+// already validates it via ParseAddressString.
+func (config *ConnConfig) httpURL() string {
 	protocol := "http"
 	if !config.DisableTLS {
 		protocol = "https"
 	}
 
-	parsedAddr, err := ParseAddressString(config.Host)
-	if err != nil {
-		return "", fmt.Errorf("error parsing host '%v': %v",
-			config.Host, err)
+	if strings.HasPrefix(config.Host, "unix://") ||
+		strings.HasPrefix(config.Host, "unixpacket://") {
+
+		return protocol + "://unix"
 	}
 
-	var httpURL string
-	switch parsedAddr.Network() {
-	case "unix", "unixpacket":
-		// Using a placeholder URL because a non-empty URL is required.
-		// The Unix domain socket is specified in the DialContext.
-		httpURL = protocol + "://unix"
-	default:
-		httpURL = protocol + "://" + config.Host
-	}
-
-	return httpURL, nil
+	return protocol + "://" + config.Host
 }
 
 // dial opens a websocket connection using the passed connection configuration
@@ -1528,6 +1521,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 	// when running in HTTP POST mode.
 	var wsConn *websocket.Conn
 	var httpClient *http.Client
+	var httpURL string
 	connEstablished := make(chan struct{})
 	var start bool
 	if config.HTTPPostMode {
@@ -1539,6 +1533,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		if err != nil {
 			return nil, err
 		}
+		httpURL = config.httpURL()
 	} else {
 		if !config.DisableConnectOnNew {
 			var err error
@@ -1554,6 +1549,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		config:          config,
 		wsConn:          wsConn,
 		httpClient:      httpClient,
+		httpURL:         httpURL,
 		requestMap:      make(map[uint64]*list.Element),
 		requestList:     list.New(),
 		batch:           false,
