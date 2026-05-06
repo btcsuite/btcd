@@ -743,6 +743,28 @@ func dbFetchUtxoEntryByHash(dbTx database.Tx, hash *chainhash.Hash) (*UtxoEntry,
 	return deserializeUtxoEntry(cursor.Value())
 }
 
+// BlockHashByTxHash returns the hash of the main-chain block containing the
+// given transaction when at least one of its outputs is currently unspent.
+//
+// When there is no matching unspent output for the transaction, nil will be
+// returned for both the hash and the error.
+func (b *BlockChain) BlockHashByTxHash(hash *chainhash.Hash) (*chainhash.Hash, error) {
+	var entry *UtxoEntry
+	err := b.db.View(func(dbTx database.Tx) error {
+		var err error
+		entry, err = dbFetchUtxoEntryByHash(dbTx, hash)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, nil
+	}
+
+	return b.BlockHashByHeight(entry.BlockHeight())
+}
+
 // dbFetchUtxoEntry uses an existing database transaction to fetch the specified
 // transaction output from the utxo set.
 //

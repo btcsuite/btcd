@@ -545,6 +545,12 @@ var helpDescsEnUS = map[string]string{
 	"gettxout-vout":           "The index of the output",
 	"gettxout-includemempool": "Include the mempool when true",
 
+	// GetTxOutProofCmd help.
+	"gettxoutproof--synopsis": "Returns a proof that one or more transactions were included in a block.",
+	"gettxoutproof-txids":     "The transaction hashes to prove",
+	"gettxoutproof-blockhash": "Optional block hash to restrict the proof to a specific block",
+	"gettxoutproof--result0":  "The serialized merkle proof encoded as hex",
+
 	// InvalidateBlockCmd help.
 	"invalidateblock--synopsis": "Invalidates the block of the given block hash. To re-validate the invalidated block, use the reconsiderblock rpc",
 	"invalidateblock-blockhash": "The block hash of the block to invalidate",
@@ -639,6 +645,11 @@ var helpDescsEnUS = map[string]string{
 	"verifymessage-signature": "The base-64 encoded signature provided by the signer",
 	"verifymessage-message":   "The signed message",
 	"verifymessage--result0":  "Whether or not the signature verified",
+
+	// VerifyTxOutProofCmd help.
+	"verifytxoutproof--synopsis": "Verifies a transaction inclusion proof and returns the committed transaction hashes.",
+	"verifytxoutproof-proof":     "The serialized merkle proof encoded as hex",
+	"verifytxoutproof--result0":  "The transaction hashes committed to by the proof",
 
 	// -------- Websocket-specific help --------
 
@@ -795,6 +806,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"getrawmempool":          {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
 	"getrawtransaction":      {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":               {(*btcjson.GetTxOutResult)(nil)},
+	"gettxoutproof":          {(*string)(nil)},
 	"node":                   nil,
 	"help":                   {(*string)(nil), (*string)(nil)},
 	"invalidateblock":        nil,
@@ -810,6 +822,7 @@ var rpcResultTypes = map[string][]interface{}{
 	"validateaddress":        {(*btcjson.ValidateAddressChainResult)(nil)},
 	"verifychain":            {(*bool)(nil)},
 	"verifymessage":          {(*bool)(nil)},
+	"verifytxoutproof":       {(*[]string)(nil)},
 	"version":                {(*map[string]btcjson.VersionResult)(nil)},
 	"testmempoolaccept":      {(*[]btcjson.TestMempoolAcceptResult)(nil)},
 	"gettxspendingprevout":   {(*[]btcjson.GetTxSpendingPrevOutResult)(nil)},
