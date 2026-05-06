@@ -560,8 +560,8 @@ var RegressionNetParams = Params{
 			DeploymentEnder: NewMedianTimeDeploymentEnder(
 				time.Time{}, // Never expires.
 			),
-			MinActivationHeight: 0,
-			AlwaysActiveHeight:  1,
+			MinActivationHeight:       0,
+			AlwaysActiveHeight:        1,
 			CustomActivationThreshold: 108, // Only needs 75% hash rate.
 		},
 	},

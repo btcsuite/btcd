@@ -115,4 +115,3 @@ func BenchmarkMsgCFCheckptDecodeEmpty(b *testing.B) {
 		}
 	}
 }
-
