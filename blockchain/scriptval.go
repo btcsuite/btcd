@@ -5,6 +5,8 @@
 package blockchain
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"math"
 	"runtime"
@@ -12,180 +14,140 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/stringintech/go-bitcoinkernel/kernel"
+	"golang.org/x/sync/errgroup"
 )
 
-// txValidateItem holds a transaction along with which input to validate.
-type txValidateItem struct {
-	txInIndex int
-	txIn      *wire.TxIn
-	tx        *btcutil.Tx
-	sigHashes *txscript.TxSigHashes
+// btcdFlagsToKernel translates btcd's txscript.ScriptFlags to the
+// equivalent kernel.ScriptFlags for use with libbitcoinkernel verification.
+func btcdFlagsToKernel(flags txscript.ScriptFlags) kernel.ScriptFlags {
+	var kFlags kernel.ScriptFlags
+	if flags&txscript.ScriptBip16 != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyP2SH
+	}
+	if flags&txscript.ScriptVerifyDERSignatures != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyDERSig
+	}
+	if flags&txscript.ScriptStrictMultiSig != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyNullDummy
+	}
+	if flags&txscript.ScriptVerifyCheckLockTimeVerify != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyCheckLockTimeVerify
+	}
+	if flags&txscript.ScriptVerifyCheckSequenceVerify != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyCheckSequenceVerify
+	}
+	if flags&txscript.ScriptVerifyWitness != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyWitness
+	}
+	if flags&txscript.ScriptVerifyTaproot != 0 {
+		kFlags |= kernel.ScriptFlagsVerifyTaproot
+	}
+	return kFlags
 }
 
-// txValidator provides a type which asynchronously validates transaction
-// inputs.  It provides several channels for communication and a processing
-// function that is intended to be in run multiple goroutines.
-type txValidator struct {
-	validateChan chan *txValidateItem
-	quitChan     chan struct{}
-	resultChan   chan error
-	utxoView     *UtxoViewpoint
-	flags        txscript.ScriptFlags
-	sigCache     *txscript.SigCache
-	hashCache    *txscript.HashCache
+type scriptPubkeyEntry struct {
+	pkScript []byte
+	amount   int64
+	index    uint
 }
 
-// sendResult sends the result of a script pair validation on the internal
-// result channel while respecting the quit channel.  This allows orderly
-// shutdown when the validation process is aborted early due to a validation
-// error in one of the other goroutines.
-func (v *txValidator) sendResult(result error) {
-	select {
-	case v.resultChan <- result:
-	case <-v.quitChan:
-	}
+type kernelTxVerifier struct {
+	tx                *kernel.Transaction
+	precomputedTxData *kernel.PrecomputedTransactionData
+	flags             kernel.ScriptFlags
+	entries           []scriptPubkeyEntry
 }
 
-// validateHandler consumes items to validate from the internal validate channel
-// and returns the result of the validation on the internal result channel. It
-// must be run as a goroutine.
-func (v *txValidator) validateHandler() {
-out:
-	for {
-		select {
-		case txVI := <-v.validateChan:
-			// Ensure the referenced input utxo is available.
-			txIn := txVI.txIn
-			utxo := v.utxoView.LookupEntry(txIn.PreviousOutPoint)
-			if utxo == nil {
-				str := fmt.Sprintf("unable to find unspent "+
-					"output %v referenced from "+
-					"transaction %s:%d",
-					txIn.PreviousOutPoint, txVI.tx.Hash(),
-					txVI.txInIndex)
-				err := ruleError(ErrMissingTxOut, str)
-				v.sendResult(err)
-				break out
-			}
-
-			// Create a new script engine for the script pair.
-			sigScript := txIn.SignatureScript
-			witness := txIn.Witness
-			pkScript := utxo.PkScript()
-			inputAmount := utxo.Amount()
-			vm, err := txscript.NewEngine(
-				pkScript, txVI.tx.MsgTx(), txVI.txInIndex,
-				v.flags, v.sigCache, txVI.sigHashes,
-				inputAmount, v.utxoView,
-			)
-			if err != nil {
-				str := fmt.Sprintf("failed to parse input "+
-					"%s:%d which references output %v - "+
-					"%v (input witness %x, input script "+
-					"bytes %x, prev output script bytes %x)",
-					txVI.tx.Hash(), txVI.txInIndex,
-					txIn.PreviousOutPoint, err, witness,
-					sigScript, pkScript)
-				err := ruleError(ErrScriptMalformed, str)
-				v.sendResult(err)
-				break out
-			}
-
-			// Execute the script pair.
-			if err := vm.Execute(); err != nil {
-				str := fmt.Sprintf("failed to validate input "+
-					"%s:%d which references output %v - "+
-					"%v (input witness %x, input script "+
-					"bytes %x, prev output script bytes %x)",
-					txVI.tx.Hash(), txVI.txInIndex,
-					txIn.PreviousOutPoint, err, witness,
-					sigScript, pkScript)
-				err := ruleError(ErrScriptValidation, str)
-				v.sendResult(err)
-				break out
-			}
-
-			// Validation succeeded.
-			v.sendResult(nil)
-
-		case <-v.quitChan:
-			break out
-		}
-	}
-}
-
-// Validate validates the scripts for all of the passed transaction inputs using
-// multiple goroutines.
-func (v *txValidator) Validate(items []*txValidateItem) error {
-	if len(items) == 0 {
-		return nil
+func newKernelTxVerifier(tx *btcutil.Tx, utxoView *UtxoViewpoint, flags txscript.ScriptFlags) (*kernelTxVerifier, error) {
+	var txBuf bytes.Buffer
+	if err := tx.MsgTx().Serialize(&txBuf); err != nil {
+		return nil, err
 	}
 
-	// Limit the number of goroutines to do script validation based on the
-	// number of processor cores.  This helps ensure the system stays
-	// reasonably responsive under heavy load.
-	maxGoRoutines := runtime.NumCPU() * 3
-	if maxGoRoutines <= 0 {
-		maxGoRoutines = 1
-	}
-	if maxGoRoutines > len(items) {
-		maxGoRoutines = len(items)
+	kernelTx, err := kernel.NewTransaction(txBuf.Bytes())
+	if err != nil {
+		return nil, err
 	}
 
-	// Start up validation handlers that are used to asynchronously
-	// validate each transaction input.
-	for i := 0; i < maxGoRoutines; i++ {
-		go v.validateHandler()
-	}
-
-	// Validate each of the inputs.  The quit channel is closed when any
-	// errors occur so all processing goroutines exit regardless of which
-	// input had the validation error.
-	numInputs := len(items)
-	currentItem := 0
-	processedItems := 0
-	for processedItems < numInputs {
-		// Only send items while there are still items that need to
-		// be processed.  The select statement will never select a nil
-		// channel.
-		var validateChan chan *txValidateItem
-		var item *txValidateItem
-		if currentItem < numInputs {
-			validateChan = v.validateChan
-			item = items[currentItem]
+	spentOutputs := make([]kernel.TransactionOutputLike, 0, len(tx.MsgTx().TxIn))
+	scriptPubkeys := make([]scriptPubkeyEntry, 0, len(tx.MsgTx().TxIn))
+	for txInIdx, txIn := range tx.MsgTx().TxIn {
+		if txIn.PreviousOutPoint.Index == math.MaxUint32 {
+			// coinbase - add empty placeholder for spent
+			sp := kernel.NewScriptPubkey([]byte{})
+			spentOutputs = append(spentOutputs, kernel.NewTransactionOutput(sp, 0))
+			sp.Destroy()
+			continue
 		}
 
-		select {
-		case validateChan <- item:
-			currentItem++
-
-		case err := <-v.resultChan:
-			processedItems++
-			if err != nil {
-				close(v.quitChan)
-				return err
-			}
+		utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
+		if utxo == nil {
+			kernelTx.Destroy()
+			return nil, ruleError(ErrMissingTxOut, fmt.Sprintf(
+				"unable to find unspent output %v", txIn.PreviousOutPoint))
 		}
+
+		pubKey := kernel.NewScriptPubkey(utxo.PkScript())
+		spentOutputs = append(spentOutputs, kernel.NewTransactionOutput(pubKey, utxo.Amount()))
+		pubKey.Destroy()
+
+		scriptPubkeys = append(scriptPubkeys, scriptPubkeyEntry{
+			pkScript: utxo.PkScript(),
+			amount:   utxo.Amount(),
+			index:    uint(txInIdx),
+		})
 	}
 
-	close(v.quitChan)
+	precomputedTxData, err := kernel.NewPrecomputedTransactionData(kernelTx, spentOutputs)
+	if err != nil {
+		kernelTx.Destroy()
+		return nil, err
+	}
+
+	return &kernelTxVerifier{
+		tx:                kernelTx,
+		precomputedTxData: precomputedTxData,
+		flags:             btcdFlagsToKernel(flags),
+		entries:           scriptPubkeys,
+	}, nil
+}
+
+func (v *kernelTxVerifier) verifyInput(pkScript []byte, amount int64, index uint) error {
+	sp := kernel.NewScriptPubkey(pkScript)
+	defer sp.Destroy()
+
+	valid, err := sp.Verify(amount, v.tx, v.precomputedTxData, index, v.flags)
+	if err != nil {
+		return ruleError(ErrScriptMalformed, fmt.Sprintf(
+			"failed to verify input %d: %v", index, err))
+	}
+
+	if !valid {
+		return ruleError(ErrScriptValidation, fmt.Sprintf(
+			"failed to validate input %d", index))
+	}
+
 	return nil
 }
 
-// newTxValidator returns a new instance of txValidator to be used for
-// validating transaction scripts asynchronously.
-func newTxValidator(utxoView *UtxoViewpoint, flags txscript.ScriptFlags,
-	sigCache *txscript.SigCache, hashCache *txscript.HashCache) *txValidator {
-	return &txValidator{
-		validateChan: make(chan *txValidateItem),
-		quitChan:     make(chan struct{}),
-		resultChan:   make(chan error),
-		utxoView:     utxoView,
-		sigCache:     sigCache,
-		hashCache:    hashCache,
-		flags:        flags,
+func (v *kernelTxVerifier) validateAll(ctx context.Context, g *errgroup.Group) {
+	for _, entry := range v.entries {
+		g.Go(func() error {
+			// ctx.Err() is checked before starting work so that goroutines
+			// scheduled after a failure return early. verifyInput can not be
+			// interrupted mid-execution.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return v.verifyInput(entry.pkScript, entry.amount, entry.index)
+		})
 	}
+}
+
+func (v *kernelTxVerifier) destroy() {
+	v.precomputedTxData.Destroy()
+	v.tx.Destroy()
 }
 
 // ValidateTransactionScripts validates the scripts for the passed transaction
@@ -194,50 +156,18 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
-	// First determine if segwit is active according to the scriptFlags. If
-	// it isn't then we don't need to interact with the HashCache.
-	segwitActive := flags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
-
-	// If the hashcache doesn't yet has the sighash midstate for this
-	// transaction, then we'll compute them now so we can re-use them
-	// amongst all worker validation goroutines.
-	if segwitActive && tx.MsgTx().HasWitness() &&
-		!hashCache.ContainsHashes(tx.Hash()) {
-		hashCache.AddSigHashes(tx.MsgTx(), utxoView)
+	verifier, err := newKernelTxVerifier(tx, utxoView, flags)
+	if err != nil {
+		return err
 	}
+	defer verifier.destroy()
 
-	var cachedHashes *txscript.TxSigHashes
-	if segwitActive && tx.MsgTx().HasWitness() {
-		// The same pointer to the transaction's sighash midstate will
-		// be re-used amongst all validation goroutines. By
-		// pre-computing the sighash here instead of during validation,
-		// we ensure the sighashes
-		// are only computed once.
-		cachedHashes, _ = hashCache.GetSigHashes(tx.Hash())
-	}
+	g, ctx := errgroup.WithContext(context.Background())
+	g.SetLimit(runtime.NumCPU() * 3)
 
-	// Collect all of the transaction inputs and required information for
-	// validation.
-	txIns := tx.MsgTx().TxIn
-	txValItems := make([]*txValidateItem, 0, len(txIns))
-	for txInIdx, txIn := range txIns {
-		// Skip coinbases.
-		if txIn.PreviousOutPoint.Index == math.MaxUint32 {
-			continue
-		}
+	verifier.validateAll(ctx, g)
 
-		txVI := &txValidateItem{
-			txInIndex: txInIdx,
-			txIn:      txIn,
-			tx:        tx,
-			sigHashes: cachedHashes,
-		}
-		txValItems = append(txValItems, txVI)
-	}
-
-	// Validate all of the inputs.
-	validator := newTxValidator(utxoView, flags, sigCache, hashCache)
-	return validator.Validate(txValItems)
+	return g.Wait()
 }
 
 // checkBlockScripts executes and validates the scripts for all transactions in
@@ -246,78 +176,34 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
-	// First determine if segwit is active according to the scriptFlags. If
-	// it isn't then we don't need to interact with the HashCache.
-	segwitActive := scriptFlags&txscript.ScriptVerifyWitness == txscript.ScriptVerifyWitness
+	g, ctx := errgroup.WithContext(context.Background())
 
-	// Collect all of the transaction inputs and required information for
-	// validation for all transactions in the block into a single slice.
-	numInputs := 0
-	for _, tx := range block.Transactions() {
-		numInputs += len(tx.MsgTx().TxIn)
-	}
-	txValItems := make([]*txValidateItem, 0, numInputs)
-	for _, tx := range block.Transactions() {
-		hash := tx.Hash()
+	g.SetLimit(runtime.NumCPU() * 3)
 
-		// If the HashCache is present, and it doesn't yet contain the
-		// partial sighashes for this transaction, then we add the
-		// sighashes for the transaction. This allows us to take
-		// advantage of the potential speed savings due to the new
-		// digest algorithm (BIP0143).
-		if segwitActive && tx.HasWitness() && hashCache != nil &&
-			!hashCache.ContainsHashes(hash) {
-
-			hashCache.AddSigHashes(tx.MsgTx(), utxoView)
+	var verifiers []*kernelTxVerifier
+	defer func() {
+		for _, v := range verifiers {
+			v.destroy()
 		}
+	}()
 
-		var cachedHashes *txscript.TxSigHashes
-		if segwitActive && tx.HasWitness() {
-			if hashCache != nil {
-				cachedHashes, _ = hashCache.GetSigHashes(hash)
-			} else {
-				cachedHashes = txscript.NewTxSigHashes(
-					tx.MsgTx(), utxoView,
-				)
-			}
-		}
-
-		for txInIdx, txIn := range tx.MsgTx().TxIn {
-			// Skip coinbases.
-			if txIn.PreviousOutPoint.Index == math.MaxUint32 {
-				continue
-			}
-
-			txVI := &txValidateItem{
-				txInIndex: txInIdx,
-				txIn:      txIn,
-				tx:        tx,
-				sigHashes: cachedHashes,
-			}
-			txValItems = append(txValItems, txVI)
-		}
-	}
-
-	// Validate all of the inputs.
-	validator := newTxValidator(utxoView, scriptFlags, sigCache, hashCache)
 	start := time.Now()
-	if err := validator.Validate(txValItems); err != nil {
+	for _, tx := range block.Transactions() {
+		verifier, err := newKernelTxVerifier(tx, utxoView, scriptFlags)
+		if err != nil {
+			return err
+		}
+
+		verifiers = append(verifiers, verifier)
+		verifier.validateAll(ctx, g)
+	}
+
+	if err := g.Wait(); err != nil {
 		return err
 	}
+
 	elapsed := time.Since(start)
-
 	log.Tracef("block %v took %v to verify", block.Hash(), elapsed)
-
-	// If the HashCache is present, once we have validated the block, we no
-	// longer need the cached hashes for these transactions, so we purge
-	// them from the cache.
-	if segwitActive && hashCache != nil {
-		for _, tx := range block.Transactions() {
-			if tx.MsgTx().HasWitness() {
-				hashCache.PurgeSigHashes(tx.Hash())
-			}
-		}
-	}
 
 	return nil
 }

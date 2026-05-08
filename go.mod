@@ -16,8 +16,10 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jrick/logrotate v1.0.0
 	github.com/stretchr/testify v1.8.4
+	github.com/stringintech/go-bitcoinkernel v0.0.0-20260506121016-9d586c09a609
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	golang.org/x/crypto v0.25.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.22.0
 	pgregory.net/rapid v1.2.0
 )
@@ -65,6 +67,8 @@ retract (
 	v0.13.0-beta
 )
 
-go 1.23.2
+go 1.25.0
 
 replace github.com/btcsuite/btcd/btcutil => ./btcutil
+
+replace github.com/stringintech/go-bitcoinkernel => /root/src/go-bitcoinkernel
