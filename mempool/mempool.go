@@ -1535,8 +1535,7 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 	// Verify crypto signatures for each input and reject the transaction
 	// if any don't verify.
 	err = blockchain.ValidateTransactionScripts(tx, utxoView,
-		txscript.StandardVerifyFlags, mp.cfg.SigCache,
-		mp.cfg.HashCache)
+		txscript.StandardVerifyFlags)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)

@@ -153,8 +153,7 @@ func (v *kernelTxVerifier) destroy() {
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
 func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
-	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
-	hashCache *txscript.HashCache) error {
+	flags txscript.ScriptFlags) error {
 
 	verifier, err := newKernelTxVerifier(tx, utxoView, flags)
 	if err != nil {
@@ -173,8 +172,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block using multiple goroutines.
 func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
-	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache,
-	hashCache *txscript.HashCache) error {
+	scriptFlags txscript.ScriptFlags) error {
 
 	g, ctx := errgroup.WithContext(context.Background())
 
