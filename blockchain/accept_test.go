@@ -26,6 +26,7 @@ func TestMaybeAcceptBlockReusesHeaderNode(t *testing.T) {
 	//
 	// genesis -> 1 -> 2 -> 3
 	tip := btcutil.NewBlock(params.GenesisBlock)
+	tip.SetHeight(0)
 	_, _, err := addBlocks(3, chain, tip, []*testhelper.SpendableOut{})
 	if err != nil {
 		t.Fatalf("failed to build base chain: %v", err)

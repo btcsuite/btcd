@@ -554,15 +554,17 @@ func TestIsInIBDMode(t *testing.T) {
 // createTestCoinbase creates a minimal coinbase transaction for the given
 // block height.  The signature script encodes the height to ensure unique
 // transaction hashes across blocks.
-func createTestCoinbase(height int32, params *chaincfg.Params) *wire.MsgTx {
+func createTestCoinbase(t *testing.T, height int32,
+	params *chaincfg.Params) *wire.MsgTx {
+
 	tx := wire.NewMsgTx(wire.TxVersion)
 
-	// Push the height as data to guarantee unique txids per block.
-	sigScript := []byte{
-		0x04,
-		byte(height), byte(height >> 8),
-		byte(height >> 16), byte(height >> 24),
-	}
+	// BIP34 requires the block height to be the first item pushed in the
+	// coinbase signature script, minimally encoded as a script number.
+	// The extra OP_0 ensures the script meets the 2-byte minimum length.
+	sigScript, err := txscript.NewScriptBuilder().AddInt64(int64(height)).
+		AddOp(txscript.OP_0).Script()
+	require.NoError(t, err)
 
 	tx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{
@@ -609,11 +611,11 @@ func generateTestBlocks(
 	prevTime := params.GenesisBlock.Header.Timestamp
 
 	for h := int32(1); h <= int32(count); h++ {
-		cb := createTestCoinbase(h, params)
+		cb := createTestCoinbase(t, h, params)
 		merkleRoot := cb.TxHash()
 
 		header := wire.BlockHeader{
-			Version:    1,
+			Version:    4,
 			PrevBlock:  *prevHash,
 			MerkleRoot: merkleRoot,
 			Timestamp:  prevTime.Add(time.Minute),
@@ -1185,9 +1187,9 @@ func TestStartSyncChainCurrent(t *testing.T) {
 
 	// Mine a single block with a recent timestamp so
 	// IsCurrent() returns true.
-	cb := createTestCoinbase(1, &params)
+	cb := createTestCoinbase(t, 1, &params)
 	header := wire.BlockHeader{
-		Version:    1,
+		Version:    4,
 		PrevBlock:  *params.GenesisHash,
 		MerkleRoot: cb.TxHash(),
 		Timestamp:  time.Now().Truncate(time.Second),

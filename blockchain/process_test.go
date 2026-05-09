@@ -36,7 +36,7 @@ func chainedHeaders(parent *wire.BlockHeader, chainParams *chaincfg.Params,
 		merkle := chainhash.HashH(randBytes[:])
 
 		header := wire.BlockHeader{
-			Version:    1,
+			Version:    4,
 			PrevBlock:  tip.BlockHash(),
 			MerkleRoot: merkle,
 			Bits:       chainParams.PowLimitBits,
