@@ -557,11 +557,15 @@ func TestIsInIBDMode(t *testing.T) {
 func createTestCoinbase(height int32, params *chaincfg.Params) *wire.MsgTx {
 	tx := wire.NewMsgTx(wire.TxVersion)
 
-	// Push the height as data to guarantee unique txids per block.
-	sigScript := []byte{
-		0x04,
-		byte(height), byte(height >> 8),
-		byte(height >> 16), byte(height >> 24),
+	// Encode the height as a minimally encoded script integer and add a trailing
+	// OP_0 so the script also satisfies the generic coinbase-length checks.
+	sigScript, err := txscript.NewScriptBuilder().
+		AddInt64(int64(height)).
+		AddInt64(0).
+		Script()
+	if err != nil {
+		panic(fmt.Sprintf("unable to encode coinbase height %d: %v",
+			height, err))
 	}
 
 	tx.AddTxIn(&wire.TxIn{
@@ -613,7 +617,8 @@ func generateTestBlocks(
 		merkleRoot := cb.TxHash()
 
 		header := wire.BlockHeader{
-			Version:    1,
+			// Regtest enforces the BIP34/65/66 version floor from height 1.
+			Version:    4,
 			PrevBlock:  *prevHash,
 			MerkleRoot: merkleRoot,
 			Timestamp:  prevTime.Add(time.Minute),
@@ -1187,7 +1192,8 @@ func TestStartSyncChainCurrent(t *testing.T) {
 	// IsCurrent() returns true.
 	cb := createTestCoinbase(1, &params)
 	header := wire.BlockHeader{
-		Version:    1,
+		// Regtest enforces the BIP34/65/66 version floor from height 1.
+		Version:    4,
 		PrevBlock:  *params.GenesisHash,
 		MerkleRoot: cb.TxHash(),
 		Timestamp:  time.Now().Truncate(time.Second),

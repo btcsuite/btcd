@@ -276,7 +276,7 @@ func IsRoutable(na *wire.NetAddressV2) bool {
 		IsRFC4843(lna) || IsRFC7343(lna) || IsRFC5737(lna) ||
 		IsRFC6598(lna) || IsLocal(lna) || IsZero(lna) ||
 		(IsRFC4193(lna) &&
-		!IsOnionCatTor(lna)))
+			!IsOnionCatTor(lna)))
 }
 
 // GroupKey returns a string representing the network group an address is part

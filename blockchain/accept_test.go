@@ -26,6 +26,9 @@ func TestMaybeAcceptBlockReusesHeaderNode(t *testing.T) {
 	//
 	// genesis -> 1 -> 2 -> 3
 	tip := btcutil.NewBlock(params.GenesisBlock)
+	// Generated descendants must start at height 1 so the coinbase height
+	// encoding matches regtest's BIP34 rules.
+	tip.SetHeight(0)
 	_, _, err := addBlocks(3, chain, tip, []*testhelper.SpendableOut{})
 	if err != nil {
 		t.Fatalf("failed to build base chain: %v", err)
