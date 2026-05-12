@@ -2903,9 +2903,14 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s := server{
-		chainParams:          chainParams,
-		addrManager:          amgr,
-		peerLifecycle:        make(chan peerLifecycleEvent, cfg.MaxPeers*2),
+		chainParams: chainParams,
+		addrManager: amgr,
+
+		// peerLifecycle is buffered for up to two events per peer
+		// (peerAdd followed by peerDone) so peerLifecycleHandler
+		// does not block under normal connect/disconnect churn.
+		peerLifecycle: make(chan peerLifecycleEvent, cfg.MaxPeers*2),
+
 		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
