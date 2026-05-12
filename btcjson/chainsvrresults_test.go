@@ -5,6 +5,7 @@
 package btcjson_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"reflect"
@@ -213,6 +214,155 @@ func TestChainSvrMiningInfoResults(t *testing.T) {
 				test.expected)
 			continue
 		}
+	}
+}
+
+// TestStringOrArrayMarshalJSON ensures StringOrArray.MarshalJSON encodes the
+// underlying slice as a JSON array without recursing into itself. Prior to the
+// fix, calling MarshalJSON would dispatch back through the json.Marshaler
+// interface and recurse until the goroutine stack overflowed.
+func TestStringOrArrayMarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    btcjson.StringOrArray
+		expected []byte
+	}{
+		{
+			name:     "nil slice marshals as null",
+			input:    nil,
+			expected: []byte(`null`),
+		},
+		{
+			name:     "empty slice marshals as empty array",
+			input:    btcjson.StringOrArray{},
+			expected: []byte(`[]`),
+		},
+		{
+			name:     "single element",
+			input:    btcjson.StringOrArray{"test"},
+			expected: []byte(`["test"]`),
+		},
+		{
+			name:     "multiple elements",
+			input:    btcjson.StringOrArray{"test", "test1"},
+			expected: []byte(`["test","test1"]`),
+		},
+		{
+			name:     "element requiring escaping",
+			input:    btcjson.StringOrArray{`a "quoted" value`},
+			expected: []byte(`["a \"quoted\" value"]`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Call MarshalJSON directly to exercise the method
+			// that previously recursed. Using json.Marshal at the
+			// top level would also work, but the direct call makes
+			// the regression target explicit.
+			got, err := test.input.MarshalJSON()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !bytes.Equal(got, test.expected) {
+				t.Fatalf("unexpected marshalled data - got %s, "+
+					"want %s", got, test.expected)
+			}
+
+			// Also exercise the path through json.Marshal so we
+			// cover the case where StringOrArray is reached via
+			// the json.Marshaler interface dispatch.
+			got, err = json.Marshal(test.input)
+			if err != nil {
+				t.Fatalf("json.Marshal returned error: %v", err)
+			}
+			if !bytes.Equal(got, test.expected) {
+				t.Fatalf("unexpected json.Marshal data - got "+
+					"%s, want %s", got, test.expected)
+			}
+		})
+	}
+}
+
+// TestStringOrArrayRoundTrip ensures values produced by MarshalJSON can be
+// round-tripped back through UnmarshalJSON to the original slice.
+func TestStringOrArrayRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	inputs := []btcjson.StringOrArray{
+		{},
+		{"warning"},
+		{"a", "b", "c"},
+	}
+
+	for _, in := range inputs {
+		encoded, err := json.Marshal(in)
+		if err != nil {
+			t.Fatalf("marshal failed for %v: %v", in, err)
+		}
+
+		var out btcjson.StringOrArray
+		if err := json.Unmarshal(encoded, &out); err != nil {
+			t.Fatalf("unmarshal failed for %s: %v", encoded, err)
+		}
+
+		// Treat nil and empty as equivalent since json.Unmarshal of
+		// an empty array yields a non-nil empty slice.
+		if len(in) == 0 && len(out) == 0 {
+			continue
+		}
+		if !reflect.DeepEqual(in, out) {
+			t.Fatalf("round-trip mismatch: got %v, want %v",
+				out, in)
+		}
+	}
+}
+
+// TestGetBlockChainInfoWarnings tests that the warnings field in
+// GetBlockChainInfoResult can be unmarshalled from both the legacy single
+// string form and the post-bitcoin#29845 array form.
+func TestGetBlockChainInfoWarnings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		result   string
+		expected btcjson.StringOrArray
+	}{
+		{
+			name:   "blockchain info with single warning string",
+			result: `{"warnings": "this is a warning"}`,
+			expected: btcjson.StringOrArray{
+				"this is a warning",
+			},
+		},
+		{
+			name:   "blockchain info with array of warnings",
+			result: `{"warnings": ["a", "or", "b"]}`,
+			expected: btcjson.StringOrArray{
+				"a", "or", "b",
+			},
+		},
+		{
+			name:     "blockchain info with empty warnings array",
+			result:   `{"warnings": []}`,
+			expected: btcjson.StringOrArray{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var info btcjson.GetBlockChainInfoResult
+			if err := json.Unmarshal([]byte(test.result), &info); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(info.Warnings, test.expected) {
+				t.Fatalf("unexpected warnings - got %+v, "+
+					"want %+v", info.Warnings, test.expected)
+			}
+		})
 	}
 }
 
