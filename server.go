@@ -302,6 +302,15 @@ type serverPeer struct {
 	verAckCh   chan struct{}
 	verAckOnce sync.Once
 
+	// peerAdded is set by peerLifecycleHandler after a peerAdd event
+	// has been enqueued on s.peerLifecycle. handleDonePeerMsg reads
+	// this to decide whether to notify the sync manager and evict
+	// orphans: those side effects must only run for peers that were
+	// actually registered via syncManager.NewPeer, never for peers
+	// where peerAdd was skipped because the verAckCh/Peer.Done()
+	// select picked the disconnect case.
+	peerAdded atomic.Bool
+
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
@@ -1937,8 +1946,15 @@ func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
 	}
 
 	// Notify the sync manager the peer is gone and evict any
-	// remaining orphans that were sent by the peer.
-	if sp.VerAckReceived() {
+	// remaining orphans that were sent by the peer. We gate on
+	// peerAdded rather than VerAckReceived() because the verack flag
+	// is set inside processRemoteVerAckMsg before OnVerAck closes
+	// verAckCh. If the peer disconnects in that window and the
+	// peerLifecycleHandler select picks Peer.Done() over verAckCh,
+	// no peerAdd is enqueued and the sync manager never sees
+	// NewPeer for this peer, so a matching DonePeer would be a
+	// no-op warning at best.
+	if sp.peerAdded.Load() {
 		s.syncManager.DonePeer(sp.Peer)
 
 		numEvicted := s.txMemPool.RemoveOrphansByTag(mempool.Tag(sp.ID()))
@@ -2329,6 +2345,7 @@ func (s *server) peerLifecycleHandler(sp *serverPeer) {
 		s.peerLifecycle <- peerLifecycleEvent{
 			action: peerAdd, sp: sp,
 		}
+		sp.peerAdded.Store(true)
 
 	case <-sp.Peer.Done():
 		// Disconnected before verack; no peerAdd needed.
