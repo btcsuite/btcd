@@ -296,9 +296,12 @@ type serverPeer struct {
 	addressesMtx   sync.RWMutex
 	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
-	quit           chan struct{}
-	// Closed when OnVerAck fires.
-	verAckCh chan struct{}
+	quit chan struct{}
+
+	// Closed by verAckOnce when OnVerAck fires.
+	verAckCh   chan struct{}
+	verAckOnce sync.Once
+
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
 	blockProcessed chan struct{}
@@ -558,15 +561,11 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 
 // OnVerAck is invoked when a peer receives a verack bitcoin message.
 // It signals the peer's lifecycle handler that the handshake is
-// complete so it can register the peer with the server.
+// complete so it can register the peer with the server. The
+// sync.Once guard ensures verAckCh is closed at most once even if
+// OnVerAck is ever invoked more than once for a given peer.
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
-	select {
-	case <-sp.verAckCh:
-		peerLog.Errorf("OnVerAck called more than once "+
-			"for peer %v", sp)
-	default:
-		close(sp.verAckCh)
-	}
+	sp.verAckOnce.Do(func() { close(sp.verAckCh) })
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
