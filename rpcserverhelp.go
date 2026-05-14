@@ -54,6 +54,7 @@ var helpDescsEnUS = map[string]string{
 	"createrawtransaction-amounts--value": "n.nnn",
 	"createrawtransaction-amounts--desc":  "The destination address as the key and the amount in BTC as the value",
 	"createrawtransaction-locktime":       "Locktime value; a non-zero value will also locktime-activate the inputs",
+	"createrawtransaction-replaceable":    "If false, do not mark this transaction as BIP125-replaceable.",
 	"createrawtransaction--result0":       "Hex-encoded bytes of the serialized transaction",
 
 	// ScriptSig help.
