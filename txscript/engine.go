@@ -118,6 +118,11 @@ const (
 	// ScriptVerifyConstScriptCode fails non-segwit scripts if a signature
 	// match is found in the script code or if OP_CODESEPARATOR is used.
 	ScriptVerifyConstScriptCode
+
+	// ScriptVerifyECOps enables the new elliptic curve operation opcodes
+	// (OP_EC_POINT_ADD, OP_EC_POINT_MUL, OP_EC_POINT_NEGATE,
+	// OP_EC_POINT_X_COORD) in tapscript execution.
+	ScriptVerifyECOps
 )
 
 const (
@@ -175,6 +180,20 @@ type taprootExecutionCtx struct {
 // a signature.
 const sigOpsDelta = 50
 
+const (
+	// EcPointAddCost is the cost for OP_EC_POINT_ADD.
+	EcPointAddCost = 10
+
+	// EcPointMulCost is the cost for OP_EC_POINT_MUL.
+	EcPointMulCost = 30
+
+	// EcPointNegateCost is the cost for OP_EC_POINT_NEGATE.
+	EcPointNegateCost = 5
+
+	// EcPointXCoordCost is the cost for OP_EC_POINT_X_COORD.
+	EcPointXCoordCost = 1
+)
+
 // tallysigOp attempts to decrease the current sig ops budget by sigOpsDelta.
 // An error is returned if after subtracting the delta, the budget is below
 // zero.
@@ -183,6 +202,23 @@ func (t *taprootExecutionCtx) tallysigOp() error {
 
 	if t.sigOpsBudget < 0 {
 		return scriptError(ErrTaprootMaxSigOps, "")
+	}
+
+	return nil
+}
+
+// tallyECOp updates the sigops budget for EC operations. This is similar to
+// tallysigOp but with custom costs per operation.
+func (t *taprootExecutionCtx) tallyECOp(cost int) error {
+	cost32 := int32(cost)
+
+	t.sigOpsBudget -= cost32
+
+	if t.sigOpsBudget < 0 {
+		str := fmt.Sprintf("ec op budget exceeded (need %d, have %d)",
+			cost32, t.sigOpsBudget+cost32)
+
+		return scriptError(ErrTaprootMaxSigOps, str)
 	}
 
 	return nil
