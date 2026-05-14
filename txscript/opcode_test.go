@@ -124,7 +124,14 @@ func TestOpcodeDisasm(t *testing.T) {
 
 		// OP_UNKNOWN#.
 		case opcodeVal >= 0xbb && opcodeVal <= 0xf9 || opcodeVal == 0xfc:
-			expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			switch opcodeVal {
+			// OP_UNKOWN189 a.k.a 0xbd is now OP_CHECKTEMPLATEVERIFY.
+			case 0xbd:
+				expectedStr = "OP_CHECKTEMPLATEVERIFY"
+
+			default:
+				expectedStr = "OP_UNKNOWN" + strconv.Itoa(opcodeVal)
+			}
 		}
 
 		var buf strings.Builder
@@ -184,6 +191,9 @@ func TestOpcodeDisasm(t *testing.T) {
 			case 0xb2:
 				// OP_NOP3 is an alias of OP_CHECKSEQUENCEVERIFY
 				expectedStr = "OP_CHECKSEQUENCEVERIFY"
+			case 0xbd:
+				expectedStr = "OP_CHECKTEMPLATEVERIFY"
+				// OP_UNKNOWN189 a.k.a 0xbd is now OP_CHECKTEMPLATEVERIFY.
 			default:
 				val := byte(opcodeVal - (0xb0 - 1))
 				expectedStr = "OP_NOP" + strconv.Itoa(int(val))
