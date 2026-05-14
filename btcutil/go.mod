@@ -9,6 +9,7 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
+	github.com/kcalvinalvin/anet v0.0.0-20251112173137-d8ddc1f6dbee
 	github.com/kkdai/bstream v0.0.0-20161212061736-f391b8402d23
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.25.0
