@@ -42,6 +42,7 @@ const (
 	defaultLogLevel              = "info"
 	defaultLogDirname            = "logs"
 	defaultLogFilename           = "btcd.log"
+	defaultLogCompressor         = Gzip
 	defaultMaxPeers              = 125
 	defaultBanDuration           = time.Hour * 24
 	defaultBanThreshold          = 100
@@ -127,6 +128,7 @@ type config struct {
 	FreeTxRelayLimit     float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	Listeners            []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
+	LogCompressor        string        `long:"logcompressor" description:"Compression algorithm to use when rotating logs." choice:"gzip" choice:"zstd"`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
 	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
@@ -426,6 +428,7 @@ func loadConfig() (*config, []string, error) {
 		RPCMaxConcurrentReqs: defaultMaxRPCConcurrentReqs,
 		DataDir:              defaultDataDir,
 		LogDir:               defaultLogDir,
+		LogCompressor:        defaultLogCompressor,
 		DbType:               defaultDbType,
 		RPCKey:               defaultRPCKeyFile,
 		RPCCert:              defaultRPCCertFile,
@@ -664,9 +667,19 @@ func loadConfig() (*config, []string, error) {
 		os.Exit(0)
 	}
 
+	// Validate that the selected log compression algorithm is supported.
+	if !supportedCompressor(cfg.LogCompressor) {
+		str := "%s: The specified log compressor [%v] is invalid"
+		err := fmt.Errorf(str, funcName, cfg.LogCompressor)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
 	// Initialize log rotation.  After log rotation has been initialized, the
 	// logger variables may be used.
-	initLogRotator(filepath.Join(cfg.LogDir, defaultLogFilename))
+	logFile := filepath.Join(cfg.LogDir, defaultLogFilename)
+	initLogRotator(logFile, cfg.LogCompressor)
 
 	// Parse, validate, and set debug log level(s).
 	if err := parseAndSetDebugLevels(cfg.DebugLevel); err != nil {
