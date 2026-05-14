@@ -10,6 +10,20 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+// filterNil removes nil pointer elements from a slice. This is used to
+// defensively filter taproot-specific PSBT fields before sorting and
+// serializing, preventing panics when users construct PInput with slices
+// containing nil elements.
+func filterNil[T any](slice []*T) []*T {
+	filtered := make([]*T, 0, len(slice))
+	for _, item := range slice {
+		if item != nil {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
 // PInput is a struct encapsulating all the data that can be attached to any
 // specific input of the PSBT.
 type PInput struct {
@@ -494,50 +508,57 @@ func (pi *PInput) serialize(w io.Writer) error {
 			}
 		}
 
-		sort.Slice(pi.TaprootScriptSpendSig, func(i, j int) bool {
-			return pi.TaprootScriptSpendSig[i].SortBefore(
-				pi.TaprootScriptSpendSig[j],
-			)
-		})
-		for _, scriptSpend := range pi.TaprootScriptSpendSig {
-			keyData := append([]byte{}, scriptSpend.XOnlyPubKey...)
-			keyData = append(keyData, scriptSpend.LeafHash...)
-			value := append([]byte{}, scriptSpend.Signature...)
-			if scriptSpend.SigHash != txscript.SigHashDefault {
-				value = append(value, byte(scriptSpend.SigHash))
-			}
-			err := serializeKVPairWithType(
-				w, uint8(TaprootScriptSpendSignatureType),
-				keyData, value,
-			)
-			if err != nil {
-				return err
-			}
-		}
+	// Filter nil entries from taproot-specific fields before sorting
+	// and serializing to prevent panics when users provide slices
+	// containing nil elements (fixes #2495).
+	pi.TaprootScriptSpendSig = filterNil(pi.TaprootScriptSpendSig)
+	pi.TaprootLeafScript = filterNil(pi.TaprootLeafScript)
+	pi.TaprootBip32Derivation = filterNil(pi.TaprootBip32Derivation)
 
-		sort.Slice(pi.TaprootLeafScript, func(i, j int) bool {
-			return pi.TaprootLeafScript[i].SortBefore(
-				pi.TaprootLeafScript[j],
-			)
-		})
-		for _, leafScript := range pi.TaprootLeafScript {
-			value := append([]byte{}, leafScript.Script...)
-			value = append(value, byte(leafScript.LeafVersion))
-			err := serializeKVPairWithType(
-				w, uint8(TaprootLeafScriptType),
-				leafScript.ControlBlock, value,
-			)
-			if err != nil {
-				return err
-			}
+	sort.Slice(pi.TaprootScriptSpendSig, func(i, j int) bool {
+		return pi.TaprootScriptSpendSig[i].SortBefore(
+			pi.TaprootScriptSpendSig[j],
+		)
+	})
+	for _, scriptSpend := range pi.TaprootScriptSpendSig {
+		keyData := append([]byte{}, scriptSpend.XOnlyPubKey...)
+		keyData = append(keyData, scriptSpend.LeafHash...)
+		value := append([]byte{}, scriptSpend.Signature...)
+		if scriptSpend.SigHash != txscript.SigHashDefault {
+			value = append(value, byte(scriptSpend.SigHash))
 		}
+		err := serializeKVPairWithType(
+			w, uint8(TaprootScriptSpendSignatureType),
+			keyData, value,
+		)
+		if err != nil {
+			return err
+		}
+	}
 
-		sort.Slice(pi.TaprootBip32Derivation, func(i, j int) bool {
-			return pi.TaprootBip32Derivation[i].SortBefore(
-				pi.TaprootBip32Derivation[j],
-			)
-		})
-		for _, derivation := range pi.TaprootBip32Derivation {
+	sort.Slice(pi.TaprootLeafScript, func(i, j int) bool {
+		return pi.TaprootLeafScript[i].SortBefore(
+			pi.TaprootLeafScript[j],
+		)
+	})
+	for _, leafScript := range pi.TaprootLeafScript {
+		value := append([]byte{}, leafScript.Script...)
+		value = append(value, byte(leafScript.LeafVersion))
+		err := serializeKVPairWithType(
+			w, uint8(TaprootLeafScriptType),
+			leafScript.ControlBlock, value,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	sort.Slice(pi.TaprootBip32Derivation, func(i, j int) bool {
+		return pi.TaprootBip32Derivation[i].SortBefore(
+			pi.TaprootBip32Derivation[j],
+		)
+	})
+	for _, derivation := range pi.TaprootBip32Derivation {
 			value, err := SerializeTaprootBip32Derivation(
 				derivation,
 			)
