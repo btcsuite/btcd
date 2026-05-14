@@ -5,6 +5,31 @@
 // Package psbt is an implementation of Partially Signed Bitcoin
 // Transactions (PSBT). The format is defined in BIP 174:
 // https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki
+//
+// # Workflow: Creating, Signing, and Finalizing PSBTs
+//
+// A typical workflow is:
+//
+//  1. Creator: Build an unsigned transaction skeleton (New or NewFromUnsignedTx).
+//  2. Updater: Add UTXO information (WitnessUtxo, NonWitnessUtxo), redeem scripts,
+//     and witness scripts to each input as needed.
+//  3. Signer: Add partial signatures via Updater.Sign (or taproot-specific
+//     methods for Taproot spends). The unsigned transaction inside the PSBT
+//     never receives scriptSig or witness data; signatures are stored only in
+//     the PSBT input key-value map.
+//  4. Finalizer: Call MaybeFinalize or MaybeFinalizeAll. The finalizer
+//     constructs the full scriptSig and/or witness from partial signatures
+//     and writes them into the input's FinalScriptSig and/or FinalScriptWitness
+//     fields. For Taproot (and other witness inputs), the witness stack is
+//     written to FinalScriptWitness—this is how a "signed" PSBT gets the
+//     witness data that will later be attached to the extracted transaction.
+//  5. Extractor: Call Extract to produce the network-serialized signed
+//     transaction (only valid when the PSBT is complete). Extract copies
+//     FinalScriptSig/FinalScriptWitness into the transaction's inputs.
+//
+// So when comparing an unsigned vs signed PSBT, the signed one will have
+// FinalScriptSig and/or FinalScriptWitness populated on each finalized input;
+// the finalizer sets these from the partial signatures you added in step 3.
 package psbt
 
 import (
