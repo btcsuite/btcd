@@ -24,6 +24,14 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Cross-compile (android/arm64)
+        env:
+          GOOS: android
+          GOARCH: arm64
+        run: |
+          go build ./...
+          (cd btcutil && go build ./...)
+
   test-cover:
     name: Unit coverage
     runs-on: ubuntu-latest
