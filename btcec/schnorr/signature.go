@@ -275,9 +275,11 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// 15. return sig.
 	//
 	// Note that the set of functional options passed in may modify the
-	// above algorithm. Namely if CustomNonce is used, then steps 6-8 are
-	// replaced with a process that generates the nonce using rfc6979. If
-	// FastSign is passed, then we skip set 14.
+	// above algorithm. If CustomNonce is used, steps 6-8 follow BIP-340's
+	// nonce derivation using the provided auxiliary randomness. If CustomNonce
+	// is NOT used (the default), steps 6-8 are replaced with RFC6979 nonce
+	// generation for deterministic signing. If FastSign is passed, we skip
+	// step 14 (signature verification).
 
 	// NOTE: Steps 1-9 are performed by the caller.
 
@@ -424,9 +426,11 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// 15. return sig.
 	//
 	// Note that the set of functional options passed in may modify the
-	// above algorithm. Namely if CustomNonce is used, then steps 6-8 are
-	// replaced with a process that generates the nonce using rfc6979. If
-	// FastSign is passed, then we skip set 14.
+	// above algorithm. If CustomNonce is used, steps 6-8 follow BIP-340's
+	// nonce derivation using the provided auxiliary randomness. If CustomNonce
+	// is NOT used (the default), steps 6-8 are replaced with RFC6979 nonce
+	// generation for deterministic signing. If FastSign is passed, we skip
+	// step 14 (signature verification).
 
 	// Step 1.
 	//

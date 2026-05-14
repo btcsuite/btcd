@@ -21,6 +21,7 @@ import (
 // TestHaveBlock tests the HaveBlock API to ensure proper functionality.
 func TestHaveBlock(t *testing.T) {
 	// Load up blocks such that there is a side chain.
+	// We'll only process the header for block 4.
 	// (genesis block) -> 1 -> 2 -> 3 -> 4
 	//                          \-> 3a
 	testFiles := []string{
@@ -51,7 +52,29 @@ func TestHaveBlock(t *testing.T) {
 	// maturity to 1.
 	chain.TstSetCoinbaseMaturity(1)
 
+	// We want to process just the header for block 4.
+	block4Hash := newHashFromStr("000000002f264d6504013e73b9c913de9098d4d771c1bb219af475d2a01b128e")
+
 	for i := 1; i < len(blocks); i++ {
+		// Add just the header for the block 4.
+		if blocks[i].Hash().IsEqual(block4Hash) {
+
+			isMainChain, err := chain.ProcessBlockHeader(
+				&blocks[i].MsgBlock().Header, BFNone, false)
+			if err != nil {
+				t.Errorf("ProcessBlockHeader fail on block %v: %v\n",
+					i, err)
+				return
+			}
+			if !isMainChain {
+				t.Errorf("ProcessBlockHeader incorrectly returned "+
+					"block %v is a side-chain\n", i)
+				return
+			}
+
+			continue
+		}
+
 		_, isOrphan, err := chain.ProcessBlock(blocks[i], BFNone)
 		if err != nil {
 			t.Errorf("ProcessBlock fail on block %v: %v\n", i, err)
@@ -86,6 +109,9 @@ func TestHaveBlock(t *testing.T) {
 
 		// Block 3a should be present (on a side chain).
 		{hash: "00000000474284d20067a4d33f6a02284e6ef70764a3a26d6a5b9df52ef663dd", want: true},
+
+		// Block 4 shouldn't be present as we only have its header.
+		{hash: "000000002f264d6504013e73b9c913de9098d4d771c1bb219af475d2a01b128e", want: false},
 
 		// Block 100000 should be present (as an orphan).
 		{hash: "000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506", want: true},
@@ -1384,6 +1410,7 @@ func TestInvalidateBlock(t *testing.T) {
 						"invalidate-once")
 				// Grab the tip of the chain.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 
 				// Create a chain with 11 blocks.
 				_, _, err := addBlocks(11, chain, tip, []*testhelper.SpendableOut{})
@@ -1407,6 +1434,7 @@ func TestInvalidateBlock(t *testing.T) {
 				chain, params, tearDown := utxoCacheTestChain("TestInvalidateBlock-invalidate-twice")
 				// Grab the tip of the chain.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 
 				// Create a chain with 11 blocks.
 				_, spendableOuts, err := addBlocks(11, chain, tip, []*testhelper.SpendableOut{})
@@ -1453,6 +1481,7 @@ func TestInvalidateBlock(t *testing.T) {
 			chainGen: func() (*BlockChain, []*chainhash.Hash, func()) {
 				chain, params, tearDown := utxoCacheTestChain("TestInvalidateBlock-invalidate-side-branch")
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 
 				// Grab the tip of the chain.
 				tip, err := chain.BlockByHash(&chain.bestChain.Tip().hash)
@@ -1635,6 +1664,7 @@ func TestReconsiderBlock(t *testing.T) {
 
 				// Create a chain with 101 blocks.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, _, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1657,6 +1687,7 @@ func TestReconsiderBlock(t *testing.T) {
 
 				// Create a chain with 101 blocks.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1689,6 +1720,7 @@ func TestReconsiderBlock(t *testing.T) {
 
 				// Create a chain with 101 blocks.
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(101, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1718,6 +1750,7 @@ func TestReconsiderBlock(t *testing.T) {
 				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-reconsider-an-invalid-side-branch-higher")
 
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)
@@ -1752,6 +1785,7 @@ func TestReconsiderBlock(t *testing.T) {
 				chain, params, tearDown := utxoCacheTestChain("TestReconsiderBlock-reconsider-an-invalid-side-branch-lower")
 
 				tip := btcutil.NewBlock(params.GenesisBlock)
+				tip.SetHeight(0)
 				_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
 				if err != nil {
 					t.Fatal(err)

@@ -181,6 +181,19 @@ func NetAddressV2FromBytes(timestamp time.Time, services ServiceFlag,
 			break
 		}
 
+		// IPv4-mapped IPv6 addresses (::ffff:0:0/96) should use the
+		// IPv4 networkID. Bitcoin Core silently drops IPv6 addrv2
+		// entries with this prefix. Go's net.IP commonly stores
+		// IPv4 addresses in this 16-byte form, so extract the
+		// 4-byte IPv4 address.
+		if isIPv4Mapped(addrBytes) {
+			addr := &ipv4Addr{}
+			addr.netID = ipv4
+			copy(addr.addr[:], addrBytes[12:])
+			netAddr = addr
+			break
+		}
+
 		addr := &ipv6Addr{}
 		addr.netID = ipv6
 		copy(addr.addr[:], addrBytes)

@@ -187,6 +187,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockchaininforesult-initialblockdownload": "Estimate of whether this node is in Initial Block Download mode",
 	"getblockchaininforesult-softforks":            "The status of the super-majority soft-forks",
 	"getblockchaininforesult-unifiedsoftforks":     "The status of the super-majority soft-forks used by bitcoind on or after v0.19.0",
+	"getblockchaininforesult-warnings":             "Any network and blockchain warnings",
 
 	// SoftForkDescription help.
 	"softforkdescription-reject":  "The current activation status of the softfork",

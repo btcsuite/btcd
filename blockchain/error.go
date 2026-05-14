@@ -224,6 +224,11 @@ const (
 	// ErrTimewarpAttack indicates a timewarp attack i.e.
 	// when block's timestamp is too early on diff adjustment block.
 	ErrTimewarpAttack
+
+	// ErrKnownInvalidBlock indicates that the block itself has previously
+	// been found to violate a consensus rule, as opposed to having an
+	// invalid ancestor.
+	ErrKnownInvalidBlock
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -271,6 +276,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrPreviousBlockUnknown:      "ErrPreviousBlockUnknown",
 	ErrInvalidAncestorBlock:      "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
+	ErrKnownInvalidBlock:         "ErrKnownInvalidBlock",
 }
 
 // String returns the ErrorCode as a human-readable name.

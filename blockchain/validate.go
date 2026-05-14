@@ -51,6 +51,11 @@ const (
 	// block of a difficulty adjustment period is allowed to
 	// be earlier than the last block of the previous period (BIP94).
 	maxTimeWarp = 600 * time.Second
+
+	// bip34ReenableBIP30Height is the height where BIP0030 is re-enabled even
+	// though BIP34 is active.  This mirrors Bitcoin Core's safeguard against
+	// coinbases that serialized future heights prior to BIP34 activation.
+	bip34ReenableBIP30Height int32 = 1983702
 )
 
 var (
@@ -189,6 +194,56 @@ func isBIP0030Node(node *blockNode) bool {
 	}
 
 	return false
+}
+
+// bip0030CheckNeeded determines if the expensive overwrite check from BIP0030
+// needs to be executed for the provided block node under the supplied network
+// parameters.
+//
+// There are two blocks in the chain which violate this rule, so the check must
+// be skipped for those blocks.  The isBIP0030Node function is used to determine
+// if this block is one of the two blocks that must be skipped.
+//
+// In addition, as of BIP0034, duplicate coinbases are no longer possible due to
+// its requirement for including the block height in the coinbase and thus it is
+// no longer possible to create transactions that 'overwrite' older ones.
+// Therefore, only enforce the rule if BIP0034 is not yet active, or the chain
+// has reached the height bip34ReenableBIP30Height where the optimization must
+// no longer apply.  This is a useful optimization because the BIP0030 check is
+// expensive since it involves a ton of cache misses in the utxoset.
+func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
+	// Sanity checks for the inputs not to dereference a nil pointer.
+	if node == nil || params == nil {
+		return false
+	}
+
+	// Skip the check for the historical mainnet blocks that overwrote
+	// earlier coinbases before BIP0030 existed.
+	if isBIP0030Node(node) {
+		return false
+	}
+
+	// Once BIP0034 is known to be active on this chain, duplicate coinbases
+	// can no longer occur, so the check can be omitted until the re-enable
+	// height.  See the following comment for the details about re-enabling:
+	// https://github.com/bitcoin/bitcoin/pull/12204#issuecomment-359106628
+	h := node.height
+	if params.BIP0034Height < h && h < bip34ReenableBIP30Height {
+		// Make sure that BIP0034 was activated.  We need to make sure
+		// that there is a block with the hash we expect at the height
+		// BIP0034Height.  If this is not the case, we might be on an
+		// alternate chain that hasn't activated BIP34 yet - even if its
+		// height is higher.  In that case, BIP30 still applies.
+		if params.BIP0034Hash != nil && node.parent != nil {
+			ancestor := node.parent.Ancestor(params.BIP0034Height)
+			want := params.BIP0034Hash
+			if ancestor != nil && ancestor.hash.IsEqual(want) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // CalcBlockSubsidy returns the subsidy amount a block at the provided height
@@ -1102,20 +1157,9 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// BIP0030 added a rule to prevent blocks which contain duplicate
 	// transactions that 'overwrite' older transactions which are not fully
 	// spent.  See the documentation for checkBIP0030 for more details.
-	//
-	// There are two blocks in the chain which violate this rule, so the
-	// check must be skipped for those blocks.  The isBIP0030Node function
-	// is used to determine if this block is one of the two blocks that must
-	// be skipped.
-	//
-	// In addition, as of BIP0034, duplicate coinbases are no longer
-	// possible due to its requirement for including the block height in the
-	// coinbase and thus it is no longer possible to create transactions
-	// that 'overwrite' older ones.  Therefore, only enforce the rule if
-	// BIP0034 is not yet active.  This is a useful optimization because the
-	// BIP0030 check is expensive since it involves a ton of cache misses in
-	// the utxoset.
-	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
+	// Sometimes BIP0030 must to skipped (as an exception) or may be skipped
+	// (as an optimization), see bip0030CheckNeeded for details.
+	if bip0030CheckNeeded(node, b.chainParams) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
 			return err

@@ -286,6 +286,30 @@ func replaceCoinbaseSigScript(script []byte) func(*wire.MsgBlock) {
 	}
 }
 
+// padCoinbaseSigScript returns a function that pads the existing coinbase
+// signature script with OP_0 until it reaches the provided length. It keeps the
+// existing prefix (including the serialized height) intact.
+func padCoinbaseSigScript(targetLen int) func(*wire.MsgBlock) {
+	return func(b *wire.MsgBlock) {
+		sigScript := b.Transactions[0].TxIn[0].SignatureScript
+		if len(sigScript) > targetLen {
+			panic(fmt.Sprintf("padCoinbaseSigScript: script len "+
+				"%d > target %d", len(sigScript), targetLen))
+		}
+
+		if len(sigScript) == targetLen {
+			return
+		}
+
+		padding := bytes.Repeat(
+			[]byte{txscript.OP_0}, targetLen-len(sigScript),
+		)
+		b.Transactions[0].TxIn[0].SignatureScript = append(
+			sigScript, padding...,
+		)
+	}
+}
+
 // additionalTx returns a function that itself takes a block and modifies it by
 // adding the provided transaction.
 func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
@@ -355,7 +379,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *testhelper.SpendableO
 
 	block := wire.MsgBlock{
 		Header: wire.BlockHeader{
-			Version:    1,
+			Version:    4,
 			PrevBlock:  g.tip.BlockHash(),
 			MerkleRoot: calcMerkleRoot(txns),
 			Bits:       g.params.PowLimitBits,
@@ -1044,8 +1068,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//
 	//   ... -> b23(6) -> b30(7)
 	g.setTip("b23")
-	maxSizeCbScript := repeatOpcode(0x00, maxCoinbaseScriptLen)
-	g.nextBlock("b30", outs[7], replaceCoinbaseSigScript(maxSizeCbScript))
+	g.nextBlock("b30", outs[7], padCoinbaseSigScript(maxCoinbaseScriptLen))
 	accepted()
 
 	// ---------------------------------------------------------------------
@@ -1575,6 +1598,19 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		// condition.
 		parent := g.blocks[b.Header.PrevBlock]
 		b.Transactions[0] = parent.Transactions[0]
+	})
+	rejected(blockchain.ErrBadCoinbaseHeight)
+
+	// Create block that duplicates a non-coinbase transaction from an
+	// earlier block to trigger BIP30 rejection (duplicate txid in UTXO).
+	//
+	//   ... -> b60(17)
+	//                 \-> b61dup(18)
+	g.setTip("b60")
+	g.nextBlock("b61dup", outs[18], func(b *wire.MsgBlock) {
+		parent := g.blocks[b.Header.PrevBlock]
+		dupTx := parent.Transactions[1].Copy()
+		b.AddTransaction(dupTx)
 	})
 	rejected(blockchain.ErrOverwriteTx)
 

@@ -174,7 +174,7 @@ func TestHandleSendPostMessageNilCtxFallsBackToBackground(t *testing.T) {
 		responseChan:   responseChan,
 	}
 
-	client.handleSendPostMessage(jReq)
+	client.handleSendPostMessage(context.Background(), jReq)
 
 	count, err := FutureGetBlockCountResult(responseChan).Receive()
 	require.NoError(t, err)

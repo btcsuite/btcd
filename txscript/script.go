@@ -468,8 +468,12 @@ func GetWitnessSigOpCount(sigScript, pkScript []byte, witness wire.TxWitness) in
 	// witness program. This is a case wherein the sigScript is actually a
 	// datapush of a p2wsh witness program.
 	if isScriptHashScript(pkScript) && IsPushOnlyScript(sigScript) &&
-		len(sigScript) > 0 && isWitnessProgramScript(sigScript[1:]) {
-		return getWitnessSigOps(sigScript[1:], witness)
+		len(sigScript) > 0 {
+
+		redeem := finalOpcodeData(0, sigScript)
+		if len(redeem) > 0 && isWitnessProgramScript(redeem) {
+			return getWitnessSigOps(redeem, witness)
+		}
 	}
 
 	return 0

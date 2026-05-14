@@ -62,6 +62,12 @@ var (
 // string that has too many characters.
 var ErrHashStrSize = fmt.Errorf("max hash string length is %v bytes", MaxHashStringSize)
 
+// ErrHashStrSizeMismatch describes an error that indicates the caller
+// specified a hash string that does not meet the exact length required for
+// strict parsing.
+var ErrHashStrSizeMismatch = fmt.Errorf("hash string must be exactly %d "+
+	"characters", MaxHashStringSize)
+
 // Hash is used in several of the bitcoin messages and common structures.  It
 // typically represents the double sha256 of data.
 type Hash [HashSize]byte
@@ -180,6 +186,10 @@ func TaggedHash(tag []byte, msgs ...[]byte) *Hash {
 // NewHashFromStr creates a Hash from a hash string.  The string should be
 // the hexadecimal string of a byte-reversed hash, but any missing characters
 // result in zero padding at the end of the Hash.
+//
+// NOTE: This function accepts short and odd-length hex strings and pads them.
+// Typical parsing of full txids or block hashes should use NewHashFromStrStrict
+// instead.
 func NewHashFromStr(hash string) (*Hash, error) {
 	ret := new(Hash)
 	err := Decode(ret, hash)
@@ -189,8 +199,23 @@ func NewHashFromStr(hash string) (*Hash, error) {
 	return ret, nil
 }
 
+// NewHashFromStrStrict creates a Hash from a hash string.  The string must be
+// the full hexadecimal string of a byte-reversed hash.
+func NewHashFromStrStrict(hash string) (*Hash, error) {
+	ret := new(Hash)
+	err := DecodeStrict(ret, hash)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 // Decode decodes the byte-reversed hexadecimal string encoding of a Hash to a
 // destination.
+//
+// NOTE: This function accepts short and odd-length hex strings and pads them.
+// Typical parsing of full txids or block hashes should use DecodeStrict
+// instead.
 func Decode(dst *Hash, src string) error {
 	// Return error if hash string is too long.
 	if len(src) > MaxHashStringSize {
@@ -208,9 +233,27 @@ func Decode(dst *Hash, src string) error {
 		copy(srcBytes[1:], src)
 	}
 
+	return decodeHash(dst, srcBytes)
+}
+
+// DecodeStrict decodes the byte-reversed hexadecimal string encoding of a Hash
+// to a destination.  The source string must be exactly MaxHashStringSize
+// bytes, or ErrHashStrSizeMismatch is returned.
+func DecodeStrict(dst *Hash, src string) error {
+	if len(src) != MaxHashStringSize {
+		return ErrHashStrSizeMismatch
+	}
+
+	return decodeHash(dst, []byte(src))
+}
+
+// decodeHash decodes the provided byte-reversed hexadecimal bytes into dst.
+// The caller is responsible for applying any caller-specific length validation
+// before invoking this helper.
+func decodeHash(dst *Hash, src []byte) error {
 	// Hex decode the source bytes to a temporary destination.
 	var reversedHash Hash
-	_, err := hex.Decode(reversedHash[HashSize-hex.DecodedLen(len(srcBytes)):], srcBytes)
+	_, err := hex.Decode(reversedHash[HashSize-hex.DecodedLen(len(src)):], src)
 	if err != nil {
 		return err
 	}

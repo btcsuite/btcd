@@ -95,6 +95,17 @@ func TestNetAddressV2FromBytes(t *testing.T) {
 			string(ipv6),
 		},
 
+		// IPv4-mapped IPv6 encoding (::ffff:127.0.0.1) should be
+		// converted to IPv4.
+		{
+			[]byte{
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01,
+			},
+			"127.0.0.1",
+			string(ipv4),
+		},
+
 		// OnionCat encoding
 		{
 			[]byte{

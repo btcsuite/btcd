@@ -5,6 +5,7 @@
 package txscript
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -50,6 +51,15 @@ const (
 		ScriptVerifyConstScriptCode
 )
 
+// PayToAnchorScript is the fixed script bytes for a pay-to-anchor output.
+// This is OP_1 OP_DATA_2 0x4e73 (witness v1 with program 0x4e73).
+//
+// The same constant is also defined unexported as
+// btcutil.payToAnchorScript; the duplication is intentional to avoid an
+// import cycle (btcutil cannot import txscript). Keep both definitions in
+// sync.
+var PayToAnchorScript = []byte{OP_1, OP_DATA_2, 0x4e, 0x73}
+
 // ScriptClass is an enumeration for the list of standard types of script.
 type ScriptClass byte
 
@@ -64,6 +74,7 @@ const (
 	MultiSigTy                               // Multi signature.
 	NullDataTy                               // Empty data-only (provably prunable).
 	WitnessV1TaprootTy                       // Taproot output
+	PayToAnchorTy                            // Pay to anchor (P2A)
 	WitnessUnknownTy                         // Witness unknown
 )
 
@@ -79,6 +90,7 @@ var scriptClassToName = []string{
 	MultiSigTy:            "multisig",
 	NullDataTy:            "nulldata",
 	WitnessV1TaprootTy:    "witness_v1_taproot",
+	PayToAnchorTy:         "anchor",
 	WitnessUnknownTy:      "witness_unknown",
 }
 
@@ -490,6 +502,26 @@ func extractAnnex(witness [][]byte) ([]byte, error) {
 	return lastElement, nil
 }
 
+// extractPayToAnchor extracts the Pay-to-Anchor data from the passed script
+// if it is a standard pay-to-anchor script. P2A scripts have the format:
+// OP_1 <0x4e73>. It will return nil otherwise.
+func extractPayToAnchor(script []byte) []byte {
+	// P2A script is exactly: OP_1 OP_DATA_2 0x4e 0x73.
+	if bytes.Equal(script, PayToAnchorScript) {
+		// Return the anchor data bytes for valid P2A scripts.
+		return script[2:4]
+	}
+
+	return nil
+}
+
+// IsPayToAnchorScript returns whether or not the passed script is a standard
+// pay-to-anchor (P2A) script. P2A scripts are used for anchor outputs that
+// allow anyone to spend them for CPFP (Child Pays For Parent) fee bumping.
+func IsPayToAnchorScript(script []byte) bool {
+	return extractPayToAnchor(script) != nil
+}
+
 // isNullDataScript returns whether or not the passed script is a standard
 // null data script.
 //
@@ -549,6 +581,9 @@ func typeOfScript(scriptVersion uint16, script []byte) ScriptClass {
 		}
 	case TaprootWitnessVersion:
 		switch {
+		// Check P2A before taproot since P2A is a specific taproot program.
+		case IsPayToAnchorScript(script):
+			return PayToAnchorTy
 		case isWitnessTaprootScript(script):
 			return WitnessV1TaprootTy
 		}
@@ -620,6 +655,10 @@ func expectedInputs(script []byte, class ScriptClass) int {
 		// Not including script.  That is handled by the caller.
 		return 1
 
+	case PayToAnchorTy:
+		// P2A outputs require no inputs for spending (anyone can spend).
+		return 0
+
 	case MultiSigTy:
 		// Standard multisig has a push a small number for the number
 		// of sigs and number of keys.  Check the first push instruction
@@ -654,6 +693,87 @@ type ScriptInfo struct {
 
 	// SigOps is the number of signature operations in the script pair.
 	SigOps int
+}
+
+// calcP2SHScriptInfo returns ScriptInfo fields for spends whose pkScript class
+// is pay-to-script-hash.  It handles both cases hidden behind P2SH:
+// - ordinary legacy P2SH, where sigScript reveals a redeem script that executes
+// directly.
+// - nested witness spends, where sigScript reveals a redeem script that is
+// itself a witness program.
+//
+// The caller has already initialized si.ExpectedInputs from the outer pkScript,
+// so this helper is responsible for folding in any additional inputs required
+// by the redeem script layer and, for nested P2WSH, the inner witness script
+// layer as well.
+func calcP2SHScriptInfo(scriptVersion uint16, sigScript, pkScript []byte,
+	witness wire.TxWitness, numInputs, expectedInputCount int,
+	segwit bool) (int, int, int) {
+
+	// For P2SH, the consensus-visible redeem script is the final data push in
+	// sigScript. This is the script that will ultimately execute for legacy
+	// P2SH, and it is also the script we must inspect to decide whether the
+	// spend is actually nested witness.
+	redeemScript := finalOpcodeData(scriptVersion, sigScript)
+
+	// Classify the revealed redeem script so we can account for both its script
+	// shape and the number of stack elements it expects from the spending
+	// input.
+	redeemClass := typeOfScript(scriptVersion, redeemScript)
+
+	// Fold the redeem-script layer into ExpectedInputs. A return value of -1
+	// means the helper cannot determine the count for this script shape, so the
+	// entire overall ExpectedInputs value becomes unknown as well.
+	rsInputs := expectedInputs(redeemScript, redeemClass)
+	if rsInputs == -1 {
+		expectedInputCount = -1
+	} else {
+		expectedInputCount += rsInputs
+	}
+
+	// If segwit is active and the actual redeem script is itself a witness
+	// program, then this is a nested witness spend such as P2SH-P2WPKH or
+	// P2SH-P2WSH. The key point is that this decision is based on the actual
+	// redeem script revealed by sigScript.
+	if segwit && IsWitnessProgram(redeemScript) {
+		// Nested P2WSH adds one more layer of indirection: the witness program
+		// commits to a witness script, and the final witness element carries
+		// the serialized witness script itself.  That inner script can require
+		// its own stack arguments, so ExpectedInputs must include them too.
+		if redeemClass == WitnessV0ScriptHashTy && len(witness) > 0 {
+			// In P2WSH, the last witness item is the witness script being
+			// executed.
+			witnessScript := witness[len(witness)-1]
+
+			// Classify the inner witness script and ask how many stack elements
+			// it expects from the preceding witness items.
+			witnessScriptClass := typeOfScript(scriptVersion, witnessScript)
+			wsInputs := expectedInputs(witnessScript, witnessScriptClass)
+
+			// Preserve the same unknown-count behavior as above: once any inner
+			// layer reports an unknown expected-input count, the overall answer
+			// is unknown.  Otherwise, add the inner witness-script contribution
+			// on top of the already-counted outer P2SH and redeem-script
+			// layers.
+			if wsInputs == -1 {
+				expectedInputCount = -1
+			} else if expectedInputCount != -1 {
+				expectedInputCount += wsInputs
+			}
+		}
+
+		// Once the spend is known to be nested witness, sigops must be counted
+		// with witness-aware rules, and the provided input items are the total
+		// of the pushed sigScript items plus the witness stack items.
+		sigOps := GetWitnessSigOpCount(sigScript, pkScript, witness)
+		return expectedInputCount, sigOps, len(witness) + numInputs
+	}
+
+	// Otherwise this is ordinary legacy P2SH.  The revealed redeem script
+	// executes directly, so sigops are counted from that script using legacy
+	// rules, and the only provided inputs are the pushed items from sigScript.
+	sigOps := countSigOpsV0(redeemScript, true)
+	return expectedInputCount, sigOps, numInputs
 }
 
 // CalcScriptInfo returns a structure providing data about the provided script
@@ -700,21 +820,11 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 
 	switch {
 	// Count sigops taking into account pay-to-script-hash.
-	case si.PkScriptClass == ScriptHashTy && bip16 && !segwit:
-		// The redeem script is the final data push of the signature script.
-		redeemScript := finalOpcodeData(scriptVersion, sigScript)
-		reedeemClass := typeOfScript(scriptVersion, redeemScript)
-		rsInputs := expectedInputs(redeemScript, reedeemClass)
-		if rsInputs == -1 {
-			si.ExpectedInputs = -1
-		} else {
-			si.ExpectedInputs += rsInputs
-		}
-		si.SigOps = countSigOpsV0(redeemScript, true)
-
-		// All entries pushed to stack (or are OP_RESERVED and exec
-		// will fail).
-		si.NumInputs = numInputs
+	case si.PkScriptClass == ScriptHashTy && bip16:
+		si.ExpectedInputs, si.SigOps, si.NumInputs = calcP2SHScriptInfo(
+			scriptVersion, sigScript, pkScript, witness, numInputs,
+			si.ExpectedInputs, segwit,
+		)
 
 	// If segwit is active, and this is a regular p2wkh output, then we'll
 	// treat the script as a p2pkh output in essence.
@@ -722,26 +832,6 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 
 		si.SigOps = GetWitnessSigOpCount(sigScript, pkScript, witness)
 		si.NumInputs = len(witness)
-
-	// We'll attempt to detect the nested p2sh case so we can accurately
-	// count the signature operations involved.
-	case si.PkScriptClass == ScriptHashTy &&
-		IsWitnessProgram(sigScript[1:]) && bip16 && segwit:
-
-		// Extract the pushed witness program from the sigScript so we
-		// can determine the number of expected inputs.
-		redeemClass := typeOfScript(scriptVersion, sigScript[1:])
-		shInputs := expectedInputs(sigScript[1:], redeemClass)
-		if shInputs == -1 {
-			si.ExpectedInputs = -1
-		} else {
-			si.ExpectedInputs += shInputs
-		}
-
-		si.SigOps = GetWitnessSigOpCount(sigScript, pkScript, witness)
-
-		si.NumInputs = len(witness)
-		si.NumInputs += numInputs
 
 	// If segwit is active, and this is a p2wsh output, then we'll need to
 	// examine the witness script to generate accurate script info.
@@ -823,6 +913,12 @@ func payToWitnessTaprootScript(rawKey []byte) ([]byte, error) {
 	return NewScriptBuilder().AddOp(OP_1).AddData(rawKey).Script()
 }
 
+// payToAnchorScript wraps the given 2-byte witness program in the canonical
+// pay-to-anchor envelope (OP_1 OP_DATA_2 <program>).
+func payToAnchorScript(witnessProgram []byte) ([]byte, error) {
+	return NewScriptBuilder().AddOp(OP_1).AddData(witnessProgram).Script()
+}
+
 // payToPubkeyScript creates a new script to pay a transaction output to a
 // public key. It is expected that the input is a valid pubkey.
 func payToPubKeyScript(serializedPubKey []byte) ([]byte, error) {
@@ -875,6 +971,12 @@ func PayToAddrScript(addr btcutil.Address) ([]byte, error) {
 				nilAddrErrStr)
 		}
 		return payToWitnessTaprootScript(addr.ScriptAddress())
+	case *btcutil.AddressPayToAnchor:
+		if addr == nil {
+			return nil, scriptError(ErrUnsupportedAddress,
+				nilAddrErrStr)
+		}
+		return payToAnchorScript(addr.ScriptAddress())
 	}
 
 	str := fmt.Sprintf("unable to generate payment script for unsupported "+
@@ -1009,6 +1111,21 @@ func ExtractPkScriptAddrs(pkScript []byte,
 	if isNullDataScript(scriptVersion, pkScript) {
 		// Null data transactions have no addresses or required signatures.
 		return NullDataTy, nil, 0, nil
+	}
+
+	// Check for pay-to-anchor script.
+	if IsPayToAnchorScript(pkScript) {
+		// P2A scripts have a single deterministic bech32 address per
+		// network (e.g. bc1pfeessrawgf on mainnet) and require no
+		// signatures (anyone can spend them).
+		var addrs []btcutil.Address
+		if addr, err := btcutil.NewAddressPayToAnchor(
+			chainParams,
+		); err == nil {
+
+			addrs = append(addrs, addr)
+		}
+		return PayToAnchorTy, addrs, 0, nil
 	}
 
 	if hash := extractWitnessPubKeyHash(pkScript); hash != nil {
