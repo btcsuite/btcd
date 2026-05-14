@@ -465,6 +465,9 @@ func FindLeafScript(pInput *PInput,
 	targetLeafHash []byte) (*TaprootTapLeafScript, error) {
 
 	for _, leaf := range pInput.TaprootLeafScript {
+		if leaf == nil {
+			continue
+		}
 		leafHash := txscript.TapLeaf{
 			LeafVersion: leaf.LeafVersion,
 			Script:      leaf.Script,
