@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/aead/siphash v1.0.1
 	github.com/btcsuite/btcd/address/v2 v2.0.0
-	github.com/btcsuite/btcd/btcec/v2 v2.4.0
+	github.com/btcsuite/btcd/btcec/v2 v2.5.0
 	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0
 	github.com/btcsuite/btcd/txscript/v2 v2.0.0
@@ -22,21 +22,3 @@ require (
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 )
-
-// TODO(guggero): Remove this as soon as we have a tagged version of address.
-replace github.com/btcsuite/btcd/address/v2 => ../address
-
-// TODO(guggero): Remove this as soon as we have a tagged version of btcec.
-replace github.com/btcsuite/btcd/btcec/v2 => ../btcec
-
-// TODO(guggero): Remove this as soon as we have a tagged version of chaincfg.
-replace github.com/btcsuite/btcd/chaincfg/v2 => ../chaincfg
-
-// TODO(guggero): Remove this as soon as we have a tagged version of chainhash.
-replace github.com/btcsuite/btcd/chainhash/v2 => ../chainhash
-
-// TODO(guggero): Remove this as soon as we have a tagged version of txscript.
-replace github.com/btcsuite/btcd/txscript/v2 => ../txscript
-
-// TODO(guggero): Remove this as soon as we have a tagged version of wire.
-replace github.com/btcsuite/btcd/wire/v2 => ../wire

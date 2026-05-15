@@ -3,7 +3,7 @@ module github.com/btcsuite/btcd/address/v2
 go 1.25
 
 require (
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	github.com/btcsuite/btcd/btcec/v2 v2.5.0
 	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0
 	github.com/btcsuite/btcd/wire/v2 v2.0.0
 	github.com/stretchr/testify v1.10.0
@@ -18,15 +18,3 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// TODO(guggero): Remove this as soon as we have a tagged version of btcec.
-replace github.com/btcsuite/btcd/btcec/v2 => ../btcec
-
-// TODO(guggero): Remove this as soon as we have a tagged version of chaincfg.
-replace github.com/btcsuite/btcd/chaincfg/v2 => ../chaincfg
-
-// TODO(guggero): Remove this as soon as we have a tagged version of chainhash.
-replace github.com/btcsuite/btcd/chainhash/v2 => ../chainhash
-
-// TODO(guggero): Remove this as soon as we have a tagged version of wire.
-replace github.com/btcsuite/btcd/wire/v2 => ../wire
