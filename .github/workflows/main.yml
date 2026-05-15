@@ -6,7 +6,7 @@ env:
   GOCACHE: /home/runner/work/go/pkg/build
   GOPATH: /home/runner/work/go
   GOBIN: /home/runner/work/go/bin
-  GO_VERSION: 1.22.11
+  GO_VERSION: 1.26.3
 
 jobs:
   build:

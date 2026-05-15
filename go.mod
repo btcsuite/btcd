@@ -66,6 +66,6 @@ retract (
 	v0.13.0-beta
 )
 
-go 1.23.2
+go 1.25
 
 replace github.com/btcsuite/btcd/btcutil => ./btcutil
