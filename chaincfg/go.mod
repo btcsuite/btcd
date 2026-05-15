@@ -1,6 +1,6 @@
 module github.com/btcsuite/btcd/chaincfg/v2
 
-go 1.23.2
+go 1.25
 
 require (
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0
@@ -15,9 +15,3 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// TODO(guggero): Remove once we have a tagged version of the chainhash package.
-replace github.com/btcsuite/btcd/chainhash/v2 => ../chainhash
-
-// TODO(guggero): Remove once we have a tagged version of the wire package.
-replace github.com/btcsuite/btcd/wire/v2 => ../wire
