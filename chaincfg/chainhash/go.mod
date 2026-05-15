@@ -1,3 +1,3 @@
 module github.com/btcsuite/btcd/chaincfg/chainhash
 
-go 1.22
+go 1.25
