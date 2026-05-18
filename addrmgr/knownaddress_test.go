@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 func TestChance(t *testing.T) {

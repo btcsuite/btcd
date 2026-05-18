@@ -151,11 +151,13 @@ func testMultiPartySign(t *testing.T, taprootTweak []byte,
 				nonce := otherCtx.PublicNonce()
 				haveAll, err := signer.RegisterPubNonce(nonce)
 				if err != nil {
-					t.Fatalf("unable to add public nonce")
+					t.Errorf("unable to add public nonce")
+					return
 				}
 
 				if j == len(signers)-1 && !haveAll {
-					t.Fatalf("all public nonces should have been detected")
+					t.Errorf("all public nonces should have been detected")
+					return
 				}
 			}
 		}(i, signCtx)

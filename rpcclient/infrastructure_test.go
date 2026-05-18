@@ -322,8 +322,8 @@ func TestSendPostRequestWithRetrySuccess(t *testing.T) {
 	jReq := newPostTestRequest()
 
 	result, err := sendPostRequestWithRetry(
-		context.Background(), jReq, 1, client.httpClient, client.config,
-		false,
+		context.Background(), jReq, 1, client.httpClient,
+		client.config, client.httpURL, false,
 	)
 	require.NoError(t, err)
 	require.Equal(t, []byte("1"), result)
@@ -340,8 +340,8 @@ func TestSendPostRequestWithRetryShutdown(t *testing.T) {
 			jReq := newPostTestRequest()
 
 			result, err := sendPostRequestWithRetry(
-				ctx, jReq, tc.tries, client.httpClient, client.config,
-				false,
+				ctx, jReq, tc.tries, client.httpClient,
+				client.config, client.httpURL, false,
 			)
 			require.Nil(t, result)
 			require.ErrorIs(t, err, context.Canceled)
@@ -475,6 +475,80 @@ func TestSendPostRequestAndRespondShutdown(t *testing.T) {
 
 			require.EqualValues(t, tc.wantAttempts,
 				atomic.LoadInt32(&attempts))
+		})
+	}
+}
+
+// TestHTTPURL pins down the URL strings produced by httpURL for each
+// supported host shape. httpURL runs on every RPC and now uses a
+// hand-rolled prefix check rather than delegating to ParseAddressString,
+// so its output is exercised directly here.
+func TestHTTPURL(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		host       string
+		disableTLS bool
+		expURL     string
+	}{
+		{
+			name:       "unix socket",
+			host:       "unix:///var/run/bitcoin/bitcoin.sock",
+			disableTLS: true,
+			expURL:     "http://unix",
+		},
+		{
+			name:       "unixpacket socket",
+			host:       "unixpacket:///var/run/bitcoin/bitcoin.sock",
+			disableTLS: true,
+			expURL:     "http://unix",
+		},
+		{
+			name:       "ipv4 literal",
+			host:       "127.0.0.1:8332",
+			disableTLS: true,
+			expURL:     "http://127.0.0.1:8332",
+		},
+		{
+			name:       "ipv6 literal",
+			host:       "[::1]:8332",
+			disableTLS: true,
+			expURL:     "http://[::1]:8332",
+		},
+		{
+			name:       "hostname",
+			host:       "localhost:8332",
+			disableTLS: true,
+			expURL:     "http://localhost:8332",
+		},
+		{
+			name:       "empty host",
+			host:       "",
+			disableTLS: true,
+			expURL:     "http://",
+		},
+		{
+			name:       "tls hostname",
+			host:       "bitcoind.example.com:8332",
+			disableTLS: false,
+			expURL:     "https://bitcoind.example.com:8332",
+		},
+		{
+			name:       "tls unix socket",
+			host:       "unix:///var/run/bitcoin/bitcoin.sock",
+			disableTLS: false,
+			expURL:     "https://unix",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &ConnConfig{
+				Host:       tc.host,
+				DisableTLS: tc.disableTLS,
+			}
+			require.Equal(t, tc.expURL, cfg.httpURL())
 		})
 	}
 }
@@ -671,4 +745,26 @@ func TestNewBatchSerializesPostSends(t *testing.T) {
 	}
 
 	require.EqualValues(t, 1, observedMax, "POST sends must be serialized")
+}
+
+// TestHTTPURLWiring guards the construction-time wiring that copies
+// (*ConnConfig).httpURL onto Client.httpURL when HTTPPostMode is set.
+// TestHTTPURL covers the method itself; this test catches the case
+// where a refactor of New silently drops the assignment, leaving
+// Client.httpURL as the zero value.
+func TestHTTPURLWiring(t *testing.T) {
+	t.Parallel()
+
+	cfg := &ConnConfig{
+		Host:         "localhost:8332",
+		HTTPPostMode: true,
+		DisableTLS:   true,
+		User:         "user",
+		Pass:         "pass",
+	}
+	c, err := New(cfg, nil)
+	require.NoError(t, err)
+	defer c.Shutdown()
+
+	require.Equal(t, "http://localhost:8332", c.httpURL)
 }

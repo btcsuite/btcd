@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/v2transport"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/lru"
@@ -2490,6 +2490,13 @@ func (p *Peer) AssociateConnection(conn net.Conn) {
 // Disconnect.
 func (p *Peer) WaitForDisconnect() {
 	<-p.quit
+}
+
+// Done returns a channel that is closed when the peer has been
+// disconnected. This allows callers to select on peer disconnect
+// alongside other channels.
+func (p *Peer) Done() <-chan struct{} {
+	return p.quit
 }
 
 // ShouldDowngradeToV1 is called when we try to connect to a peer via v2 BIP324

@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/rpcclient"
 )

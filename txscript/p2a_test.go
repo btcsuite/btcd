@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 )
 
 // TestIsPayToAnchorScript tests the IsPayToAnchorScript function.

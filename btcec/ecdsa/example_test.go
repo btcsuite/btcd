@@ -10,7 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chainhash/v2"
 )
 
 // This example demonstrates signing a message with a secp256k1 private key that

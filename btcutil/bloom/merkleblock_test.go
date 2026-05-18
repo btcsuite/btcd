@@ -9,10 +9,10 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/btcutil/bloom"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/btcutil/v2/bloom"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 func TestMerkleBlock3(t *testing.T) {

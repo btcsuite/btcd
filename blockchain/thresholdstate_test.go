@@ -7,7 +7,7 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chainhash/v2"
 )
 
 // TestThresholdStateStringer tests the stringized output for the

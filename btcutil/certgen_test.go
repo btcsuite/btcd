@@ -11,8 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/btcutil"
-	//"github.com/davecgh/go-spew/spew"
+	"github.com/btcsuite/btcd/btcutil/v2"
 )
 
 // TestNewTLSCertPair ensures the NewTLSCertPair function works as expected.
