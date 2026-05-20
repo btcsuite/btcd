@@ -2996,6 +2996,28 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		return nil, err
 	}
 
+	// stopatheight is a testing aid: once the main chain connects the
+	// configured height, request a graceful shutdown through the same
+	// path as an interrupt signal. The notification fires with the chain
+	// lock released, so blocking on the channel here is safe.
+	if stopHeight := int32(cfg.StopAtHeight); stopHeight > 0 {
+		requestShutdown := sync.OnceFunc(func() {
+			srvrLog.Infof("Reached stopatheight %d; "+
+				"requesting shutdown", stopHeight)
+			shutdownRequestChannel <- struct{}{}
+		})
+		s.chain.Subscribe(func(n *blockchain.Notification) {
+			if n.Type != blockchain.NTBlockConnected {
+				return
+			}
+			block, ok := n.Data.(*btcutil.Block)
+			if !ok || block.Height() < stopHeight {
+				return
+			}
+			requestShutdown()
+		})
+	}
+
 	// Search for a FeeEstimator state in the database. If none can be found
 	// or if it cannot be loaded, create a new one.
 	db.Update(func(tx database.Tx) error {
