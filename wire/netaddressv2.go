@@ -25,14 +25,11 @@ var (
 	// maximum size for an unknown networkID.
 	ErrInvalidAddressSize = fmt.Errorf("invalid address size")
 
-	// ErrSkippedNetworkID is returned when the cjdns, i2p, or unknown
-	// networks are encountered during decoding. btcd does not support i2p
-	// or cjdns addresses. In the case of an unknown networkID, this is so
-	// that a future BIP reserving a new networkID does not cause older
-	// addrv2-supporting btcd software to disconnect upon receiving the new
-	// addresses. This error can also be returned when an OnionCat-encoded
-	// torv2 address is received with the ipv6 networkID. This error
-	// signals to the caller to continue reading.
+	// ErrSkippedNetworkID is returned when an unknown network ID is
+	// encountered during decoding, or when an OnionCat-encoded torv2 address
+	// is received with the ipv6 networkID. This allows future BIP-reserved
+	// networkIDs to be silently skipped rather than causing a disconnect.
+	// It signals to the caller to continue reading the message.
 	ErrSkippedNetworkID = fmt.Errorf("skipped networkID")
 )
 
@@ -155,6 +152,13 @@ func (na *NetAddressV2) IsI2P() bool {
 	return ok
 }
 
+// IsCJDNS returns a bool that signals to the caller whether or not this is a
+// cjdns address.
+func (na *NetAddressV2) IsCJDNS() bool {
+	_, ok := na.Addr.(*cjdnsAddr)
+	return ok
+}
+
 // TorV3Key returns the first byte of the v3 public key. This is used in the
 // addrmgr to calculate a key from a network group.
 func (na *NetAddressV2) TorV3Key() byte {
@@ -255,6 +259,9 @@ func writeNetAddressV2(w io.Writer, pver uint32, na *NetAddressV2) error {
 		netID = a.netID
 		address = a.addr[:]
 	case *i2pAddr:
+		netID = a.netID
+		address = a.addr[:]
+	case *cjdnsAddr:
 		netID = a.netID
 		address = a.addr[:]
 	default:
@@ -445,7 +452,7 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 			return err
 		}
 
-		return ErrSkippedNetworkID
+		na.Addr = addr
 	}
 
 	return nil
@@ -640,3 +647,16 @@ type cjdnsAddr struct {
 	addr  [cjdnsSize]byte
 	netID networkID
 }
+
+// Part of the net.Addr interface.
+func (a *cjdnsAddr) String() string {
+	return net.IP(a.addr[:]).String()
+}
+
+// Part of the net.Addr interface.
+func (a *cjdnsAddr) Network() string {
+	return string(a.netID)
+}
+
+// Compile-time constraint to check that cjdnsAddr meets the net.Addr interface.
+var _ net.Addr = (*cjdnsAddr)(nil)

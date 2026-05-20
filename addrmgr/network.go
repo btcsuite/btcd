@@ -271,6 +271,10 @@ func IsRoutable(na *wire.NetAddressV2) bool {
 		return false
 	}
 
+	if na.IsCJDNS() {
+		return false
+	}
+
 	lna := na.ToLegacy()
 	return IsValid(lna) && !(IsRFC1918(lna) || IsRFC2544(lna) ||
 		IsRFC3927(lna) || IsRFC4862(lna) || IsRFC3849(lna) ||
