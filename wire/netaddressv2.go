@@ -148,6 +148,13 @@ func (na *NetAddressV2) IsTorV3() bool {
 	return ok
 }
 
+// IsI2P returns a bool that signals to the caller whether or not this is an
+// i2p address.
+func (na *NetAddressV2) IsI2P() bool {
+	_, ok := na.Addr.(*i2pAddr)
+	return ok
+}
+
 // TorV3Key returns the first byte of the v3 public key. This is used in the
 // addrmgr to calculate a key from a network group.
 func (na *NetAddressV2) TorV3Key() byte {
@@ -245,6 +252,9 @@ func writeNetAddressV2(w io.Writer, pver uint32, na *NetAddressV2) error {
 		netID = a.netID
 		address = a.addr[:]
 	case *torv3Addr:
+		netID = a.netID
+		address = a.addr[:]
+	case *i2pAddr:
 		netID = a.netID
 		address = a.addr[:]
 	default:
@@ -418,7 +428,7 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 			return err
 		}
 
-		return ErrSkippedNetworkID
+		na.Addr = addr
 	case cjdns:
 		addr := &cjdnsAddr{}
 		addr.netID = cjdns
@@ -611,6 +621,20 @@ type i2pAddr struct {
 	addr  [i2pSize]byte
 	netID networkID
 }
+
+// Part of the net.Addr interface.
+func (a *i2pAddr) String() string {
+	b32 := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(a.addr[:])
+	return strings.ToLower(b32) + ".b32.i2p"
+}
+
+// Part of the net.Addr interface.
+func (a *i2pAddr) Network() string {
+	return string(a.netID)
+}
+
+// Compile-time constraint to check that i2pAddr meets the net.Addr interface.
+var _ net.Addr = (*i2pAddr)(nil)
 
 type cjdnsAddr struct {
 	addr  [cjdnsSize]byte
