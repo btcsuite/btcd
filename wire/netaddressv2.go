@@ -159,6 +159,13 @@ func (na *NetAddressV2) IsCJDNS() bool {
 	return ok
 }
 
+// IsYggdrasil returns a bool that signals to the caller whether or not this is
+// a yggdrasil address.
+func (na *NetAddressV2) IsYggdrasil() bool {
+	_, ok := na.Addr.(*yggdrasilAddr)
+	return ok
+}
+
 // TorV3Key returns the first byte of the v3 public key. This is used in the
 // addrmgr to calculate a key from a network group.
 func (na *NetAddressV2) TorV3Key() byte {
@@ -262,6 +269,9 @@ func writeNetAddressV2(w io.Writer, pver uint32, na *NetAddressV2) error {
 		netID = a.netID
 		address = a.addr[:]
 	case *cjdnsAddr:
+		netID = a.netID
+		address = a.addr[:]
+	case *yggdrasilAddr:
 		netID = a.netID
 		address = a.addr[:]
 	default:
@@ -453,6 +463,23 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 		}
 
 		na.Addr = addr
+	case yggdrasil:
+		addr := &yggdrasilAddr{}
+		addr.netID = yggdrasil
+		if decodedSize != uint64(yggdrasilSize) {
+			return ErrInvalidAddressSize
+		}
+
+		if err := readElement(r, &addr.addr); err != nil {
+			return err
+		}
+
+		na.Port, err = binarySerializer.Uint16(r, bigEndian)
+		if err != nil {
+			return err
+		}
+
+		na.Addr = addr
 	}
 
 	return nil
@@ -480,6 +507,9 @@ const (
 
 	// cjdns means the following address is a cjdns address.
 	cjdns
+
+	// yggdrasil means the following address is a yggdrasil address.
+	yggdrasil
 )
 
 const (
@@ -500,6 +530,9 @@ const (
 
 	// cjdnsSize is the size of a cjdns address.
 	cjdnsSize = 16
+
+	// yggdrasilSize is the size of a yggdrasil address.
+	yggdrasilSize = 16
 )
 
 const (
@@ -515,7 +548,7 @@ const (
 // isKnownNetworkID returns true if the networkID is one listed above and false
 // otherwise.
 func isKnownNetworkID(netID uint8) bool {
-	return uint8(ipv4) <= netID && netID <= uint8(cjdns)
+	return uint8(ipv4) <= netID && netID <= uint8(yggdrasil)
 }
 
 type ipv4Addr struct {
@@ -660,3 +693,21 @@ func (a *cjdnsAddr) Network() string {
 
 // Compile-time constraint to check that cjdnsAddr meets the net.Addr interface.
 var _ net.Addr = (*cjdnsAddr)(nil)
+
+type yggdrasilAddr struct {
+	addr  [yggdrasilSize]byte
+	netID networkID
+}
+
+// Part of the net.Addr interface.
+func (a *yggdrasilAddr) String() string {
+	return net.IP(a.addr[:]).String()
+}
+
+// Part of the net.Addr interface.
+func (a *yggdrasilAddr) Network() string {
+	return string(a.netID)
+}
+
+// Compile-time constraint to check that yggdrasilAddr meets the net.Addr interface.
+var _ net.Addr = (*yggdrasilAddr)(nil)
