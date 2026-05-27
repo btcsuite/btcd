@@ -7,26 +7,12 @@ package netsync
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/aead/siphash"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/wire/v2"
-)
-
-var (
-	// ErrNilTx signals that the provided transaction is nil.
-	ErrNilTx = errors.New("nil transaction")
-
-	// ErrShortIDCountTooLow signals that the compact block short ID count is
-	// lower than expected.
-	ErrShortIDCountTooLow = errors.New("compact block short id count too low")
-
-	// ErrShortIDCountTooHigh signals that the compact block short ID count is
-	// higher than expected.
-	ErrShortIDCountTooHigh = errors.New("compact block short id count too high")
 )
 
 // CompactBlockShortID returns the BIP 152 short ID for the given transaction.
