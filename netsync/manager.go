@@ -5,6 +5,7 @@
 package netsync
 
 import (
+	"errors"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -45,6 +46,10 @@ const (
 	// stallSampleInterval the interval at which we will check to see if our
 	// sync has stalled.
 	stallSampleInterval = 30 * time.Second
+
+	// compactBlockTxnTimeout is the amount of time to wait for missing
+	// compact block transactions before falling back to the full block.
+	compactBlockTxnTimeout = 30 * time.Second
 )
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
@@ -61,6 +66,20 @@ type blockMsg struct {
 	block *btcutil.Block
 	peer  *peerpkg.Peer
 	reply chan struct{}
+}
+
+// cmpctBlockMsg packages a compact block message and the peer it came from
+// together so the block handler has access to that information.
+type cmpctBlockMsg struct {
+	block *wire.MsgCmpctBlock
+	peer  *peerpkg.Peer
+}
+
+// blockTxnMsg packages a blocktxn message and the peer it came from together
+// so the block handler has access to that information.
+type blockTxnMsg struct {
+	blockTxn *wire.MsgBlockTxn
+	peer     *peerpkg.Peer
 }
 
 // invMsg packages a bitcoin inv message and the peer it came from together
@@ -143,13 +162,20 @@ type headerNode struct {
 	hash   *chainhash.Hash
 }
 
+// pendingCompactBlock tracks an in-progress compact block reconstruction.
+type pendingCompactBlock struct {
+	reconstructor *CompactBlockReconstructor
+	requestTime   time.Time
+}
+
 // peerSyncState stores additional information that the SyncManager tracks
 // about a peer.
 type peerSyncState struct {
-	syncCandidate   bool
-	requestQueue    []*wire.InvVect
-	requestedTxns   map[chainhash.Hash]struct{}
-	requestedBlocks map[chainhash.Hash]struct{}
+	syncCandidate        bool
+	requestQueue         []*wire.InvVect
+	requestedTxns        map[chainhash.Hash]struct{}
+	requestedBlocks      map[chainhash.Hash]struct{}
+	pendingCompactBlocks map[chainhash.Hash]*pendingCompactBlock
 }
 
 // limitAdd is a helper function for maps that require a maximum limit by
@@ -434,9 +460,10 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 	// Initialize the peer state.
 	isSyncCandidate := sm.isSyncCandidate(peer)
 	sm.peerStates[peer] = &peerSyncState{
-		syncCandidate:   isSyncCandidate,
-		requestedTxns:   make(map[chainhash.Hash]struct{}),
-		requestedBlocks: make(map[chainhash.Hash]struct{}),
+		syncCandidate:        isSyncCandidate,
+		requestedTxns:        make(map[chainhash.Hash]struct{}),
+		requestedBlocks:      make(map[chainhash.Hash]struct{}),
+		pendingCompactBlocks: make(map[chainhash.Hash]*pendingCompactBlock),
 	}
 
 	// Start syncing by choosing the best candidate if needed.
@@ -453,6 +480,8 @@ func (sm *SyncManager) handleStallSample() {
 	if atomic.LoadInt32(&sm.shutdown) != 0 {
 		return
 	}
+
+	sm.expirePendingCompactBlocks()
 
 	// If we don't have an active sync peer, exit early.
 	if sm.syncPeer == nil {
@@ -540,6 +569,11 @@ func (sm *SyncManager) clearRequestedState(state *peerSyncState) {
 	for blockHash := range state.requestedBlocks {
 		delete(sm.requestedBlocks, blockHash)
 	}
+
+	for blockHash := range state.pendingCompactBlocks {
+		delete(sm.requestedBlocks, blockHash)
+	}
+	state.pendingCompactBlocks = make(map[chainhash.Hash]*pendingCompactBlock)
 }
 
 // updateSyncPeer choose a new sync peer to replace the current one. If
@@ -860,6 +894,164 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			"caught up to block %v(%v) -- now listening to blocks.",
 			bmsg.block.Hash(), bmsg.block.Height())
 		sm.ibdMode = false
+	}
+}
+
+// handleCmpctBlockMsg handles compact block messages from all peers.
+func (sm *SyncManager) handleCmpctBlockMsg(msg *cmpctBlockMsg) {
+	peer := msg.peer
+	state, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received cmpctblock message from unknown peer %s", peer)
+		return
+	}
+
+	blockHash := msg.block.Header.BlockHash()
+	iv := wire.NewInvVect(wire.InvTypeBlock, &blockHash)
+	peer.AddKnownInventory(iv)
+
+	haveBlock, err := sm.chain.HaveBlock(&blockHash)
+	if err != nil {
+		log.Warnf("Unable to determine if compact block %v is known: %v",
+			blockHash, err)
+		return
+	}
+	if haveBlock {
+		return
+	}
+
+	if sm.ibdMode && peer != sm.syncPeer {
+		return
+	}
+
+	witness := peer.CompactBlockVersion() == 2
+	mempoolTxns := sm.compactBlockMempoolTxns()
+	recon, err := NewCompactBlockReconstructor(msg.block, mempoolTxns, witness)
+	if err != nil {
+		log.Debugf("Unable to reconstruct compact block %v from %s: %v",
+			blockHash, peer, err)
+		sm.requestFullBlock(peer, state, &blockHash)
+		return
+	}
+
+	sm.markBlockRequested(state, &blockHash)
+
+	if recon.IsComplete() {
+		block, err := recon.Block()
+		if err != nil {
+			log.Debugf("Unable to finalize compact block %v from %s: %v",
+				blockHash, peer, err)
+			sm.requestFullBlock(peer, state, &blockHash)
+			return
+		}
+
+		sm.handleBlockMsg(&blockMsg{
+			block: block,
+			peer:  peer,
+			reply: make(chan struct{}, 1),
+		})
+		return
+	}
+
+	state.pendingCompactBlocks[blockHash] = &pendingCompactBlock{
+		reconstructor: recon,
+		requestTime:   time.Now(),
+	}
+
+	peer.QueueMessage(recon.GetBlockTxnRequest(), nil)
+}
+
+// handleBlockTxnMsg handles blocktxn messages from all peers.
+func (sm *SyncManager) handleBlockTxnMsg(msg *blockTxnMsg) {
+	peer := msg.peer
+	state, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received blocktxn message from unknown peer %s", peer)
+		return
+	}
+
+	blockHash := msg.blockTxn.BlockHash
+	pending, exists := state.pendingCompactBlocks[blockHash]
+	if !exists {
+		log.Debugf("Received unexpected blocktxn %v from %s",
+			blockHash, peer)
+		return
+	}
+
+	block, err := pending.reconstructor.ProvideBlockTxn(msg.blockTxn)
+	if err != nil {
+		log.Debugf("Unable to complete compact block %v from %s: %v",
+			blockHash, peer, err)
+		delete(state.pendingCompactBlocks, blockHash)
+		if errors.Is(err, ErrCompactBlockBadMerkleRoot) {
+			// BIP-152 requires peers not to be penalized for collisions,
+			// so retry with the full block
+			sm.requestFullBlock(peer, state, &blockHash)
+			return
+		}
+
+		peer.Disconnect()
+		return
+	}
+
+	delete(state.pendingCompactBlocks, blockHash)
+	sm.markBlockRequested(state, &blockHash)
+	sm.handleBlockMsg(&blockMsg{
+		block: block,
+		peer:  peer,
+		reply: make(chan struct{}, 1),
+	})
+}
+
+func (sm *SyncManager) compactBlockMempoolTxns() []*btcutil.Tx {
+	if sm.txMemPool == nil {
+		return nil
+	}
+
+	txDescs := sm.txMemPool.TxDescs()
+	txns := make([]*btcutil.Tx, 0, len(txDescs))
+	for _, txDesc := range txDescs {
+		txns = append(txns, txDesc.Tx)
+	}
+
+	return txns
+}
+
+func (sm *SyncManager) markBlockRequested(state *peerSyncState,
+	hash *chainhash.Hash) {
+
+	limitAdd(sm.requestedBlocks, *hash, maxRequestedBlocks)
+	limitAdd(state.requestedBlocks, *hash, maxRequestedBlocks)
+}
+
+func (sm *SyncManager) requestFullBlock(peer *peerpkg.Peer,
+	state *peerSyncState, hash *chainhash.Hash) {
+
+	delete(state.pendingCompactBlocks, *hash)
+	sm.markBlockRequested(state, hash)
+
+	invType := wire.InvTypeBlock
+	if peer.IsWitnessEnabled() {
+		invType = wire.InvTypeWitnessBlock
+	}
+
+	gdmsg := wire.NewMsgGetDataSizeHint(1)
+	_ = gdmsg.AddInvVect(wire.NewInvVect(invType, hash))
+	peer.QueueMessage(gdmsg, nil)
+}
+
+func (sm *SyncManager) expirePendingCompactBlocks() {
+	now := time.Now()
+	for peer, state := range sm.peerStates {
+		for blockHash, pending := range state.pendingCompactBlocks {
+			if now.Sub(pending.requestTime) < compactBlockTxnTimeout {
+				continue
+			}
+
+			log.Debugf("Timed out waiting for blocktxn %v from %s; "+
+				"requesting full block", blockHash, peer)
+			sm.requestFullBlock(peer, state, &blockHash)
+		}
 	}
 }
 
@@ -1253,7 +1445,10 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				limitAdd(sm.requestedBlocks, iv.Hash, maxRequestedBlocks)
 				limitAdd(state.requestedBlocks, iv.Hash, maxRequestedBlocks)
 
-				if peer.IsWitnessEnabled() {
+				switch {
+				case peer.IsCompactBlocksEnabled():
+					iv.Type = wire.InvTypeCompactBlock
+				case peer.IsWitnessEnabled():
 					iv.Type = wire.InvTypeWitnessBlock
 				}
 
@@ -1316,6 +1511,12 @@ out:
 			case *blockMsg:
 				sm.handleBlockMsg(msg)
 				msg.reply <- struct{}{}
+
+			case *cmpctBlockMsg:
+				sm.handleCmpctBlockMsg(msg)
+
+			case *blockTxnMsg:
+				sm.handleBlockTxnMsg(msg)
 
 			case *invMsg:
 				sm.handleInvMsg(msg)
@@ -1510,6 +1711,30 @@ func (sm *SyncManager) QueueBlock(block *btcutil.Block, peer *peerpkg.Peer, done
 	}
 
 	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
+}
+
+// QueueCmpctBlock adds the passed compact block message and peer to the block
+// handling queue.
+func (sm *SyncManager) QueueCmpctBlock(block *wire.MsgCmpctBlock,
+	peer *peerpkg.Peer) {
+
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		return
+	}
+
+	sm.msgChan <- &cmpctBlockMsg{block: block, peer: peer}
+}
+
+// QueueBlockTxn adds the passed blocktxn message and peer to the block
+// handling queue.
+func (sm *SyncManager) QueueBlockTxn(blockTxn *wire.MsgBlockTxn,
+	peer *peerpkg.Peer) {
+
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		return
+	}
+
+	sm.msgChan <- &blockTxnMsg{blockTxn: blockTxn, peer: peer}
 }
 
 // QueueInv adds the passed inv message and peer to the block handling queue.
