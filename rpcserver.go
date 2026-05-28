@@ -1271,6 +1271,9 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		case chaincfg.DeploymentTaproot:
 			forkName = "taproot"
 
+		case chaincfg.DeploymentBIP54:
+			forkName = "bip54"
+
 		default:
 			return nil, &btcjson.RPCError{
 				Code: btcjson.ErrRPCInternal.Code,
