@@ -211,9 +211,19 @@ func isBIP0030Node(node *blockNode) bool {
 // has reached the height bip34ReenableBIP30Height where the optimization must
 // no longer apply.  This is a useful optimization because the BIP0030 check is
 // expensive since it involves a ton of cache misses in the utxoset.
-func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
+//
+// Once BIP54 is active, the coinbase commits to its block height via
+// nLockTime, which makes duplicate-coinbase txids impossible without a
+// BIP30 lookup; the check is then skipped unconditionally.
+func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params, bip54Active bool) bool {
 	// Sanity checks for the inputs not to dereference a nil pointer.
 	if node == nil || params == nil {
+		return false
+	}
+
+	// Once BIP54 is active the rule is superseded by the coinbase
+	// nLockTime commitment.
+	if bip54Active {
 		return false
 	}
 
@@ -928,6 +938,17 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		// previous block.
 		blockHeight := prevNode.height + 1
 
+		// BIP-54 introduces extra per-transaction and per-coinbase
+		// constraints that supersede some earlier checks (BIP-30 and
+		// BIP-34), so resolve its deployment state once up front and
+		// reuse it below.
+		bip54State, err := b.deploymentState(prevNode,
+			chaincfg.DeploymentBIP54)
+		if err != nil {
+			return err
+		}
+		bip54Active := bip54State == ThresholdActive
+
 		// Ensure all transactions in the block are finalized.
 		for _, tx := range block.Transactions() {
 			if !IsFinalizedTransaction(tx, blockHeight,
@@ -942,8 +963,8 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		// Ensure coinbase starts with serialized block heights for
 		// blocks whose version is the serializedHeightVersion or newer
 		// once a majority of the network has upgraded.  This is part of
-		// BIP0034.
-		if ShouldHaveSerializedBlockHeight(header) &&
+		// BIP0034 and is superseded by the BIP-54 commitment above.
+		if !bip54Active && ShouldHaveSerializedBlockHeight(header) &&
 			blockHeight >= b.chainParams.BIP0034Height {
 
 			coinbaseTx := block.Transactions()[0]
@@ -953,16 +974,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 			}
 		}
 
-		// Once BIP-54 is active, the coinbase transaction must commit
-		// to its block height via nLockTime + non-final nSequence so
-		// that duplicate coinbases are impossible without a BIP-30
-		// lookup.
-		bip54State, err := b.deploymentState(prevNode,
-			chaincfg.DeploymentBIP54)
-		if err != nil {
-			return err
-		}
-		if bip54State == ThresholdActive {
+		if bip54Active {
 			if err := CheckBIP54Coinbase(
 				block.Transactions()[0], blockHeight,
 			); err != nil {
@@ -1203,8 +1215,15 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// transactions that 'overwrite' older transactions which are not fully
 	// spent.  See the documentation for checkBIP0030 for more details.
 	// Sometimes BIP0030 must to skipped (as an exception) or may be skipped
-	// (as an optimization), see bip0030CheckNeeded for details.
-	if bip0030CheckNeeded(node, b.chainParams) {
+	// (as an optimization), see bip0030CheckNeeded for details. Once BIP54
+	// is active the coinbase commits to its block height via nLockTime, so
+	// the BIP30 lookup is no longer required.
+	bip54State, err := b.deploymentState(node.parent, chaincfg.DeploymentBIP54)
+	if err != nil {
+		return err
+	}
+	bip54Active := bip54State == ThresholdActive
+	if bip0030CheckNeeded(node, b.chainParams, bip54Active) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
 			return err
@@ -1216,7 +1235,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	//
 	// These utxo entries are needed for verification of things such as
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
-	err := view.fetchInputUtxos(b.utxoCache, block)
+	err = view.fetchInputUtxos(b.utxoCache, block)
 	if err != nil {
 		return err
 	}
