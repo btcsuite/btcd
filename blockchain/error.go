@@ -229,6 +229,12 @@ const (
 	// been found to violate a consensus rule, as opposed to having an
 	// invalid ancestor.
 	ErrKnownInvalidBlock
+
+	// ErrBadCoinbaseLockTime indicates that a block's coinbase transaction
+	// does not satisfy the BIP-54 constraints: nLockTime must equal the
+	// block height minus one, and at least one input's nSequence must be
+	// less than 0xffffffff.
+	ErrBadCoinbaseLockTime
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -277,6 +283,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrInvalidAncestorBlock:      "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
 	ErrKnownInvalidBlock:         "ErrKnownInvalidBlock",
+	ErrBadCoinbaseLockTime:       "ErrBadCoinbaseLockTime",
 }
 
 // String returns the ErrorCode as a human-readable name.

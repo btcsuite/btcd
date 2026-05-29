@@ -691,6 +691,34 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 	return serializedHeight, nil
 }
 
+// CheckBIP54Coinbase enforces the BIP-54 restrictions on coinbase
+// transactions: the coinbase's nLockTime must equal blockHeight-1, and
+// its input's nSequence must not equal 0xffffffff. Together these
+// commit the coinbase to its block height in a way that BIP-30 lookups
+// cannot, preventing duplicate coinbase transactions.
+//
+// The caller is responsible for verifying that coinbaseTx is in fact the
+// block's coinbase (and therefore has exactly one input) and that the
+// rule is in force at blockHeight.
+func CheckBIP54Coinbase(coinbaseTx *btcutil.Tx, blockHeight int32) error {
+	msgTx := coinbaseTx.MsgTx()
+
+	wantLockTime := uint32(blockHeight - 1)
+	if msgTx.LockTime != wantLockTime {
+		str := fmt.Sprintf("coinbase nLockTime is %d but BIP-54 "+
+			"requires %d (block height %d minus one)",
+			msgTx.LockTime, wantLockTime, blockHeight)
+		return ruleError(ErrBadCoinbaseLockTime, str)
+	}
+
+	if msgTx.TxIn[0].Sequence == wire.MaxTxInSequenceNum {
+		str := "coinbase nSequence is final, BIP-54 requires non-final"
+		return ruleError(ErrBadCoinbaseLockTime, str)
+	}
+
+	return nil
+}
+
 // CheckSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
 func CheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
@@ -921,6 +949,23 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 			coinbaseTx := block.Transactions()[0]
 			err := CheckSerializedHeight(coinbaseTx, blockHeight)
 			if err != nil {
+				return err
+			}
+		}
+
+		// Once BIP-54 is active, the coinbase transaction must commit
+		// to its block height via nLockTime + non-final nSequence so
+		// that duplicate coinbases are impossible without a BIP-30
+		// lookup.
+		bip54State, err := b.deploymentState(prevNode,
+			chaincfg.DeploymentBIP54)
+		if err != nil {
+			return err
+		}
+		if bip54State == ThresholdActive {
+			if err := CheckBIP54Coinbase(
+				block.Transactions()[0], blockHeight,
+			); err != nil {
 				return err
 			}
 		}

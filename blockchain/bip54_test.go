@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
@@ -237,26 +238,178 @@ func TestBIP54Sigops(t *testing.T) {
 }
 
 // ----------------------------------------------------------------------------
+// Unit test: CheckBIP54Coinbase
+// ----------------------------------------------------------------------------
+
+// TestCheckBIP54Coinbase exercises the CheckBIP54Coinbase helper in
+// isolation, without going through the full block-processing pipeline.
+// The rule under test is:
+//
+//   - the coinbase's nLockTime must equal blockHeight - 1, and
+//   - the coinbase input's nSequence must not equal 0xffffffff.
+func TestCheckBIP54Coinbase(t *testing.T) {
+	const (
+		finalSeq    = wire.MaxTxInSequenceNum
+		nonFinalSeq = wire.MaxTxInSequenceNum - 1
+	)
+
+	makeCoinbase := func(lockTime, sequence uint32) *btcutil.Tx {
+		msgTx := wire.NewMsgTx(wire.TxVersion)
+		msgTx.LockTime = lockTime
+		msgTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Index: 0xffffffff},
+			SignatureScript:  []byte{0x51},
+			Sequence:         sequence,
+		})
+		msgTx.AddTxOut(&wire.TxOut{Value: 5000000000, PkScript: []byte{0x51}})
+		return btcutil.NewTx(msgTx)
+	}
+
+	tests := []struct {
+		name        string
+		lockTime    uint32
+		sequence    uint32
+		blockHeight int32
+		wantErr     ErrorCode // 0 means expect nil
+	}{{
+		name:        "valid: lockTime=height-1 with non-final sequence",
+		lockTime:    3,
+		sequence:    nonFinalSeq,
+		blockHeight: 4,
+	}, {
+		name:        "valid: lockTime=0 at height 1",
+		lockTime:    0,
+		sequence:    nonFinalSeq,
+		blockHeight: 1,
+	}, {
+		name:        "invalid: lockTime greater than height-1",
+		lockTime:    5,
+		sequence:    nonFinalSeq,
+		blockHeight: 4,
+		wantErr:     ErrBadCoinbaseLockTime,
+	}, {
+		name:        "invalid: lockTime equal to height",
+		lockTime:    4,
+		sequence:    nonFinalSeq,
+		blockHeight: 4,
+		wantErr:     ErrBadCoinbaseLockTime,
+	}, {
+		name:        "invalid: lockTime less than height-1",
+		lockTime:    2,
+		sequence:    nonFinalSeq,
+		blockHeight: 4,
+		wantErr:     ErrBadCoinbaseLockTime,
+	}, {
+		name:        "invalid: final nSequence",
+		lockTime:    3,
+		sequence:    finalSeq,
+		blockHeight: 4,
+		wantErr:     ErrBadCoinbaseLockTime,
+	}, {
+		// nLockTime values >= 500_000_000 are interpreted as unix
+		// timestamps, not block heights; BIP-54 requires a height-
+		// based lockTime equal to blockHeight-1, so this is rejected.
+		name:        "invalid: time-based lockTime",
+		lockTime:    1700000000,
+		sequence:    nonFinalSeq,
+		blockHeight: 4,
+		wantErr:     ErrBadCoinbaseLockTime,
+	}}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tx := makeCoinbase(tt.lockTime, tt.sequence)
+			err := CheckBIP54Coinbase(tx, tt.blockHeight)
+
+			if tt.wantErr == 0 {
+				if err != nil {
+					t.Fatalf("expected nil; got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected ErrorCode %v; got nil", tt.wantErr)
+			}
+			re, ok := err.(RuleError)
+			if !ok {
+				t.Fatalf("expected RuleError, got %T: %v", err, err)
+			}
+			if re.ErrorCode != tt.wantErr {
+				t.Fatalf("expected ErrorCode %v; got %v (%v)",
+					tt.wantErr, re.ErrorCode, re)
+			}
+		})
+	}
+}
+
+// ----------------------------------------------------------------------------
 // Test: coinbases.json
 // ----------------------------------------------------------------------------
+
+// bip54MainNetParams returns a value copy of chaincfg.MainNetParams with
+// DeploymentBIP54 forced active from height 1. It exists so the BIP-54
+// test vectors can drive the validation pipeline before BIP-54 has any
+// scheduled activation on real mainnet.
+func bip54MainNetParams() *chaincfg.Params {
+	params := chaincfg.MainNetParams
+	deploy := params.Deployments[chaincfg.DeploymentBIP54]
+	deploy.AlwaysActiveHeight = 1
+	params.Deployments[chaincfg.DeploymentBIP54] = deploy
+	return &params
+}
 
 // TestBIP54Coinbases exercises BIP-54's restrictions on coinbase
 // transactions, intended to make duplicate coinbases impossible without a
 // BIP-30 lookup. Each test case is a fresh chain of mainnet blocks
-// starting from the real genesis.
+// starting from the real genesis; the chain is valid iff every non-genesis
+// block is accepted as the new tip via ProcessBlock.
 func TestBIP54Coinbases(t *testing.T) {
 	var cases []bip54CoinbaseCase
 	loadBIP54JSON(t, "coinbases.json", &cases)
 
-	for _, tc := range cases {
-		tc := tc
+	for i, tc := range cases {
+		i, tc := i, tc
 		t.Run(tc.Comment, func(t *testing.T) {
-			for h, hexBlock := range tc.BlockChain {
-				if _, err := decodeBIP54Block(hexBlock); err != nil {
-					t.Fatalf("decode block %d: %v", h, err)
+			dbName := fmt.Sprintf("bip54_coinbases_%d", i)
+			chain, teardown, err := chainSetup(dbName, bip54MainNetParams())
+			if err != nil {
+				t.Fatalf("chainSetup: %v", err)
+			}
+			defer teardown()
+
+			// Genesis at index 0 is already present in the fresh chain.
+			rejected := false
+			var rejectErr error
+			for h, hexBlock := range tc.BlockChain[1:] {
+				block, err := decodeBIP54Block(hexBlock)
+				if err != nil {
+					t.Fatalf("decode block %d: %v", h+1, err)
+				}
+				isMain, isOrphan, perr := chain.ProcessBlock(block, BFNone)
+				if perr != nil {
+					rejected = true
+					rejectErr = fmt.Errorf("block %d: %w", h+1, perr)
+					break
+				}
+				if isOrphan {
+					rejected = true
+					rejectErr = fmt.Errorf("block %d accepted as orphan", h+1)
+					break
+				}
+				if !isMain {
+					rejected = true
+					rejectErr = fmt.Errorf("block %d did not extend main chain", h+1)
+					break
 				}
 			}
-			t.Skip("BIP-54 coinbase rule not implemented yet")
+
+			switch {
+			case tc.Valid && rejected:
+				t.Fatalf("expected valid; %v", rejectErr)
+			case !tc.Valid && !rejected:
+				t.Fatalf("expected invalid; chain accepted")
+			}
 		})
 	}
 }
@@ -283,3 +436,4 @@ func TestBIP54Timestamps(t *testing.T) {
 		})
 	}
 }
+
