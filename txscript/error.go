@@ -425,6 +425,12 @@ const (
 	// greater than or equal to the number of outputs.
 	ErrInvalidSigHashSingleIndex
 
+	// ErrDisallowedSigHashType is returned when the
+	// ScriptVerifyRestrictSigHash flag is active and a signature uses a
+	// sighash type other than SIGHASH_ALL (or SIGHASH_DEFAULT for taproot
+	// signatures).
+	ErrDisallowedSigHashType
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -514,6 +520,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrNonConstScriptCode:                  "ErrNonConstScriptCode",
 	ErrCodeSeparator:                       "ErrCodeSeparator",
 	ErrInvalidSigHashSingleIndex:           "ErrInvalidSigHashSingleIndex",
+	ErrDisallowedSigHashType:               "ErrDisallowedSigHashType",
 }
 
 // String returns the ErrorCode as a human-readable name.

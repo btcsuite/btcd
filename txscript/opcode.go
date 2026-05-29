@@ -2365,6 +2365,9 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 			if err := vm.checkHashTypeEncoding(hashType); err != nil {
 				return err
 			}
+			if err := vm.checkSigHashType(hashType); err != nil {
+				return err
+			}
 			if err := vm.checkSignatureEncoding(signature); err != nil {
 				return err
 			}
