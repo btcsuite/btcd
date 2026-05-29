@@ -75,6 +75,9 @@ func parseBaseSigAndPubkey(pkBytes, fullSigBytes []byte,
 	if err := vm.checkHashTypeEncoding(hashType); err != nil {
 		return nil, nil, 0, err
 	}
+	if err := vm.checkSigHashType(hashType); err != nil {
+		return nil, nil, 0, err
+	}
 	if err := vm.checkSignatureEncoding(sigBytes); err != nil {
 		return nil, nil, 0, err
 	}
@@ -423,6 +426,13 @@ func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 			pkBytes, rawSig, &vm.tx, vm.txIdx, vm.prevOutFetcher,
 			vm.sigCache, vm.hashCache, vm.taprootCtx.annex,
 		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Enforce the restricted-sighash policy (if active) on the
+		// tapscript signature's hash type.
+		err = vm.checkSigHashType(baseTaprootVerifier.hashType)
 		if err != nil {
 			return nil, err
 		}
