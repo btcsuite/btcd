@@ -729,6 +729,21 @@ func CheckBIP54Coinbase(coinbaseTx *btcutil.Tx, blockHeight int32) error {
 	return nil
 }
 
+// CheckBIP54TxSize enforces BIP-54's ban on transactions whose stripped
+// (no-witness) serialization is exactly 64 bytes. A 64-byte payload at
+// that position in a block's transaction list is indistinguishable from
+// an internal node in the Merkle tree, so allowing one would enable
+// Merkle tree malleability.
+func CheckBIP54TxSize(tx *btcutil.Tx) error {
+	const forbiddenSize = 64
+	if size := tx.MsgTx().SerializeSizeStripped(); size == forbiddenSize {
+		str := fmt.Sprintf("transaction stripped size is %d bytes, "+
+			"forbidden by BIP-54", size)
+		return ruleError(ErrBadTxSize, str)
+	}
+	return nil
+}
+
 // CheckSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
 func CheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
@@ -949,7 +964,9 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		}
 		bip54Active := bip54State == ThresholdActive
 
-		// Ensure all transactions in the block are finalized.
+		// Ensure all transactions in the block are finalized; under
+		// BIP-54, additionally reject any transaction whose stripped
+		// serialization is exactly 64 bytes (Merkle-tree malleability).
 		for _, tx := range block.Transactions() {
 			if !IsFinalizedTransaction(tx, blockHeight,
 				blockTime) {
@@ -957,6 +974,11 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 				str := fmt.Sprintf("block contains unfinalized "+
 					"transaction %v", tx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
+			}
+			if bip54Active {
+				if err := CheckBIP54TxSize(tx); err != nil {
+					return err
+				}
 			}
 		}
 

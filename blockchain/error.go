@@ -235,6 +235,11 @@ const (
 	// block height minus one, and at least one input's nSequence must be
 	// less than 0xffffffff.
 	ErrBadCoinbaseLockTime
+
+	// ErrBadTxSize indicates a transaction's stripped (no-witness)
+	// serialization is exactly 64 bytes, which BIP-54 disallows to
+	// prevent Merkle tree malleability.
+	ErrBadTxSize
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -284,6 +289,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
 	ErrKnownInvalidBlock:         "ErrKnownInvalidBlock",
 	ErrBadCoinbaseLockTime:       "ErrBadCoinbaseLockTime",
+	ErrBadTxSize:                 "ErrBadTxSize",
 }
 
 // String returns the ErrorCode as a human-readable name.

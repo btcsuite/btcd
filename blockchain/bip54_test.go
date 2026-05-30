@@ -195,10 +195,17 @@ func TestBIP54TxSize(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.Comment, func(t *testing.T) {
-			if _, err := decodeBIP54Tx(tc.Tx); err != nil {
+			tx, err := decodeBIP54Tx(tc.Tx)
+			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
-			t.Skip("BIP-54 64-byte transaction rule not implemented yet")
+			err = CheckBIP54TxSize(tx)
+			switch {
+			case tc.Valid && err != nil:
+				t.Fatalf("expected valid; got error: %v", err)
+			case !tc.Valid && err == nil:
+				t.Fatalf("expected invalid; got nil")
+			}
 		})
 	}
 }
