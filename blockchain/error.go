@@ -240,6 +240,11 @@ const (
 	// serialization is exactly 64 bytes, which BIP-54 disallows to
 	// prevent Merkle tree malleability.
 	ErrBadTxSize
+
+	// ErrTooManyBIP54SigOps indicates a transaction's input scripts
+	// contain more than MaxBIP54LegacySigOpsPerTx potentially-executed
+	// legacy signature operations.
+	ErrTooManyBIP54SigOps
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -290,6 +295,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrKnownInvalidBlock:         "ErrKnownInvalidBlock",
 	ErrBadCoinbaseLockTime:       "ErrBadCoinbaseLockTime",
 	ErrBadTxSize:                 "ErrBadTxSize",
+	ErrTooManyBIP54SigOps:        "ErrTooManyBIP54SigOps",
 }
 
 // String returns the ErrorCode as a human-readable name.

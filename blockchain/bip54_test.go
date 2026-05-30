@@ -239,7 +239,19 @@ func TestBIP54Sigops(t *testing.T) {
 				t.Fatalf("vector has %d spent_outputs but tx has %d inputs",
 					len(prevOuts), len(tx.MsgTx().TxIn))
 			}
-			t.Skip("BIP-54 sigop counter not implemented yet")
+
+			err = CheckBIP54SigOps(tx, prevOuts)
+			switch {
+			case tc.Valid && err != nil:
+				t.Fatalf("expected valid; got error: %v "+
+					"(count=%d)", err,
+					CountBIP54SigOps(tx, prevOuts))
+			case !tc.Valid && err == nil:
+				t.Fatalf("expected invalid; got nil "+
+					"(count=%d, limit=%d)",
+					CountBIP54SigOps(tx, prevOuts),
+					MaxBIP54LegacySigOpsPerTx)
+			}
 		})
 	}
 }

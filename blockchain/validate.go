@@ -56,6 +56,21 @@ const (
 	// though BIP34 is active.  This mirrors Bitcoin Core's safeguard against
 	// coinbases that serialized future heights prior to BIP34 activation.
 	bip34ReenableBIP30Height int32 = 1983702
+
+	// MaxBIP54LegacySigOpsPerTx is the maximum number of legacy signature
+	// operations BIP-54 allows in a single transaction's input scripts.
+	// CHECKSIG and CHECKMULTISIG opcodes in each input's scriptSig, the
+	// spent output's scriptPubKey, and the P2SH redeemScript (when
+	// applicable) are accumulated with BIP-16 precise accounting; any
+	// transaction whose total strictly exceeds this limit is invalid.
+	MaxBIP54LegacySigOpsPerTx = 2500
+
+	// defaultCheckMultiSigSigOps is the sigop count charged to a
+	// CHECKMULTISIG or CHECKMULTISIGVERIFY opcode that is not
+	// immediately preceded by an OP_1..OP_16 push, under BIP-16 precise
+	// accounting. The script engine cannot cheaply recover the actual
+	// number of pubkeys in that case, so it conservatively assigns 20.
+	defaultCheckMultiSigSigOps = 20
 )
 
 var (
@@ -744,6 +759,86 @@ func CheckBIP54TxSize(tx *btcutil.Tx) error {
 	return nil
 }
 
+// preciseLegacySigOps returns the BIP-16 precise legacy sigop count of a
+// single script:
+//
+//   - CHECKSIG and CHECKSIGVERIFY count as 1 each.
+//   - CHECKMULTISIG and CHECKMULTISIGVERIFY preceded by OP_1..OP_16 count
+//     as 1..16, and otherwise as 20.
+//
+// If the script fails to parse, the count up to the failure point is
+// returned.
+func preciseLegacySigOps(script []byte) int {
+	const scriptVersion = 0
+
+	count := 0
+	tokenizer := txscript.MakeScriptTokenizer(scriptVersion, script)
+	var prevOp byte
+	for tokenizer.Next() {
+		switch tokenizer.Opcode() {
+		case txscript.OP_CHECKSIG, txscript.OP_CHECKSIGVERIFY:
+			count++
+
+		case txscript.OP_CHECKMULTISIG, txscript.OP_CHECKMULTISIGVERIFY:
+			if prevOp >= txscript.OP_1 && prevOp <= txscript.OP_16 {
+				count += txscript.AsSmallInt(prevOp)
+			} else {
+				count += defaultCheckMultiSigSigOps
+			}
+		}
+		prevOp = tokenizer.Opcode()
+	}
+	return count
+}
+
+// CountBIP54SigOps returns the number of potentially-executed legacy
+// signature operations in a transaction's input scripts according to
+// BIP-54: for each input, the sigops in the scriptSig, in the spent
+// output's scriptPubKey, and (when the prevout is P2SH) in the
+// redeemScript embedded in the scriptSig are summed using BIP-16
+// precise accounting. Coinbase transactions always have zero such
+// sigops.
+//
+// prevOuts must be aligned 1:1 with tx.MsgTx().TxIn.
+func CountBIP54SigOps(tx *btcutil.Tx, prevOuts []*wire.TxOut) int {
+	if IsCoinBase(tx) {
+		return 0
+	}
+
+	msgTx := tx.MsgTx()
+	count := 0
+	for i, txIn := range msgTx.TxIn {
+		scriptSig := txIn.SignatureScript
+		scriptPubKey := prevOuts[i].PkScript
+
+		count += preciseLegacySigOps(scriptSig)
+		count += preciseLegacySigOps(scriptPubKey)
+
+		if txscript.IsPayToScriptHash(scriptPubKey) {
+			// GetPreciseSigOpCount returns the precise count of
+			// the redeemScript (the last data push in scriptSig)
+			// when scriptPubKey is P2SH and scriptSig is push-only.
+			count += txscript.GetPreciseSigOpCount(
+				scriptSig, scriptPubKey, true,
+			)
+		}
+	}
+	return count
+}
+
+// CheckBIP54SigOps rejects a transaction whose total potentially-executed
+// legacy signature operations exceed MaxBIP54LegacySigOpsPerTx. The
+// caller is responsible for verifying that the rule is in force.
+func CheckBIP54SigOps(tx *btcutil.Tx, prevOuts []*wire.TxOut) error {
+	if got := CountBIP54SigOps(tx, prevOuts); got > MaxBIP54LegacySigOpsPerTx {
+		str := fmt.Sprintf("transaction has %d legacy signature "+
+			"operations, BIP-54 allows at most %d",
+			got, MaxBIP54LegacySigOpsPerTx)
+		return ruleError(ErrTooManyBIP54SigOps, str)
+	}
+	return nil
+}
+
 // CheckSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
 func CheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
@@ -1307,6 +1402,33 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
 			return ruleError(ErrTooManySigOps, str)
+		}
+
+		// Under BIP-54, every non-coinbase transaction is also subject
+		// to a per-transaction cap on the precisely-counted legacy
+		// signature operations in its input scripts.
+		if bip54Active && i != 0 {
+			prevOuts := make([]*wire.TxOut, len(tx.MsgTx().TxIn))
+			for j, txIn := range tx.MsgTx().TxIn {
+				utxo := view.LookupEntry(txIn.PreviousOutPoint)
+				if utxo == nil || utxo.IsSpent() {
+					str := fmt.Sprintf("output %v "+
+						"referenced from "+
+						"transaction %s:%d either "+
+						"does not exist or has "+
+						"already been spent",
+						txIn.PreviousOutPoint,
+						tx.Hash(), j)
+					return ruleError(ErrMissingTxOut, str)
+				}
+				prevOuts[j] = &wire.TxOut{
+					Value:    utxo.Amount(),
+					PkScript: utxo.PkScript(),
+				}
+			}
+			if err := CheckBIP54SigOps(tx, prevOuts); err != nil {
+				return err
+			}
 		}
 	}
 
