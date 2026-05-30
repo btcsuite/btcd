@@ -442,16 +442,51 @@ func TestBIP54Coinbases(t *testing.T) {
 // must be ≥ the last block of the previous period minus 7200 s) and the
 // Murch-Zawy fix (the last block of a difficulty period must be ≥ the
 // first block of the same period). Each test case is a complete mainnet
-// header chain starting from the real genesis.
+// header chain starting from the real genesis; the chain is valid iff every
+// non-genesis header is accepted by ProcessBlockHeader.
 func TestBIP54Timestamps(t *testing.T) {
 	var root bip54TimestampsNode
 	loadBIP54JSON(t, "timestamps.json", &root)
 	leaves := flattenBIP54Timestamps(t, root)
 
-	for _, leaf := range leaves {
-		leaf := leaf
+	for i, leaf := range leaves {
+		i, leaf := i, leaf
 		t.Run(leaf.Comment, func(t *testing.T) {
-			t.Skip("BIP-54 timestamp rules not implemented yet")
+			params := bip54MainNetParams()
+			dbName := fmt.Sprintf("bip54_timestamps_%d", i)
+			chain, teardown, err := chainSetup(dbName, params)
+			if err != nil {
+				t.Fatalf("chainSetup: %v", err)
+			}
+			defer teardown()
+
+			// The chain is already initialized with the mainnet
+			// genesis, and ProcessBlockHeader cannot accept a header
+			// whose parent isn't already in the index, so verify the
+			// vector's first header is the genesis and start from the
+			// next one.
+			if got := leaf.Headers[0].BlockHash(); got != *params.GenesisHash {
+				t.Fatalf("first header is not the mainnet genesis: "+
+					"got %v, want %v", got, params.GenesisHash)
+			}
+
+			rejected := false
+			var rejectErr error
+			for j, hdr := range leaf.Headers[1:] {
+				_, perr := chain.ProcessBlockHeader(hdr, BFNone, true)
+				if perr != nil {
+					rejected = true
+					rejectErr = fmt.Errorf("header %d: %w", j+1, perr)
+					break
+				}
+			}
+
+			switch {
+			case leaf.Valid && rejected:
+				t.Fatalf("expected valid; %v", rejectErr)
+			case !leaf.Valid && !rejected:
+				t.Fatalf("expected invalid; chain accepted")
+			}
 		})
 	}
 }

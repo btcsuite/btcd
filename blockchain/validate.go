@@ -937,6 +937,20 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 				return err
 			}
 		}
+
+		// Once BIP-54 is active, enforce its difficulty-period
+		// boundary timestamp constraints.
+		bip54Active, err := c.BIP54Active(prevNode)
+		if err != nil {
+			return err
+		}
+		if bip54Active {
+			if err := CheckBIP54Timestamps(
+				header, prevNode,
+			); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Reject outdated block versions once a majority of the network
@@ -1002,6 +1016,57 @@ func assertNoTimeWarp(blockHeight, blocksPerReTarget int32, headerTimestamp,
 			"block %v"
 		str = fmt.Sprintf(str, headerTimestamp, prevBlockTimestamp)
 		return ruleError(ErrTimewarpAttack, str)
+	}
+
+	return nil
+}
+
+// CheckBIP54Timestamps enforces BIP-54's two header-timestamp rules at
+// difficulty-period boundaries. Letting N be the block height and TN
+// its timestamp:
+//
+//   - If N % 2016 == 0, TN must satisfy TN >= TN-1 - 7200.
+//   - If N % 2016 == 2015, TN must satisfy TN >= TN-2015.
+//
+// The caller is responsible for verifying that BIP-54 is in force.
+func CheckBIP54Timestamps(header *wire.BlockHeader, prevNode HeaderCtx) error {
+	blockHeight := prevNode.Height() + 1
+	headerTime := header.Timestamp
+
+	switch {
+	case blockHeight%2016 == 0:
+		// First block of a new period: compare against block at
+		// height N-1 (prevNode).
+		prevTime := time.Unix(prevNode.Timestamp(), 0)
+		threshold := prevTime.Add(-7200 * time.Second)
+		if headerTime.Before(threshold) {
+			str := fmt.Sprintf("block at height %d has timestamp "+
+				"%v which is more than 7200 seconds before "+
+				"block at height %d (N-1) with timestamp %v, "+
+				"violating BIP-54", blockHeight, headerTime,
+				prevNode.Height(), prevTime)
+			return ruleError(ErrBadBIP54Timestamp, str)
+		}
+
+	case blockHeight%2016 == 2015:
+		// Last block of the current period: compare against the block
+		// at height N-2015, which sits 2014 nodes back from prevNode
+		// (at height N-1).
+		ancestor := prevNode.RelativeAncestorCtx(2014)
+		if ancestor == nil {
+			return AssertError(fmt.Sprintf("BIP-54 timestamp "+
+				"check could not find block at height N-2015 "+
+				"for height %d", blockHeight))
+		}
+		ancestorTime := time.Unix(ancestor.Timestamp(), 0)
+		if headerTime.Before(ancestorTime) {
+			str := fmt.Sprintf("block at height %d has timestamp "+
+				"%v which is earlier than block at height %d "+
+				"(N-2015) with timestamp %v, violating BIP-54",
+				blockHeight, headerTime, ancestor.Height(),
+				ancestorTime)
+			return ruleError(ErrBadBIP54Timestamp, str)
+		}
 	}
 
 	return nil
@@ -1692,6 +1757,23 @@ func (b *BlockChain) FindPreviousCheckpoint() (HeaderCtx, error) {
 	}
 
 	return checkpoint, err
+}
+
+// BIP54Active reports whether the BIP-54 deployment has reached the active
+// threshold for a block extending prevNode.
+//
+// NOTE: Part of the ChainCtx interface.
+func (b *BlockChain) BIP54Active(prevNode HeaderCtx) (bool, error) {
+	bn, ok := prevNode.(*blockNode)
+	if !ok {
+		return false, AssertError(fmt.Sprintf("BIP54Active requires "+
+			"a *blockNode, got %T", prevNode))
+	}
+	state, err := b.deploymentState(bn, chaincfg.DeploymentBIP54)
+	if err != nil {
+		return false, err
+	}
+	return state == ThresholdActive, nil
 }
 
 // A compile-time assertion to ensure BlockChain implements the ChainCtx

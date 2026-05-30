@@ -245,6 +245,11 @@ const (
 	// contain more than MaxBIP54LegacySigOpsPerTx potentially-executed
 	// legacy signature operations.
 	ErrTooManyBIP54SigOps
+
+	// ErrBadBIP54Timestamp indicates a block header violates one of
+	// BIP-54's two new timestamp constraints at difficulty-period
+	// boundaries (the first or last block of a period).
+	ErrBadBIP54Timestamp
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -296,6 +301,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrBadCoinbaseLockTime:       "ErrBadCoinbaseLockTime",
 	ErrBadTxSize:                 "ErrBadTxSize",
 	ErrTooManyBIP54SigOps:        "ErrTooManyBIP54SigOps",
+	ErrBadBIP54Timestamp:         "ErrBadBIP54Timestamp",
 }
 
 // String returns the ErrorCode as a human-readable name.

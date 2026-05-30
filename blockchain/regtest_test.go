@@ -54,6 +54,12 @@ func (s stubChainCtx) FindPreviousCheckpoint() (HeaderCtx, error) {
 	return nil, nil
 }
 
+// BIP54Active reports whether BIP-54 is active for blocks extending
+// prevNode. The stub never activates it.
+func (s stubChainCtx) BIP54Active(_ HeaderCtx) (bool, error) {
+	return false, nil
+}
+
 // regtestPrevNode returns a blockNode for the regtest genesis block to serve
 // as the parent of height-1 test headers.
 func regtestPrevNode(t *testing.T) *blockNode {
