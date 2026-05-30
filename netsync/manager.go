@@ -1124,9 +1124,10 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 	}
 
-	// Ignore invs from peers that aren't the sync if we are not current.
-	// Helps prevent fetching a mass of orphans.
-	if peer != sm.syncPeer && !sm.current() {
+	// Ignore invs from peers that aren't the sync peer if we are not
+	// current. Helps prevent fetching a mass of orphans. When syncPeer
+	// is nil, accept invs from any peer.
+	if sm.syncPeer != nil && peer != sm.syncPeer && !sm.current() {
 		return
 	}
 
