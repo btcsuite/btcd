@@ -145,3 +145,18 @@ jobs:
 
       - name: Test
         run: make unit-race
+
+  test-rpctest:
+    name: Unit rpctest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Test
+        run: make unit
