@@ -385,6 +385,9 @@ func (h *StringOrArray) UnmarshalJSON(data []byte) error {
 	}
 
 	switch v := unmarshalled.(type) {
+	case nil:
+		*h = nil
+
 	case string:
 		*h = []string{v}
 
