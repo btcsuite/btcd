@@ -6,6 +6,7 @@ package rpctest
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -43,8 +44,12 @@ func btcdExecutablePath() (string, error) {
 		return "", err
 	}
 
-	// Build btcd and output an executable in a static temp path.
-	outputPath := filepath.Join(testDir, "btcd")
+	// Build btcd to a random path so concurrent `go test` processes
+	// (e.g. when test packages run in parallel under `make unit`) do
+	// not race on the same output file. Each test process pays a
+	// one-time compile cost; within a process the compileMtx-guarded
+	// cache keeps it to one build.
+	outputPath := filepath.Join(testDir, fmt.Sprintf("btcd-%d", rand.Uint32()))
 	if runtime.GOOS == "windows" {
 		outputPath += ".exe"
 	}
