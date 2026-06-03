@@ -197,6 +197,15 @@ func TestChainSvrMiningInfoResults(t *testing.T) {
 				NetworkHashPS: 89790618491361,
 			},
 		},
+		{
+			name: "mining info with signet challenge",
+			result: `{"networkhashps": 89790618491361, ` +
+				`"signet_challenge": "51"}`,
+			expected: btcjson.GetMiningInfoResult{
+				NetworkHashPS:   89790618491361,
+				SignetChallenge: "51",
+			},
+		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -363,6 +372,29 @@ func TestGetBlockChainInfoWarnings(t *testing.T) {
 					"want %+v", info.Warnings, test.expected)
 			}
 		})
+	}
+}
+
+// TestGetBlockChainInfoSignetChallenge tests that the signet_challenge field in
+// GetBlockChainInfoResult can be unmarshalled from signet responses.
+func TestGetBlockChainInfoSignetChallenge(t *testing.T) {
+	t.Parallel()
+
+	const signetChallenge = "51"
+
+	var info btcjson.GetBlockChainInfoResult
+	err := json.Unmarshal(
+		[]byte(`{"chain":"signet","signet_challenge":"`+
+			signetChallenge+`"}`),
+		&info,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if info.SignetChallenge != signetChallenge {
+		t.Fatalf("unexpected signet challenge - got %v, want %v",
+			info.SignetChallenge, signetChallenge)
 	}
 }
 

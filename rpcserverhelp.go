@@ -174,6 +174,7 @@ var helpDescsEnUS = map[string]string{
 
 	// GetBlockChainInfoResult help.
 	"getblockchaininforesult-chain":                "The name of the chain the daemon is on (testnet, mainnet, etc)",
+	"getblockchaininforesult-signet_challenge":     "The hex-encoded signet challenge for signet chains",
 	"getblockchaininforesult-blocks":               "The number of blocks in the best known chain",
 	"getblockchaininforesult-headers":              "The number of headers that we've gathered for in the best known chain",
 	"getblockchaininforesult-bestblockhash":        "The block hash for the latest block in the main chain",
@@ -449,6 +450,7 @@ var helpDescsEnUS = map[string]string{
 	"getmininginforesult-hashespersec":       "Recent hashes per second performance measurement while generating coins",
 	"getmininginforesult-networkhashps":      "Estimated network hashes per second for the most recent blocks",
 	"getmininginforesult-pooledtx":           "Number of transactions in the memory pool",
+	"getmininginforesult-signet_challenge":   "The hex-encoded signet challenge for signet chains",
 	"getmininginforesult-testnet":            "Whether or not server is using testnet",
 
 	// GetMiningInfoCmd help.
