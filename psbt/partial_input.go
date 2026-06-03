@@ -3,6 +3,7 @@ package psbt
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"sort"
 
@@ -515,6 +516,11 @@ func (pi *PInput) serialize(w io.Writer) error {
 			}
 		}
 
+		for idx, leafScript := range pi.TaprootLeafScript {
+			if leafScript == nil {
+				return fmt.Errorf("nil taproot leaf script at index %d", idx)
+			}
+		}
 		sort.Slice(pi.TaprootLeafScript, func(i, j int) bool {
 			return pi.TaprootLeafScript[i].SortBefore(
 				pi.TaprootLeafScript[j],
