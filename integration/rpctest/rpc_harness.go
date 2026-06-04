@@ -6,6 +6,7 @@ package rpctest
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"os"
 	"path/filepath"
@@ -76,7 +77,15 @@ var (
 
 	// lastPort is the last port determined to be free for use by a new
 	// node. It should be used atomically.
-	lastPort uint32 = defaultNodePort
+	//
+	// Seed with a random offset so concurrent `go test` processes
+	// (e.g. when integration/ and integration/rpctest/ run in parallel
+	// under `make unit`) do not race on the same port range. The
+	// bind-test in NextAvailablePort closes the listener before
+	// returning, leaving a window where another process could grab the
+	// same port; staggering each process's starting point avoids the
+	// collision. The 50k-port window leaves headroom below 65535.
+	lastPort uint32 = defaultNodePort + rand.Uint32N(50000)
 )
 
 // HarnessTestCase represents a test-case which utilizes an instance of the

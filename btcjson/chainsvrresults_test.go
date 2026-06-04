@@ -350,6 +350,16 @@ func TestGetBlockChainInfoWarnings(t *testing.T) {
 			result:   `{"warnings": []}`,
 			expected: btcjson.StringOrArray{},
 		},
+		{
+			name:     "blockchain info with null warnings",
+			result:   `{"warnings": null}`,
+			expected: nil,
+		},
+		{
+			name:     "blockchain info with warnings field omitted",
+			result:   `{}`,
+			expected: nil,
+		},
 	}
 
 	for _, test := range tests {

@@ -6,6 +6,7 @@ package integration
 import (
 	"testing"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
@@ -46,7 +47,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 
 	// Create a P2A output using the helper to get a P2A address. This
 	// ensures we're using the same P2A script generation logic.
-	p2aAddr, err := btcutil.NewAddressPayToAnchor(&chaincfg.SimNetParams)
+	p2aAddr, err := address.NewAddressPayToAnchor(&chaincfg.SimNetParams)
 	if err != nil {
 		t.Fatalf("unable to create P2A address: %v", err)
 	}
