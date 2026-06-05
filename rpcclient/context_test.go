@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,10 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testContextKey struct{}
+
 // TestGetBlockCountWithContextSuccess verifies that the context-
-// aware GetBlockCountWithContext returns the correct block height.
+// aware GetBlockCountWithContext returns the correct block height
+// and sends the HTTP request with the caller-provided context.
 func TestGetBlockCountWithContextSuccess(t *testing.T) {
 	t.Parallel()
+
+	const marker = "getblockcount success context"
 
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -31,9 +37,13 @@ func TestGetBlockCountWithContextSuccess(t *testing.T) {
 
 	client := newTestHTTPClient(t, server)
 	defer client.Shutdown()
+	requireRequestContextValue(t, client, marker)
 
+	ctx := context.WithValue(
+		context.Background(), testContextKey{}, marker,
+	)
 	count, err := client.GetBlockCountWithContext(
-		context.Background(),
+		ctx,
 	)
 	require.NoError(t, err)
 	require.Equal(t, int64(941874), count)
@@ -182,9 +192,12 @@ func TestHandleSendPostMessageNilCtxFallsBackToBackground(t *testing.T) {
 }
 
 // TestGetBlockCountWithContextRPCError verifies that JSON-RPC
-// errors are properly propagated through the context path.
+// errors are properly propagated through the caller-provided context
+// path.
 func TestGetBlockCountWithContextRPCError(t *testing.T) {
 	t.Parallel()
+
+	const marker = "getblockcount rpc error context"
 
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -204,9 +217,13 @@ func TestGetBlockCountWithContextRPCError(t *testing.T) {
 
 	client := newTestHTTPClient(t, server)
 	defer client.Shutdown()
+	requireRequestContextValue(t, client, marker)
 
+	ctx := context.WithValue(
+		context.Background(), testContextKey{}, marker,
+	)
 	_, err := client.GetBlockCountWithContext(
-		context.Background(),
+		ctx,
 	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "method not found")
@@ -233,6 +250,35 @@ func newTestHTTPClient(
 	require.NoError(t, err)
 
 	return client
+}
+
+func requireRequestContextValue(
+	t *testing.T, client *Client, want string,
+) {
+
+	t.Helper()
+
+	client.httpClient.Transport = roundTripperFunc(
+		func(r *http.Request) (*http.Response, error) {
+			if got := r.Context().Value(testContextKey{}); got != want {
+				errResponse := fmt.Sprintf(
+					`{"result":null,"error":{"code":-1,`+
+						`"message":"request context value = %v, want %v"},`+
+						`"id":1}`,
+					got, want,
+				)
+
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(errResponse)),
+					Request:    r,
+				}, nil
+			}
+
+			return http.DefaultTransport.RoundTrip(r)
+		},
+	)
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
