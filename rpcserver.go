@@ -792,11 +792,24 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		return nil, rpcDecodeHexError(hexStr)
 	}
 	var mtx wire.MsgTx
-	err = mtx.Deserialize(bytes.NewReader(serializedTx))
+	txReader := bytes.NewReader(serializedTx)
+	err = mtx.Deserialize(txReader)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDeserialization,
 			Message: "TX decode failed: " + err.Error(),
+		}
+	}
+
+	// Ensure the entire input was consumed during deserialization. Any
+	// trailing bytes mean the input is not a valid serialized transaction,
+	// so reject it to match bitcoind's behavior instead of silently
+	// discarding the extra data.
+	if txReader.Len() != 0 {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCDeserialization,
+			Message: "TX decode failed: transaction has " +
+				"unexpected trailing bytes",
 		}
 	}
 

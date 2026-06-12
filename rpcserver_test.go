@@ -67,6 +67,36 @@ func TestHandleTestMempoolAcceptFailDecode(t *testing.T) {
 	}
 }
 
+// TestHandleDecodeRawTransactionTrailingBytes checks that
+// decoderawtransaction rejects an input that has trailing bytes left over
+// after a transaction has been fully deserialized, matching bitcoind's
+// behavior.
+func TestHandleDecodeRawTransactionTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	// Create a testing server.
+	s := &rpcServer{}
+
+	// txHex1 is a valid, fully-formed transaction. Appending extra bytes
+	// to it must cause the decode to fail since the whole input is no
+	// longer consumed by deserialization.
+	hexTxWithTrailingBytes := txHex1 + "00"
+
+	cmd := btcjson.NewDecodeRawTransactionCmd(hexTxWithTrailingBytes)
+
+	closeChan := make(chan struct{})
+	result, err := handleDecodeRawTransaction(s, cmd, closeChan)
+
+	// A deserialization error should be returned and no result produced.
+	require.Error(err)
+	rpcErr, ok := err.(*btcjson.RPCError)
+	require.True(ok)
+	require.Equal(btcjson.ErrRPCDeserialization, rpcErr.Code)
+	require.Nil(result)
+}
+
 var (
 	// TODO(yy): make a `btctest` package and move these testing txns there
 	// so they be used in other tests.
