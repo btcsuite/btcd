@@ -97,6 +97,7 @@ unit:
 	@$(call print, "Running unit tests.")
 	$(GOTEST_DEV) ./... -test.timeout=20m
 	cd address && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd bip322 && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcec && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd btcutil && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd chaincfg && $(GOTEST_DEV) ./... -test.timeout=20m
@@ -114,6 +115,7 @@ unit-cover:
 	# We need to remove the /v2 pathing from the module to have it work
 	# nicely with the CI tool we use to render live code coverage.
 	cd address && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd bip322 && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd btcec && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd btcutil && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd chaincfg && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
@@ -128,6 +130,7 @@ unit-race:
 	@$(call print, "Running unit race tests.")
 	env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd address && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd bip322 && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd btcec && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd btcutil && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd chaincfg && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
