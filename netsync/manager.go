@@ -360,38 +360,13 @@ func (sm *SyncManager) startSync() {
 // isSyncCandidate returns whether or not the peer is a candidate to consider
 // syncing from.
 func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
-	// Typically a peer is not a candidate for sync if it's not a full node,
-	// however regression test is special in that the regression tool is
-	// not a full node and still needs to be considered a sync candidate.
-	switch sm.chainParams.Name {
-	case chaincfg.RegressionNetParams.Name, chaincfg.SimNetParams.Name:
-		// In regtest/simnet mode, any peer is a valid sync candidate
-		// regardless of its address or service flags. This allows
-		// syncing from peers on non-localhost networks such as Docker
-		// bridge networks.
-		return true
-	}
-
-	// If the segwit soft-fork package has activated, then the peer must
-	// also be upgraded.
-	segwitActive, err := sm.chain.IsDeploymentActive(
-		chaincfg.DeploymentSegwit,
-	)
-	if err != nil {
-		log.Errorf("Unable to query for segwit soft-fork state: %v",
-			err)
-	}
-
-	if segwitActive && !peer.IsWitnessEnabled() {
-		return false
-	}
-
 	var (
 		nodeServices = peer.Services()
 		fullNode     = nodeServices.HasFlag(wire.SFNodeNetwork)
 		prunedNode   = nodeServices.HasFlag(wire.SFNodeNetworkLimited)
 	)
 
+	// We check the node's ability to serve blocks first.
 	switch {
 	case fullNode:
 		// Node is a sync candidate if it has all the blocks.
@@ -415,6 +390,29 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	default:
 		// If the peer isn't an archival node, and it's not signaling
 		// NODE_NETWORK_LIMITED, we can't sync off of this node.
+		return false
+	}
+
+	// We can skip the deployment requirement for local test networks.
+	switch sm.chainParams.Name {
+	case chaincfg.RegressionNetParams.Name, chaincfg.SimNetParams.Name:
+		// Being able to serve blocks in the range we need is the only
+		// requirement for regtest and simnet. Any light clients such as
+		// Neutrino would fail above already.
+		return true
+	}
+
+	// If the segwit soft-fork package has activated, then the peer must
+	// also be upgraded.
+	segwitActive, err := sm.chain.IsDeploymentActive(
+		chaincfg.DeploymentSegwit,
+	)
+	if err != nil {
+		log.Errorf("Unable to query for segwit soft-fork state: %v",
+			err)
+	}
+
+	if segwitActive && !peer.IsWitnessEnabled() {
 		return false
 	}
 

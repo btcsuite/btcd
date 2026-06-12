@@ -1220,9 +1220,8 @@ func TestStartSyncChainCurrent(t *testing.T) {
 		"ibdMode should not be activated when chain is already current")
 }
 
-// TestIsSyncCandidateRegtest verifies that isSyncCandidate accepts any peer
-// on regtest regardless of address, including non-localhost Docker bridge
-// addresses.
+// TestIsSyncCandidateRegtest verifies that isSyncCandidate accepts peers
+// on regtest and simnet based on their service flags.
 func TestIsSyncCandidateRegtest(t *testing.T) {
 	t.Parallel()
 
@@ -1231,29 +1230,41 @@ func TestIsSyncCandidateRegtest(t *testing.T) {
 	defer tearDown()
 
 	tests := []struct {
-		name string
-		addr string
-		want bool
+		name      string
+		flags     wire.ServiceFlag
+		lastBlock int32
+		want      bool
 	}{
 		{
-			name: "localhost",
-			addr: "127.0.0.1:18444",
-			want: true,
+			name:  "just node network",
+			flags: wire.SFNodeNetwork,
+			want:  true,
 		},
 		{
-			name: "docker bridge ip",
-			addr: "172.18.0.2:18444",
-			want: true,
+			name:  "just limited network",
+			flags: wire.SFNodeNetworkLimited,
+			want:  true,
 		},
 		{
-			name: "remote ip",
-			addr: "93.184.216.34:18444",
-			want: true,
+			name:      "limited network with block ahead",
+			flags:     wire.SFNodeNetworkLimited,
+			lastBlock: wire.NodeNetworkLimitedBlockThreshold + 1,
+			want:      false,
 		},
 		{
-			name: "ipv6 loopback",
-			addr: "[::1]:18444",
-			want: true,
+			name:  "node network and limited node network",
+			flags: wire.SFNodeNetwork | wire.SFNodeNetworkLimited,
+			want:  true,
+		},
+		{
+			name:  "no flags",
+			flags: 0,
+			want:  false,
+		},
+		{
+			name:  "different flag",
+			flags: wire.SFNodeBloom,
+			want:  false,
 		},
 	}
 
@@ -1261,7 +1272,9 @@ func TestIsSyncCandidateRegtest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := peer.NewInboundPeer(&peer.Config{
 				ChainParams: sm.chainParams,
+				Services:    tc.flags,
 			})
+			p.UpdateLastBlockHeight(tc.lastBlock)
 
 			got := sm.isSyncCandidate(p)
 			require.Equal(t, tc.want, got)
