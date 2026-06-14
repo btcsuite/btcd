@@ -151,6 +151,23 @@ type BlockChain struct {
 	nextCheckpoint *chaincfg.Checkpoint
 	checkpointNode *blockNode
 
+	// These fields are related to swift sync. Swift sync enables fast UTXO
+	// set bootstrapping using a precomputed hintsfile of unspent
+	// outputs (chaincfg.SwiftSyncData).
+	swiftSync        *chaincfg.SwiftSyncData
+	swiftSyncHeight  int32 // Last block height applied via swift sync (persisted)
+	swiftSyncEnabled bool  // False if no swift sync hintsfile was provided
+
+	// swiftSyncSalt and swiftSyncAgg validate the swift sync hints.  The salt
+	// is a secret generated and persisted when the database is created for
+	// swift sync, and is constant for the whole sync.  The aggregate sums the
+	// salted outpoint of every spent output, added when the output is created
+	// and subtracted when it is spent, and must be zero at the boundary.  It is
+	// persisted with swiftSyncHeight so a resumed sync continues the same
+	// aggregate against the same salt.
+	swiftSyncSalt [32]byte
+	swiftSyncAgg  Agg512
+
 	// The state is used as a fairly efficient way to cache information
 	// about the current best chain state that is returned to callers when
 	// requested.  It operates on the principle of MVCC such that any time a
@@ -583,10 +600,15 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			"that extends the main chain")
 	}
 
-	// Sanity check the correct number of stxos are provided.
-	if len(stxos) != countSpentOutputs(block) {
-		return AssertError("connectBlock called with inconsistent " +
-			"spent transaction out information")
+	// Swift sync adds only the hints' unspent outputs and never spends inputs,
+	// so it provides no stxos even though the block has spends.  The count
+	// check below therefore only applies when swift sync is not active.
+	if !b.isSwiftSyncActive(block.Height()) {
+		// Sanity check the correct number of stxos are provided.
+		if len(stxos) != countSpentOutputs(block) {
+			return AssertError("connectBlock called with inconsistent " +
+				"spent transaction out information")
+		}
 	}
 
 	// No warnings about unknown rules until the chain is current.
@@ -674,6 +696,21 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
 		if err != nil {
 			return err
+		}
+
+		// Save swift sync progress.  The aggregate is persisted in the
+		// same transaction as the height so the pair is always consistent
+		// on resume.  The salt is constant and was persisted when the
+		// database was created.
+		if b.isSwiftSyncActive(node.height) {
+			err = dbPutSwiftSyncHeight(dbTx, b.swiftSyncHeight)
+			if err != nil {
+				return err
+			}
+			err = dbPutSwiftSyncAgg(dbTx, &b.swiftSyncAgg)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Allow the index manager to call each of the currently active
@@ -1178,6 +1215,68 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	if parentHash.IsEqual(&b.bestChain.Tip().hash) {
 		// Skip checks if node has already been fully validated.
 		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
+
+		// Swift sync: use the precomputed hintsfile for fast UTXO
+		// bootstrapping.  This skips all validation and uses the hints
+		// to directly construct the UTXO set.
+		if b.isSwiftSyncActive(node.height) {
+			// Add only unspent outputs to the UTXO cache using the
+			// per-block hints, and update the aggregate that validates
+			// them at the boundary.
+			err := b.utxoCache.swiftSyncConnectTransactions(
+				b, block, true,
+			)
+			if err != nil {
+				return false, err
+			}
+
+			b.swiftSyncHeight = node.height
+
+			// Connect the block to the main chain. Pass nil for stxos
+			// since we don't need spend journal during swift sync.
+			err = b.connectBlock(node, block, nil)
+			if err != nil {
+				return false, err
+			}
+
+			b.index.SetStatusFlags(node, statusValid)
+			flushIndexState()
+
+			// At the swift sync boundary, verify the aggregate is zero,
+			// which proves the hints are correct and the UTXO set we
+			// built is valid.  The boundary block is the swift sync
+			// checkpoint, so checkpoint enforcement already pins its
+			// identity.
+			if node.height == b.swiftSync.Height {
+				if !b.swiftSyncAgg.IsZero() {
+					// A non-zero aggregate means the hintsfile was
+					// invalid or malicious and the UTXO set we built from
+					// it is unusable, so stop the node and have the user
+					// start over from a fresh database.  Reported as
+					// corruption so the sync manager halts rather than
+					// retrying the boundary block.
+					log.Criticalf("Swift sync failed at height %d (block "+
+						"%s): aggregate %x is non-zero, so the hintsfile is "+
+						"invalid and may be malicious and the UTXO set it "+
+						"built is corrupt. Stop btcd and delete the data "+
+						"directory, then resync without a hintsfile or with "+
+						"a different one from a source you trust.",
+						node.height, block.Hash(), b.swiftSyncAgg.Bytes())
+					return false, database.Error{
+						ErrorCode: database.ErrCorruption,
+						Description: fmt.Sprintf("swift sync aggregate %x "+
+							"is non-zero at boundary height %d (block %s), "+
+							"the hintsfile is invalid or malicious",
+							b.swiftSyncAgg.Bytes(), node.height,
+							block.Hash()),
+					}
+				}
+				log.Infof("Swift sync completed at height %d, hash %v",
+					node.height, block.Hash())
+			}
+
+			return true, nil
+		}
 
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
@@ -2175,6 +2274,15 @@ type Config struct {
 	// checkpoints.
 	Checkpoints []chaincfg.Checkpoint
 
+	// SwiftSync, when non-nil, holds a parsed swift sync hintsfile used to
+	// bootstrap the UTXO set without replaying historical spends.  The
+	// caller loads the hintsfile from disk and validates it against the
+	// network's expected swift sync boundary (see
+	// chaincfg.ParseSwiftSyncHints) before passing it in.
+	//
+	// This field can be nil, in which case the chain syncs normally.
+	SwiftSync *chaincfg.SwiftSyncData
+
 	// TimeSource defines the median time source to use for things such as
 	// block processing and determining whether or not the chain is current.
 	//
@@ -2250,6 +2358,21 @@ func New(config *Config) (*BlockChain, error) {
 	targetTimespan := int64(params.TargetTimespan / time.Second)
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
+
+	// Swift sync is enabled when the caller provided a hintsfile.  Swift sync
+	// builds the UTXO set without validating signatures up to its boundary, so
+	// independently confirm that boundary is pinned by a checkpoint before
+	// trusting it.  Without that anchor (for example under --nocheckpoints)
+	// swift sync is disabled and the chain syncs normally.
+	swiftSyncEnabled := config.SwiftSync != nil
+	if swiftSyncEnabled {
+		if _, ok := checkpointsByHeight[config.SwiftSync.Height]; !ok {
+			log.Warnf("Swift sync disabled: boundary at height %d is not "+
+				"backed by a checkpoint", config.SwiftSync.Height)
+			swiftSyncEnabled = false
+		}
+	}
+
 	b := BlockChain{
 		checkpoints:         config.Checkpoints,
 		checkpointsByHeight: checkpointsByHeight,
@@ -2271,6 +2394,8 @@ func New(config *Config) (*BlockChain, error) {
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 		pruneTarget:         config.Prune,
+		swiftSync:           config.SwiftSync,
+		swiftSyncEnabled:    swiftSyncEnabled,
 	}
 
 	// Ensure all the deployments are synchronized with our clock if
@@ -2292,6 +2417,13 @@ func New(config *Config) (*BlockChain, error) {
 	// will be initialized to contain only the genesis block.
 	if err := b.initChainState(); err != nil {
 		return nil, err
+	}
+
+	// Report the final swift sync state once the chain is initialized, so it is
+	// logged on a fresh database as well as a resumed one.
+	if b.swiftSyncEnabled {
+		log.Infof("Swift sync enabled: target height=%d, resume height=%d",
+			b.swiftSync.Height, b.swiftSyncHeight)
 	}
 
 	// Perform any upgrades to the various chain-specific buckets as needed.

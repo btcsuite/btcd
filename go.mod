@@ -68,6 +68,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+// The chaincfg module gains the SwiftSyncData type on this branch, so build
+// against the local copy until a new chaincfg/v2 version is tagged.
+replace github.com/btcsuite/btcd/chaincfg/v2 => ./chaincfg
+
 // The retract statements below fixes an accidental push of the tags of a btcd
 // fork.
 retract (
