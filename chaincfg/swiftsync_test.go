@@ -315,3 +315,39 @@ func TestParseSwiftSyncHintsRejects(t *testing.T) {
 		})
 	}
 }
+
+// TestSigNetSwiftSyncCheckpoint verifies signet's swift sync boundary and the
+// hintsfile hash the loader validates against.
+func TestSigNetSwiftSyncCheckpoint(t *testing.T) {
+	cp := SigNetParams.SwiftSync
+	require.NotNil(t, cp)
+	require.Equal(t, int32(285205), cp.Height)
+	require.Equal(t,
+		"df2a00fe29905bbc1897d23a04f169ea2b5e909b53e55dacc41eb1ab9d04edde",
+		cp.HintsHash)
+}
+
+// TestSwiftSyncBoundaryIsCheckpoint enforces, for every network that enables
+// swift sync, that the boundary is a checkpoint.  Swift sync skips signature
+// validation up to the boundary, so the boundary must be a checkpoint that
+// freezes the block and supplies its trusted hash.
+func TestSwiftSyncBoundaryIsCheckpoint(t *testing.T) {
+	for _, p := range []*Params{
+		&MainNetParams, &TestNet3Params, &TestNet4Params,
+		&SigNetParams, &SimNetParams, &RegressionNetParams,
+	} {
+		if p.SwiftSync == nil {
+			continue // swift sync not supported on this network
+		}
+		var found bool
+		for _, cp := range p.Checkpoints {
+			if cp.Height == p.SwiftSync.Height {
+				found = true
+				break
+			}
+		}
+		require.Truef(t, found,
+			"%s: swift sync boundary height %d is not a checkpoint",
+			p.Name, p.SwiftSync.Height)
+	}
+}
