@@ -118,6 +118,7 @@ type config struct {
 	MemoryProfile        string        `long:"memprofile" description:"Write memory profile to the specified file"`
 	TraceProfile         string        `long:"traceprofile" description:"Write execution trace to the specified file"`
 	DataDir              string        `short:"b" long:"datadir" description:"Directory to store data"`
+	SwiftSyncHints       string        `long:"swiftsynchints" description:"Path to a swift sync hintsfile used to bootstrap the UTXO set. Defaults to sshints.dat in the data directory or next to the btcd binary when present."`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	DebugLevel           string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	DropAddrIndex        bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
@@ -653,6 +654,12 @@ func loadConfig() (*config, []string, error) {
 	// worry about changing names per network and such.
 	cfg.DataDir = cleanAndExpandPath(cfg.DataDir)
 	cfg.DataDir = filepath.Join(cfg.DataDir, netName(activeNetParams))
+
+	// Expand a swift sync hintsfile override path if one was provided.  When
+	// it is empty the loader falls back to the per-network data directory.
+	if cfg.SwiftSyncHints != "" {
+		cfg.SwiftSyncHints = cleanAndExpandPath(cfg.SwiftSyncHints)
+	}
 
 	// Append the network type to the log directory so it is "namespaced"
 	// per network in the same fashion as the data directory.

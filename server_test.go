@@ -145,3 +145,35 @@ func TestPeerLifecycleSimultaneousReady(t *testing.T) {
 		"(both outcomes are valid per documented behavior)",
 		addEmitted, iterations)
 }
+
+// TestSwiftSyncHintsLookup verifies the default hintsfile locations and the
+// search over them: the data directory is listed first, the running binary's
+// directory is also searched, and findSwiftSyncHints returns the first location
+// that exists (or "" when none do).
+func TestSwiftSyncHintsLookup(t *testing.T) {
+	dataDir := t.TempDir()
+
+	// The data directory is searched first, then the directory holding the
+	// running binary so a distributed bundle is found.
+	candidates := swiftSyncHintsCandidates(dataDir)
+	require.Equal(t, filepath.Join(dataDir, swiftSyncHintsFilename),
+		candidates[0], "data directory must be searched first")
+
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	require.Contains(t, candidates,
+		filepath.Join(filepath.Dir(exe), swiftSyncHintsFilename),
+		"the binary's directory must be among the searched locations")
+
+	// With no file in any location, the lookup reports none.
+	require.Empty(t, findSwiftSyncHints(t.TempDir()))
+
+	// A file in the data directory is found, and is preferred since the data
+	// directory is searched first.
+	path := filepath.Join(dataDir, swiftSyncHintsFilename)
+	require.NoError(t, os.WriteFile(path, []byte("hints"), 0o644))
+	require.Equal(t, path, findSwiftSyncHints(dataDir))
+}

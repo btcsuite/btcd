@@ -7,13 +7,18 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -296,7 +301,7 @@ type serverPeer struct {
 	addressesMtx   sync.RWMutex
 	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
-	quit chan struct{}
+	quit           chan struct{}
 
 	// Closed by verAckOnce when OnVerAck fires.
 	verAckCh   chan struct{}
@@ -2859,6 +2864,157 @@ func setupRPCListeners() ([]net.Listener, error) {
 	return listeners, nil
 }
 
+// swiftSyncHintsFilename is the default name of the swift sync hintsfile.  It is
+// searched for in the network's data directory and next to the btcd binary, and
+// matches the name cmd/genswiftsynchints writes, so a freshly generated or
+// bundled file is found without any extra configuration.
+const swiftSyncHintsFilename = "sshints.dat"
+
+// maxSwiftSyncHintsFileSize bounds how many bytes loadSwiftSyncHints reads into
+// memory.  Real hintsfiles are far smaller than this, so the cap only rejects
+// corrupt or hostile input while bounding the amount read into memory before it
+// is parsed.
+const maxSwiftSyncHintsFileSize = 1 << 30 // 1 GiB
+
+// loadSwiftSyncHints loads and validates the swift sync hintsfile for the given
+// network, if one is available.  The file is read from overridePath when set,
+// otherwise from the first default location that exists (see
+// swiftSyncHintsCandidates).
+//
+// It returns (nil, nil) when swift sync is not supported for the network or no
+// hintsfile is present in a default location, so the chain simply syncs
+// normally.  It returns an error when a hintsfile that should exist cannot be
+// read or fails validation against the network's swift sync checkpoint.
+func loadSwiftSyncHints(chainParams *chaincfg.Params, dataDir,
+	overridePath string) (*chaincfg.SwiftSyncData, error) {
+
+	cfg := chainParams.SwiftSync
+	if cfg == nil {
+		// Swift sync is not supported for this network.
+		return nil, nil
+	}
+
+	path := overridePath
+	if path == "" {
+		// With no explicit path, use the first default location that
+		// exists.  No hintsfile in any of them just means swift sync is
+		// not in use, so the chain syncs normally.
+		path = findSwiftSyncHints(dataDir)
+		if path == "" {
+			btcdLog.Debugf("No swift sync hintsfile in a default " +
+				"location; syncing normally")
+			return nil, nil
+		}
+	}
+
+	// Stat first so an oversized file is rejected before it is loaded into
+	// memory.  A missing file at an explicitly requested path is reported.
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("unable to stat swift sync hintsfile "+
+			"%q: %w", path, err)
+	}
+	if info.Size() > maxSwiftSyncHintsFileSize {
+		return nil, fmt.Errorf("swift sync hintsfile %q is too large "+
+			"(%d bytes, limit %d)", path, info.Size(),
+			maxSwiftSyncHintsFileSize)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open swift sync hintsfile "+
+			"%q: %w", path, err)
+	}
+	defer f.Close()
+
+	// Read the compressed file so its hash can be checked before it is
+	// inflated.  The stat above bounds the size; cap the read too in case the
+	// file grew since.
+	compressed, err := io.ReadAll(io.LimitReader(f, maxSwiftSyncHintsFileSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read swift sync hintsfile "+
+			"%q: %w", path, err)
+	}
+	if int64(len(compressed)) > maxSwiftSyncHintsFileSize {
+		return nil, fmt.Errorf("swift sync hintsfile %q is too large "+
+			"(limit %d bytes)", path, maxSwiftSyncHintsFileSize)
+	}
+
+	// Reject a hintsfile whose hash does not match the one pinned for the
+	// network, catching a wrong or corrupt file here rather than at the
+	// aggregate check after a full sync.
+	if cfg.HintsHash != "" {
+		got := fmt.Sprintf("%x", sha256.Sum256(compressed))
+		if !strings.EqualFold(got, cfg.HintsHash) {
+			return nil, fmt.Errorf("swift sync hintsfile %q has hash %s, "+
+				"want %s", path, got, cfg.HintsHash)
+		}
+	}
+
+	zr, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return nil, fmt.Errorf("invalid swift sync hintsfile %q: %w",
+			path, err)
+	}
+	defer zr.Close()
+
+	// The size check above only bounds the compressed size, so bound the
+	// inflated size too: read one byte past the cap and reject anything that
+	// reaches it, which stops a small but hostile file from inflating without
+	// limit.
+	raw, err := io.ReadAll(io.LimitReader(zr, maxSwiftSyncHintsFileSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read swift sync hintsfile "+
+			"%q: %w", path, err)
+	}
+	if int64(len(raw)) > maxSwiftSyncHintsFileSize {
+		return nil, fmt.Errorf("swift sync hintsfile %q inflates to more "+
+			"than %d bytes", path, maxSwiftSyncHintsFileSize)
+	}
+
+	data, err := chaincfg.ParseSwiftSyncHints(
+		raw, cfg.Height,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("invalid swift sync hintsfile %q: %w",
+			path, err)
+	}
+
+	btcdLog.Infof("Loaded swift sync hintsfile %q covering blocks 1..%d",
+		path, data.Height)
+	return data, nil
+}
+
+// findSwiftSyncHints returns the first default swift sync hintsfile location
+// that exists, or "" when none do.
+func findSwiftSyncHints(dataDir string) string {
+	for _, path := range swiftSyncHintsCandidates(dataDir) {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path
+		}
+	}
+	return ""
+}
+
+// swiftSyncHintsCandidates returns the default swift sync hintsfile locations in
+// search order: swiftSyncHintsFilename in the data directory, then next to the
+// running btcd binary.  Bundling the hintsfile alongside the binaries lets a
+// distribution be used without configuration, since a fresh data directory does
+// not contain it.
+func swiftSyncHintsCandidates(dataDir string) []string {
+	paths := []string{filepath.Join(dataDir, swiftSyncHintsFilename)}
+	if exe, err := os.Executable(); err == nil {
+		// Resolve symlinks so a binary invoked through one is matched to
+		// the directory that actually holds it.
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		paths = append(paths,
+			filepath.Join(filepath.Dir(exe), swiftSyncHintsFilename))
+	}
+	return paths
+}
+
 // newServer returns a new btcd server configured to listen on addr for the
 // bitcoin network type specified by chainParams.  Use start to begin accepting
 // connections from peers.
@@ -2978,13 +3134,23 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		btcdLog.Infof("Prune set to %d MiB", cfg.Prune)
 	}
 
+	// Load a swift sync hintsfile if one is available so the UTXO set can be
+	// bootstrapped without replaying historical spends.  A missing file or a
+	// load error just means a normal sync.
+	swiftSync, err := loadSwiftSyncHints(
+		s.chainParams, cfg.DataDir, cfg.SwiftSyncHints,
+	)
+	if err != nil {
+		btcdLog.Warnf("Swift sync disabled: %v", err)
+	}
+
 	// Create a new block chain instance with the appropriate configuration.
-	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
 		DB:               s.db,
 		Interrupt:        interrupt,
 		ChainParams:      s.chainParams,
 		Checkpoints:      checkpoints,
+		SwiftSync:        swiftSync,
 		TimeSource:       s.timeSource,
 		SigCache:         s.sigCache,
 		IndexManager:     indexManager,
