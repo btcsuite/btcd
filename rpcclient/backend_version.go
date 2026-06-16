@@ -19,6 +19,10 @@ type BackendVersion interface {
 	// SupportGetTxSpendingPrevOut returns true if the backend supports the
 	// gettxspendingprevout RPC.
 	SupportGetTxSpendingPrevOut() bool
+
+	// SupportSubmitPackage returns true if the backend supports the
+	// submitpackage RPC.
+	SupportSubmitPackage() bool
 }
 
 // BitcoindVersion represents the version of the bitcoind the client is
@@ -85,6 +89,15 @@ func (b BitcoindVersion) SupportTestMempoolAccept() bool {
 // SupportGetTxSpendingPrevOut returns true if bitcoind version is 24.0.0 or
 // above.
 func (b BitcoindVersion) SupportGetTxSpendingPrevOut() bool {
+	return b > BitcoindPre24
+}
+
+// SupportSubmitPackage returns true if bitcoind version is 24.0.0 or above,
+// the release in which the submitpackage RPC was introduced.
+//
+// NOTE: the optional maxfeerate/maxburnamount arguments were only added in
+// v28; this predicate only gates the call itself, not those arguments.
+func (b BitcoindVersion) SupportSubmitPackage() bool {
 	return b > BitcoindPre24
 }
 
@@ -185,6 +198,11 @@ func (b BtcdVersion) SupportTestMempoolAccept() bool {
 // SupportGetTxSpendingPrevOut returns true if btcd version is 24.1.0 or above.
 func (b BtcdVersion) SupportGetTxSpendingPrevOut() bool {
 	return b > BtcdPre2401
+}
+
+// SupportSubmitPackage returns false: btcd has no submitpackage RPC handler.
+func (b BtcdVersion) SupportSubmitPackage() bool {
+	return false
 }
 
 // Compile-time checks to ensure that BtcdVersion satisfy the BackendVersion
