@@ -22,7 +22,7 @@ const (
 
 	// appPreRelease MUST only contain characters from semanticAlphabet
 	// per the semantic versioning spec.
-	appPreRelease = "beta.rc1"
+	appPreRelease = "beta"
 )
 
 // appBuild is defined as a variable so it can be overridden during the build
