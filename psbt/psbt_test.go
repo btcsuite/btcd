@@ -1338,6 +1338,24 @@ func TestFromUnsigned(t *testing.T) {
 	}
 }
 
+func TestB64EncodeRejectsNilTaprootLeafScript(t *testing.T) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  chainhash.Hash{},
+			Index: 0,
+		},
+	})
+	tx.AddTxOut(wire.NewTxOut(1, []byte{txscript.OP_TRUE}))
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	packet.Inputs[0].TaprootLeafScript = []*TaprootTapLeafScript{nil}
+	_, err = packet.B64Encode()
+	require.ErrorContains(t, err, "nil taproot leaf script at index 0")
+}
+
 func TestNonWitnessToWitness(t *testing.T) {
 	// We'll start with a PSBT produced by Core for which
 	// the first input is signed and we'll provided the signatures for
