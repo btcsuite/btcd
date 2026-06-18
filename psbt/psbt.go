@@ -278,9 +278,9 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 				return nil, err
 			}
 
-			// Duplicate keys are not allowed
+			// Duplicate keys are not allowed.
 			for _, x := range xPubSlice {
-				if bytes.Equal(x.ExtendedKey, keyData) {
+				if bytes.Equal(x.ExtendedKey, keydata) {
 					return nil, ErrDuplicateKey
 				}
 			}
