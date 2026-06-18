@@ -1,6 +1,8 @@
 package btcec
 
-import secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
+import (
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
+)
 
 // FieldVal implements optimized fixed-precision arithmetic over the secp256k1
 // finite field. This means all arithmetic is performed modulo
