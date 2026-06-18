@@ -386,7 +386,10 @@ func loadBlockDB() (database.DB, error) {
 
 	// The regression test is special in that it needs a clean database for
 	// each run, so remove it now if it already exists.
-	removeRegressionDB(dbPath)
+	err := removeRegressionDB(dbPath)
+	if err != nil {
+		return nil, err
+	}
 
 	btcdLog.Infof("Loading block database from '%s'", dbPath)
 	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
