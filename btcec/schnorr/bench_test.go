@@ -136,7 +136,7 @@ func BenchmarkSign(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sig, err = Sign(
-			privKey, msgHash, CustomNonce(auxBytes), FastSign(),
+			privKey, msgHash, AuxRand(auxBytes), FastSign(),
 		)
 	}
 
@@ -144,8 +144,9 @@ func BenchmarkSign(b *testing.B) {
 	testErr = err
 }
 
-// BenchmarkSignRfc6979 benchmarks how long it takes to sign a message.
-func BenchmarkSignRfc6979(b *testing.B) {
+// BenchmarkSignDefault benchmarks how long it takes to sign a message when
+// AuxRand is not passed in
+func BenchmarkSignDefault(b *testing.B) {
 	// Randomly generated keypair.
 	d := hexToModNScalar("9e0699c91ca1e3b7e3c9ba71eb71c89890872be97576010fe593fbf3fd57e66d")
 	privKey := secp256k1.NewPrivateKey(d)
