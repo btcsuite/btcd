@@ -184,7 +184,7 @@ func TestTxHash(t *testing.T) {
 	}
 }
 
-// TestTxSha tests the ability to generate the wtxid, and txid of a transaction
+// TestWTxSha tests the ability to generate the wtxid, and txid of a transaction
 // with witness inputs accurately.
 func TestWTxSha(t *testing.T) {
 	hashStrTxid := "0f167d1385a84d1518cfee208b653fc9163b605ccf1b75347e2850b3e2eb19f3"
