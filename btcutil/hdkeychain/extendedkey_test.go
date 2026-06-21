@@ -860,11 +860,9 @@ func TestErrors(t *testing.T) {
 
 	// NewKeyFromString failure tests.
 	tests := []struct {
-		name      string
-		key       string
-		err       error
-		neuter    bool
-		neuterErr error
+		name string
+		key  string
+		err  error
 	}{
 		{
 			name: "invalid key length",
@@ -882,31 +880,100 @@ func TestErrors(t *testing.T) {
 			err:  secp_ecdsa.ErrPubKeyNotOnCurve,
 		},
 		{
-			name:      "unsupported version",
-			key:       "xbad4LfUL9eKmA66w2GJdVMqhvDmYGJpTGjWRAtjHqoUY17sGaymoMV9Cm3ocn9Ud6Hh2vLFVC7KSKCRVVrqc6dsEdsTjRV1WUmkK85YEUujAPX",
-			err:       nil,
-			neuter:    true,
-			neuterErr: chaincfg.ErrUnknownHDKeyID,
+			name: "unsupported version",
+			key:  "xbad4LfUL9eKmA66w2GJdVMqhvDmYGJpTGjWRAtjHqoUY17sGaymoMV9Cm3ocn9Ud6Hh2vLFVC7KSKCRVVrqc6dsEdsTjRV1WUmkK85YEUujAPX",
+			err:  chaincfg.ErrUnknownHDKeyID,
+		},
+		// BIP32 test vector 5 (invalid extended keys should be rejected).
+		{
+			name: "tv5_1 pubkey version / prvkey mismatch",
+			key:  "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6LBpB85b3D2yc8sfvZU521AAwdZafEz7mnzBBsz4wKY5fTtTQBm",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_2 prvkey version / pubkey mismatch",
+			key:  "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFGTQQD3dC4H2D5GBj7vWvSQaaBv5cxi9gafk7NF3pnBju6dwKvH",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_3 invalid pubkey prefix 04",
+			key:  "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6Txnt3siSujt9RCVYsx4qHZGc62TG4McvMGcAUjeuwZdduYEvFn",
+			err:  secp_ecdsa.ErrPubKeyInvalidFormat,
+		},
+		{
+			name: "tv5_4 invalid prvkey prefix 04",
+			key:  "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFGpWnsj83BHtEy5Zt8CcDr1UiRXuWCmTQLxEK9vbz5gPstX92JQ",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_5 invalid pubkey prefix 01",
+			key:  "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6N8ZMMXctdiCjxTNq964yKkwrkBJJwpzZS4HS2fxvyYUA4q2Xe4",
+			err:  secp_ecdsa.ErrPubKeyInvalidFormat,
+		},
+		{
+			name: "tv5_6 invalid prvkey prefix 01",
+			key:  "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFAzHGBP2UuGCqWLTAPLcMtD9y5gkZ6Eq3Rjuahrv17fEQ3Qen6J",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_7 zero depth with non-zero parent fingerprint (xprv)",
+			key:  "xprv9s2SPatNQ9Vc6GTbVMFPFo7jsaZySyzk7L8n2uqKXJen3KUmvQNTuLh3fhZMBoG3G4ZW1N2kZuHEPY53qmbZzCHshoQnNf4GvELZfqTUrcv",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_8 zero depth with non-zero parent fingerprint (xpub)",
+			key:  "xpub661no6RGEX3uJkY4bNnPcw4URcQTrSibUZ4NqJEw5eBkv7ovTwgiT91XX27VbEXGENhYRCf7hyEbWrR3FewATdCEebj6znwMfQkhRYHRLpJ",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_9 zero depth with non-zero index (xprv)",
+			key:  "xprv9s21ZrQH4r4TsiLvyLXqM9P7k1K3EYhA1kkD6xuquB5i39AU8KF42acDyL3qsDbU9NmZn6MsGSUYZEsuoePmjzsB3eFKSUEh3Gu1N3cqVUN",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_10 zero depth with non-zero index (xpub)",
+			key:  "xpub661MyMwAuDcm6CRQ5N4qiHKrJ39Xe1R1NyfouMKTTWcguwVcfrZJaNvhpebzGerh7gucBvzEQWRugZDuDXjNDRmXzSZe4c7mnTK97pTvGS8",
+			err:  ErrInvalidChild,
+		},
+		{
+			name: "tv5_11 unknown extended key version (xpub-like)",
+			key:  "DMwo58pR1QLEFihHiXPVykYB6fJmsTeHvyTp7hRThAtCX8CvYzgPcn8XnmdfHGMQzT7ayAmfo4z3gY5KfbrZWZ6St24UVf2Qgo6oujFktLHdHY4",
+			err:  chaincfg.ErrUnknownHDKeyID,
+		},
+		{
+			name: "tv5_12 unknown extended key version (xprv-like)",
+			key:  "DMwo58pR1QLEFihHiXPVykYB6fJmsTeHvyTp7hRThAtCX8CvYzgPcn8XnmdfHPmHJiEDXkTiJTVV9rHEBUem2mwVbbNfvT2MTcAqj3nesx8uBf9",
+			err:  chaincfg.ErrUnknownHDKeyID,
+		},
+		{
+			name: "tv5_13 private key 0 not in 1..n-1",
+			key:  "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzF93Y5wvzdUayhgkkFoicQZcP3y52uPPxFnfoLZB21Teqt1VvEHx",
+			err:  ErrUnusableSeed,
+		},
+		{
+			name: "tv5_14 private key n not in 1..n-1",
+			key:  "xprv9s21ZrQH143K24Mfq5zL5MhWK9hUhhGbd45hLXo2Pq2oqzMMo63oStZzFAzHGBP2UuGCqWLTAPLcMtD5SDKr24z3aiUvKr9bJpdrcLg1y3G",
+			err:  ErrUnusableSeed,
+		},
+		{
+			name: "tv5_15 invalid pubkey point",
+			key:  "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6Q5JXayek4PRsn35jii4veMimro1xefsM58PgBMrvdYre8QyULY",
+			err:  secp_ecdsa.ErrPubKeyNotOnCurve,
+		},
+		{
+			name: "tv5_16 invalid checksum",
+			key:  "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHL",
+			err:  ErrBadChecksum,
 		},
 	}
 
 	for i, test := range tests {
-		extKey, err := NewKeyFromString(test.key)
+		_, err := NewKeyFromString(test.key)
 		if !errors.Is(err, test.err) {
 			t.Errorf("NewKeyFromString #%d (%s): mismatched error "+
 				"-- got: %v, want: %v", i, test.name, err,
 				test.err)
 			continue
-		}
-
-		if test.neuter {
-			_, err := extKey.Neuter()
-			if !errors.Is(err, test.neuterErr) {
-				t.Errorf("Neuter #%d (%s): mismatched error "+
-					"-- got: %v, want: %v", i, test.name,
-					err, test.neuterErr)
-				continue
-			}
 		}
 	}
 }
@@ -1098,6 +1165,14 @@ func TestMaximumDepth(t *testing.T) {
 //
 //	https://jlopp.github.io/xpub-converter
 func TestCloneWithVersion(t *testing.T) {
+	// Register SLIP-132 zpub/zprv versions used in this test.
+	err := chaincfg.RegisterHDKeyID(
+		[]byte{0x04, 0xb2, 0x47, 0x46}, // zpub
+		[]byte{0x04, 0xb2, 0x43, 0x0c}, // zprv
+	)
+	if err != nil {
+		t.Fatalf("RegisterHDKeyID: %v", err)
+	}
 	tests := []struct {
 		name    string
 		key     string
