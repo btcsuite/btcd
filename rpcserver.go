@@ -1317,6 +1317,12 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		}
 	}
 
+	if params.Name == chaincfg.SigNetParams.Name {
+		chainInfo.SignetChallenge = hex.EncodeToString(
+			params.SignetChallenge,
+		)
+	}
+
 	return chainInfo, nil
 }
 
@@ -2419,6 +2425,12 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
 		TestNet:            cfg.TestNet3 || cfg.TestNet4,
 	}
+	if s.cfg.ChainParams.Name == chaincfg.SigNetParams.Name {
+		result.SignetChallenge = hex.EncodeToString(
+			s.cfg.ChainParams.SignetChallenge,
+		)
+	}
+
 	return &result, nil
 }
 
