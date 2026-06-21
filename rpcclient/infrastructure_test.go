@@ -329,6 +329,85 @@ func TestSendPostRequestWithRetrySuccess(t *testing.T) {
 	require.Equal(t, []byte("1"), result)
 }
 
+// TestSendPostRequestWithRetryUsesBasicAuthByDefault ensures the existing HTTP
+// POST-mode auth behavior is preserved when DisableAuth is false.
+func TestSendPostRequestWithRetryUsesBasicAuthByDefault(t *testing.T) {
+	t.Parallel()
+
+	authChecked := make(chan struct{}, 1)
+	client := newPostModeTestClient(postRoundTripFunc(
+		func(req *http.Request) (*http.Response, error) {
+			user, pass, ok := req.BasicAuth()
+			require.True(t, ok)
+			require.Equal(t, "user", user)
+			require.Equal(t, "pass", pass)
+			authChecked <- struct{}{}
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(
+					`{"result":1,"error":null,"id":1}`,
+				)),
+			}, nil
+		},
+	))
+	jReq := newPostTestRequest()
+
+	result, err := sendPostRequestWithRetry(
+		context.Background(), jReq, 1, client.httpClient,
+		client.config, client.httpURL, false,
+	)
+	require.NoError(t, err)
+	require.Equal(t, []byte("1"), result)
+
+	select {
+	case <-authChecked:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for auth check")
+	}
+}
+
+// TestSendPostRequestWithRetryDisableAuth skips Basic Auth entirely for RPC
+// providers that authenticate out-of-band and reject Authorization headers.
+func TestSendPostRequestWithRetryDisableAuth(t *testing.T) {
+	t.Parallel()
+
+	authChecked := make(chan struct{}, 1)
+	client := newPostModeTestClient(postRoundTripFunc(
+		func(req *http.Request) (*http.Response, error) {
+			require.Empty(t, req.Header.Get("Authorization"))
+			authChecked <- struct{}{}
+
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(
+					`{"result":1,"error":null,"id":1}`,
+				)),
+			}, nil
+		},
+	))
+	client.config.User = ""
+	client.config.Pass = ""
+	client.config.CookiePath = ""
+	client.config.DisableAuth = true
+	jReq := newPostTestRequest()
+
+	result, err := sendPostRequestWithRetry(
+		context.Background(), jReq, 1, client.httpClient,
+		client.config, client.httpURL, false,
+	)
+	require.NoError(t, err)
+	require.Equal(t, []byte("1"), result)
+
+	select {
+	case <-authChecked:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for auth check")
+	}
+}
+
 // TestSendPostRequestWithRetryShutdown keeps the shutdown regression cases in
 // one table while preserving a distinct symptomatic failure for each path.
 func TestSendPostRequestWithRetryShutdown(t *testing.T) {

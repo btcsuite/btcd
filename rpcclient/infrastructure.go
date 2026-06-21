@@ -811,11 +811,13 @@ retryloop:
 		}
 
 		// Configure basic access authorization.
-		user, pass, authErr := config.getAuth()
-		if authErr != nil {
-			return nil, authErr
+		if !config.DisableAuth {
+			user, pass, authErr := config.getAuth()
+			if authErr != nil {
+				return nil, authErr
+			}
+			httpReq.SetBasicAuth(user, pass)
 		}
-		httpReq.SetBasicAuth(user, pass)
 
 		httpResponse, err = httpClient.Do(httpReq)
 
@@ -1264,6 +1266,12 @@ type ConnConfig struct {
 	// Pass is the passphrase to use to authenticate to the RPC server.
 	Pass string
 
+	// DisableAuth prevents the client from sending HTTP Basic Auth
+	// credentials. This is useful for RPC providers that authenticate
+	// out-of-band, for example with an API key in the request URL, and
+	// reject Authorization headers.
+	DisableAuth bool
+
 	// CookiePath is the path to a cookie file containing the username and
 	// passphrase to use to authenticate to the RPC server.  It is used
 	// instead of User and Pass if non-empty.
@@ -1469,16 +1477,21 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 		dialer.NetDial = proxy.Dial
 	}
 
-	// The RPC server requires basic authorization, so create a custom
-	// request header with the Authorization header set.
-	user, pass, err := config.getAuth()
-	if err != nil {
-		return nil, err
-	}
-	login := user + ":" + pass
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+	// The RPC server requires basic authorization by default, so create a
+	// custom request header with the Authorization header set unless the
+	// caller explicitly disabled auth.
 	requestHeader := make(http.Header)
-	requestHeader.Add("Authorization", auth)
+	if !config.DisableAuth {
+		user, pass, err := config.getAuth()
+		if err != nil {
+			return nil, err
+		}
+		login := user + ":" + pass
+		auth := "Basic " + base64.StdEncoding.EncodeToString(
+			[]byte(login),
+		)
+		requestHeader.Add("Authorization", auth)
+	}
 	for key, value := range config.ExtraHeaders {
 		requestHeader.Add(key, value)
 	}
