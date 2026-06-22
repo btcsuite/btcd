@@ -665,6 +665,14 @@ var TestNet3Params = Params{
 		{2010000, newHashFromStr("0000000000004ae2f3896ca8ecd41c460a35bf6184e145d91558cece1c688a76")},
 		{2143398, newHashFromStr("00000000000163cfb1f97c4e4098a3692c8053ad9cab5ad9c86b338b5c00b8b7")},
 		{2344474, newHashFromStr("0000000000000004877fa2d36316398528de4f347df2f8a96f76613a298ce060")},
+		{4950000, newHashFromStr("000000000012502d78127f2632911a680a401d13d990cd72fe5fe3d0ba3f2301")},
+	},
+
+	// Swift sync covers blocks up to the checkpoint at block 4950000, which
+	// lives in Checkpoints above so the boundary block hash is single sourced.
+	SwiftSync: &SwiftSyncCheckpoint{
+		Height:    4950000,
+		HintsHash: "3eb03d76b0a88299283c07cb97a5cc6608cf5f146aab9aa10ade7d5e99f21976",
 	},
 
 	// Consensus rule change deployments.
