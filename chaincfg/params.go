@@ -261,6 +261,10 @@ type Params struct {
 	// Checkpoints ordered from oldest to newest.
 	Checkpoints []Checkpoint
 
+	// SwiftSync configures swift sync for the network, or nil when swift sync
+	// is not supported.  See SwiftSyncCheckpoint.
+	SwiftSync *SwiftSyncCheckpoint
+
 	// These fields are related to voting on consensus rule changes as
 	// defined by BIP0009.
 	//
@@ -299,6 +303,17 @@ type Params struct {
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType uint32
+}
+
+// SwiftSyncCheckpoint is a network's swift sync boundary: the height of the
+// checkpoint a hintsfile must cover, and the lowercase hex SHA256 of that
+// hintsfile.  Swift sync builds the UTXO set without validating block
+// signatures up to Height, so Height must be a Checkpoints entry, which pins
+// the boundary block.  HintsHash lets a wrong or corrupt hintsfile be rejected
+// before it is used.
+type SwiftSyncCheckpoint struct {
+	Height    int32
+	HintsHash string
 }
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
@@ -372,6 +387,14 @@ var MainNetParams = Params{
 		{781565, newHashFromStr("00000000000000000002b8c04999434c33b8e033f11a977b288f8411766ee61c")},
 		{800000, newHashFromStr("00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054")},
 		{810000, newHashFromStr("000000000000000000028028ca82b6aa81ce789e4eb9e0321b74c3cbaf405dd1")},
+		{933038, newHashFromStr("000000000000000000010d52657494f1d78fac53ccf030eaf14fc25cd233aba1")},
+	},
+
+	// Swift sync covers blocks up to the checkpoint at block 933038, which
+	// lives in Checkpoints above so the boundary block hash is single sourced.
+	SwiftSync: &SwiftSyncCheckpoint{
+		Height:    933038,
+		HintsHash: "baf5875e7b62173514d9063687e7f422d168ffb7057190dcdeebcc6f9edbc85c",
 	},
 
 	// Consensus rule change deployments.
@@ -642,6 +665,14 @@ var TestNet3Params = Params{
 		{2010000, newHashFromStr("0000000000004ae2f3896ca8ecd41c460a35bf6184e145d91558cece1c688a76")},
 		{2143398, newHashFromStr("00000000000163cfb1f97c4e4098a3692c8053ad9cab5ad9c86b338b5c00b8b7")},
 		{2344474, newHashFromStr("0000000000000004877fa2d36316398528de4f347df2f8a96f76613a298ce060")},
+		{4950000, newHashFromStr("000000000012502d78127f2632911a680a401d13d990cd72fe5fe3d0ba3f2301")},
+	},
+
+	// Swift sync covers blocks up to the checkpoint at block 4950000, which
+	// lives in Checkpoints above so the boundary block hash is single sourced.
+	SwiftSync: &SwiftSyncCheckpoint{
+		Height:    4950000,
+		HintsHash: "3eb03d76b0a88299283c07cb97a5cc6608cf5f146aab9aa10ade7d5e99f21976",
 	},
 
 	// Consensus rule change deployments.
@@ -1004,6 +1035,15 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 	// We use little endian encoding of the hash prefix to be in line with
 	// the other wire network identities.
 	net := binary.LittleEndian.Uint32(hashDouble[0:4])
+
+	// swiftSyncCheckpoint is the block a swift sync hintsfile must cover for
+	// signet.  It is registered as a checkpoint, and SwiftSync.Height names its
+	// height so the boundary's block hash is single sourced here.
+	swiftSyncCheckpoint := Checkpoint{
+		Height: 285205,
+		Hash:   newHashFromStr("00000004b1cc694c48295fc56c2d78b88abdd648ee60a21548feba259e6dedf1"),
+	}
+
 	return Params{
 		Name:        "signet",
 		Net:         wire.BitcoinNet(net),
@@ -1028,7 +1068,16 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 		GenerateSupported:        false,
 
 		// Checkpoints ordered from oldest to newest.
-		Checkpoints: nil,
+		Checkpoints: []Checkpoint{
+			swiftSyncCheckpoint,
+		},
+
+		// Swift sync covers blocks up to swiftSyncCheckpoint, which lives in
+		// Checkpoints above so the boundary block hash is single sourced.
+		SwiftSync: &SwiftSyncCheckpoint{
+			Height:    swiftSyncCheckpoint.Height,
+			HintsHash: "df2a00fe29905bbc1897d23a04f169ea2b5e909b53e55dacc41eb1ab9d04edde",
+		},
 
 		// Consensus rule change deployments.
 		//

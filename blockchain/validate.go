@@ -73,7 +73,28 @@ var (
 	// set forth in BIP0030.  It is defined as a package level variable to
 	// avoid the need to create a new instance every time a check is needed.
 	block91880Hash = newHashFromStr("00000000000743f190a18c5577a3c2d2a1f610ae9601ac046a38084ccb7cd721")
+
+	// bip30UnspendableCoinbaseHashes holds the two mainnet coinbase blocks whose
+	// outputs were rendered permanently unspendable by BIP-30 deduplication.  Both
+	// the swift sync hintsfile producer and the consumer must agree on this set so
+	// that the spendable-index numbering matches.
+	bip30UnspendableCoinbaseHashes = map[int32]*chainhash.Hash{
+		91722: newHashFromStr("00000000000271a2dc26e7667f8419f2e15416dc6955e5a6c6cdf3f2574dd08e"),
+		91812: newHashFromStr("00000000000af0aed4792b1acee3d966af36cf5def14935db8de83d6f9306f2f"),
+	}
 )
+
+// isBIP30UnspendableCoinbaseOutput reports whether the given block-0 coinbase
+// output is one of the two BIP-30 mainnet duplicates whose outputs are
+// permanently unspendable.
+func isBIP30UnspendableCoinbaseOutput(net wire.BitcoinNet, blockHash *chainhash.Hash, height int32, txIndex int) bool {
+	if net != wire.MainNet || txIndex != 0 || blockHash == nil {
+		return false
+	}
+
+	wantHash, ok := bip30UnspendableCoinbaseHashes[height]
+	return ok && blockHash.IsEqual(wantHash)
+}
 
 // isNullOutpoint determines whether or not a previous transaction output point
 // is set.

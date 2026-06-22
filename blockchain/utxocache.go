@@ -693,7 +693,18 @@ func (b *BlockChain) InitConsistentState(tip *blockNode, interrupt <-chan struct
 			return err
 		}
 
-		err = b.utxoCache.connectTransactions(block, nil)
+		// Blocks within the swift sync range were applied from the hints,
+		// not by spending inputs, so their spent ancestors are intentionally
+		// absent from the UTXO set.  Replay them the same way (UTXO adds
+		// only); the normal input-spending path would fail with a missing
+		// input.  The aggregate is not recomputed here because the persisted
+		// aggregate already covers blocks up to swiftSyncHeight.  Blocks past
+		// the boundary are fully validated and replay normally.
+		if b.swiftSyncEnabled && node.height <= b.swiftSync.Height {
+			err = b.utxoCache.swiftSyncConnectTransactions(b, block, false)
+		} else {
+			err = b.utxoCache.connectTransactions(block, nil)
+		}
 		if err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -70,6 +71,21 @@ var (
 	// utxoSetBucketName is the name of the db bucket used to house the
 	// unspent transaction output set.
 	utxoSetBucketName = []byte("utxosetv2")
+
+	// swiftSyncHeightKeyName is the name of the db key used to store the
+	// last block height already applied via swift sync.  It is used to
+	// resume swift sync after a restart.
+	swiftSyncHeightKeyName = []byte("swiftsyncheight")
+
+	// swiftSyncSaltKeyName is the name of the db key used to store the secret
+	// salt that the swift sync aggregate hashes outpoints with.  It is
+	// generated once when swift sync starts and reused across restarts.
+	swiftSyncSaltKeyName = []byte("swiftsyncsalt")
+
+	// swiftSyncAggKeyName is the name of the db key used to store the swift
+	// sync aggregate.  It is persisted with swiftSyncHeight so a resumed sync
+	// continues the same running value.
+	swiftSyncAggKeyName = []byte("swiftsyncagg")
 
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
@@ -1068,6 +1084,60 @@ func dbFetchUtxoStateConsistency(dbTx database.Tx) []byte {
 	return nil
 }
 
+// dbPutSwiftSyncHeight uses an existing database transaction to store the
+// last block height that has been applied via swift sync.  This is used to
+// resume swift sync after a restart.
+func dbPutSwiftSyncHeight(dbTx database.Tx, height int32) error {
+	var buf [4]byte
+	byteOrder.PutUint32(buf[:], uint32(height))
+	return dbTx.Metadata().Put(swiftSyncHeightKeyName, buf[:])
+}
+
+// dbFetchSwiftSyncHeight uses an existing database transaction to retrieve the
+// swift sync resume height from the database.  Returns 0 if not found.
+func dbFetchSwiftSyncHeight(dbTx database.Tx) int32 {
+	data := dbTx.Metadata().Get(swiftSyncHeightKeyName)
+	if data == nil || len(data) != 4 {
+		return 0
+	}
+	return int32(byteOrder.Uint32(data))
+}
+
+// dbPutSwiftSyncSalt uses an existing database transaction to store the swift
+// sync aggregate salt.
+func dbPutSwiftSyncSalt(dbTx database.Tx, salt *[32]byte) error {
+	return dbTx.Metadata().Put(swiftSyncSaltKeyName, salt[:])
+}
+
+// dbFetchSwiftSyncSalt uses an existing database transaction to retrieve the
+// swift sync aggregate salt.  ok is false when no salt has been stored.
+func dbFetchSwiftSyncSalt(dbTx database.Tx) (salt [32]byte, ok bool) {
+	data := dbTx.Metadata().Get(swiftSyncSaltKeyName)
+	if len(data) != len(salt) {
+		return salt, false
+	}
+	copy(salt[:], data)
+	return salt, true
+}
+
+// dbPutSwiftSyncAgg uses an existing database transaction to store the swift
+// sync aggregate.
+func dbPutSwiftSyncAgg(dbTx database.Tx, agg *Agg512) error {
+	buf := agg.Bytes()
+	return dbTx.Metadata().Put(swiftSyncAggKeyName, buf[:])
+}
+
+// dbFetchSwiftSyncAgg uses an existing database transaction to retrieve the
+// swift sync aggregate.  A missing or malformed value yields the zero
+// aggregate.
+func dbFetchSwiftSyncAgg(dbTx database.Tx) Agg512 {
+	var agg Agg512
+	if err := agg.SetBytes(dbTx.Metadata().Get(swiftSyncAggKeyName)); err != nil {
+		return Agg512{}
+	}
+	return agg
+}
+
 // createChainState initializes both the database and the chain state to the
 // genesis block.  This includes creating the necessary buckets and inserting
 // the genesis block, so it must only be called on an uninitialized database.
@@ -1160,6 +1230,18 @@ func (b *BlockChain) createChainState() error {
 		err = dbPutBestState(dbTx, b.stateSnapshot, node.workSum)
 		if err != nil {
 			return err
+		}
+
+		// When the database is created with swift sync enabled, generate and
+		// store its secret salt.  The salt is constant for the whole sync and
+		// is what lets the aggregate detect an invalid or malicious hintsfile.
+		if b.swiftSyncEnabled {
+			if _, err := rand.Read(b.swiftSyncSalt[:]); err != nil {
+				return err
+			}
+			if err := dbPutSwiftSyncSalt(dbTx, &b.swiftSyncSalt); err != nil {
+				return err
+			}
 		}
 
 		// Store the genesis block into the database.
@@ -1308,6 +1390,25 @@ func (b *BlockChain) initChainState() error {
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, CalcPastMedianTime(tip))
+
+		// Load swift sync state if swift sync is enabled.
+		if b.swiftSyncEnabled {
+			b.swiftSyncHeight = dbFetchSwiftSyncHeight(dbTx)
+			b.swiftSyncAgg = dbFetchSwiftSyncAgg(dbTx)
+			salt, haveSalt := dbFetchSwiftSyncSalt(dbTx)
+			b.swiftSyncSalt = salt
+
+			// The salt is created with the database (see createChainState),
+			// so a missing salt means this database was not created for swift
+			// sync, for example it was first synced normally.  Swift sync
+			// cannot be applied to such a database, so disable it.
+			if !haveSalt {
+				log.Warnf("Swift sync disabled: this database was not " +
+					"created with swift sync. Use a fresh database for " +
+					"swift sync.")
+				b.swiftSyncEnabled = false
+			}
+		}
 
 		return nil
 	})
