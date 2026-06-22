@@ -387,6 +387,14 @@ var MainNetParams = Params{
 		{781565, newHashFromStr("00000000000000000002b8c04999434c33b8e033f11a977b288f8411766ee61c")},
 		{800000, newHashFromStr("00000000000000000002a7c4c1e48d76c5a37902165a270156b7a8d72728a054")},
 		{810000, newHashFromStr("000000000000000000028028ca82b6aa81ce789e4eb9e0321b74c3cbaf405dd1")},
+		{933038, newHashFromStr("000000000000000000010d52657494f1d78fac53ccf030eaf14fc25cd233aba1")},
+	},
+
+	// Swift sync covers blocks up to the checkpoint at block 933038, which
+	// lives in Checkpoints above so the boundary block hash is single sourced.
+	SwiftSync: &SwiftSyncCheckpoint{
+		Height:    933038,
+		HintsHash: "baf5875e7b62173514d9063687e7f422d168ffb7057190dcdeebcc6f9edbc85c",
 	},
 
 	// Consensus rule change deployments.
