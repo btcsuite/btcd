@@ -115,3 +115,19 @@ func TestRejectsTrailingDataInTransactionValues(t *testing.T) {
 		})
 	}
 }
+
+// TestRejectsTrailingDataAfterPacket verifies that extra bytes after a valid
+// PSBT packet are rejected.
+func TestRejectsTrailingDataAfterPacket(t *testing.T) {
+	unsignedTx, prevTx := strictnessTxPair(t)
+	rawPacket := strictnessPSBT(
+		t,
+		serializeTxForStrictness(t, unsignedTx, true),
+		serializeTxForStrictness(t, prevTx, false),
+	)
+
+	_, err := NewFromRawBytes(
+		bytes.NewReader(append(rawPacket, 0x00)), false,
+	)
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
