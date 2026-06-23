@@ -324,6 +324,10 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		return nil, err
 	}
 
+	if err := assertFullyConsumed(r); err != nil {
+		return nil, err
+	}
+
 	return &newPsbt, nil
 }
 
