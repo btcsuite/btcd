@@ -147,6 +147,23 @@ func TestHandleGetBlockTemplateProposalRejectsTrailingBytes(t *testing.T) {
 	require.Nil(t, result)
 }
 
+// TestHandleSubmitBlockRejectsTrailingBytes ensures submitblock rejects byte
+// strings that contain a valid block plus trailing data.
+func TestHandleSubmitBlockRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		recovered := recover()
+		require.Nil(t, recovered, "handler reached sync manager")
+	}()
+
+	cmd := btcjson.NewSubmitBlockCmd(blockHexWithTrailingByte(t), nil)
+	result, err := handleSubmitBlock(&rpcServer{}, cmd, make(chan struct{}))
+
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
 var (
 	// TODO(yy): make a `btctest` package and move these testing txns there
 	// so they be used in other tests.
