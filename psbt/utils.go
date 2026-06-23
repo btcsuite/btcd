@@ -6,7 +6,6 @@ package psbt
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -303,17 +302,20 @@ func assertFullyConsumed(r io.Reader) error {
 	}
 }
 
-// readTxOut is a limited version of wire.ReadTxOut, because the latter is not
-// exported.
+// readTxOut parses a transaction output value and requires the full value to
+// be consumed.
 func readTxOut(txout []byte) (*wire.TxOut, error) {
-	if len(txout) < 10 {
-		return nil, ErrInvalidPsbtFormat
+	txOut := &wire.TxOut{}
+	reader := bytes.NewReader(txout)
+
+	if err := wire.ReadTxOut(reader, 0, 0, txOut); err != nil {
+		return nil, err
+	}
+	if err := assertFullyConsumed(reader); err != nil {
+		return nil, err
 	}
 
-	valueSer := binary.LittleEndian.Uint64(txout[:8])
-	scriptPubKey := txout[9:]
-
-	return wire.NewTxOut(int64(valueSer), scriptPubKey), nil
+	return txOut, nil
 }
 
 // readTransaction parses a transaction value and requires the full value to be
