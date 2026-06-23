@@ -225,11 +225,9 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	if err != nil {
 		return nil, err
 	}
-	msgTx := wire.NewMsgTx(2)
-
 	// BIP-0174 states: "The transaction must be in the old serialization
 	// format (without witnesses)."
-	err = msgTx.DeserializeNoWitness(bytes.NewReader(value))
+	msgTx, err := readTransaction(value, true)
 	if err != nil {
 		return nil, err
 	}
