@@ -291,6 +291,30 @@ func readTxOut(txout []byte) (*wire.TxOut, error) {
 	return wire.NewTxOut(int64(valueSer), scriptPubKey), nil
 }
 
+// readTransaction parses a transaction value and requires the full value to be
+// consumed. PSBT transaction-valued fields contain exactly one network
+// serialized transaction, not a transaction prefix with arbitrary trailing data.
+func readTransaction(txBytes []byte, noWitness bool) (*wire.MsgTx, error) {
+	tx := wire.NewMsgTx(2)
+	reader := bytes.NewReader(txBytes)
+
+	var err error
+	if noWitness {
+		err = tx.DeserializeNoWitness(reader)
+	} else {
+		err = tx.Deserialize(reader)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if reader.Len() > 0 {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	return tx, nil
+}
+
 // SumUtxoInputValues tries to extract the sum of all inputs specified in the
 // UTXO fields of the PSBT. An error is returned if an input is specified that
 // does not contain any UTXO information.
