@@ -99,6 +99,21 @@ func TestHandleSendRawTransactionRejectsTrailingBytes(t *testing.T) {
 	require.Nil(t, result)
 }
 
+// TestHandleDecodeRawTransactionRejectsTrailingBytes ensures
+// decoderawtransaction rejects byte strings that contain a valid transaction
+// plus trailing data.
+func TestHandleDecodeRawTransactionRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	cmd := btcjson.NewDecodeRawTransactionCmd(txHex1 + "00")
+	result, err := handleDecodeRawTransaction(
+		&rpcServer{}, cmd, make(chan struct{}),
+	)
+
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
 var (
 	// TODO(yy): make a `btctest` package and move these testing txns there
 	// so they be used in other tests.
