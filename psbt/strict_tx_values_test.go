@@ -83,6 +83,45 @@ func strictnessPSBT(t *testing.T, unsignedTx,
 	return buf.Bytes()
 }
 
+// serializeTxOutForStrictness serializes txOut in the PSBT form required by
+// the WitnessUtxo field.
+func serializeTxOutForStrictness(t *testing.T, txOut *wire.TxOut) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	require.NoError(t, wire.WriteTxOut(&buf, 0, 0, txOut))
+
+	return buf.Bytes()
+}
+
+// strictnessPSBTWithWitnessUtxo builds a minimal PSBT using the supplied
+// WitnessUtxo value verbatim.
+func strictnessPSBTWithWitnessUtxo(t *testing.T,
+	witnessUtxo []byte) []byte {
+
+	t.Helper()
+
+	unsignedTx, _ := strictnessTxPair(t)
+
+	var buf bytes.Buffer
+	_, err := buf.Write(psbtMagic[:])
+	require.NoError(t, err)
+
+	require.NoError(t, serializeKVPairWithType(
+		&buf, byte(UnsignedTxType), nil,
+		serializeTxForStrictness(t, unsignedTx, true),
+	))
+	require.NoError(t, buf.WriteByte(0x00))
+
+	require.NoError(t, serializeKVPairWithType(
+		&buf, byte(WitnessUtxoType), nil, witnessUtxo,
+	))
+	require.NoError(t, buf.WriteByte(0x00))
+	require.NoError(t, buf.WriteByte(0x00))
+
+	return buf.Bytes()
+}
+
 // TestRejectsTrailingDataInTransactionValues verifies that PSBT transaction
 // values must contain exactly one serialized transaction.
 func TestRejectsTrailingDataInTransactionValues(t *testing.T) {
@@ -129,5 +168,27 @@ func TestRejectsTrailingDataAfterPacket(t *testing.T) {
 	_, err := NewFromRawBytes(
 		bytes.NewReader(append(rawPacket, 0x00)), false,
 	)
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
+// TestParsesWitnessUtxoTxOutStrictly verifies that WitnessUtxo values are
+// parsed as exact transaction outputs.
+func TestParsesWitnessUtxoTxOutStrictly(t *testing.T) {
+	pkScript := bytes.Repeat([]byte{0x51}, 253)
+	txOutBytes := serializeTxOutForStrictness(t, &wire.TxOut{
+		Value:    1234,
+		PkScript: pkScript,
+	})
+
+	packet, err := NewFromRawBytes(bytes.NewReader(
+		strictnessPSBTWithWitnessUtxo(t, txOutBytes),
+	), false)
+	require.NoError(t, err)
+	require.Equal(t, pkScript, packet.Inputs[0].WitnessUtxo.PkScript)
+
+	malformedTxOut := append(append([]byte{}, txOutBytes...), 0x00)
+	_, err = NewFromRawBytes(bytes.NewReader(
+		strictnessPSBTWithWitnessUtxo(t, malformedTxOut),
+	), false)
 	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
 }
