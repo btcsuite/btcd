@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -79,6 +81,17 @@ func requireRPCErrorCode(t *testing.T, err error, code btcjson.RPCErrorCode) {
 	require.Equal(t, code, rpcErr.Code)
 }
 
+// blockHexWithTrailingByte serializes a valid block and appends one extra byte.
+func blockHexWithTrailingByte(t *testing.T) string {
+	t.Helper()
+
+	var block bytes.Buffer
+	err := chaincfg.MainNetParams.GenesisBlock.Serialize(&block)
+	require.NoError(t, err)
+
+	return hex.EncodeToString(append(block.Bytes(), 0x00))
+}
+
 // TestHandleSendRawTransactionRejectsTrailingBytes ensures sendrawtransaction
 // rejects byte strings that contain a valid transaction plus trailing data.
 func TestHandleSendRawTransactionRejectsTrailingBytes(t *testing.T) {
@@ -110,6 +123,26 @@ func TestHandleDecodeRawTransactionRejectsTrailingBytes(t *testing.T) {
 		&rpcServer{}, cmd, make(chan struct{}),
 	)
 
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
+// TestHandleGetBlockTemplateProposalRejectsTrailingBytes ensures proposal mode
+// rejects byte strings that contain a valid block plus trailing data.
+func TestHandleGetBlockTemplateProposalRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		recovered := recover()
+		require.Nil(t, recovered, "handler reached chain state")
+	}()
+
+	request := &btcjson.TemplateRequest{
+		Mode: "proposal",
+		Data: blockHexWithTrailingByte(t),
+	}
+
+	result, err := handleGetBlockTemplateProposal(&rpcServer{}, request)
 	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
 	require.Nil(t, result)
 }
