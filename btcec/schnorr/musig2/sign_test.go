@@ -311,6 +311,27 @@ func pSigsFromIndices(t *testing.T, sigs []string, indices []int) []*PartialSign
 	return pSigs
 }
 
+// TestPartialSignatureDecodeRejectsShortReads verifies that Decode rejects
+// inputs that do not contain a full scalar.
+func TestPartialSignatureDecodeRejectsShortReads(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string][]byte{
+		"empty":     nil,
+		"truncated": bytes.Repeat([]byte{0x01}, 31),
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var sig PartialSignature
+			err := sig.Decode(bytes.NewReader(testCase))
+			require.Error(t, err)
+		})
+	}
+}
+
 // TestMusig2SignCombine tests that we pass the musig2 sig combination tests.
 func TestMusig2SignCombine(t *testing.T) {
 	t.Parallel()
