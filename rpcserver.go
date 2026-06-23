@@ -791,22 +791,22 @@ func handleDecodeRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	if err != nil {
 		return nil, rpcDecodeHexError(hexStr)
 	}
-	var mtx wire.MsgTx
-	err = mtx.Deserialize(bytes.NewReader(serializedTx))
+	tx, err := btcutil.NewTxFromBytes(serializedTx)
 	if err != nil {
 		return nil, &btcjson.RPCError{
 			Code:    btcjson.ErrRPCDeserialization,
 			Message: "TX decode failed: " + err.Error(),
 		}
 	}
+	mtx := tx.MsgTx()
 
 	// Create and return the result.
 	txReply := btcjson.TxRawDecodeResult{
 		Txid:     mtx.TxHash().String(),
 		Version:  mtx.Version,
 		Locktime: mtx.LockTime,
-		Vin:      createVinList(&mtx),
-		Vout:     createVoutList(&mtx, s.cfg.ChainParams, nil),
+		Vin:      createVinList(mtx),
+		Vout:     createVoutList(mtx, s.cfg.ChainParams, nil),
 	}
 	return txReply, nil
 }
