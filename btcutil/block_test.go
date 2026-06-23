@@ -200,6 +200,23 @@ func TestNewBlockFromBytes(t *testing.T) {
 	}
 }
 
+// TestNewBlockFromBytesRejectsTrailingData verifies that NewBlockFromBytes
+// rejects bytes after the serialized block.
+func TestNewBlockFromBytesRejectsTrailingData(t *testing.T) {
+	var block100000Buf bytes.Buffer
+	err := Block100000.Serialize(&block100000Buf)
+	if err != nil {
+		t.Errorf("Serialize: %v", err)
+	}
+
+	_, err = btcutil.NewBlockFromBytes(
+		append(block100000Buf.Bytes(), 0x00),
+	)
+	if err == nil {
+		t.Fatal("expected error for block with trailing data")
+	}
+}
+
 // TestNewBlockFromBlockAndBytes tests creation of a Block from a MsgBlock and
 // raw bytes.
 func TestNewBlockFromBlockAndBytes(t *testing.T) {
