@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,6 +66,37 @@ func TestHandleTestMempoolAcceptFailDecode(t *testing.T) {
 			require.Nil(result)
 		})
 	}
+}
+
+// requireRPCErrorCode asserts that the error is an RPC error with the expected
+// error code.
+func requireRPCErrorCode(t *testing.T, err error, code btcjson.RPCErrorCode) {
+	t.Helper()
+
+	require.Error(t, err)
+	rpcErr, ok := err.(*btcjson.RPCError)
+	require.True(t, ok)
+	require.Equal(t, code, rpcErr.Code)
+}
+
+// TestHandleSendRawTransactionRejectsTrailingBytes ensures sendrawtransaction
+// rejects byte strings that contain a valid transaction plus trailing data.
+func TestHandleSendRawTransactionRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	mm := &mempool.MockTxMempool{}
+	mm.On(
+		"ProcessTransaction", mock.Anything, false, false, mempool.Tag(0),
+	).Return(nil, errors.New("mempool should not be reached")).Maybe()
+
+	s := &rpcServer{cfg: rpcserverConfig{
+		TxMemPool: mm,
+	}}
+	cmd := btcjson.NewSendRawTransactionCmd(txHex1+"00", nil)
+
+	result, err := handleSendRawTransaction(s, cmd, make(chan struct{}))
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
 }
 
 var (
