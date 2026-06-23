@@ -324,6 +324,18 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		return nil, err
 	}
 
+	var trailing [1]byte
+	_, err = io.ReadFull(r, trailing[:])
+	switch {
+	case err == nil:
+		return nil, ErrInvalidPsbtFormat
+
+	case err == io.EOF:
+
+	case err != nil:
+		return nil, err
+	}
+
 	return &newPsbt, nil
 }
 
