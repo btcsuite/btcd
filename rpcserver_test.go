@@ -70,6 +70,25 @@ func TestHandleTestMempoolAcceptFailDecode(t *testing.T) {
 	}
 }
 
+// TestHandleTestMempoolAcceptRejectsTrailingBytes ensures testmempoolaccept
+// rejects byte strings that contain a valid transaction plus trailing data.
+func TestHandleTestMempoolAcceptRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		recovered := recover()
+		require.Nil(t, recovered, "handler reached mempool")
+	}()
+
+	cmd := btcjson.NewTestMempoolAcceptCmd([]string{txHex1 + "00"}, 0)
+	result, err := handleTestMempoolAccept(
+		&rpcServer{}, cmd, make(chan struct{}),
+	)
+
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
 // requireRPCErrorCode asserts that the error is an RPC error with the expected
 // error code.
 func requireRPCErrorCode(t *testing.T, err error, code btcjson.RPCErrorCode) {
