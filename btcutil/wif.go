@@ -127,6 +127,7 @@ func DecodeWIF(wif string) (*WIF, error) {
 	// the one actually encoded in the WIF (or the all-zero key) without
 	// reporting an error.
 	var keyScalar btcec.ModNScalar
+	defer keyScalar.Zero()
 	if overflow := keyScalar.SetByteSlice(privKeyBytes); overflow ||
 		keyScalar.IsZero() {
 
