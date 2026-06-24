@@ -6,6 +6,7 @@ package btcutil
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/btcsuite/btcd/chainhash/v2"
@@ -173,7 +174,16 @@ func (t *Tx) setBytes(bytes []byte) {
 // serialized bytes.  See Tx.
 func NewTxFromBytes(serializedTx []byte) (*Tx, error) {
 	br := bytes.NewReader(serializedTx)
-	return NewTxFromReader(br)
+	tx, err := NewTxFromReader(br)
+	if err != nil {
+		return nil, err
+	}
+	if br.Len() > 0 {
+		return nil, fmt.Errorf("transaction has %d trailing bytes",
+			br.Len())
+	}
+
+	return tx, nil
 }
 
 // NewTxFromReader returns a new instance of a bitcoin transaction given a
