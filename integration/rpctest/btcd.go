@@ -53,9 +53,8 @@ func btcdExecutablePath() (string, error) {
 	if runtime.GOOS == "windows" {
 		outputPath += ".exe"
 	}
-	cmd := exec.Command(
-		"go", "build", "-o", outputPath, "github.com/btcsuite/btcd",
-	)
+	cmd := exec.Command("go", "build", "-tags=debug", "-o", outputPath,
+		"github.com/btcsuite/btcd")
 	err = cmd.Run()
 	if err != nil {
 		return "", fmt.Errorf("Failed to build btcd: %v", err)

@@ -18,6 +18,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/debugstream"
 	"github.com/btcsuite/btcd/limits"
 	"github.com/btcsuite/btcd/ossec"
 )
@@ -55,6 +56,24 @@ func btcdMain(serverChan chan<- *server) error {
 			logRotator.Close()
 		}
 	}()
+
+	// DebugStream is enabled only if btcd is compiled with the debug tag.
+	// Otherwise a nop implementation is used.
+	debugstream.S = debugstream.New()
+	if dsListen := cfg.DebugStream; dsListen != "" {
+		err := debugstream.S.Listen(dsListen)
+		if err != nil {
+			return fmt.Errorf("error starting debug stream: %v",
+				err)
+		}
+		debugstream.S.Broadcast(debugstream.Event{
+			Code: debugstream.DEStart,
+		})
+		defer debugstream.S.Shutdown()
+		defer debugstream.S.Broadcast(debugstream.Event{
+			Code: debugstream.DEShutdown,
+		})
+	}
 
 	// Get a channel that will be closed when a shutdown signal has been
 	// triggered either from an OS signal such as SIGINT (Ctrl+C) or from

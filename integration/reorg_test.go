@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/stretchr/testify/require"
@@ -33,14 +32,14 @@ func TestReorgFromForkPoint(t *testing.T) {
 		forkBranchLen = int32(shorterBlocks)
 	)
 
-	longer, err := rpctest.New(&chaincfg.SimNetParams, nil, []string{}, "")
+	longer, err := rpctest.New()
 	require.NoError(t, err)
-	require.NoError(t, longer.SetUp(false, 0))
+	require.NoError(t, longer.SetUp())
 	t.Cleanup(func() { require.NoError(t, longer.TearDown()) })
 
-	shorter, err := rpctest.New(&chaincfg.SimNetParams, nil, []string{}, "")
+	shorter, err := rpctest.New()
 	require.NoError(t, err)
-	require.NoError(t, shorter.SetUp(false, 0))
+	require.NoError(t, shorter.SetUp())
 	t.Cleanup(func() { require.NoError(t, shorter.TearDown()) })
 
 	// Mine the shared chain on the longer node before connecting so that

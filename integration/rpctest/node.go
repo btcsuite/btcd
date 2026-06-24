@@ -5,6 +5,7 @@
 package rpctest
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -30,6 +31,7 @@ type nodeConfig struct {
 	profile    string
 	debugLevel string
 	extra      []string
+	startArgs  []string
 	nodeDir    string
 
 	exe          string
@@ -131,6 +133,7 @@ func (n *nodeConfig) arguments() []string {
 		args = append(args, fmt.Sprintf("--debuglevel=%s", n.debugLevel))
 	}
 	args = append(args, n.extra...)
+	args = append(args, n.startArgs...)
 	return args
 }
 
@@ -166,6 +169,8 @@ type node struct {
 	pidFile string
 
 	dataDir string
+
+	started bool
 }
 
 // newNode creates a new node instance according to the passed config. dataDir
@@ -175,63 +180,54 @@ func newNode(config *nodeConfig, dataDir string) (*node, error) {
 	return &node{
 		config:  config,
 		dataDir: dataDir,
-		cmd:     config.command(),
 	}, nil
-}
-
-// start creates a new btcd process, and writes its pid in a file reserved for
-// recording the pid of the launched process. This file can be used to
-// terminate the process in case of a hang, or panic. In the case of a failing
-// test case, or panic, it is important that the process be stopped via stop(),
-// otherwise, it will persist unless explicitly killed.
-func (n *node) start() error {
-	if err := n.cmd.Start(); err != nil {
-		return err
-	}
-
-	pid, err := os.Create(filepath.Join(n.dataDir, "btcd.pid"))
-	if err != nil {
-		return err
-	}
-
-	n.pidFile = pid.Name()
-	if _, err = fmt.Fprintf(pid, "%d\n", n.cmd.Process.Pid); err != nil {
-		return err
-	}
-
-	if err := pid.Close(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // stop interrupts the running btcd process process, and waits until it exits
 // properly. On windows, interrupt is not supported, so a kill signal is used
-// instead
-func (n *node) stop() error {
-	if n.cmd == nil || n.cmd.Process == nil {
-		// return if not properly initialized
-		// or error starting the process
+// instead.
+//
+// If noSignal is true, then we don't send a signal, but wait for the process to
+// stop itself.
+func (n *node) stop(noSignal bool) error {
+	if !n.started || n.cmd == nil || n.cmd.Process == nil {
+		// return if not properly initialized or error starting the
+		// process.
 		return nil
 	}
-	defer n.cmd.Wait()
-	if runtime.GOOS == "windows" {
-		return n.cmd.Process.Signal(os.Kill)
+
+	var err error
+	switch {
+	case !noSignal && runtime.GOOS == "windows":
+		err = n.cmd.Process.Signal(os.Kill)
+
+	case !noSignal:
+		err = n.cmd.Process.Signal(os.Interrupt)
 	}
-	return n.cmd.Process.Signal(os.Interrupt)
+
+	waitErr := n.cmd.Wait()
+	if waitErr != nil {
+		err = errors.Join(waitErr, err)
+	}
+
+	n.started = false
+
+	return err
 }
 
 // cleanup cleanups process and args files. The file housing the pid of the
 // created process will be deleted, as well as any directories created by the
 // process.
 func (n *node) cleanup() error {
-	if n.pidFile != "" {
-		if err := os.Remove(n.pidFile); err != nil {
-			log.Printf("unable to remove file %s: %v", n.pidFile,
-				err)
-		}
+	if n.pidFile == "" {
+		return nil
 	}
+
+	if err := os.Remove(n.pidFile); err != nil {
+		log.Printf("unable to remove file %s: %v", n.pidFile, err)
+	}
+
+	n.pidFile = ""
 
 	// Since the node's main data directory is passed in to the node config,
 	// it isn't our responsibility to clean it up. So we're done after
@@ -241,13 +237,62 @@ func (n *node) cleanup() error {
 
 // shutdown terminates the running btcd process, and cleans up all
 // file/directories created by node.
-func (n *node) shutdown() error {
-	if err := n.stop(); err != nil {
+//
+// If noSignal is true, shutdown will block until the process stops itself,
+// without sending a signal to the process.
+func (n *node) shutdown(noSignal bool) error {
+	if !n.started {
+		return nil
+	}
+
+	err := n.stop(noSignal)
+
+	if cleanupErr := n.cleanup(); cleanupErr != nil {
+		err = errors.Join(cleanupErr, err)
+	}
+
+	return err
+}
+
+// start creates a new btcd process, and writes its pid in a file reserved for
+// recording the pid of the launched process. This file can be used to
+// terminate the process in case of a hang, or panic. In the case of a failing
+// test case, or panic, it is important that the process be stopped via stop(),
+// otherwise, it will persist unless explicitly killed.
+//
+// args are appended to the node start command, enabling cases where the node
+// is stopped an then started again with different args.
+func (n *node) start(args []string) error {
+	if n.started {
+		return fmt.Errorf("node already started")
+	}
+
+	n.config.startArgs = args
+	n.cmd = n.config.command()
+
+	if err := n.cmd.Start(); err != nil {
 		return err
 	}
-	if err := n.cleanup(); err != nil {
+
+	n.started = true
+
+	pid, err := os.Create(filepath.Join(n.dataDir, "btcd.pid"))
+	if err != nil {
+		n.shutdown(false)
 		return err
 	}
+
+	n.pidFile = pid.Name()
+	if _, err = fmt.Fprintf(pid, "%d\n", n.cmd.Process.Pid); err != nil {
+		n.shutdown(false)
+		return err
+	}
+
+	if err := pid.Close(); err != nil {
+		n.shutdown(false)
+		return err
+	}
+
 	return nil
 }
 

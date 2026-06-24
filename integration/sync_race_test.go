@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
@@ -99,9 +98,9 @@ func fakePeerConn(nodeAddr string) error {
 // sync, it was stuck with a dead sync peer (the sync manager still
 // has a dead peer as sync peer, so it ignores the new live one).
 func TestSyncManagerRaceCorruption(t *testing.T) {
-	stressedHarness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	stressedHarness, err := rpctest.New()
 	require.NoError(t, err)
-	require.NoError(t, stressedHarness.SetUp(true, 0))
+	require.NoError(t, stressedHarness.SetUp())
 	t.Cleanup(func() {
 		require.NoError(t, stressedHarness.TearDown())
 	})
@@ -128,9 +127,9 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 	// Prove corruption: connect a live node and generate blocks. If
 	// the stressed node was corrupted (dead sync peer, 0 connected
 	// peers), it will not sync from the new one.
-	newHarness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	newHarness, err := rpctest.New()
 	require.NoError(t, err)
-	require.NoError(t, newHarness.SetUp(true, 0))
+	require.NoError(t, newHarness.SetUp())
 	defer func() { _ = newHarness.TearDown() }()
 
 	require.NoError(t, rpctest.ConnectNode(stressedHarness, newHarness),
@@ -204,9 +203,9 @@ func dialAndSendVersion(
 // produced (no peerAdd), since peerLifecycleHandler only sends
 // peerAdd when verAckCh is closed. The node must remain healthy.
 func TestPreVerackDisconnect(t *testing.T) {
-	harness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := rpctest.New()
 	require.NoError(t, err)
-	require.NoError(t, harness.SetUp(true, 0))
+	require.NoError(t, harness.SetUp())
 	t.Cleanup(func() { _ = harness.TearDown() })
 
 	nodeAddr := harness.P2PAddress()
@@ -226,9 +225,9 @@ func TestPreVerackDisconnect(t *testing.T) {
 
 	// Verify the node is still healthy: connect a real peer, generate
 	// blocks, and confirm the harness syncs them.
-	helper, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	helper, err := rpctest.New()
 	require.NoError(t, err)
-	require.NoError(t, helper.SetUp(true, 0))
+	require.NoError(t, helper.SetUp())
 	defer func() { _ = helper.TearDown() }()
 
 	require.NoError(t, rpctest.ConnectNode(harness, helper))

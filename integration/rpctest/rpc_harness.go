@@ -5,6 +5,7 @@
 package rpctest
 
 import (
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net"
@@ -20,6 +21,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/debugstream"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire/v2"
 )
@@ -121,28 +123,57 @@ type Harness struct {
 
 	wallet *memWallet
 
+	debugClient *debugstream.Client
+
 	testNodeDir string
 	nodeNum     int
 
 	sync.Mutex
 }
 
+// Opts are options that can be passed to [New] when creating the [Harness],
+// otherwise default configuration is used.
+type Opts struct {
+	// Net allows overriding the default SimNet chain config params.
+	Net *chaincfg.Params
+
+	// Handlers are websocket handlers that can be passed.
+	Handlers *rpcclient.NotificationHandlers
+
+	// CustomExePath can be set to the path of a custom btcd executable,
+	// otherwise we build and use a default executable.
+	CustomExePath string
+
+	// DebugHandler makes the harness start btcd with the debug stream
+	// enabled and use the DebugHandler as the handler of the debug
+	// events coming from btcd.
+	DebugHandler func(debugstream.Event)
+}
+
 // New creates and initializes new instance of the rpc test harness.
-// Optionally, websocket handlers and a specified configuration may be passed.
-// In the case that a nil config is passed, a default configuration will be
-// used. If a custom btcd executable is specified, it will be used to start the
-// harness node. Otherwise a new binary is built on demand.
+//
+// To avoid the need of passing an empty or nil [Opts] to get default
+// initialization, opts is variadic, but only the first argument (if present)
+// is used.
 //
 // NOTE: This function is safe for concurrent access.
-func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
-	extraArgs []string, customExePath string) (*Harness, error) {
-
+func New(opts ...Opts) (*Harness, error) {
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
 
+	var o Opts
+	if len(opts) != 0 {
+		o = opts[0]
+	}
+	if o.Net == nil {
+		// Use SimNet as default network.
+		o.Net = &chaincfg.SimNetParams
+	}
+
+	var extraArgs []string
 	// Add a flag for the appropriate network type based on the provided
 	// chain params.
-	switch activeNet.Net {
+	switch o.Net.Net {
 	case wire.MainNet:
 		// No extra flags since mainnet is the default
 	case wire.TestNet3:
@@ -161,28 +192,34 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 		return nil, err
 	}
 
-	nodeTestData, err := os.MkdirTemp(testDir, "rpc-node")
+	testNodeDir, err := os.MkdirTemp(testDir, "rpc-node")
 	if err != nil {
 		return nil, err
 	}
 
-	certFile := filepath.Join(nodeTestData, "rpc.cert")
-	keyFile := filepath.Join(nodeTestData, "rpc.key")
+	certFile := filepath.Join(testNodeDir, "rpc.cert")
+	keyFile := filepath.Join(testNodeDir, "rpc.key")
 	if err := genCertPair(certFile, keyFile); err != nil {
 		return nil, err
 	}
 
-	wallet, err := newMemWallet(activeNet, uint32(numTestInstances))
+	wallet, err := newMemWallet(o.Net, uint32(numTestInstances))
 	if err != nil {
 		return nil, err
 	}
-
 	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
 	extraArgs = append(extraArgs, miningAddr)
 
-	config, err := newConfig(
-		nodeTestData, certFile, keyFile, extraArgs, customExePath,
-	)
+	var debugClient *debugstream.Client
+	if o.DebugHandler != nil {
+		p := NextAvailablePort()
+		streamAddr := fmt.Sprintf("127.0.0.1:%d", p)
+		debugClient = debugstream.NewClient(streamAddr, o.DebugHandler)
+		extraArgs = append(extraArgs, "--debugstream="+streamAddr)
+	}
+
+	config, err := newConfig(testNodeDir, certFile, keyFile, extraArgs,
+		o.CustomExePath)
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +227,8 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	// Generate p2p+rpc listening addresses.
 	config.listen, config.rpcListen = ListenAddressGenerator()
 
-	// Create the testing node bounded to the simnet.
-	node, err := newNode(config, nodeTestData)
+	// Create the testing node.
+	node, err := newNode(config, testNodeDir)
 	if err != nil {
 		return nil, err
 	}
@@ -199,43 +236,48 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	nodeNum := numTestInstances
 	numTestInstances++
 
-	if handlers == nil {
-		handlers = &rpcclient.NotificationHandlers{}
+	if o.Handlers == nil {
+		o.Handlers = &rpcclient.NotificationHandlers{}
 	}
 
 	// If a handler for the OnFilteredBlock{Connected,Disconnected} callback
 	// callback has already been set, then create a wrapper callback which
 	// executes both the currently registered callback and the mem wallet's
 	// callback.
-	if handlers.OnFilteredBlockConnected != nil {
-		obc := handlers.OnFilteredBlockConnected
-		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+	if o.Handlers.OnFilteredBlockConnected != nil {
+		obc := o.Handlers.OnFilteredBlockConnected
+		o.Handlers.OnFilteredBlockConnected = func(height int32,
+			header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+
 			wallet.IngestBlock(height, header, filteredTxns)
 			obc(height, header, filteredTxns)
 		}
 	} else {
 		// Otherwise, we can claim the callback ourselves.
-		handlers.OnFilteredBlockConnected = wallet.IngestBlock
+		o.Handlers.OnFilteredBlockConnected = wallet.IngestBlock
 	}
-	if handlers.OnFilteredBlockDisconnected != nil {
-		obd := handlers.OnFilteredBlockDisconnected
-		handlers.OnFilteredBlockDisconnected = func(height int32, header *wire.BlockHeader) {
+	if o.Handlers.OnFilteredBlockDisconnected != nil {
+		obd := o.Handlers.OnFilteredBlockDisconnected
+		o.Handlers.OnFilteredBlockDisconnected = func(height int32,
+			header *wire.BlockHeader) {
+
 			wallet.UnwindBlock(height, header)
 			obd(height, header)
 		}
 	} else {
-		handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
+		o.Handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
 	}
 
 	h := &Harness{
-		handlers:               handlers,
+		handlers:               o.Handlers,
 		node:                   node,
 		MaxConnRetries:         DefaultMaxConnectionRetries,
 		ConnectionRetryTimeout: DefaultConnectionRetryTimeout,
-		testNodeDir:            nodeTestData,
-		ActiveNet:              activeNet,
+		testNodeDir:            testNodeDir,
+		ActiveNet:              o.Net,
 		nodeNum:                nodeNum,
 		wallet:                 wallet,
+		debugClient:            debugClient,
 	}
 
 	// Track this newly created test instance within the package level
@@ -245,21 +287,63 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	return h, nil
 }
 
+// SOpts are options that can be passed to [Harness.SetUp], otherwise default
+// configuration is used.
+type SOpts struct {
+	// UTXOCount is the count of mature outputs to be mined in a generated
+	// chain and added to the memwallet.
+	UTXOCount uint32
+
+	// Args can be used to pass extra arguments to the btcd instance.
+	Args []string
+
+	// NoRPCAndWallet can be set to skip initialization of RPC client
+	// and mem wallet. Note that this option also disables the generation
+	// of coins via the UTXOCount count.
+	NoRPCAndWallet bool
+
+	// NoWalletWait can be set to avoid mem wallet sync blocking on
+	// [Harness.SetUp].
+	NoWalletWait bool
+}
+
 // SetUp initializes the rpc test state. Initialization includes: starting up a
-// simnet node, creating a websockets client and connecting to the started
-// node, and finally: optionally generating and submitting a testchain with a
-// configurable number of mature coinbase outputs coinbase outputs.
+// btcd node, and depending on the harness configuration: starting the debug
+// stream client, creating a websockets client, connecting it to the started
+// node, and generating and submitting a testchain with the configured number
+// of mature coinbase outputs.
 //
-// NOTE: This method and TearDown should always be called from the same
-// goroutine as they are not concurrent safe.
-func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
+// To avoid the need of passing an empty or nil [SOpts] to get default
+// initialization, opts is variadic, but only the first argument (if present)
+// is used.
+//
+// NOTE: This method and [Harness.TearDown] should always be called from the
+// same goroutine as they are not concurrent safe.
+func (h *Harness) SetUp(opts ...SOpts) error {
+	var o SOpts
+	if len(opts) != 0 {
+		o = opts[0]
+	}
+
 	// Start the btcd node itself. This spawns a new process which will be
-	// managed
-	if err := h.node.start(); err != nil {
+	// managed.
+	if err := h.node.start(o.Args); err != nil {
 		return fmt.Errorf("error starting node: %w", err)
 	}
+
+	if h.debugClient != nil {
+		if err := h.debugClient.Start(); err != nil {
+			return fmt.Errorf("error connecting debug client: %w",
+				err)
+		}
+	}
+
+	if o.NoRPCAndWallet {
+		return nil
+	}
 	if err := h.connectRPCClient(); err != nil {
-		return fmt.Errorf("error connecting RPC client: %w", err)
+		return fmt.Errorf("error connecting RPC client: %w",
+			err)
 	}
 
 	h.wallet.Start()
@@ -279,15 +363,18 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 
 	// Create a test chain with the desired number of mature coinbase
 	// outputs.
-	if createTestChain && numMatureOutputs != 0 {
+	if o.UTXOCount > 0 {
 		coinbaseMaturity := uint32(h.ActiveNet.CoinbaseMaturity)
-		numToGenerate := coinbaseMaturity + numMatureOutputs
+		numToGenerate := coinbaseMaturity + o.UTXOCount
 		_, err := h.Client.Generate(numToGenerate)
 		if err != nil {
 			return err
 		}
 	}
 
+	if o.NoWalletWait {
+		return nil
+	}
 	// Block until the wallet has fully synced up to the tip of the main
 	// chain.
 	_, height, err := h.Client.GetBestBlock()
@@ -295,7 +382,10 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 		return err
 	}
 	ticker := time.NewTicker(time.Millisecond * 100)
-	for range ticker.C {
+	for i := 0; ; i++ {
+		if i > 0 {
+			<-ticker.C
+		}
 		walletHeight := h.wallet.SyncedHeight()
 		if walletHeight == height {
 			break
@@ -306,11 +396,33 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 	return nil
 }
 
-// tearDown stops the running rpc test instance.  All created processes are
-// killed, and temporary directories removed.
+// TOpts are options that can be passed to [Harness.TearDown], otherwise default
+// configuration is used.
+type TOpts struct {
+	// NoNodeCleanup skips cleaning up node data, which enable tests that
+	// need to restart the node.
+	NoNodeCleanup bool
+
+	// NoShutdownSignal waits for node shutdown without sending a stop
+	// signal when stopping the node, which is useful for when we are
+	// testing features that stops the node.
+	NoShutdownSignal bool
+}
+
+// tearDown stops the running rpc test instance. By default all created
+// processes are killed, and temporary directories removed.
+//
+// To avoid the need of passing an empty or nil [TOpts] to get default
+// initialization, opts is variadic, but only the first argument (if present)
+// is used.
 //
 // This function MUST be called with the harness state mutex held (for writes).
-func (h *Harness) tearDown() error {
+func (h *Harness) tearDown(opts ...TOpts) error {
+	var o TOpts
+	if len(opts) != 0 {
+		o = opts[0]
+	}
+
 	if h.Client != nil {
 		h.Client.Shutdown()
 		h.Client.WaitForShutdown()
@@ -321,29 +433,45 @@ func (h *Harness) tearDown() error {
 		h.BatchClient.WaitForShutdown()
 	}
 
-	if err := h.node.shutdown(); err != nil {
-		return err
+	if h.debugClient != nil {
+		// Is better to stop the client after stopping btcd, because
+		// this way we can use the debugHandler to test the btcd
+		// shutdown behavior.
+		defer h.debugClient.Stop()
 	}
 
-	if err := os.RemoveAll(h.testNodeDir); err != nil {
-		return err
+	if h.wallet != nil {
+		h.wallet.Stop()
 	}
 
-	delete(testInstances, h.testNodeDir)
+	err := h.node.shutdown(o.NoShutdownSignal)
 
-	return nil
+	if !o.NoNodeCleanup {
+		rmErr := os.RemoveAll(h.testNodeDir)
+		if rmErr != nil {
+			err = errors.Join(rmErr, err)
+		}
+
+		delete(testInstances, h.testNodeDir)
+	}
+
+	return err
 }
 
-// TearDown stops the running rpc test instance. All created processes are
-// killed, and temporary directories removed.
+// TearDown stops the running rpc test instance. By default all created
+// processes are killed, and temporary directories removed.
 //
-// NOTE: This method and SetUp should always be called from the same goroutine
-// as they are not concurrent safe.
-func (h *Harness) TearDown() error {
+// To avoid the need of passing an empty or nil [TOpts] to get default
+// initialization, opts is variadic, but only the first argument (if present)
+// is used.
+//
+// NOTE: This method and [Harness.SetUp] should always be called from the same
+// goroutine as they are not concurrent safe.
+func (h *Harness) TearDown(opts ...TOpts) error {
 	harnessStateMtx.Lock()
 	defer harnessStateMtx.Unlock()
 
-	return h.tearDown()
+	return h.tearDown(opts...)
 }
 
 // connectRPCClient attempts to establish an RPC connection to the created btcd
