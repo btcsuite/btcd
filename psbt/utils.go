@@ -478,3 +478,36 @@ func FindLeafScript(pInput *PInput,
 	return nil, fmt.Errorf("leaf script for target leaf hash %x not "+
 		"found in input", targetLeafHash)
 }
+
+// PrevOutputFetcher returns a txscript.PrevOutFetcher built from the UTXO
+// information in a PSBT packet.
+func PrevOutputFetcher(packet *Packet) *txscript.MultiPrevOutFetcher {
+	fetcher := txscript.NewMultiPrevOutFetcher(nil)
+	for idx, txIn := range packet.UnsignedTx.TxIn {
+		in := packet.Inputs[idx]
+
+		// Skip any input that has no UTXO.
+		if in.WitnessUtxo == nil && in.NonWitnessUtxo == nil {
+			continue
+		}
+
+		if in.NonWitnessUtxo != nil {
+			prevIndex := txIn.PreviousOutPoint.Index
+			fetcher.AddPrevOut(
+				txIn.PreviousOutPoint,
+				in.NonWitnessUtxo.TxOut[prevIndex],
+			)
+
+			continue
+		}
+
+		// Fall back to witness UTXO only for older wallets.
+		if in.WitnessUtxo != nil {
+			fetcher.AddPrevOut(
+				txIn.PreviousOutPoint, in.WitnessUtxo,
+			)
+		}
+	}
+
+	return fetcher
+}
