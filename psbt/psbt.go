@@ -188,12 +188,12 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 // NOTE: To create a Packet from one's own data, rather than reading in a
 // serialization from a counterparty, one should use a psbt.New.
 func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
-	// If the PSBT is encoded in bas64, then we'll create a new wrapper
-	// reader that'll allow us to incrementally decode the contents of the
-	// io.Reader.
 	if b64 {
-		based64EncodedReader := r
-		r = base64.NewDecoder(base64.StdEncoding, based64EncodedReader)
+		decoded, err := decodeBase64Strict(r)
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewReader(decoded)
 	}
 
 	// The Packet struct does not store the fixed magic bytes, but they
@@ -329,6 +329,29 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	}
 
 	return &newPsbt, nil
+}
+
+// decodeBase64Strict decodes an RFC4648 base64 stream without permitting
+// whitespace and with '=' allowed only as final padding.
+func decodeBase64Strict(r io.Reader) ([]byte, error) {
+	encoded, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Go's strict base64 decoder still ignores CR/LF. Reject them before
+	// decoding so base64 PSBT parsing matches the RFC4648 alphabet exactly.
+	if bytes.ContainsAny(encoded, "\r\n") {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(encoded)))
+	n, err := base64.StdEncoding.Strict().Decode(decoded, encoded)
+	if err != nil {
+		return nil, ErrInvalidPsbtFormat
+	}
+
+	return decoded[:n], nil
 }
 
 // Serialize creates a binary serialization of the referenced Packet struct
