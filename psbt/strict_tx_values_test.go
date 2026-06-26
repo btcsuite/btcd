@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+	"encoding/base64"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire/v2"
@@ -169,6 +170,61 @@ func TestRejectsTrailingDataAfterPacket(t *testing.T) {
 		bytes.NewReader(append(rawPacket, 0x00)), false,
 	)
 	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
+// TestRejectsNonCanonicalBase64Packet verifies that base64 PSBT input rejects
+// whitespace, bad padding, and extra decoded packet bytes.
+func TestRejectsNonCanonicalBase64Packet(t *testing.T) {
+	unsignedTx, prevTx := strictnessTxPair(t)
+	rawPacket := strictnessPSBT(
+		t,
+		serializeTxForStrictness(t, unsignedTx, true),
+		serializeTxForStrictness(t, prevTx, false),
+	)
+	encoded := base64.StdEncoding.EncodeToString(rawPacket)
+	insert := func(idx int, s string) string {
+		return encoded[:idx] + s + encoded[idx:]
+	}
+
+	testCases := []struct {
+		name    string
+		encoded string
+	}{{
+		name:    "trailing LF",
+		encoded: encoded + "\n",
+	}, {
+		name:    "trailing CRLF",
+		encoded: encoded + "\r\n",
+	}, {
+		name:    "LF between groups",
+		encoded: insert(4, "\n"),
+	}, {
+		name:    "LF inside group",
+		encoded: insert(5, "\n"),
+	}, {
+		name:    "space between groups",
+		encoded: insert(4, " "),
+	}, {
+		name:    "tab inside group",
+		encoded: insert(5, "\t"),
+	}, {
+		name:    "padding in middle",
+		encoded: insert(len(encoded)-4, "="),
+	}, {
+		name: "extra decoded bytes",
+		encoded: base64.StdEncoding.EncodeToString(
+			append(append([]byte{}, rawPacket...), 0x00),
+		),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := NewFromRawBytes(
+				bytes.NewReader([]byte(tc.encoded)), true,
+			)
+			require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+		})
+	}
 }
 
 // TestParsesWitnessUtxoTxOutStrictly verifies that WitnessUtxo values are
