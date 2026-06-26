@@ -278,6 +278,31 @@ func getKey(r io.Reader) (int, []byte, error) {
 	return int(keyType), keyData, nil
 }
 
+// assertFullyConsumed returns ErrInvalidPsbtFormat if r still has bytes
+// available after parsing.
+func assertFullyConsumed(r io.Reader) error {
+	if lr, ok := r.(interface{ Len() int }); ok {
+		if lr.Len() > 0 {
+			return ErrInvalidPsbtFormat
+		}
+
+		return nil
+	}
+
+	var trailing [1]byte
+	_, err := io.ReadFull(r, trailing[:])
+	switch {
+	case err == nil:
+		return ErrInvalidPsbtFormat
+
+	case errors.Is(err, io.EOF):
+		return nil
+
+	default:
+		return err
+	}
+}
+
 // readTxOut is a limited version of wire.ReadTxOut, because the latter is not
 // exported.
 func readTxOut(txout []byte) (*wire.TxOut, error) {
