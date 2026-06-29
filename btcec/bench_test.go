@@ -174,21 +174,32 @@ func BenchmarkFieldNormalize(b *testing.B) {
 	}
 }
 
+var PubSink PublicKey
+
 // BenchmarkParseCompressedPubKey benchmarks how long it takes to decompress and
 // validate a compressed public key from a byte array.
 func BenchmarkParseCompressedPubKey(b *testing.B) {
-	rawPk, _ := hex.DecodeString("0234f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6")
+	pubs := "0234f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6"
+	pubb := hexToBytes(pubs)
+	var pub PublicKey
 
-	var (
-		pk  *PublicKey
-		err error
-	)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		pk, err = ParsePubKey(rawPk)
+	for b.Loop() {
+		pub2, _ := ParsePubKey(pubb)
+		pub = *pub2
 	}
-	_ = pk
-	_ = err
+
+	PubSink = pub
+}
+
+func BenchmarkParseUncompressedPubKey(b *testing.B) {
+	pubs := "0434f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c60b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232"
+	pubb := hexToBytes(pubs)
+	var pub PublicKey
+
+	for b.Loop() {
+		pub2, _ := ParsePubKey(pubb)
+		pub = *pub2
+	}
+
+	PubSink = pub
 }
