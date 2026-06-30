@@ -166,10 +166,11 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	// e = int(tagged_hash("BIP0340/challenge", bytes(r) || bytes(P) || M)) mod n.
 	var rBytes [32]byte
 	sig.r.PutBytesUnchecked(rBytes[:])
-	pBytes := SerializePubKey(pubKey)
+	var pBytes [32]byte
+	serializePubKey32(pBytes[:], pubKey)
 
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, rBytes[:], pBytes[:], hash,
 	)
 
 	var e btcec.ModNScalar
@@ -226,8 +227,9 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 // Verify returns whether or not the signature is valid for the provided hash
 // and secp256k1 public key.
 func (sig *Signature) Verify(hash []byte, pubKey *btcec.PublicKey) bool {
-	pubkeyBytes := SerializePubKey(pubKey)
-	return schnorrVerify(sig, hash, pubkeyBytes) == nil
+	var pubkeyBytes [32]byte
+	serializePubKey32(pubkeyBytes[:], pubKey)
+	return schnorrVerify(sig, hash, pubkeyBytes[:]) == nil
 }
 
 // zeroArray zeroes the memory of a scalar array.
@@ -304,9 +306,10 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// Step 12.
 	//
 	// e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m) mod n
-	pBytes := SerializePubKey(pubKey)
+	var pBytes [32]byte
+	serializePubKey32(pBytes[:], pubKey)
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, R.X.Bytes()[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, R.X.Bytes()[:], pBytes[:], hash,
 	)
 
 	var e btcec.ModNScalar
@@ -328,7 +331,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	//
 	// If Verify(bytes(P), m, sig) fails, abort.
 	if !opts.fastSign {
-		if err := schnorrVerify(sig, hash, pBytes); err != nil {
+		if err := schnorrVerify(sig, hash, pBytes[:]); err != nil {
 			return nil, err
 		}
 	}

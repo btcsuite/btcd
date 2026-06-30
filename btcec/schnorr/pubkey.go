@@ -62,3 +62,9 @@ func SerializePubKey(pub *btcec.PublicKey) []byte {
 	pBytes := pub.SerializeCompressed()
 	return pBytes[1:]
 }
+
+func serializePubKey32(out32 []byte, pub *btcec.PublicKey) {
+	var point secp.JacobianPoint
+	pub.AsJacobian(&point)
+	copy(out32, point.X.Bytes()[:])
+}
