@@ -1,5 +1,28 @@
 package psbt
 
+const (
+	// PsbtVersion0 is the original PSBT version (BIP-174).
+	PsbtVersion0 uint32 = 0
+
+	// PsbtVersion2 is the updated PSBT version (BIP-370).
+	PsbtVersion2 uint32 = 2
+)
+
+const (
+	// FlagInputsModifiable is a bit field flag that indicates whether
+	// inputs can be added or removed.
+	FlagInputsModifiable uint8 = 0x01
+
+	// FlagOutputsModifiable is a bit field flag that indicates whether
+	// outputs can be added or removed.
+	FlagOutputsModifiable uint8 = 0x02
+
+	// FlagSighashSingle is a bit field flag that indicates whether the
+	// transaction has a SIGHASH_SINGLE signature who's input and output
+	// pairing must be preserved.
+	FlagSighashSingle uint8 = 0x04
+)
+
 // GlobalType is the set of types that are used at the global scope level
 // within the PSBT.
 type GlobalType uint8
@@ -29,6 +52,31 @@ const (
 	// unsigned integer indexes must match the depth provided in the
 	// extended public key.
 	XPubType GlobalType = 1
+
+	// TxVersionGlobalType is the PSBT version number. The key is {0x02}.
+	// The value is a 32-bit little endian signed integer for the version
+	// number.
+	TxVersionGlobalType GlobalType = 0x02
+
+	// FallbackLocktimeGlobalType is the fallback locktime for the
+	// transaction. The key is {0x03}. The value is a 32-bit little endian
+	// unsigned integer.
+	FallbackLocktimeGlobalType GlobalType = 0x03
+
+	// InputCountGlobalType is the number of inputs in this PSBT.
+	// The key is {0x04}.
+	// The value is a compact size unsigned integer.
+	InputCountGlobalType GlobalType = 0x04
+
+	// OutputCountGlobalType is the number of outputs in this PSBT.
+	// The key is {0x05}.
+	// The value is a compact size unsigned integer.
+	OutputCountGlobalType GlobalType = 0x05
+
+	// TxModifiableGlobalType is a bitfield denoting the modifiability of
+	// the transaction. The key is {0x06}.
+	// The value is an 8-bit unsigned integer.
+	TxModifiableGlobalType GlobalType = 0x06
 
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is
@@ -114,6 +162,31 @@ const (
 	// scripts necessary for the input to pass validation.
 	FinalScriptWitnessType InputType = 8
 
+	// PreviousTxidInputType is the txid of the previous transaction.
+	// The key is {0x0E}.
+	// The value is a 32-byte txid.
+	PreviousTxidInputType InputType = 0x0E
+
+	// SpentOutputIndexInputType is the spent output index of the previous
+	// transaction. The key is {0x0F}. The value is a 32-bit little endian
+	// unsigned integer.
+	SpentOutputIndexInputType InputType = 0x0F
+
+	// SequenceInputType is the sequence number for this input.
+	// The key is {0x10}.
+	// The value is a 32-bit little endian unsigned integer.
+	SequenceInputType InputType = 0x10
+
+	// TimeLocktimeInputType is the time-based locktime for this input.
+	// The key is {0x11}.
+	// The value is a 32-bit little endian unsigned integer.
+	TimeLocktimeInputType InputType = 0x11
+
+	// HeightLocktimeInputType is the height-based locktime for this input.
+	// The key is {0x12}.
+	// The value is a 32-bit little endian unsigned integer.
+	HeightLocktimeInputType InputType = 0x12
+
 	// TaprootKeySpendSignatureType is an empty key ({0x13}). The value is
 	// a 64-byte Schnorr signature or a 65-byte Schnorr signature with the
 	// one byte sighash type appended to it.
@@ -175,14 +248,25 @@ const (
 	// The value is the witness script of this input, if it has one.
 	WitnessScriptOutputType OutputType = 1
 
-	// Bip32DerivationOutputType is used to communicate derivation information
-	// needed to spend this output. The key is ({0x02}|{public key}).
+	// Bip32DerivationOutputType is used to communicate derivation
+	// information needed to spend this output. The key is ({0x02}|{public
+	// key}).
 	//
 	// The value is master key fingerprint concatenated with the derivation
 	// path of the public key. The derivation path is represented as 32-bit
 	// little endian unsigned integer indexes concatenated with each other.
 	// Public keys are those needed to spend this output.
 	Bip32DerivationOutputType OutputType = 2
+
+	// AmountOutputType is the value of this output.
+	// The key is {0x03}.
+	// The value is an 8-byte little endian signed integer.
+	AmountOutputType OutputType = 0x03
+
+	// ScriptOutputType is the locking script for this output.
+	// The key is {0x04}.
+	// The value is the scriptPubkey.
+	ScriptOutputType OutputType = 0x04
 
 	// TaprootInternalKeyOutputType is an empty key ({0x05}). The value is
 	// an x-only pubkey denoting the internal public key used for

@@ -83,7 +83,10 @@ func isFinalizableWitnessInput(pInput *PInput) bool {
 			if pInput.WitnessScript == nil {
 				return false
 			}
-		} else if txscript.IsPayToWitnessPubKeyHash(pInput.RedeemScript) {
+		} else if txscript.IsPayToWitnessPubKeyHash(
+			pInput.RedeemScript,
+		) {
+
 			if pInput.WitnessScript != nil {
 				return false
 			}
@@ -111,8 +114,18 @@ func isFinalizableLegacyInput(p *Packet, pInput *PInput, inIndex int) bool {
 
 	// Otherwise, we'll verify that we only have a RedeemScript if the prev
 	// output script is P2SH.
-	outIndex := p.UnsignedTx.TxIn[inIndex].PreviousOutPoint.Index
-	if txscript.IsPayToScriptHash(pInput.NonWitnessUtxo.TxOut[outIndex].PkScript) {
+	if p.Version == PsbtVersion0 && p.UnsignedTx == nil {
+		return false
+	}
+	outIndex, err := p.outIndex(inIndex)
+	if err != nil {
+		return false
+	}
+
+	if txscript.IsPayToScriptHash(
+		pInput.NonWitnessUtxo.TxOut[outIndex].PkScript,
+	) {
+
 		if pInput.RedeemScript == nil {
 			return false
 		}
@@ -186,7 +199,7 @@ func MaybeFinalize(p *Packet, inIndex int) (bool, error) {
 // MaybeFinalizeAll attempts to finalize all inputs of the psbt.Packet that are
 // not already finalized, and returns an error if it fails to do so.
 func MaybeFinalizeAll(p *Packet) error {
-	for i := range p.UnsignedTx.TxIn {
+	for i := range p.Inputs {
 		success, err := MaybeFinalize(p, i)
 		if err != nil || !success {
 			return err
@@ -351,6 +364,9 @@ func finalizeNonWitnessInput(p *Packet, inIndex int) error {
 	newInput := NewPsbtInput(pInput.NonWitnessUtxo, nil)
 	newInput.FinalScriptSig = sigScript
 
+	// Preserve required PSBTv2 fields and unknowns as mandated by BIP-370
+	newInput.CopyInputFields(&pInput)
+
 	// Overwrite the entry in the input list at the correct index. Note
 	// that this removes all the other entries in the list for this input
 	// index.
@@ -493,6 +509,9 @@ func finalizeWitnessInput(p *Packet, inIndex int) error {
 
 	newInput.FinalScriptWitness = serializedWitness
 
+	// Preserve required PSBTv2 fields and unknowns as mandated by BIP-370
+	newInput.CopyInputFields(&pInput)
+
 	// Finally, we overwrite the entry in the input list at the correct
 	// index.
 	p.Inputs[inIndex] = *newInput
@@ -556,7 +575,10 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 		for idx, scriptSpendSig := range pInput.TaprootScriptSpendSig {
 			// Make sure that if there are indeed multiple
 			// signatures, they all reference the same leaf hash.
-			if !bytes.Equal(scriptSpendSig.LeafHash, targetLeafHash) {
+			if !bytes.Equal(
+				scriptSpendSig.LeafHash, targetLeafHash,
+			) {
+
 				return fmt.Errorf("script spend signature %d "+
 					"references different target leaf "+
 					"hash than first signature; only one "+
@@ -589,6 +611,9 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 	// finalscriptwitness (08).
 	newInput := NewPsbtInput(nil, pInput.WitnessUtxo)
 	newInput.FinalScriptWitness = serializedWitness
+
+	// Preserve required PSBTv2 fields and unknowns as mandated by BIP-370
+	newInput.CopyInputFields(pInput)
 
 	// Finally, we overwrite the entry in the input list at the correct
 	// index.
