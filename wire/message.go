@@ -570,6 +570,12 @@ func ReadV2MessageN(plaintext []byte, pver uint32, enc MessageEncoding) (
 		return nil, nil, err
 	}
 
+	if buf.Len() > 0 {
+		str := fmt.Sprintf("message payload has %d extra bytes "+
+			"after decode", buf.Len())
+		return nil, nil, messageError("ReadV2MessageN", str)
+	}
+
 	return msg, plaintext, nil
 }
 

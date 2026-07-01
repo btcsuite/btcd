@@ -90,9 +90,7 @@ func (pi *PInput) deserialize(r io.Reader) error {
 			if keyData != nil {
 				return ErrInvalidKeyData
 			}
-			tx := wire.NewMsgTx(2)
-
-			err := tx.Deserialize(bytes.NewReader(value))
+			tx, err := readTransaction(value, false)
 			if err != nil {
 				return err
 			}

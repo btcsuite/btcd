@@ -76,6 +76,22 @@ func TestNewTxFromBytes(t *testing.T) {
 	}
 }
 
+// TestNewTxFromBytesRejectsTrailingData verifies that NewTxFromBytes rejects
+// bytes after the serialized transaction.
+func TestNewTxFromBytesRejectsTrailingData(t *testing.T) {
+	testTx := Block100000.Transactions[0]
+	var testTxBuf bytes.Buffer
+	err := testTx.Serialize(&testTxBuf)
+	if err != nil {
+		t.Errorf("Serialize: %v", err)
+	}
+
+	_, err = btcutil.NewTxFromBytes(append(testTxBuf.Bytes(), 0x00))
+	if err == nil {
+		t.Fatal("expected error for transaction with trailing data")
+	}
+}
+
 // TestTxErrors tests the error paths for the Tx API.
 func TestTxErrors(t *testing.T) {
 	// Serialize the test transaction.

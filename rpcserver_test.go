@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,6 +68,119 @@ func TestHandleTestMempoolAcceptFailDecode(t *testing.T) {
 			require.Nil(result)
 		})
 	}
+}
+
+// TestHandleTestMempoolAcceptRejectsTrailingBytes ensures testmempoolaccept
+// rejects byte strings that contain a valid transaction plus trailing data.
+func TestHandleTestMempoolAcceptRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		recovered := recover()
+		require.Nil(t, recovered, "handler reached mempool")
+	}()
+
+	cmd := btcjson.NewTestMempoolAcceptCmd([]string{txHex1 + "00"}, 0)
+	result, err := handleTestMempoolAccept(
+		&rpcServer{}, cmd, make(chan struct{}),
+	)
+
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
+// requireRPCErrorCode asserts that the error is an RPC error with the expected
+// error code.
+func requireRPCErrorCode(t *testing.T, err error, code btcjson.RPCErrorCode) {
+	t.Helper()
+
+	require.Error(t, err)
+	rpcErr, ok := err.(*btcjson.RPCError)
+	require.True(t, ok)
+	require.Equal(t, code, rpcErr.Code)
+}
+
+// blockHexWithTrailingByte serializes a valid block and appends one extra byte.
+func blockHexWithTrailingByte(t *testing.T) string {
+	t.Helper()
+
+	var block bytes.Buffer
+	err := chaincfg.MainNetParams.GenesisBlock.Serialize(&block)
+	require.NoError(t, err)
+
+	return hex.EncodeToString(append(block.Bytes(), 0x00))
+}
+
+// TestHandleSendRawTransactionRejectsTrailingBytes ensures sendrawtransaction
+// rejects byte strings that contain a valid transaction plus trailing data.
+func TestHandleSendRawTransactionRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	mm := &mempool.MockTxMempool{}
+	mm.On(
+		"ProcessTransaction", mock.Anything, false, false, mempool.Tag(0),
+	).Return(nil, errors.New("mempool should not be reached")).Maybe()
+
+	s := &rpcServer{cfg: rpcserverConfig{
+		TxMemPool: mm,
+	}}
+	cmd := btcjson.NewSendRawTransactionCmd(txHex1+"00", nil)
+
+	result, err := handleSendRawTransaction(s, cmd, make(chan struct{}))
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
+// TestHandleDecodeRawTransactionRejectsTrailingBytes ensures
+// decoderawtransaction rejects byte strings that contain a valid transaction
+// plus trailing data.
+func TestHandleDecodeRawTransactionRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	cmd := btcjson.NewDecodeRawTransactionCmd(txHex1 + "00")
+	result, err := handleDecodeRawTransaction(
+		&rpcServer{}, cmd, make(chan struct{}),
+	)
+
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
+// TestHandleGetBlockTemplateProposalRejectsTrailingBytes ensures proposal mode
+// rejects byte strings that contain a valid block plus trailing data.
+func TestHandleGetBlockTemplateProposalRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		recovered := recover()
+		require.Nil(t, recovered, "handler reached chain state")
+	}()
+
+	request := &btcjson.TemplateRequest{
+		Mode: "proposal",
+		Data: blockHexWithTrailingByte(t),
+	}
+
+	result, err := handleGetBlockTemplateProposal(&rpcServer{}, request)
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
+}
+
+// TestHandleSubmitBlockRejectsTrailingBytes ensures submitblock rejects byte
+// strings that contain a valid block plus trailing data.
+func TestHandleSubmitBlockRejectsTrailingBytes(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		recovered := recover()
+		require.Nil(t, recovered, "handler reached sync manager")
+	}()
+
+	cmd := btcjson.NewSubmitBlockCmd(blockHexWithTrailingByte(t), nil)
+	result, err := handleSubmitBlock(&rpcServer{}, cmd, make(chan struct{}))
+
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+	require.Nil(t, result)
 }
 
 var (

@@ -9,9 +9,12 @@ import (
 	"errors"
 	"math/big"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
@@ -34,6 +37,52 @@ func TestErrNotInMainChain(t *testing.T) {
 	err = errors.New("something else")
 	if isNotInMainChainErr(err) {
 		t.Fatalf("isNotInMainChainErr detected incorrect type")
+	}
+}
+
+// TestInitChainStateRejectsTrailingBestBlockBytes ensures startup rejects a
+// stored best block whose bytes contain a valid block plus trailing data.
+func TestInitChainStateRejectsTrailingBestBlockBytes(t *testing.T) {
+	chain, params, teardown := utxoCacheTestChain(
+		"TestInitChainStateRejectsTrailingBestBlockBytes")
+	defer teardown()
+
+	tip := btcutil.NewBlock(params.GenesisBlock)
+	tip.SetHeight(0)
+
+	block, _, err := newBlock(chain, tip, nil)
+	if err != nil {
+		t.Fatalf("failed to build block: %v", err)
+	}
+
+	var serialized bytes.Buffer
+	err = block.MsgBlock().Serialize(&serialized)
+	if err != nil {
+		t.Fatalf("failed to serialize block: %v", err)
+	}
+
+	trailingBytes := append([]byte(nil), serialized.Bytes()...)
+	trailingBytes = append(trailingBytes, 0x00)
+	trailingBlock := btcutil.NewBlockFromBlockAndBytes(
+		block.MsgBlock(), trailingBytes,
+	)
+
+	_, _, err = chain.ProcessBlock(trailingBlock, BFNone)
+	if err != nil {
+		t.Fatalf("failed to process block: %v", err)
+	}
+
+	_, err = New(&Config{
+		DB:          chain.db,
+		ChainParams: params,
+		TimeSource:  NewMedianTime(),
+		SigCache:    txscript.NewSigCache(1000),
+	})
+	if err == nil {
+		t.Fatal("expected trailing best block bytes to fail startup")
+	}
+	if !strings.Contains(err.Error(), "trailing bytes") {
+		t.Fatalf("expected trailing byte error, got: %v", err)
 	}
 }
 

@@ -347,7 +347,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 			ErrUnknownMessage,
 			24,
 		},
-
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -420,6 +419,28 @@ func TestReadMessageTrailingBytes(t *testing.T) {
 	_, _, _, err := ReadMessageN(r, pver, btcnet)
 	if err == nil {
 		t.Fatal("expected error for message with trailing bytes")
+	}
+
+	var msgErr *MessageError
+	if !errors.As(err, &msgErr) {
+		t.Fatalf("expected MessageError, got: %T (%v)", err, err)
+	}
+}
+
+// TestReadV2MessageTrailingBytes verifies that a v2 message with unconsumed
+// trailing bytes after BtcDecode is rejected with a MessageError.
+func TestReadV2MessageTrailingBytes(t *testing.T) {
+	payload := []byte{
+		v2Messages[CmdInv],
+		0x00, // zero inventory vectors
+		0xaa, // trailing data not consumed by MsgInv.BtcDecode
+	}
+
+	_, _, err := ReadV2MessageN(
+		payload, ProtocolVersion, BaseEncoding,
+	)
+	if err == nil {
+		t.Fatal("expected error for v2 message with trailing bytes")
 	}
 
 	var msgErr *MessageError

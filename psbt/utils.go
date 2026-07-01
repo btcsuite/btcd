@@ -6,7 +6,6 @@ package psbt
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -278,17 +277,69 @@ func getKey(r io.Reader) (int, []byte, error) {
 	return int(keyType), keyData, nil
 }
 
-// readTxOut is a limited version of wire.ReadTxOut, because the latter is not
-// exported.
-func readTxOut(txout []byte) (*wire.TxOut, error) {
-	if len(txout) < 10 {
-		return nil, ErrInvalidPsbtFormat
+// assertFullyConsumed returns ErrInvalidPsbtFormat if r still has bytes
+// available after parsing.
+func assertFullyConsumed(r io.Reader) error {
+	if lr, ok := r.(interface{ Len() int }); ok {
+		if lr.Len() > 0 {
+			return ErrInvalidPsbtFormat
+		}
+
+		return nil
 	}
 
-	valueSer := binary.LittleEndian.Uint64(txout[:8])
-	scriptPubKey := txout[9:]
+	var trailing [1]byte
+	_, err := io.ReadFull(r, trailing[:])
+	switch {
+	case err == nil:
+		return ErrInvalidPsbtFormat
 
-	return wire.NewTxOut(int64(valueSer), scriptPubKey), nil
+	case errors.Is(err, io.EOF):
+		return nil
+
+	default:
+		return err
+	}
+}
+
+// readTxOut parses a transaction output value and requires the full value to
+// be consumed.
+func readTxOut(txout []byte) (*wire.TxOut, error) {
+	txOut := &wire.TxOut{}
+	reader := bytes.NewReader(txout)
+
+	if err := wire.ReadTxOut(reader, 0, 0, txOut); err != nil {
+		return nil, err
+	}
+	if err := assertFullyConsumed(reader); err != nil {
+		return nil, err
+	}
+
+	return txOut, nil
+}
+
+// readTransaction parses a transaction value and requires the full value to be
+// consumed. PSBT transaction-valued fields contain exactly one network
+// serialized transaction, not a transaction prefix with arbitrary trailing data.
+func readTransaction(txBytes []byte, noWitness bool) (*wire.MsgTx, error) {
+	tx := wire.NewMsgTx(2)
+	reader := bytes.NewReader(txBytes)
+
+	var err error
+	if noWitness {
+		err = tx.DeserializeNoWitness(reader)
+	} else {
+		err = tx.Deserialize(reader)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if err := assertFullyConsumed(reader); err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 // SumUtxoInputValues tries to extract the sum of all inputs specified in the

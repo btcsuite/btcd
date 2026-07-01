@@ -91,7 +91,7 @@ func (p *PartialSignature) Decode(r io.Reader) error {
 
 	var sBytes [32]byte
 	if _, err := io.ReadFull(r, sBytes[:]); err != nil {
-		return nil
+		return err
 	}
 
 	overflows := p.S.SetBytes(&sBytes)
