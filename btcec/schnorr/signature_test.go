@@ -291,3 +291,40 @@ func TestSchnorrSignNoMutate(t *testing.T) {
 		t.Fatalf("private key modified: %v", err)
 	}
 }
+
+// TestParseSignatureComponentRange ensures ParseSignature enforces the BIP-340
+// range restrictions on both the r and s components, in particular that an s
+// value greater than or equal to the group order n is rejected rather than
+// silently reduced modulo n.
+func TestParseSignatureComponentRange(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		sig  string
+		err  error
+	}{{
+		name: "r == p",
+		sig: "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f" +
+			"181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d09",
+		err: ecdsa_schnorr.ErrSigRTooBig,
+	}, {
+		name: "s == n",
+		sig: "4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41" +
+			"fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+		err: ecdsa_schnorr.ErrSigSTooBig,
+	}, {
+		name: "s > n",
+		sig: "4e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41" +
+			"fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364142",
+		err: ecdsa_schnorr.ErrSigSTooBig,
+	}}
+
+	for _, test := range tests {
+		_, err := ParseSignature(decodeHex(test.sig))
+		if !errors.Is(err, test.err) {
+			t.Errorf("%s: mismatched err -- got %v, want %v", test.name,
+				err, test.err)
+		}
+	}
+}
