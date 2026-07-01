@@ -1499,6 +1499,7 @@ out:
 				// command.
 				p.PushRejectMsg("malformed", wire.RejectMalformed, errMsg, nil,
 					true)
+				p.Disconnect()
 			}
 			break out
 		}
