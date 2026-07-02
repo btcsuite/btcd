@@ -869,9 +869,10 @@ func syncSendHeaders(t *testing.T, sm *SyncManager,
 
 	t.Helper()
 
-	// Record the progress time set by startIBD so we can verify
-	// that handleHeadersMsg advances it.
-	progressBefore := sm.lastProgressTime
+	// Reset the progress time to a zero sentinel so the assertion below
+	// verifies that handleHeadersMsg writes it without depending on the
+	// system clock advancing between calls to time.Now.
+	sm.lastProgressTime = time.Time{}
 
 	headers := wire.NewMsgHeaders()
 	for _, block := range blocks {
@@ -887,7 +888,7 @@ func syncSendHeaders(t *testing.T, sm *SyncManager,
 	_, bestHeaderHeight := sm.chain.BestHeader()
 	require.Equal(t, int32(totalBlocks), bestHeaderHeight)
 
-	require.True(t, sm.lastProgressTime.After(progressBefore),
+	require.False(t, sm.lastProgressTime.IsZero(),
 		"handleHeadersMsg should update lastProgressTime")
 
 	wantRequested := make(map[chainhash.Hash]struct{}, len(blocks))
