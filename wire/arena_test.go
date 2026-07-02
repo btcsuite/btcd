@@ -6,6 +6,7 @@ package wire
 
 import (
 	"bytes"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -40,9 +41,9 @@ func TestScriptArenaAlloc(t *testing.T) {
 	// bug that handed out overlapping memory would have clobbered one of
 	// the earlier allocations.
 	for marker, s := range allocs {
-		for _, b := range s {
-			require.Equal(t, byte(marker), b)
-		}
+		require.Equal(
+			t, len(s), bytes.Count(s, []byte{byte(marker)}),
+		)
 	}
 }
 
@@ -197,7 +198,9 @@ func TestScriptArenaConcurrentDecode(t *testing.T) {
 					tx2.TxIn[0].SignatureScript,
 					multiTx.TxIn[0].SignatureScript,
 				) {
-					errs <- errScriptArenaFull
+					errs <- fmt.Errorf("cross-arena " +
+						"aliasing: decoded script " +
+						"mismatch")
 					return
 				}
 			}
@@ -241,9 +244,10 @@ func TestScriptArenaRandomizedAllocations(t *testing.T) {
 
 			// All live allocations must retain their markers.
 			for marker, s := range live {
-				for _, b := range s {
-					require.Equal(t, byte(marker), b)
-				}
+				require.Equal(
+					t, len(s),
+					bytes.Count(s, []byte{byte(marker)}),
+				)
 			}
 
 			ar.rewind()

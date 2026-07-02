@@ -201,9 +201,8 @@ func TestScriptArenaPropertyAllocator(t *testing.T) {
 
 		verifyLive := func() {
 			for _, a := range live {
-				for _, b := range a.s {
-					require.Equal(rt, a.marker, b)
-				}
+				count := bytes.Count(a.s, []byte{a.marker})
+				require.Equal(rt, len(a.s), count)
 			}
 		}
 
@@ -245,6 +244,24 @@ func TestScriptArenaPropertyAllocator(t *testing.T) {
 		}
 		verifyLive()
 	})
+}
+
+// TestReadTxOutOwnedScript ensures the script returned by the exported
+// ReadTxOut owns its memory: the arena used to stage it is recycled when
+// ReadTxOut returns, so a script still aliasing arena memory would be
+// corrupted by the pool poisoning below.
+func TestReadTxOutOwnedScript(t *testing.T) {
+	orig := blockOne.Transactions[0].TxOut[0]
+	var buf bytes.Buffer
+	require.NoError(t, WriteTxOut(&buf, 0, 0, orig))
+
+	var txOut TxOut
+	require.NoError(t, ReadTxOut(bytes.NewReader(buf.Bytes()), 0, 0, &txOut))
+	require.Equal(t, orig.PkScript, txOut.PkScript)
+
+	poisonScriptChunkPools()
+
+	require.Equal(t, orig.PkScript, txOut.PkScript)
 }
 
 // TestScriptArenaReleaseSafety exercises the misuse guards: double release

@@ -483,8 +483,8 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	txIns := make([]TxIn, count)
 	msg.TxIn = make([]*TxIn, count)
 	for i := uint64(0); i < count; i++ {
-		// The pointer is set now in case a script buffer is borrowed
-		// and needs to be returned to the pool on error.
+		// The pointer is assigned into the message before the decode
+		// call that populates it.
 		ti := &txIns[i]
 		msg.TxIn[i] = ti
 		err = readTxInBuf(r, pver, msg.Version, ti, buf, ar)
@@ -513,8 +513,8 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	txOuts := make([]TxOut, count)
 	msg.TxOut = make([]*TxOut, count)
 	for i := uint64(0); i < count; i++ {
-		// The pointer is set now in case a script buffer is borrowed
-		// and needs to be returned to the pool on error.
+		// The pointer is assigned into the message before the decode
+		// call that populates it.
 		to := &txOuts[i]
 		msg.TxOut[i] = to
 		err = readTxOutBuf(r, pver, msg.Version, to, buf, ar)
@@ -573,19 +573,18 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	msg.LockTime = littleEndian.Uint32(buf[:4])
 
 	// Create a single allocation to house all of the scripts and set each
-	// input signature script and output public key script to the
-	// appropriate subslice of the overall contiguous buffer.  Then, return
-	// each individual script buffer back to the pool so they can be reused
-	// for future deserializations.  This is done because it significantly
-	// reduces the number of allocations the garbage collector needs to
-	// track, which in turn improves performance and drastically reduces the
-	// amount of runtime overhead that would otherwise be needed to keep
-	// track of millions of small allocations.
+	// input signature script, witness item, and output public key script
+	// to the appropriate subslice of the overall contiguous buffer.  This
+	// copies the scripts out of the transient decode arena into memory
+	// the transaction owns, which is what makes rewinding the arena for
+	// the next transaction safe.  A single backing allocation also
+	// significantly reduces the number of allocations the garbage
+	// collector needs to track, which in turn improves performance and
+	// drastically reduces the amount of runtime overhead that would
+	// otherwise be needed to keep track of millions of small allocations.
 	//
-	// NOTE: It is no longer valid to call the returnScriptBuffers closure
-	// after these blocks of code run because it is already done and the
-	// scripts in the transaction inputs and outputs no longer point to the
-	// buffers.
+	// NOTE: After these blocks of code run, no script in the transaction
+	// points into the arena any longer.
 	var offset uint64
 	scripts := make([]byte, totalScriptSize)
 	for i := 0; i < len(msg.TxIn); i++ {

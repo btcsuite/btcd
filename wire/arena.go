@@ -42,6 +42,12 @@ const (
 	// maximum block payload, so anything beyond this is malformed.
 	scriptArenaMaxAlloc = 1 << 22
 
+	// maxScriptChunkSize is the size of the largest chunk class.  It
+	// must be at least scriptArenaMaxAlloc so that any single allocation
+	// passing the arena capacity check can be satisfied by one chunk;
+	// the compile-time assertion below enforces the coupling.
+	maxScriptChunkSize = 1 << 22
+
 	// txScriptChunkClass is the chunk size class used as the starting
 	// point when decoding standalone transactions.  See
 	// scriptChunkClasses.
@@ -69,8 +75,14 @@ var scriptChunkClasses = [...]int{
 	16 << 10,
 	128 << 10,
 	1 << 20,
-	1 << 22,
+	maxScriptChunkSize,
 }
+
+// Compile-time assertion that the largest chunk class can satisfy any single
+// allocation that passes the arena capacity check.  grow relies on this: if
+// scriptArenaMaxAlloc were raised past maxScriptChunkSize, allocSlow could
+// select a chunk smaller than the requested allocation and panic slicing it.
+var _ [maxScriptChunkSize - scriptArenaMaxAlloc]byte
 
 // scriptChunkFixedCaps is the number of chunks per size class that are
 // retained in a small bounded free list rather than being subject to GC
@@ -137,7 +149,7 @@ var scriptChunkPools = func() [len(scriptChunkClasses)]*chunkClassPool {
 
 // putScriptChunk returns a chunk to the pool for its size class.  Chunks are
 // only ever created by the class pools, so their lengths always match a class
-// size exactly.
+// size exactly; anything else indicates internal corruption.
 func putScriptChunk(chunk *[]byte) {
 	for i, size := range scriptChunkClasses {
 		if len(*chunk) == size {
@@ -145,6 +157,8 @@ func putScriptChunk(chunk *[]byte) {
 			return
 		}
 	}
+
+	panic("putScriptChunk: chunk size matches no class")
 }
 
 // errScriptArenaFull is returned by alloc when satisfying the request would
@@ -197,9 +211,11 @@ var scriptArenaPool = sync.Pool{
 }
 
 // borrowScriptArena returns an arena that will serve its first allocation
-// from a chunk of the given starting size class.  Chunks are borrowed
-// lazily, so an arena that never allocates never touches the chunk pools.
-// The returned arena must be handed back via release.
+// from a chunk of the given starting size class.  The startClass must be a
+// valid index into scriptChunkClasses; all callers pass one of the
+// *ScriptChunkClass constants.  Chunks are borrowed lazily, so an arena
+// that never allocates never touches the chunk pools.  The returned arena
+// must be handed back via release.
 //
 // Forgetting to call release is safe in the memory sense: the chunks are
 // ordinary garbage collected slices, so an abandoned arena is simply
@@ -243,8 +259,9 @@ func (a *scriptArena) alloc(n int) ([]byte, error) {
 }
 
 // allocSlow services an allocation that does not fit in the current chunk
-// by growing first.  It is kept out of line so the common in-chunk alloc
-// path stays small enough to inline.
+// by growing first.  It is kept separate so the common in-chunk alloc path
+// stays small; alloc itself still lands just past the compiler's inlining
+// budget due to the call here, which is left as a future optimization.
 func (a *scriptArena) allocSlow(n int) ([]byte, error) {
 	a.grow(n)
 
@@ -346,7 +363,7 @@ func (a *scriptArena) rewindSlow() {
 // no-op rather than double-inserting the arena into the pool, which would
 // hand the same arena to two concurrent decodes.  A released arena also
 // rejects any further alloc calls with errScriptArenaFull (used is poisoned
-// to the capacity limit) so a stale reference held past release fails
+// past the capacity limit) so a stale reference held past release fails
 // loudly instead of silently carving memory out of chunks that another
 // decode may now own.
 func (a *scriptArena) release() {
@@ -365,8 +382,9 @@ func (a *scriptArena) release() {
 
 	// Poison the capacity so any alloc through a stale reference fails
 	// with errScriptArenaFull rather than succeeding against recycled
-	// memory.
-	a.used = scriptArenaMaxAlloc
+	// memory.  One past the limit makes remaining negative, so even a
+	// zero-length alloc is rejected.
+	a.used = scriptArenaMaxAlloc + 1
 	a.dead = true
 
 	scriptArenaPool.Put(a)
