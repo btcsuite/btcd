@@ -85,21 +85,49 @@ func BenchmarkSigVerify(b *testing.B) {
 	)
 
 	// Double sha256 of []byte{0x01, 0x02, 0x03, 0x04}
-	msgHash := fromHex("8de472e2399610baaa7f84840547cd409434e31f5d3bd71e4d947f283874f9c0")
+	msgHash := fromHex("8de472e2399610baaa7f84840547cd409434e31f5d3bd71e4d947f283874f9c0").Bytes()
 	sig := NewSignature(
 		hexToModNScalar("fef45d2892953aa5bbcdb057b5e98b208f1617a7498af7eb765574e29b5d9c2c"),
 		hexToModNScalar("d47563f52aac6b04b55de236b7c515eb9311757db01e02cff079c3ca6efb063f"),
 	)
 
-	if !sig.Verify(msgHash.Bytes(), pubKey) {
+	if !sig.Verify(msgHash, pubKey) {
 		b.Errorf("Signature failed to verify")
 		return
 	}
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		sig.Verify(msgHash.Bytes(), pubKey)
+		sig.Verify(msgHash, pubKey)
 	}
+}
+
+var SigSink Signature
+
+func BenchmarkParseDERSignature(b *testing.B) {
+	sigders := "3045022100fef45d2892953aa5bbcdb057b5e98b208f1617a7498af7eb765574e29b5d9c2c02202b8a9c0ad55394fb4aa21dc9483aea13279d6768ff2a9d6bcf589ac2613b3b02"
+	sigder := hexToBytes(sigders)
+	var sig Signature
+
+	for b.Loop() {
+		sig2, _ := ParseDERSignature(sigder)
+		sig = *sig2
+	}
+
+	SigSink = sig
+}
+
+func BenchmarkParseBERSignature(b *testing.B) {
+	sigders := "3045022100fef45d2892953aa5bbcdb057b5e98b208f1617a7498af7eb765574e29b5d9c2c02202b8a9c0ad55394fb4aa21dc9483aea13279d6768ff2a9d6bcf589ac2613b3b02"
+	sigder := hexToBytes(sigders)
+	var sig Signature
+
+	for b.Loop() {
+		sig2, _ := ParseSignature(sigder)
+		sig = *sig2
+	}
+
+	SigSink = sig
 }
 
 // BenchmarkSign benchmarks how long it takes to sign a message.

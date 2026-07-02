@@ -62,23 +62,20 @@ func (sig Signature) Serialize() []byte {
 	return b[:]
 }
 
-// ParseSignature parses a signature according to the BIP-340 specification and
-// enforces the following additional restrictions specific to secp256k1:
-//
-// - The r component must be in the valid range for secp256k1 field elements
-// - The s component must be in the valid range for secp256k1 scalars
-func ParseSignature(sig []byte) (*Signature, error) {
+// parseSignature exists to make ParseSignature eligible to inlining and
+// therefore avoid allocations.
+func parseSignature(sig *Signature, sigb []byte) error {
 	// The signature must be the correct length.
-	sigLen := len(sig)
+	sigLen := len(sigb)
 	if sigLen < SignatureSize {
 		str := fmt.Sprintf("malformed signature: too short: %d < %d", sigLen,
 			SignatureSize)
-		return nil, signatureError(ecdsa_schnorr.ErrSigTooShort, str)
+		return signatureError(ecdsa_schnorr.ErrSigTooShort, str)
 	}
 	if sigLen > SignatureSize {
 		str := fmt.Sprintf("malformed signature: too long: %d > %d", sigLen,
 			SignatureSize)
-		return nil, signatureError(ecdsa_schnorr.ErrSigTooLong, str)
+		return signatureError(ecdsa_schnorr.ErrSigTooLong, str)
 	}
 
 	// The signature is validly encoded at this point, however, enforce
@@ -86,15 +83,31 @@ func ParseSignature(sig []byte) (*Signature, error) {
 	// the range [0, n-1] since valid Schnorr signatures are required to be in
 	// that range per spec.
 	var r btcec.FieldVal
-	if overflow := r.SetByteSlice(sig[0:32]); overflow {
+	if overflow := r.SetByteSlice(sigb[0:32]); overflow {
 		str := "invalid signature: r >= field prime"
-		return nil, signatureError(ecdsa_schnorr.ErrSigRTooBig, str)
+		return signatureError(ecdsa_schnorr.ErrSigRTooBig, str)
 	}
 	var s btcec.ModNScalar
-	s.SetByteSlice(sig[32:64])
+	s.SetByteSlice(sigb[32:64])
 
-	// Return the signature.
-	return NewSignature(&r, &s), nil
+	// Return the normalized signature.
+	sig.r = r
+	sig.s = s
+	sig.r.Normalize()
+	return nil
+}
+
+// ParseSignature parses a signature according to the BIP-340 specification and
+// enforces the following additional restrictions specific to secp256k1:
+//
+// - The r component must be in the valid range for secp256k1 field elements
+// - The s component must be in the valid range for secp256k1 scalars
+func ParseSignature(sig []byte) (*Signature, error) {
+	s := new(Signature)
+	if err := parseSignature(s, sig); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // IsEqual compares this Signature instance to the one passed, returning true
@@ -166,10 +179,11 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 	// e = int(tagged_hash("BIP0340/challenge", bytes(r) || bytes(P) || M)) mod n.
 	var rBytes [32]byte
 	sig.r.PutBytesUnchecked(rBytes[:])
-	pBytes := SerializePubKey(pubKey)
+	var pBytes [32]byte
+	serializePubKey32(pBytes[:], pubKey)
 
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, rBytes[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, rBytes[:], pBytes[:], hash,
 	)
 
 	var e btcec.ModNScalar
@@ -226,8 +240,9 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 // Verify returns whether or not the signature is valid for the provided hash
 // and secp256k1 public key.
 func (sig *Signature) Verify(hash []byte, pubKey *btcec.PublicKey) bool {
-	pubkeyBytes := SerializePubKey(pubKey)
-	return schnorrVerify(sig, hash, pubkeyBytes) == nil
+	var pubkeyBytes [32]byte
+	serializePubKey32(pubkeyBytes[:], pubKey)
+	return schnorrVerify(sig, hash, pubkeyBytes[:]) == nil
 }
 
 // zeroArray zeroes the memory of a scalar array.
@@ -304,9 +319,10 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// Step 12.
 	//
 	// e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m) mod n
-	pBytes := SerializePubKey(pubKey)
+	var pBytes [32]byte
+	serializePubKey32(pBytes[:], pubKey)
 	commitment := chainhash.TaggedHash(
-		chainhash.TagBIP0340Challenge, R.X.Bytes()[:], pBytes, hash,
+		chainhash.TagBIP0340Challenge, R.X.Bytes()[:], pBytes[:], hash,
 	)
 
 	var e btcec.ModNScalar
@@ -328,7 +344,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	//
 	// If Verify(bytes(P), m, sig) fails, abort.
 	if !opts.fastSign {
-		if err := schnorrVerify(sig, hash, pBytes); err != nil {
+		if err := schnorrVerify(sig, hash, pBytes[:]); err != nil {
 			return nil, err
 		}
 	}
