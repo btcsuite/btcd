@@ -240,7 +240,9 @@ func TestParsesWitnessUtxoTxOutStrictly(t *testing.T) {
 		strictnessPSBTWithWitnessUtxo(t, txOutBytes),
 	), false)
 	require.NoError(t, err)
-	require.Equal(t, pkScript, packet.Inputs[0].WitnessUtxo.PkScript)
+	script := packet.Inputs[0].WitnessUtxo.PkScript
+	require.Equal(t, pkScript, script)
+	require.Equal(t, len(script), cap(script))
 
 	malformedTxOut := append(append([]byte{}, txOutBytes...), 0x00)
 	_, err = NewFromRawBytes(bytes.NewReader(
