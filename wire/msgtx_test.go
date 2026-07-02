@@ -1168,17 +1168,17 @@ var multiWitnessTxEncodedNonZeroFlag = []byte{
 var multiWitnessTxPkScriptLocs = []int{58}
 
 // TestTxWitnessOverflowPanic ensures that decoding a witness tx where
-// cumulative witness item lengths exceed the script slab capacity
+// cumulative witness item lengths exceed the script arena capacity
 // returns a decode error instead of panicking on an out-of-bounds
 // slice.
 func TestTxWitnessOverflowPanic(t *testing.T) {
 	// Build a minimal witness tx with one input, zero outputs,
 	// and two witness items whose combined claimed lengths
-	// exceed the scriptSlabSize (4 MiB) decode buffer.
+	// exceed the scriptArenaMaxAlloc (4 MiB) decode limit.
 	//
-	// Item 1: 3 000 000 bytes  (fits in slab, < maxWitnessItemSize)
+	// Item 1: 3 000 000 bytes  (fits in arena, < maxWitnessItemSize)
 	// Item 2: 2 000 000 bytes  (passes maxWitnessItemSize but
-	//         overflows remaining slab capacity of ~1.19 MiB)
+	//         overflows remaining arena capacity of ~1.19 MiB)
 	const (
 		firstLen  = 3_000_000
 		secondLen = 2_000_000

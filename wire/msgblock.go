@@ -98,13 +98,17 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 		return messageError("MsgBlock.BtcDecode", str)
 	}
 
-	scriptBuf := scriptPool.Borrow()
-	defer scriptPool.Return(scriptBuf)
+	// A single arena is shared by every transaction in the block.  Each
+	// transaction's btcDecode rewinds it, which is safe because the
+	// scripts are copied into their final exactly-sized buffer before the
+	// next transaction is decoded.
+	ar := borrowScriptArena(blockScriptChunkClass)
+	defer ar.release()
 
 	msg.Transactions = make([]*MsgTx, 0, txCount)
 	for i := uint64(0); i < txCount; i++ {
 		tx := MsgTx{}
-		err := tx.btcDecode(r, pver, enc, buf, scriptBuf[:])
+		err := tx.btcDecode(r, pver, enc, buf, ar)
 		if err != nil {
 			return err
 		}
@@ -174,8 +178,8 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
 	}
 
-	scriptBuf := scriptPool.Borrow()
-	defer scriptPool.Return(scriptBuf)
+	ar := borrowScriptArena(blockScriptChunkClass)
+	defer ar.release()
 
 	// Deserialize each transaction while keeping track of its location
 	// within the byte stream.
@@ -184,7 +188,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		tx := MsgTx{}
-		err := tx.btcDecode(r, 0, WitnessEncoding, buf, scriptBuf[:])
+		err := tx.btcDecode(r, 0, WitnessEncoding, buf, ar)
 		if err != nil {
 			return nil, err
 		}
