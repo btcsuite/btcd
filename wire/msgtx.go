@@ -81,21 +81,6 @@ const (
 	// payload + min output payload.
 	minTxPayload = 10
 
-	// freeListMaxScriptSize is the size of each buffer in the free list
-	// that	is used for deserializing scripts from the wire before they are
-	// concatenated into a single contiguous buffers.  This value was chosen
-	// because it is slightly more than twice the size of the vast majority
-	// of all "standard" scripts.  Larger scripts are still deserialized
-	// properly as the free list will simply be bypassed for them.
-	freeListMaxScriptSize = 512
-
-	// freeListMaxItems is the number of buffers to keep in the free list
-	// to use for script deserialization.  This value allows up to 100
-	// scripts per transaction being simultaneously deserialized by 125
-	// peers.  Thus, the peak usage of the free list is 12,500 * 512 =
-	// 6,400,000 bytes.
-	freeListMaxItems = 125
-
 	// maxWitnessItemsPerInput is the maximum number of witness items to
 	// be read for the witness data for a single TxIn. This number is
 	// derived using a possible lower bound for the encoding of a witness
@@ -154,57 +139,6 @@ const (
 	// serialized transaction with witnesses from a legacy one.
 	WitnessFlag TxFlag = 0x01
 )
-
-const scriptSlabSize = 1 << 22
-
-type scriptSlab [scriptSlabSize]byte
-
-// scriptFreeList defines a free list of byte slices (up to the maximum number
-// defined by the freeListMaxItems constant) that have a cap according to the
-// freeListMaxScriptSize constant.  It is used to provide temporary buffers for
-// deserializing scripts in order to greatly reduce the number of allocations
-// required.
-//
-// The caller can obtain a buffer from the free list by calling the Borrow
-// function and should return it via the Return function when done using it.
-type scriptFreeList chan *scriptSlab
-
-// Borrow returns a byte slice from the free list with a length according the
-// provided size.  A new buffer is allocated if there are any items available.
-//
-// When the size is larger than the max size allowed for items on the free list
-// a new buffer of the appropriate size is allocated and returned.  It is safe
-// to attempt to return said buffer via the Return function as it will be
-// ignored and allowed to go the garbage collector.
-func (c scriptFreeList) Borrow() *scriptSlab {
-	var buf *scriptSlab
-	select {
-	case buf = <-c:
-	default:
-		buf = new(scriptSlab)
-	}
-	return buf
-}
-
-// Return puts the provided byte slice back on the free list when it has a cap
-// of the expected length.  The buffer is expected to have been obtained via
-// the Borrow function.  Any slices that are not of the appropriate size, such
-// as those whose size is greater than the largest allowed free list item size
-// are simply ignored so they can go to the garbage collector.
-func (c scriptFreeList) Return(buf *scriptSlab) {
-	// Return the buffer to the free list when it's not full.  Otherwise let
-	// it be garbage collected.
-	select {
-	case c <- buf:
-	default:
-		// Let it go to the garbage collector.
-	}
-}
-
-// Create the concurrent safe free list to use for script deserialization.  As
-// previously described, this free list is maintained to significantly reduce
-// the number of allocations.
-var scriptPool = make(scriptFreeList, freeListMaxItems)
 
 // OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
@@ -484,15 +418,20 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
-	sbuf := scriptPool.Borrow()
-	defer scriptPool.Return(sbuf)
+	ar := borrowScriptArena(txScriptChunkClass)
+	defer ar.release()
 
-	err := msg.btcDecode(r, pver, enc, buf, sbuf[:])
+	err := msg.btcDecode(r, pver, enc, buf, ar)
 	return err
 }
 
 func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
-	buf, sbuf []byte) error {
+	buf []byte, ar *scriptArena) error {
+
+	// Any script data staged by a previous transaction decoded with this
+	// arena has already been copied into its final exactly-sized buffer,
+	// so the arena memory can be reused from the start.
+	ar.rewind()
 
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
@@ -548,12 +487,11 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		// and needs to be returned to the pool on error.
 		ti := &txIns[i]
 		msg.TxIn[i] = ti
-		err = readTxInBuf(r, pver, msg.Version, ti, buf, sbuf)
+		err = readTxInBuf(r, pver, msg.Version, ti, buf, ar)
 		if err != nil {
 			return err
 		}
 		totalScriptSize += uint64(len(ti.SignatureScript))
-		sbuf = sbuf[len(ti.SignatureScript):]
 	}
 
 	count, err = ReadVarIntBuf(r, pver, buf)
@@ -579,12 +517,11 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 		// and needs to be returned to the pool on error.
 		to := &txOuts[i]
 		msg.TxOut[i] = to
-		err = readTxOutBuf(r, pver, msg.Version, to, buf, sbuf)
+		err = readTxOutBuf(r, pver, msg.Version, to, buf, ar)
 		if err != nil {
 			return err
 		}
 		totalScriptSize += uint64(len(to.PkScript))
-		sbuf = sbuf[len(to.PkScript):]
 	}
 
 	// If the transaction's flag byte isn't 0x00 at this point, then one or
@@ -614,13 +551,12 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			txin.Witness = make([][]byte, witCount)
 			for j := uint64(0); j < witCount; j++ {
 				txin.Witness[j], err = readScriptBuf(
-					r, pver, buf, sbuf, "script witness item",
+					r, pver, buf, ar, "script witness item",
 				)
 				if err != nil {
 					return err
 				}
 				totalScriptSize += uint64(len(txin.Witness[j]))
-				sbuf = sbuf[len(txin.Witness[j]):]
 			}
 		}
 
@@ -1008,20 +944,22 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 	return err
 }
 
-// readScript reads a variable length byte array that represents a transaction
-// script.  It is encoded as a varInt containing the length of the array
-// followed by the bytes themselves.  An error is returned if the length is
-// greater than the passed maxAllowed parameter which helps protect against
-// memory exhaustion attacks and forced panics through malformed messages.  The
-// fieldName parameter is only used for the error message so it provides more
-// context in the error.
+// readScriptBuf reads a variable length byte array that represents a
+// transaction script.  It is encoded as a varInt containing the length of the
+// array followed by the bytes themselves.  The script bytes are staged in the
+// provided arena, so the returned slice is only valid until the arena is
+// rewound or released.  An error is returned if the length is greater than
+// the max allowed script size which helps protect against memory exhaustion
+// attacks and forced panics through malformed messages.  The fieldName
+// parameter is only used for the error message so it provides more context in
+// the error.
 //
 // If b is non-nil, the provided buffer will be used for serializing small
 // values.  Otherwise a buffer will be drawn from the binarySerializer's pool
 // and return when the method finishes.
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
-func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
+func readScriptBuf(r io.Reader, pver uint32, buf []byte, ar *scriptArena,
 	fieldName string) ([]byte, error) {
 
 	count, err := ReadVarIntBuf(r, pver, buf)
@@ -1039,20 +977,22 @@ func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
 		return nil, messageError("readScript", str)
 	}
 
-	// Ensure the claimed script length fits in the remaining
-	// decode slab.
-	if count > uint64(len(s)) {
+	// Stage the script in the decode arena.  This fails if the total
+	// script data staged for the transaction being decoded exceeds the
+	// arena capacity, which no valid transaction can reach.
+	s, err := ar.alloc(int(count))
+	if err != nil {
 		str := fmt.Sprintf("%s exceeds remaining buffer "+
 			"capacity [count %d, remaining %d]",
-			fieldName, count, len(s))
+			fieldName, count, ar.remaining())
 		return nil, messageError("readScript", str)
 	}
 
-	_, err = io.ReadFull(r, s[:count])
+	_, err = io.ReadFull(r, s)
 	if err != nil {
 		return nil, err
 	}
-	return s[:count], nil
+	return s, nil
 }
 
 // readTxInBuf reads the next sequence of bytes from r as a transaction input
@@ -1064,7 +1004,7 @@ func readScriptBuf(r io.Reader, pver uint32, buf, s []byte,
 //
 // NOTE: b MUST either be nil or at least an 8-byte slice.
 func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
-	buf, s []byte) error {
+	buf []byte, ar *scriptArena) error {
 
 	err := readOutPointBuf(r, pver, version, &ti.PreviousOutPoint, buf)
 	if err != nil {
@@ -1072,7 +1012,7 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 	}
 
 	ti.SignatureScript, err = readScriptBuf(
-		r, pver, buf, s, "transaction input signature script",
+		r, pver, buf, ar, "transaction input signature script",
 	)
 	if err != nil {
 		return err
@@ -1113,13 +1053,25 @@ func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
 // ReadTxOut reads the next sequence of bytes from r as a transaction output
 // (TxOut).
 func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
-	var s scriptSlab
-
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
-	err := readTxOutBuf(r, pver, version, to, buf, s[:])
-	return err
+	ar := borrowScriptArena(txScriptChunkClass)
+	defer ar.release()
+
+	err := readTxOutBuf(r, pver, version, to, buf, ar)
+	if err != nil {
+		return err
+	}
+
+	// The script is staged in the arena, which is recycled once this
+	// function returns, so copy it into an exactly-sized allocation the
+	// returned output owns.
+	pkScript := make([]byte, len(to.PkScript))
+	copy(pkScript, to.PkScript)
+	to.PkScript = pkScript
+
+	return nil
 }
 
 // readTxOutBuf reads the next sequence of bytes from r as a transaction output
@@ -1127,7 +1079,7 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // small values. Otherwise a buffer will be drawn from the binarySerializer's
 // pool and return when the method finishes.
 func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
-	buf, s []byte) error {
+	buf []byte, ar *scriptArena) error {
 
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
@@ -1136,7 +1088,7 @@ func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	to.Value = int64(littleEndian.Uint64(buf))
 
 	to.PkScript, err = readScriptBuf(
-		r, pver, buf, s, "transaction output public key script",
+		r, pver, buf, ar, "transaction output public key script",
 	)
 	return err
 }
