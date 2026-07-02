@@ -172,7 +172,7 @@ func CompactToBig(compact uint32) *big.Int {
 - Comments in the body of the code are highly encouraged, but they should
   explain the intention of the code as opposed to just calling out the
   obvious
-  
+
 **WRONG**
 
 ```Go
