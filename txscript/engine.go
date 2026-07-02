@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )
@@ -118,6 +119,17 @@ const (
 	// ScriptVerifyConstScriptCode fails non-segwit scripts if a signature
 	// match is found in the script code or if OP_CODESEPARATOR is used.
 	ScriptVerifyConstScriptCode
+
+	// ScriptVerifyRestrictSigHash requires every signature checked during
+	// script execution to use SIGHASH_ALL or, for BIP-341 taproot
+	// signatures, the implicit SIGHASH_DEFAULT. A signature using any other
+	// sighash type fails the script with ErrDisallowedSigHashType.
+	//
+	// This is NOT a consensus rule and is not part of StandardVerifyFlags.
+	// It is an opt-in policy for applications such as BIP-322 message
+	// verification, which require that every signature commit to the entire
+	// transaction.
+	ScriptVerifyRestrictSigHash
 )
 
 const (
@@ -698,6 +710,26 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			// removing the annex), we'll do normal taproot
 			// keyspend validation.
 			rawSig := witness[0]
+
+			// Enforce the restricted-sighash policy (if active)
+			// before verifying the signature, so a disallowed
+			// sighash type is reported as such regardless of
+			// signature validity. This mirrors how the ECDSA,
+			// multisig, and tapscript paths check the policy at
+			// parse time. A well-formed key-spend signature is 64
+			// bytes (the implicit SIGHASH_DEFAULT) or 65 bytes (an
+			// explicit sighash byte); any other length is left for
+			// VerifyTaprootKeySpend to reject.
+			keySpendSigHash := SigHashDefault
+			if len(rawSig) == schnorr.SignatureSize+1 {
+				keySpendSigHash = SigHashType(
+					rawSig[schnorr.SignatureSize],
+				)
+			}
+			if err := vm.checkSigHashType(keySpendSigHash); err != nil {
+				return err
+			}
+
 			err := VerifyTaprootKeySpend(
 				vm.witnessProgram, rawSig, &vm.tx, vm.txIdx,
 				vm.prevOutFetcher, vm.hashCache, vm.sigCache,
@@ -1220,6 +1252,43 @@ func (vm *Engine) checkHashTypeEncoding(hashType SigHashType) error {
 		return scriptError(ErrInvalidSigHashType, str)
 	}
 	return nil
+}
+
+// checkSigHashType enforces the ScriptVerifyRestrictSigHash policy. When the
+// flag is set, only SIGHASH_DEFAULT (taproot) and SIGHASH_ALL are permitted;
+// any other sighash type results in a script error. When the flag is not set
+// this is a no-op.
+//
+// This is called from every signature-verification context (legacy and segwit
+// ECDSA, multisig, taproot key-spend, and tapscript) right after the signature
+// hash type becomes known, so it constrains every signature the engine
+// actually verifies.
+func (vm *Engine) checkSigHashType(hashType SigHashType) error {
+	if !vm.hasFlag(ScriptVerifyRestrictSigHash) {
+		return nil
+	}
+
+	switch hashType {
+	// SIGHASH_DEFAULT is the implicit (64-byte) taproot form and is treated
+	// as SIGHASH_ALL, but is only required in a taproot context.
+	case SigHashDefault:
+		if vm.taprootCtx == nil {
+			str := fmt.Sprintf("SIGHASH_DEFAULT requires taproot")
+			return scriptError(ErrInvalidSigHashType, str)
+		}
+
+		return nil
+
+	// Explicit SIGHASH_ALL is permitted for all signature types.
+	case SigHashAll:
+		return nil
+
+	default:
+		str := fmt.Sprintf("sighash type 0x%02x is not allowed; only "+
+			"SIGHASH_DEFAULT and SIGHASH_ALL are permitted by "+
+			"ScriptVerifyRestrictSigHash flag", hashType)
+		return scriptError(ErrDisallowedSigHashType, str)
+	}
 }
 
 // isStrictPubKeyEncoding returns whether or not the passed public key adheres
