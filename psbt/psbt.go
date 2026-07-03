@@ -528,3 +528,18 @@ func (p *Packet) GetTxFee() (btcutil.Amount, error) {
 	fee := sumInputs - sumOutputs
 	return btcutil.Amount(fee), nil
 }
+
+// Copy creates a deep copy of the packet by serializing and deserializing it.
+func (p *Packet) Copy() (*Packet, error) {
+	if p == nil {
+		return nil, nil
+	}
+
+	var buf bytes.Buffer
+	err := p.Serialize(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewFromRawBytes(&buf, false)
+}

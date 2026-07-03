@@ -214,6 +214,11 @@ func TestReadValidPsbtAndReserialize(t *testing.T) {
 		}
 
 		require.Equal(t, psbtBytes, b.Bytes(), "%d: serialized", key)
+
+		// Make sure Copy creates a deep copy.
+		copiedPsbt, err := testPsbt.Copy()
+		require.NoError(t, err)
+		require.Equal(t, testPsbt, copiedPsbt)
 	}
 
 	for key, v := range validPsbtBase64 {
@@ -234,6 +239,11 @@ func TestReadValidPsbtAndReserialize(t *testing.T) {
 
 		base64Packet := base64.StdEncoding.EncodeToString(b.Bytes())
 		require.Equal(t, v, base64Packet, "%d: serialized", key)
+
+		// Make sure Copy creates a deep copy.
+		copiedPsbt, err := testPsbt.Copy()
+		require.NoError(t, err)
+		require.Equal(t, testPsbt, copiedPsbt)
 	}
 }
 

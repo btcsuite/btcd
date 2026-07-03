@@ -3,6 +3,7 @@ package psbt
 import (
 	"bytes"
 	"io"
+	"slices"
 	"sort"
 
 	"github.com/btcsuite/btcd/wire/v2"
@@ -190,14 +191,15 @@ func (po *POutput) serialize(w io.Writer) error {
 		}
 	}
 
-	sort.Sort(Bip32Sorter(po.Bip32Derivation))
-	for _, kd := range po.Bip32Derivation {
-		err := serializeKVPairWithType(w,
-			uint8(Bip32DerivationOutputType),
-			kd.PubKey,
+	// Sort a copy so that serialization does not mutate the caller's packet
+	// by reordering its derivation slice.
+	bip32Derivation := slices.Clone(po.Bip32Derivation)
+	sort.Sort(Bip32Sorter(bip32Derivation))
+	for _, kd := range bip32Derivation {
+		err := serializeKVPairWithType(
+			w, uint8(Bip32DerivationOutputType), kd.PubKey,
 			SerializeBIP32Derivation(
-				kd.MasterKeyFingerprint,
-				kd.Bip32Path,
+				kd.MasterKeyFingerprint, kd.Bip32Path,
 			),
 		)
 		if err != nil {
@@ -225,12 +227,13 @@ func (po *POutput) serialize(w io.Writer) error {
 		}
 	}
 
-	sort.Slice(po.TaprootBip32Derivation, func(i, j int) bool {
-		return po.TaprootBip32Derivation[i].SortBefore(
-			po.TaprootBip32Derivation[j],
+	taprootBip32Derivation := slices.Clone(po.TaprootBip32Derivation)
+	sort.Slice(taprootBip32Derivation, func(i, j int) bool {
+		return taprootBip32Derivation[i].SortBefore(
+			taprootBip32Derivation[j],
 		)
 	})
-	for _, derivation := range po.TaprootBip32Derivation {
+	for _, derivation := range taprootBip32Derivation {
 		value, err := SerializeTaprootBip32Derivation(
 			derivation,
 		)
