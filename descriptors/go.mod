@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/btcsuite/btcd/btcutil/v2 v2.0.0 // indirect
 	github.com/btcsuite/btclog v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
