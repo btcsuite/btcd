@@ -209,6 +209,59 @@ func (k *descKey) multipathLen() int {
 	return 1
 }
 
+// definiteString returns the canonical string of the key with its path fully
+// resolved at the given multipath and derivation index: the multipath element
+// is replaced by its multipath-index value and the wildcard by the derivation
+// index. This matches rust-miniscript's DefiniteDescriptorKey display and is
+// the identifier passed to the plan asset and satisfier lookups.
+func (k *descKey) definiteString(multipathIndex,
+	derivationIndex uint32) string {
+
+	// Keep any optional "[origin]" prefix verbatim, since it contains its
+	// own path separators.
+	origin, rest := "", k.raw
+	if strings.HasPrefix(rest, "[") {
+		if end := strings.IndexByte(rest, ']'); end >= 0 {
+			origin, rest = rest[:end+1], rest[end+1:]
+		}
+	}
+
+	// The remainder is the key followed by its path steps; the key is the
+	// part before the first separator.
+	base := rest
+	if slash := strings.IndexByte(rest, '/'); slash >= 0 {
+		base = rest[:slash]
+	}
+
+	var b strings.Builder
+	b.WriteString(origin)
+	b.WriteString(base)
+	for _, step := range k.steps {
+		b.WriteByte('/')
+		switch step.kind {
+		case stepMultipath:
+			b.WriteString(strconv.FormatUint(
+				uint64(step.multipath[multipathIndex]), 10,
+			))
+
+		case stepWildcard:
+			b.WriteString(strconv.FormatUint(
+				uint64(derivationIndex), 10,
+			))
+
+		default:
+			b.WriteString(strconv.FormatUint(
+				uint64(step.num), 10,
+			))
+			if step.hardened {
+				b.WriteByte('\'')
+			}
+		}
+	}
+
+	return b.String()
+}
+
 // isWildcard returns whether the key has a wildcard element and is therefore
 // ranged.
 func (k *descKey) isWildcard() bool {

@@ -2,8 +2,11 @@ package descriptors
 
 import (
 	"encoding/hex"
+	"encoding/json"
+	"math"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,6 +94,87 @@ func TestMaxWeightToSatisfy(t *testing.T) {
 	descriptor, err = NewDescriptor("wsh(0)")
 	require.NoError(t, err)
 	_, err = descriptor.MaxWeightToSatisfy()
+	require.Error(t, err)
+}
+
+// TestLift checks that a descriptor lifts to the expected semantic policy,
+// including the nested-threshold structure and JSON encoding, against the
+// descriptors-go reference values.
+func TestLift(t *testing.T) {
+	t.Parallel()
+
+	descriptor, err := NewDescriptor(testTr)
+	require.NoError(t, err)
+
+	policy, err := descriptor.Lift()
+	require.NoError(t, err)
+
+	threshold1 := uint(1)
+	threshold2 := uint(2)
+	key1 := testXpub1
+	key2 := testXpub2
+	lockTime := uint32(65535)
+	require.Equal(t, &SemanticPolicy{
+		Type:      SemanticPolicyTypeThresh,
+		Threshold: &threshold1,
+		Policies: []*SemanticPolicy{{
+			Type: SemanticPolicyTypeKey,
+			Key:  &key1,
+		}, {
+			Type:      SemanticPolicyTypeThresh,
+			Threshold: &threshold2,
+			Policies: []*SemanticPolicy{{
+				Type: SemanticPolicyTypeKey,
+				Key:  &key2,
+			}, {
+				Type:     SemanticPolicyTypeOlder,
+				LockTime: &lockTime,
+			}},
+		}},
+	}, policy)
+
+	jsonPolicy, err := json.Marshal(policy)
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"type": "thresh",
+		"threshold": 1,
+		"policies": [
+			{"type": "key", "key": "`+testXpub1+`"},
+			{
+				"type": "thresh",
+				"threshold": 2,
+				"policies": [
+					{"type": "key", "key": "`+testXpub2+`"},
+					{"type": "older", "lockTime": 65535}
+				]
+			}
+		]
+	}`, string(jsonPolicy))
+}
+
+// TestMultipathIndexBounds checks that a multipath index past the descriptor's
+// multipath length is rejected with an error rather than silently accepted or
+// panicking. The bound must be overflow-safe: on 32-bit platforms a uint32
+// index above math.MaxInt32 must not wrap to a negative int and slip past it.
+func TestMultipathIndexBounds(t *testing.T) {
+	t.Parallel()
+
+	// testTr contains a "<0;1>" element, so its multipath length is 2.
+	descriptor, err := NewDescriptor(testTr)
+	require.NoError(t, err)
+	require.Equal(t, 2, descriptor.MultipathLen())
+
+	// The maximum uint32 is out of bounds for every method that takes a
+	// multipath index, which must error instead of panicking.
+	const outOfBounds = uint32(math.MaxUint32)
+
+	_, err = descriptor.AddressAt(&chaincfg.MainNetParams, outOfBounds, 0)
+	require.Error(t, err)
+
+	_, err = descriptor.ScriptCodeAt(outOfBounds, 0)
+	require.Error(t, err)
+
+	_, err = descriptor.PlanAt(outOfBounds, 0, Assets{})
 	require.Error(t, err)
 }
 

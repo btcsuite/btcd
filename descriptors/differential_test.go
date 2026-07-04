@@ -18,6 +18,8 @@ type descRecords struct {
 	mplen   string
 	typ     string
 	mweight string
+	lift    string
+	plan    []string
 	keys    []string
 	addr    [][]string
 	scode   [][]string
@@ -73,6 +75,12 @@ func TestDescriptorDifferential(t *testing.T) {
 		case "MWEIGHT":
 			rec.mweight = fields[2]
 
+		case "LIFT":
+			rec.lift = fields[2]
+
+		case "PLAN":
+			rec.plan = fields[2:]
+
 		case "KEY":
 			rec.keys = append(rec.keys, fields[2])
 
@@ -118,6 +126,46 @@ func checkDescriptor(t *testing.T, expr string, rec *descRecords) {
 		require.NoErrorf(t, weightErr, "weight for %s", expr)
 		require.Equalf(t, rec.mweight, strconv.FormatUint(weight, 10),
 			"max weight to satisfy for %s", expr)
+	}
+
+	// Lifted semantic policy, compared in its canonical display form.
+	policy, liftErr := d.Lift()
+	if strings.HasPrefix(rec.lift, "ERR:") {
+		require.Errorf(t, liftErr, "expected lift error for %s", expr)
+	} else {
+		require.NoErrorf(t, liftErr, "lift for %s", expr)
+		require.Equalf(t, rec.lift, policy.String(),
+			"lifted policy for %s", expr)
+	}
+
+	// Plan weights, computed with every signature and timelock available so
+	// the planner picks the cheapest spending path.
+	relLock, absLock := uint32(65535), uint32(499999999)
+	plan, planErr := d.PlanAt(0, 0, Assets{
+		LookupEcdsaSig: func(string) bool { return true },
+		LookupTapKeySpendSig: func(string) (uint32, bool) {
+			return 64, true
+		},
+		LookupTapLeafScriptSig: func(string, string) (uint32, bool) {
+			return 64, true
+		},
+		RelativeLocktime: &relLock,
+		AbsoluteLocktime: &absLock,
+	})
+	if len(rec.plan) == 1 && rec.plan[0] == "ERR" {
+		require.Errorf(t, planErr, "expected plan error for %s", expr)
+	} else {
+		require.NoErrorf(t, planErr, "plan for %s", expr)
+		require.Lenf(t, rec.plan, 3, "plan record for %s", expr)
+		require.Equalf(t, rec.plan[0], strconv.FormatUint(
+			plan.SatisfactionWeight(), 10),
+			"plan satisfaction weight for %s", expr)
+		require.Equalf(t, rec.plan[1], strconv.FormatUint(
+			plan.ScriptSigSize(), 10),
+			"plan scriptsig size for %s", expr)
+		require.Equalf(t, rec.plan[2], strconv.FormatUint(
+			plan.WitnessSize(), 10),
+			"plan witness size for %s", expr)
 	}
 
 	for _, a := range rec.addr {
