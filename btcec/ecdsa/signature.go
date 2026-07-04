@@ -18,8 +18,20 @@ import (
 var (
 	errNegativeValue          = errors.New("value may be interpreted as negative")
 	errExcessivelyPaddedValue = errors.New("value is excessively padded")
-	errHighS                  = errors.New("non-canonical signature: S value not in low-S form")
-	errNoHeaderMagic          = errors.New("malformed signature: no header magic")
+)
+
+// Errors returned by parseSig.
+var (
+	errNegativeR          = errors.New("negative R")
+	errNegativeS          = errors.New("negative S")
+	errExcessivelyPaddedR = errors.New("excessively padded R")
+	errExcessivelyPaddedS = errors.New("excessively padded S")
+	errNoHeaderMagic      = errors.New("malformed signature: no header magic")
+)
+
+// Errors returned by VerifyLowS.
+var (
+	errHighS = errors.New("non-canonical signature: S value not in low-S form")
 )
 
 // Signature is a type representing an ecdsa signature.
@@ -128,9 +140,9 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	if der {
 		switch err := canonicalPadding(rBytes); err {
 		case errNegativeValue:
-			return nil, errors.New("signature R is negative")
+			return nil, errNegativeR
 		case errExcessivelyPaddedValue:
-			return nil, errors.New("signature R is excessively padded")
+			return nil, errExcessivelyPaddedR
 		}
 	}
 
@@ -175,9 +187,9 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	if der {
 		switch err := canonicalPadding(sBytes); err {
 		case errNegativeValue:
-			return nil, errors.New("signature S is negative")
+			return nil, errNegativeS
 		case errExcessivelyPaddedValue:
-			return nil, errors.New("signature S is excessively padded")
+			return nil, errExcessivelyPaddedS
 		}
 	}
 
