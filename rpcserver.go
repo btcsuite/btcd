@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1688,7 +1689,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 // and returned to the caller.
 //
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld *bool) (*btcjson.GetBlockTemplateResult, error) {
+func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld *bool, segwitActive bool) (*btcjson.GetBlockTemplateResult, error) {
 	// Ensure the timestamps are still in valid range for the template.
 	// This should really only ever happen if the local clock is changed
 	// after the template is generated, but it's important to avoid serving
@@ -1789,6 +1790,10 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	// data, then include the witness commitment in the GBT result.
 	if template.WitnessCommitment != nil {
 		reply.DefaultWitnessCommitment = hex.EncodeToString(template.WitnessCommitment)
+		reply.Rules = append(reply.Rules, "!segwit")
+
+	} else if segwitActive {
+		reply.Rules = append(reply.Rules, "segwit")
 	}
 
 	if useCoinbaseValue {
@@ -1839,7 +1844,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 // has passed without finding a solution.
 //
 // See https://en.bitcoin.it/wiki/BIP_0022 for more details.
-func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbaseValue bool, closeChan <-chan struct{}) (interface{}, error) {
+func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbaseValue bool, closeChan <-chan struct{}, segwitActive bool) (interface{}, error) {
 	state := s.gbtWorkState
 	state.Lock()
 	// The state unlock is intentionally not deferred here since it needs to
@@ -1855,7 +1860,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// the caller is invalid.
 	prevHash, lastGenerated, err := decodeTemplateID(longPollID)
 	if err != nil {
-		result, err := state.blockTemplateResult(useCoinbaseValue, nil)
+		result, err := state.blockTemplateResult(useCoinbaseValue, nil, segwitActive)
 		if err != nil {
 			state.Unlock()
 			return nil, err
@@ -1877,7 +1882,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 		// already been found and added to the block chain.
 		submitOld := prevHash.IsEqual(prevTemplateHash)
 		result, err := state.blockTemplateResult(useCoinbaseValue,
-			&submitOld)
+			&submitOld, segwitActive)
 		if err != nil {
 			state.Unlock()
 			return nil, err
@@ -1917,7 +1922,7 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// block template depending on whether or not a solution has already
 	// been found and added to the block chain.
 	submitOld := prevHash.IsEqual(&state.template.Block.Header.PrevBlock)
-	result, err := state.blockTemplateResult(useCoinbaseValue, &submitOld)
+	result, err := state.blockTemplateResult(useCoinbaseValue, &submitOld, segwitActive)
 	if err != nil {
 		return nil, err
 	}
@@ -1986,12 +1991,27 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 		}
 	}
 
+	segwitState, err := s.cfg.Chain.ThresholdState(chaincfg.DeploymentSegwit)
+	if err != nil {
+		return nil, err
+	}
+
+	segwitActive := segwitState == blockchain.ThresholdActive
+	hasSegwitRule := request != nil && slices.Contains(request.Rules, "segwit")
+	if segwitActive && !hasSegwitRule {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCInvalidParameter,
+			Message: "Support for 'segwit' rule requires explicit " +
+				"client support",
+		}
+	}
+
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
 	// be replaced with a new one.
 	if request != nil && request.LongPollID != "" {
 		return handleGetBlockTemplateLongPoll(s, request.LongPollID,
-			useCoinbaseValue, closeChan)
+			useCoinbaseValue, closeChan, segwitActive)
 	}
 
 	// Protect concurrent access when updating block templates.
@@ -2008,7 +2028,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 	if err := state.updateBlockTemplate(s, useCoinbaseValue); err != nil {
 		return nil, err
 	}
-	return state.blockTemplateResult(useCoinbaseValue, nil)
+	return state.blockTemplateResult(useCoinbaseValue, nil, segwitActive)
 }
 
 // chainErrToGBTErrString converts an error returned from btcchain to a string

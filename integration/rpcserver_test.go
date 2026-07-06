@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
@@ -289,6 +290,146 @@ func testGetNetworkHashPS3(r *rpctest.Harness, t *testing.T) {
 	}
 }
 
+func ensureSegwitActive(r *rpctest.Harness, t *testing.T) {
+	t.Helper()
+
+	for {
+		info, err := r.Client.GetBlockChainInfo()
+		if err != nil {
+			t.Fatalf("unable to get blockchain info: %v", err)
+		}
+
+		if info.Bip9SoftForks == nil || info.Bip9SoftForks["segwit"] == nil {
+			t.Fatalf("segwit softfork status not found in blockchain info")
+		}
+
+		status := info.Bip9SoftForks["segwit"].Status
+		if status == "active" {
+			break
+		}
+
+		if _, err := r.Client.Generate(100); err != nil {
+			t.Fatalf("unable to generate blocks to activate "+
+				"segwit: %v", err)
+		}
+	}
+}
+
+func testGetBlockTemplateSegwitActiveNoRule(r *rpctest.Harness, t *testing.T) {
+	// Guarantee SegWit is fully active before testing
+	ensureSegwitActive(r, t)
+
+	// Call getblocktemplate with empty rules when segwit is active
+	req := &btcjson.TemplateRequest{
+		Rules: []string{},
+	}
+
+	_, err := r.Client.GetBlockTemplate(req)
+
+	if err == nil {
+		t.Fatalf("Expected getblocktemplate to fail without 'segwit' rule")
+	}
+
+	// Expect: ErrRPCInvalidParameter with correct message
+	rpcErr, ok := err.(*btcjson.RPCError)
+
+	if !ok {
+		t.Fatalf("Expected an RPCError, but got: %v", err)
+	}
+
+	if rpcErr.Code != btcjson.ErrRPCInvalidParameter {
+		t.Fatalf("Expected error code %d, but got: %d",
+			btcjson.ErrRPCInvalidParameter, rpcErr.Code)
+	}
+
+	expectedMessage := "Support for 'segwit' rule requires explicit " +
+		"client support"
+
+	if rpcErr.Message != expectedMessage {
+		t.Fatalf("Expected error message '%s', but got: '%s'",
+			expectedMessage, rpcErr.Message)
+	}
+}
+
+func testGetBlockTemplateSegwitActiveWithRule(r *rpctest.Harness, t *testing.T) {
+	// Guarantee SegWit is fully active before testing
+	ensureSegwitActive(r, t)
+
+	// Call getblocktemplate with 'segwit' rule when segwit is active
+	req := &btcjson.TemplateRequest{
+		Rules: []string{"segwit"},
+	}
+
+	result, err := r.Client.GetBlockTemplate(req)
+
+	if err != nil {
+		t.Fatalf("Expected getblocktemplate to succeed, got "+
+			"error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	hasSegwitRule := false
+	for _, rule := range result.Rules {
+		if rule == "segwit" || rule == "!segwit" {
+			hasSegwitRule = true
+			break
+		}
+	}
+
+	if !hasSegwitRule {
+		t.Fatalf("Expected 'segwit' rule to be present in the response")
+	}
+}
+
+func testGetBlockTemplateResponseRules(r *rpctest.Harness, t *testing.T) {
+	// Guarantee SegWit is fully active before testing
+	ensureSegwitActive(r, t)
+
+	// Call getblocktemplate with 'segwit' rule when segwit is active
+	req := &btcjson.TemplateRequest{
+		Rules: []string{"segwit"},
+	}
+
+	result, err := r.Client.GetBlockTemplate(req)
+
+	if err != nil {
+		t.Fatalf("Expected getblocktemplate to succeed, got "+
+			"error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	// Verify blockTemplateResult includes "!segwit" in Rules when
+	// WitnessCommitment is non-nil and "segwit" when WitnessCommitment is nil.
+	hasNotSegwit := false
+	hasSegwit := false
+
+	for _, rule := range result.Rules {
+		if rule == "!segwit" {
+			hasNotSegwit = true
+		} else if rule == "segwit" {
+			hasSegwit = true
+		}
+	}
+
+	if result.DefaultWitnessCommitment != "" {
+		if !hasNotSegwit {
+			t.Fatalf("Expected Rules to contain '!segwit' because " +
+				"WitnessCommitment is present")
+		}
+	} else {
+		if !hasSegwit {
+			t.Fatalf("Expected Rules to contain 'segwit' because " +
+				"WitnessCommitment is absent")
+		}
+	}
+}
+
 var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetBestBlock,
 	testGetBlockCount,
@@ -297,6 +438,9 @@ var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetNetworkHashPS,
 	testGetNetworkHashPS2,
 	testGetNetworkHashPS3,
+	testGetBlockTemplateSegwitActiveNoRule,
+	testGetBlockTemplateSegwitActiveWithRule,
+	testGetBlockTemplateResponseRules,
 }
 
 var primaryHarness *rpctest.Harness
