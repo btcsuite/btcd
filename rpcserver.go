@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -124,6 +125,15 @@ var (
 	ErrRPCNoWallet = &btcjson.RPCError{
 		Code:    btcjson.ErrRPCNoWallet,
 		Message: "This implementation does not implement wallet commands",
+	}
+
+	// ErrSegwitRuleMismatch is an error returned to RPC clients when the
+	// client does not explicitly support the 'segwit' rule when SegWit
+	// is active.
+	ErrSegwitRuleMismatch = &btcjson.RPCError{
+		Code: btcjson.ErrRPCInvalidParameter,
+		Message: "Support for 'segwit' rule requires explicit " +
+			"client support",
 	}
 )
 
@@ -1688,7 +1698,10 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 // and returned to the caller.
 //
 // This function MUST be called with the state locked.
-func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld *bool) (*btcjson.GetBlockTemplateResult, error) {
+func (state *gbtWorkState) blockTemplateResult(
+	useCoinbaseValue, segwitActive bool,
+	submitOld *bool) (*btcjson.GetBlockTemplateResult, error) {
+
 	// Ensure the timestamps are still in valid range for the template.
 	// This should really only ever happen if the local clock is changed
 	// after the template is generated, but it's important to avoid serving
@@ -1785,10 +1798,21 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 		NonceRange:   gbtNonceRange,
 		Capabilities: gbtCapabilities,
 	}
-	// If the generated block template includes transactions with witness
-	// data, then include the witness commitment in the GBT result.
+	// Per BIP 145, if the block template contains transactions with witness
+	// data, a witness commitment is mandatory, so the rule MUST be listed
+	// as "!segwit" (with the "!" prefix to require client enforcement).
+	// If no witness transactions are included but SegWit is active on the
+	// network, the rule MUST be listed as "segwit" (without the "!"
+	// prefix) to signal that SegWit is active while allowing unaware miners
+	// to still mine the block.
 	if template.WitnessCommitment != nil {
-		reply.DefaultWitnessCommitment = hex.EncodeToString(template.WitnessCommitment)
+		reply.DefaultWitnessCommitment = hex.EncodeToString(
+			template.WitnessCommitment,
+		)
+		reply.Rules = append(reply.Rules, "!segwit")
+
+	} else if segwitActive {
+		reply.Rules = append(reply.Rules, "segwit")
 	}
 
 	if useCoinbaseValue {
@@ -1839,7 +1863,10 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 // has passed without finding a solution.
 //
 // See https://en.bitcoin.it/wiki/BIP_0022 for more details.
-func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbaseValue bool, closeChan <-chan struct{}) (interface{}, error) {
+func handleGetBlockTemplateLongPoll(
+	s *rpcServer, longPollID string, closeChan <-chan struct{},
+	useCoinbaseValue, segwitActive bool) (interface{}, error) {
+
 	state := s.gbtWorkState
 	state.Lock()
 	// The state unlock is intentionally not deferred here since it needs to
@@ -1855,7 +1882,9 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// the caller is invalid.
 	prevHash, lastGenerated, err := decodeTemplateID(longPollID)
 	if err != nil {
-		result, err := state.blockTemplateResult(useCoinbaseValue, nil)
+		result, err := state.blockTemplateResult(
+			useCoinbaseValue, segwitActive, nil,
+		)
 		if err != nil {
 			state.Unlock()
 			return nil, err
@@ -1876,8 +1905,9 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 		// old block template depending on whether or not a solution has
 		// already been found and added to the block chain.
 		submitOld := prevHash.IsEqual(prevTemplateHash)
-		result, err := state.blockTemplateResult(useCoinbaseValue,
-			&submitOld)
+		result, err := state.blockTemplateResult(
+			useCoinbaseValue, segwitActive, &submitOld,
+		)
 		if err != nil {
 			state.Unlock()
 			return nil, err
@@ -1917,7 +1947,9 @@ func handleGetBlockTemplateLongPoll(s *rpcServer, longPollID string, useCoinbase
 	// block template depending on whether or not a solution has already
 	// been found and added to the block chain.
 	submitOld := prevHash.IsEqual(&state.template.Block.Header.PrevBlock)
-	result, err := state.blockTemplateResult(useCoinbaseValue, &submitOld)
+	result, err := state.blockTemplateResult(
+		useCoinbaseValue, segwitActive, &submitOld,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1986,12 +2018,27 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 		}
 	}
 
+	segwitState, err := s.cfg.Chain.ThresholdState(
+		chaincfg.DeploymentSegwit,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	segwitActive := segwitState == blockchain.ThresholdActive
+	hasSegwitRule := request != nil && slices.Contains(
+		request.Rules, "segwit",
+	)
+	if segwitActive && !hasSegwitRule {
+		return nil, ErrSegwitRuleMismatch
+	}
+
 	// When a long poll ID was provided, this is a long poll request by the
 	// client to be notified when block template referenced by the ID should
 	// be replaced with a new one.
 	if request != nil && request.LongPollID != "" {
 		return handleGetBlockTemplateLongPoll(s, request.LongPollID,
-			useCoinbaseValue, closeChan)
+			closeChan, useCoinbaseValue, segwitActive)
 	}
 
 	// Protect concurrent access when updating block templates.
@@ -2008,7 +2055,7 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 	if err := state.updateBlockTemplate(s, useCoinbaseValue); err != nil {
 		return nil, err
 	}
-	return state.blockTemplateResult(useCoinbaseValue, nil)
+	return state.blockTemplateResult(useCoinbaseValue, segwitActive, nil)
 }
 
 // chainErrToGBTErrString converts an error returned from btcchain to a string

@@ -340,6 +340,7 @@ var helpDescsEnUS = map[string]string{
 	"getblocktemplateresult-reject-reason":              "Reason the proposal was invalid as-is (only applies to proposal responses)",
 	"getblocktemplateresult-default_witness_commitment": "The witness commitment itself. Will be populated if the block has witness data",
 	"getblocktemplateresult-weightlimit":                "The current limit on the max allowed weight of a block",
+	"getblocktemplateresult-rules":                      "List of rules the server requires the client to understand and support",
 
 	// GetBlockTemplateCmd help.
 	"getblocktemplate--synopsis": "Returns a JSON object with information necessary to construct a block to mine or accepts a proposal to validate.\n" +
