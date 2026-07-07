@@ -375,3 +375,115 @@ func (u *Updater) AddOutWitnessScript(witnessScript []byte,
 
 	return nil
 }
+
+// AddInMuSig2Participants adds a PSBT_IN_MUSIG2_PARTICIPANT_PUBKEYS field
+// to the input at index inIndex. Returns ErrDuplicateKey if a participants
+// record with the same aggregate key is already present.
+func (u *Updater) AddInMuSig2Participants(inIndex int,
+	participants *MuSig2Participants) error {
+
+	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
+		return ErrInvalidPsbtFormat
+	}
+	if participants == nil || participants.AggregateKey == nil {
+		return ErrInvalidPsbtFormat
+	}
+
+	newKey := participants.KeyData()
+	for _, x := range u.Upsbt.Inputs[inIndex].MuSig2Participants {
+		if bytes.Equal(x.KeyData(), newKey) {
+			return ErrDuplicateKey
+		}
+	}
+
+	u.Upsbt.Inputs[inIndex].MuSig2Participants = append(
+		u.Upsbt.Inputs[inIndex].MuSig2Participants, participants,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
+
+// AddInMuSig2PubNonce adds a PSBT_IN_MUSIG2_PUB_NONCE field to the input at
+// index inIndex. Returns ErrDuplicateKey if a nonce with the same
+// (participant pubkey, aggregate pubkey, optional tap leaf hash) is already
+// present.
+func (u *Updater) AddInMuSig2PubNonce(inIndex int,
+	nonce *MuSig2PubNonce) error {
+
+	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
+		return ErrInvalidPsbtFormat
+	}
+	if nonce == nil || nonce.PubKey == nil || nonce.AggregateKey == nil {
+		return ErrInvalidPsbtFormat
+	}
+
+	newKey := nonce.KeyData()
+	for _, x := range u.Upsbt.Inputs[inIndex].MuSig2PubNonces {
+		if bytes.Equal(x.KeyData(), newKey) {
+			return ErrDuplicateKey
+		}
+	}
+
+	u.Upsbt.Inputs[inIndex].MuSig2PubNonces = append(
+		u.Upsbt.Inputs[inIndex].MuSig2PubNonces, nonce,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
+
+// AddInMuSig2PartialSig adds a PSBT_IN_MUSIG2_PARTIAL_SIG field to the input
+// at index inIndex. Returns ErrDuplicateKey if a partial signature with the
+// same (participant pubkey, aggregate pubkey, optional tap leaf hash) is
+// already present.
+func (u *Updater) AddInMuSig2PartialSig(inIndex int,
+	partialSig *MuSig2PartialSig) error {
+
+	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
+		return ErrInvalidPsbtFormat
+	}
+	if partialSig == nil || partialSig.PubKey == nil ||
+		partialSig.AggregateKey == nil {
+
+		return ErrInvalidPsbtFormat
+	}
+
+	newKey := partialSig.KeyData()
+	for _, x := range u.Upsbt.Inputs[inIndex].MuSig2PartialSigs {
+		if bytes.Equal(x.KeyData(), newKey) {
+			return ErrDuplicateKey
+		}
+	}
+
+	u.Upsbt.Inputs[inIndex].MuSig2PartialSigs = append(
+		u.Upsbt.Inputs[inIndex].MuSig2PartialSigs, partialSig,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
+
+// AddOutMuSig2Participants adds a PSBT_OUT_MUSIG2_PARTICIPANT_PUBKEYS field
+// to the output at index outIndex. Returns ErrDuplicateKey if a participants
+// record with the same aggregate key is already present.
+func (u *Updater) AddOutMuSig2Participants(outIndex int,
+	participants *MuSig2Participants) error {
+
+	if outIndex < 0 || outIndex >= len(u.Upsbt.Outputs) {
+		return ErrInvalidPsbtFormat
+	}
+	if participants == nil || participants.AggregateKey == nil {
+		return ErrInvalidPsbtFormat
+	}
+
+	newKey := participants.KeyData()
+	for _, x := range u.Upsbt.Outputs[outIndex].MuSig2Participants {
+		if bytes.Equal(x.KeyData(), newKey) {
+			return ErrDuplicateKey
+		}
+	}
+
+	u.Upsbt.Outputs[outIndex].MuSig2Participants = append(
+		u.Upsbt.Outputs[outIndex].MuSig2Participants, participants,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
