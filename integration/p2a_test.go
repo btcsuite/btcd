@@ -196,3 +196,4 @@ func TestPayToAnchorSimple(t *testing.T) {
 		}
 	})
 }
+
