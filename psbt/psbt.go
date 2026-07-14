@@ -185,6 +185,13 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 // argument b64 is true, the passed byte slice is decoded from base64 encoding
 // before processing.
 //
+// The parsing is strict: base64 input must not contain whitespace or any
+// characters outside the RFC4648 standard alphabet, and any data after the
+// packet results in ErrInvalidPsbtFormat. Trailing data is only detected
+// when the reader can report its remaining length without blocking (such as
+// bytes.Reader, or the base64 path); a plain stream is not probed past the
+// packet, so the reader is left positioned directly after it.
+//
 // NOTE: To create a Packet from one's own data, rather than reading in a
 // serialization from a counterparty, one should use a psbt.New.
 func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
@@ -324,19 +331,36 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		return nil, err
 	}
 
-	if err := assertFullyConsumed(r); err != nil {
-		return nil, err
+	// Reject any trailing data after the packet when the reader is able
+	// to report it without an additional read. This covers in-memory
+	// readers as well as the decoded base64 path above. Plain streams
+	// are not probed, as a read for EOF could block forever on an open
+	// connection that has already delivered a complete packet.
+	if lr, ok := r.(interface{ Len() int }); ok && lr.Len() > 0 {
+		return nil, ErrInvalidPsbtFormat
 	}
 
 	return &newPsbt, nil
 }
 
+// maxBase64PsbtSize is the maximum number of base64 characters accepted when
+// decoding a PSBT. It is wire.MaxMessagePayload, the largest payload the
+// wire protocol will carry, expanded by the 4/3 base64 encoding overhead. It
+// bounds the memory allocated for a caller-supplied reader before any
+// validation runs.
+const maxBase64PsbtSize = 4 * ((wire.MaxMessagePayload + 2) / 3)
+
 // decodeBase64Strict decodes an RFC4648 base64 stream without permitting
 // whitespace and with '=' allowed only as final padding.
 func decodeBase64Strict(r io.Reader) ([]byte, error) {
-	encoded, err := io.ReadAll(r)
+	// Bound the read so an unbounded stream cannot force an arbitrarily
+	// large allocation before validation.
+	encoded, err := io.ReadAll(io.LimitReader(r, maxBase64PsbtSize+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(encoded) > maxBase64PsbtSize {
+		return nil, ErrInvalidPsbtFormat
 	}
 
 	// Go's strict base64 decoder still ignores CR/LF. Reject them before
@@ -345,13 +369,12 @@ func decodeBase64Strict(r io.Reader) ([]byte, error) {
 		return nil, ErrInvalidPsbtFormat
 	}
 
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(encoded)))
-	n, err := base64.StdEncoding.Strict().Decode(decoded, encoded)
+	decoded, err := base64.StdEncoding.Strict().AppendDecode(nil, encoded)
 	if err != nil {
 		return nil, ErrInvalidPsbtFormat
 	}
 
-	return decoded[:n], nil
+	return decoded, nil
 }
 
 // Serialize creates a binary serialization of the referenced Packet struct

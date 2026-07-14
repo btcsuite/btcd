@@ -3,7 +3,10 @@ package psbt
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
+	"io"
 	"testing"
+	"testing/iotest"
 
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
@@ -169,6 +172,53 @@ func TestRejectsTrailingDataAfterPacket(t *testing.T) {
 	_, err := NewFromRawBytes(
 		bytes.NewReader(append(rawPacket, 0x00)), false,
 	)
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
+// TestStreamReaderNotProbedPastPacket verifies that a reader that cannot
+// report its remaining length is not read past the end of the packet: the
+// packet parses successfully and any subsequent data remains unread, so
+// parsing never blocks on an open stream.
+func TestStreamReaderNotProbedPastPacket(t *testing.T) {
+	unsignedTx, prevTx := strictnessTxPair(t)
+	rawPacket := strictnessPSBT(
+		t,
+		serializeTxForStrictness(t, unsignedTx, true),
+		serializeTxForStrictness(t, prevTx, false),
+	)
+
+	// io.MultiReader hides the Len method of the underlying bytes.Reader,
+	// mimicking a plain stream.
+	stream := io.MultiReader(bytes.NewReader(
+		append(append([]byte{}, rawPacket...), 0xde, 0xad),
+	))
+
+	_, err := NewFromRawBytes(stream, false)
+	require.NoError(t, err)
+
+	// The bytes following the packet must still be readable from the
+	// stream.
+	trailing, err := io.ReadAll(stream)
+	require.NoError(t, err)
+	require.Equal(t, []byte{0xde, 0xad}, trailing)
+}
+
+// TestRejectsOversizedBase64Packet verifies that base64 input larger than
+// the maximum accepted size is rejected instead of being fully decoded.
+func TestRejectsOversizedBase64Packet(t *testing.T) {
+	oversized := bytes.Repeat([]byte{'A'}, maxBase64PsbtSize+1)
+
+	// The erroring sentinel after the oversized bytes pins the bound
+	// itself: with the size limit in place the reader is never read past
+	// maxBase64PsbtSize+1 bytes, so the sentinel stays untouched. Without
+	// the limit, the full read would surface the sentinel error instead
+	// of ErrInvalidPsbtFormat.
+	stream := io.MultiReader(
+		bytes.NewReader(oversized),
+		iotest.ErrReader(errors.New("read past size bound")),
+	)
+
+	_, err := NewFromRawBytes(stream, true)
 	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
 }
 

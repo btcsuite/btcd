@@ -279,27 +279,12 @@ func getKey(r io.Reader) (int, []byte, error) {
 
 // assertFullyConsumed returns ErrInvalidPsbtFormat if r still has bytes
 // available after parsing.
-func assertFullyConsumed(r io.Reader) error {
-	if lr, ok := r.(interface{ Len() int }); ok {
-		if lr.Len() > 0 {
-			return ErrInvalidPsbtFormat
-		}
-
-		return nil
-	}
-
-	var trailing [1]byte
-	_, err := io.ReadFull(r, trailing[:])
-	switch {
-	case err == nil:
+func assertFullyConsumed(r *bytes.Reader) error {
+	if r.Len() > 0 {
 		return ErrInvalidPsbtFormat
-
-	case errors.Is(err, io.EOF):
-		return nil
-
-	default:
-		return err
 	}
+
+	return nil
 }
 
 // readTxOut parses a transaction output value and requires the full value to
@@ -318,9 +303,10 @@ func readTxOut(txout []byte) (*wire.TxOut, error) {
 	return txOut, nil
 }
 
-// readTransaction parses a transaction value and requires the full value to be
-// consumed. PSBT transaction-valued fields contain exactly one network
-// serialized transaction, not a transaction prefix with arbitrary trailing data.
+// readTransaction parses a transaction value and requires the full value to
+// be consumed. PSBT transaction-valued fields contain exactly one network
+// serialized transaction, not a transaction prefix with arbitrary trailing
+// data.
 func readTransaction(txBytes []byte, noWitness bool) (*wire.MsgTx, error) {
 	tx := wire.NewMsgTx(2)
 	reader := bytes.NewReader(txBytes)
