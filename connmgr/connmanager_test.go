@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -80,6 +81,160 @@ func TestNewConfig(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("New unexpected error: %v", err)
+	}
+}
+
+// TestInboundLimit verifies that accepted inbound connections hold slots for
+// their entire lifetime and release them exactly once on close.
+func TestInboundLimit(t *testing.T) {
+	maxInbound := uint32(2)
+
+	cmgr, err := New(&Config{
+		Dial:       mockDialer,
+		MaxInbound: &maxInbound,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+
+	newConn := func(port int) net.Conn {
+		return &mockConn{rAddr: &net.TCPAddr{
+			IP:   net.ParseIP("192.0.2.1"),
+			Port: port,
+		}}
+	}
+
+	first, ok := cmgr.limitInbound(newConn(1001))
+	if !ok {
+		t.Fatal("first inbound connection was rejected")
+	}
+	second, ok := cmgr.limitInbound(newConn(1002))
+	if !ok {
+		t.Fatal("second inbound connection was rejected")
+	}
+	if _, ok := cmgr.limitInbound(newConn(1003)); ok {
+		t.Fatal("connection above the inbound limit was accepted")
+	}
+
+	if got := len(cmgr.inboundSlots); got != int(maxInbound) {
+		t.Fatalf("unexpected occupied slots: got %d, want %d", got,
+			maxInbound)
+	}
+
+	if err := first.Close(); err != nil {
+		t.Fatalf("first close failed: %v", err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("second close failed: %v", err)
+	}
+	if got := len(cmgr.inboundSlots); got != 1 {
+		t.Fatalf("double close released the slot more than once: got %d", got)
+	}
+
+	replacement, ok := cmgr.limitInbound(newConn(1004))
+	if !ok {
+		t.Fatal("replacement connection was rejected after slot release")
+	}
+
+	_ = second.Close()
+	_ = replacement.Close()
+	if got := len(cmgr.inboundSlots); got != 0 {
+		t.Fatalf("inbound slots leaked: got %d", got)
+	}
+}
+
+// TestInboundLimitDisabled verifies that an explicit zero limit rejects every
+// accepted inbound connection.
+func TestInboundLimitDisabled(t *testing.T) {
+	maxInbound := uint32(0)
+	cmgr, err := New(&Config{
+		Dial:       mockDialer,
+		MaxInbound: &maxInbound,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+
+	conn := &mockConn{rAddr: &net.TCPAddr{
+		IP: net.ParseIP("192.0.2.1"), Port: 1001,
+	}}
+	if _, ok := cmgr.limitInbound(conn); ok {
+		t.Fatal("inbound connection accepted with a zero limit")
+	}
+	if got := atomic.LoadUint64(&cmgr.inboundRejected); got != 1 {
+		t.Fatalf("unexpected rejection count: got %d, want 1", got)
+	}
+}
+
+// TestInboundLimitConcurrent verifies that concurrent admission never exceeds
+// the configured accepted-connection bound.
+func TestInboundLimitConcurrent(t *testing.T) {
+	const attempts = 100
+	maxInbound := uint32(8)
+
+	cmgr, err := New(&Config{
+		Dial:       mockDialer,
+		MaxInbound: &maxInbound,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+
+	var (
+		wg      sync.WaitGroup
+		live    int32
+		maxLive int32
+	)
+	release := make(chan struct{})
+
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func(port int) {
+			defer wg.Done()
+
+			conn, ok := cmgr.limitInbound(&mockConn{
+				rAddr: &net.TCPAddr{
+					IP:   net.ParseIP("198.51.100.1"),
+					Port: port,
+				},
+			})
+			if !ok {
+				return
+			}
+
+			current := atomic.AddInt32(&live, 1)
+			for {
+				observed := atomic.LoadInt32(&maxLive)
+				if current <= observed || atomic.CompareAndSwapInt32(
+					&maxLive, observed, current,
+				) {
+					break
+				}
+			}
+
+			<-release
+			atomic.AddInt32(&live, -1)
+			_ = conn.Close()
+		}(10000 + i)
+	}
+
+	deadline := time.After(time.Second)
+	for len(cmgr.inboundSlots) < int(maxInbound) {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for inbound slots to fill")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	close(release)
+	wg.Wait()
+
+	if maxLive > int32(maxInbound) {
+		t.Fatalf("live inbound connections exceeded limit: got %d, want <= %d",
+			maxLive, maxInbound)
+	}
+	if got := len(cmgr.inboundSlots); got != 0 {
+		t.Fatalf("inbound slots leaked: got %d", got)
 	}
 }
 
@@ -663,4 +818,63 @@ out:
 
 	cmgr.Stop()
 	cmgr.Wait()
+}
+
+// TestListenerInboundLimit verifies excess sockets are rejected before the
+// accept callback is started and capacity returns when an admitted socket
+// closes.
+func TestListenerInboundLimit(t *testing.T) {
+	maxInbound := uint32(1)
+	listener := newMockListener("127.0.0.1:8333")
+	accepted := make(chan net.Conn, 2)
+
+	cmgr, err := New(&Config{
+		Listeners:  []net.Listener{listener},
+		OnAccept:   func(conn net.Conn) { accepted <- conn },
+		MaxInbound: &maxInbound,
+		Dial:       mockDialer,
+	})
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	cmgr.Start()
+	defer func() {
+		cmgr.Stop()
+		cmgr.Wait()
+	}()
+
+	go listener.Connect("127.0.0.1", 10001)
+	var first net.Conn
+	select {
+	case first = <-accepted:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("first inbound callback did not run")
+	}
+
+	go listener.Connect("127.0.0.1", 10002)
+	deadline := time.After(time.Second)
+	for atomic.LoadUint64(&cmgr.inboundRejected) != 1 {
+		select {
+		case <-deadline:
+			t.Fatal("connection above the limit was not rejected")
+
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	select {
+	case <-accepted:
+		t.Fatal("connection above the limit reached the accept callback")
+
+	default:
+	}
+
+	_ = first.Close()
+	go listener.Connect("127.0.0.1", 10003)
+	select {
+	case replacement := <-accepted:
+		_ = replacement.Close()
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("released inbound slot was not reused")
+	}
 }
