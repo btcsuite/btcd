@@ -1082,9 +1082,17 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	}
 	var blkBytes []byte
 	err = s.cfg.DB.View(func(dbTx database.Tx) error {
-		var err error
-		blkBytes, err = dbTx.FetchBlock(hash)
-		return err
+		dbBlockBytes, err := dbTx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+
+		// FetchBlock bytes are only valid for the lifetime of the
+		// transaction. Copy them before returning from the view so the
+		// lenient parser below owns its backing memory.
+		blkBytes = append([]byte(nil), dbBlockBytes...)
+
+		return nil
 	})
 	if err != nil {
 		return nil, &btcjson.RPCError{
@@ -1092,19 +1100,27 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 			Message: "Block not found",
 		}
 	}
+	// Deserialize the block.  Blocks read back from the node's own
+	// database are parsed leniently: trailing bytes persisted by older
+	// btcd versions are stripped rather than treated as an error, so the
+	// bytes served below are always the exact block serialization.
+	blk, err := blockchain.DBBlockFromBytes(blkBytes, *hash)
+	if err != nil {
+		context := "Failed to deserialize block"
+		return nil, internalRPCError(err.Error(), context)
+	}
+	blkBytes, err = blk.Bytes()
+	if err != nil {
+		context := "Failed to serialize block"
+		return nil, internalRPCError(err.Error(), context)
+	}
+
 	// If verbosity is 0, return the serialized block as a hex encoded string.
 	if c.Verbosity != nil && *c.Verbosity == 0 {
 		return hex.EncodeToString(blkBytes), nil
 	}
 
 	// Otherwise, generate the JSON object and return it.
-
-	// Deserialize the block.
-	blk, err := btcutil.NewBlockFromBytes(blkBytes)
-	if err != nil {
-		context := "Failed to deserialize block"
-		return nil, internalRPCError(err.Error(), context)
-	}
 
 	// Get the block height from chain.
 	blockHeight, err := s.cfg.Chain.BlockHeightByHash(hash)
