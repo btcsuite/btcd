@@ -31,6 +31,7 @@ import (
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
@@ -72,6 +73,16 @@ var (
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash chainhash.Hash
+
+// maxInboundPeers returns the accepted inbound connection budget after
+// reserving capacity for automatic outbound peers.
+func maxInboundPeers(maxPeers, targetOutbound int) uint32 {
+	if maxPeers <= targetOutbound {
+		return 0
+	}
+
+	return uint32(maxPeers - targetOutbound)
+}
 
 // onionAddr implements the net.Addr interface and represents a tor address.
 type onionAddr struct {
@@ -237,6 +248,7 @@ type server struct {
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	p2pDowngrader        *peer.P2PDowngrader
+	inboundAdmission     *inbound.Admission
 	peerLifecycle        chan peerLifecycleEvent
 	banPeers             chan *serverPeer
 	query                chan interface{}
@@ -296,11 +308,16 @@ type serverPeer struct {
 	addressesMtx   sync.RWMutex
 	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
-	quit chan struct{}
+	quit           chan struct{}
 
 	// Closed by verAckOnce when OnVerAck fires.
 	verAckCh   chan struct{}
 	verAckOnce sync.Once
+
+	// releaseInboundHandshake releases the source-prefix slot held while an
+	// inbound handshake is incomplete.
+	releaseInboundHandshake     func()
+	releaseInboundHandshakeOnce sync.Once
 
 	// peerAdded is set by peerLifecycleHandler after a peerAdd event
 	// has been enqueued on s.peerLifecycle. handleDonePeerMsg reads
@@ -329,6 +346,15 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		txProcessed:    make(chan struct{}, 1),
 		blockProcessed: make(chan struct{}, 1),
 	}
+}
+
+// releaseHandshake releases the source-prefix slot for an inbound handshake.
+func (sp *serverPeer) releaseHandshake() {
+	sp.releaseInboundHandshakeOnce.Do(func() {
+		if sp.releaseInboundHandshake != nil {
+			sp.releaseInboundHandshake()
+		}
+	})
 }
 
 // newestBlock returns the current best block hash and height using the format
@@ -574,7 +600,10 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 // sync.Once guard ensures verAckCh is closed at most once even if
 // OnVerAck is ever invoked more than once for a given peer.
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
-	sp.verAckOnce.Do(func() { close(sp.verAckCh) })
+	sp.verAckOnce.Do(func() {
+		sp.releaseHandshake()
+		close(sp.verAckCh)
+	})
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
@@ -2282,9 +2311,38 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 // instance, associates it with the connection, and starts a goroutine to wait
 // for disconnection.
 func (s *server) inboundPeerConnected(conn net.Conn) {
+	remoteAddr := conn.RemoteAddr()
+	whitelisted := isWhitelisted(remoteAddr)
+
+	// Loopback includes onion peers forwarded into the listener. Bypass the
+	// per-source limits for these and configured whitelisted peers, while the
+	// global socket, v2 rate, and v2 concurrency limits remain active.
+	bypassSourceLimits := whitelisted || inbound.IsLoopback(remoteAddr)
+
+	var releaseHandshake func()
+	if s.inboundAdmission != nil {
+		var err error
+		releaseHandshake, err = s.inboundAdmission.AcquireSource(
+			remoteAddr, bypassSourceLimits,
+		)
+		if err != nil {
+			_ = conn.Close()
+			return
+		}
+	}
+
 	sp := newServerPeer(s, false)
-	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
-	sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
+	sp.isWhitelisted = whitelisted
+	sp.releaseInboundHandshake = releaseHandshake
+
+	peerCfg := newPeerConfig(sp)
+	if s.inboundAdmission != nil {
+		peerCfg.V2HandshakeAdmission = s.inboundAdmission.BindV2(
+			remoteAddr, bypassSourceLimits,
+		)
+	}
+
+	sp.Peer = peer.NewInboundPeer(peerCfg)
 	sp.AssociateConnection(conn)
 	go s.peerLifecycleHandler(sp)
 }
@@ -2347,9 +2405,10 @@ func (s *server) peerLifecycleHandler(sp *serverPeer) {
 		}
 		sp.peerAdded.Store(true)
 
-	case <-sp.Peer.Done():
+	case <-sp.Done():
 		// Disconnected before verack; no peerAdd needed.
 	}
+	sp.releaseHandshake()
 
 	// Wait for full disconnect (may already be done).
 	sp.WaitForDisconnect()
@@ -2903,8 +2962,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s := server{
-		chainParams: chainParams,
-		addrManager: amgr,
+		chainParams:      chainParams,
+		addrManager:      amgr,
+		inboundAdmission: inbound.New(),
 
 		// peerLifecycle is buffered for up to two events per peer
 		// (peerAdd followed by peerDone) so peerLifecycleHandler
@@ -3145,9 +3205,15 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if cfg.MaxPeers < targetOutbound {
 		targetOutbound = cfg.MaxPeers
 	}
+	maxInbound := maxInboundPeers(cfg.MaxPeers, targetOutbound)
+	if maxInbound == 0 && len(listeners) > 0 {
+		srvrLog.Infof("Inbound connections disabled: maxpeers=%d, "+
+			"reserved-outbound=%d", cfg.MaxPeers, targetOutbound)
+	}
 	cmgr, err := connmgr.New(&connmgr.Config{
 		Listeners:      listeners,
 		OnAccept:       s.inboundPeerConnected,
+		MaxInbound:     &maxInbound,
 		RetryDuration:  connectionRetryInterval,
 		TargetOutbound: uint32(targetOutbound),
 		Dial:           btcdDial,

@@ -129,7 +129,7 @@ type config struct {
 	Listeners            []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
-	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers"`
+	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers. Up to 8 slots are reserved for automatic outbound peers; values of 8 or less disable inbound connections"`
 	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	MinRelayTxFee        float64       `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
 	DisableBanning       bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`

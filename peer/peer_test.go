@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +20,15 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/go-socks/socks"
 )
+
+// testHandshakeAdmission adapts a function to the v2 handshake admission
+// interface used by the peer configuration.
+type testHandshakeAdmission func() (func(), error)
+
+// Acquire invokes the test admission function.
+func (a testHandshakeAdmission) Acquire() (func(), error) {
+	return a()
+}
 
 // conn mocks a network connection by implementing the net.Conn interface.  It
 // is used to test peer connection without actually opening a network
@@ -1200,5 +1210,67 @@ func TestSendAddrV2Handshake(t *testing.T) {
 		outPeer.Disconnect()
 		inPeer.WaitForDisconnect()
 		outPeer.WaitForDisconnect()
+	}
+}
+
+// TestV2HandshakeAdmission verifies the responder admission hook is invoked
+// exactly once for an inbound v2 handshake and never for the initiator.
+func TestV2HandshakeAdmission(t *testing.T) {
+	verack := make(chan struct{}, 2)
+	var (
+		admissions atomic.Uint32
+		releases   atomic.Uint32
+	)
+
+	newConfig := func() *peer.Config {
+		return &peer.Config{
+			Listeners: peer.MessageListeners{
+				OnVerAck: func(*peer.Peer, *wire.MsgVerAck) {
+					verack <- struct{}{}
+				},
+			},
+			AllowSelfConns:  true,
+			ChainParams:     &chaincfg.MainNetParams,
+			Services:        wire.SFNodeNetwork | wire.SFNodeP2PV2,
+			UsingV2Conn:     true,
+			TrickleInterval: time.Second,
+			V2HandshakeAdmission: testHandshakeAdmission(func() (func(), error) {
+				admissions.Add(1)
+				return func() {
+					releases.Add(1)
+				}, nil
+			}),
+		}
+	}
+
+	inbound := peer.NewInboundPeer(newConfig())
+	outbound, err := peer.NewOutboundPeer(newConfig(), "127.0.0.1:8333")
+	if err != nil {
+		t.Fatalf("NewOutboundPeer failed: %v", err)
+	}
+
+	if err := setupPeerConnection(inbound, outbound); err != nil {
+		t.Fatalf("setupPeerConnection failed: %v", err)
+	}
+	t.Cleanup(func() {
+		inbound.Disconnect()
+		outbound.Disconnect()
+		inbound.WaitForDisconnect()
+		outbound.WaitForDisconnect()
+	})
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-verack:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for v2 verack")
+		}
+	}
+
+	if got := admissions.Load(); got != 1 {
+		t.Fatalf("admission invoked %d times, want 1", got)
+	}
+	if got := releases.Load(); got != 1 {
+		t.Fatalf("admission released %d times, want 1", got)
 	}
 }

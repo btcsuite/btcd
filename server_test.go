@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -61,6 +62,10 @@ func TestOnVerAckDoubleCall(t *testing.T) {
 	t.Parallel()
 
 	_, sp := newTestServerPeer(t)
+	var releases atomic.Uint32
+	sp.releaseInboundHandshake = func() {
+		releases.Add(1)
+	}
 
 	sp.OnVerAck(nil, nil)
 
@@ -78,6 +83,54 @@ func TestOnVerAckDoubleCall(t *testing.T) {
 	case <-sp.verAckCh:
 	default:
 		t.Fatal("verAckCh should still be closed after second OnVerAck call")
+	}
+	require.Equal(t, uint32(1), releases.Load(),
+		"the source-prefix slot must be released exactly once")
+}
+
+// TestHandshakeReleaseOnDisconnect verifies that a connection which
+// disconnects before verack releases its source-prefix slot.
+func TestHandshakeReleaseOnDisconnect(t *testing.T) {
+	t.Parallel()
+
+	s, sp := newTestServerPeer(t)
+	var releases atomic.Uint32
+	sp.releaseInboundHandshake = func() {
+		releases.Add(1)
+	}
+
+	sp.Disconnect()
+	go s.peerLifecycleHandler(sp)
+
+	event := recvLifecycleEvent(t, s.peerLifecycle)
+	require.Equal(t, peerDone, event.action)
+	require.Equal(t, uint32(1), releases.Load())
+}
+
+// TestMaxInboundPeers verifies that automatic outbound capacity is reserved
+// without underflow at small peer limits.
+func TestMaxInboundPeers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		maxPeers       int
+		targetOutbound int
+		want           uint32
+	}{
+		{name: "zero", maxPeers: 0, targetOutbound: 0, want: 0},
+		{name: "all outbound", maxPeers: 8, targetOutbound: 8, want: 0},
+		{name: "below outbound", maxPeers: 7, targetOutbound: 8, want: 0},
+		{name: "one inbound", maxPeers: 9, targetOutbound: 8, want: 1},
+		{name: "default", maxPeers: 125, targetOutbound: 8, want: 117},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, maxInboundPeers(
+				test.maxPeers, test.targetOutbound,
+			))
+		})
 	}
 }
 
@@ -100,7 +153,7 @@ func TestPeerLifecycleOrdering(t *testing.T) {
 	require.Equal(t, sp, first.sp)
 
 	// Trigger disconnect after peerAdd is observed.
-	sp.Peer.Disconnect()
+	sp.Disconnect()
 
 	second := recvLifecycleEvent(t, s.peerLifecycle)
 	require.Equal(t, peerDone, second.action,
@@ -123,7 +176,7 @@ func TestPeerLifecycleSimultaneousReady(t *testing.T) {
 		s, sp := newTestServerPeer(t)
 
 		close(sp.verAckCh)
-		sp.Peer.Disconnect()
+		sp.Disconnect()
 
 		go s.peerLifecycleHandler(sp)
 

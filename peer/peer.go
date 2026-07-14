@@ -292,6 +292,11 @@ type Config struct {
 	// UsingV2Conn is defined if and only if we accept and attempt to make
 	// v2 connections.
 	UsingV2Conn bool
+
+	// V2HandshakeAdmission optionally reserves resources for the CPU-bound
+	// portion of an inbound v2 handshake.  It is not used for outbound
+	// handshakes or v1 fallback.
+	V2HandshakeAdmission v2transport.HandshakeAdmission
 }
 
 // minUint32 is a helper function to return the minimum of two uint32s.
@@ -2553,7 +2558,16 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	}
 
 	if p.cfg.UsingV2Conn && p.Services()&wire.SFNodeP2PV2 == wire.SFNodeP2PV2 {
-		p.V2Transport = v2transport.NewPeer()
+		var options []v2transport.PeerOption
+		if inbound && p.cfg.V2HandshakeAdmission != nil {
+			options = append(options,
+				v2transport.WithResponderHandshakeAdmission(
+					p.cfg.V2HandshakeAdmission,
+				),
+			)
+		}
+
+		p.V2Transport = v2transport.NewPeerWithOptions(options...)
 	} else {
 		// TODO: Hack, change.
 		p.cfg.UsingV2Conn = false

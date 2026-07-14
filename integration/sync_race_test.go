@@ -99,7 +99,12 @@ func fakePeerConn(nodeAddr string) error {
 // sync, it was stuck with a dead sync peer (the sync manager still
 // has a dead peer as sync peer, so it ignores the new live one).
 func TestSyncManagerRaceCorruption(t *testing.T) {
-	stressedHarness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	// This test deliberately opens more concurrent peers than the default
+	// inbound limit. Raise the harness limit so admission does not dilute the
+	// sync-manager lifecycle stress this test is intended to apply.
+	stressedHarness, err := rpctest.New(
+		&chaincfg.SimNetParams, nil, []string{"--maxpeers=400"}, "",
+	)
 	require.NoError(t, err)
 	require.NoError(t, stressedHarness.SetUp(true, 0))
 	t.Cleanup(func() {
