@@ -451,7 +451,9 @@ type Peer struct {
 	connected     int32
 	disconnect    int32
 
-	conn net.Conn
+	// connMtx serializes connection association with disconnection.
+	connMtx sync.Mutex
+	conn    net.Conn
 
 	// These fields are set at creation time and never modified, so they are
 	// safe to read from concurrently without a mutex.
@@ -2013,8 +2015,11 @@ func (p *Peer) Disconnect() {
 	}
 
 	log.Tracef("Disconnecting %s", p)
-	if atomic.LoadInt32(&p.connected) != 0 {
-		p.conn.Close()
+	p.connMtx.Lock()
+	conn := p.conn
+	p.connMtx.Unlock()
+	if conn != nil {
+		_ = conn.Close()
 	}
 	close(p.quit)
 }
@@ -2446,16 +2451,27 @@ func (p *Peer) start() error {
 	return nil
 }
 
-// AssociateConnection associates the given conn to the peer.   Calling this
-// function when the peer is already connected will have no effect.
+// AssociateConnection associates the given conn to the peer. Calling this
+// function when the peer is already connected will have no effect. When the
+// peer is already disconnecting, the connection is closed instead.
 func (p *Peer) AssociateConnection(conn net.Conn) {
-	// Already connected?
-	if !atomic.CompareAndSwapInt32(&p.connected, 0, 1) {
+	p.connMtx.Lock()
+	if atomic.LoadInt32(&p.connected) != 0 {
+		p.connMtx.Unlock()
+		return
+	}
+	if atomic.LoadInt32(&p.disconnect) != 0 {
+		p.connMtx.Unlock()
+		_ = conn.Close()
 		return
 	}
 
 	p.conn = conn
+	p.statsMtx.Lock()
 	p.timeConnected = time.Now()
+	p.statsMtx.Unlock()
+	atomic.StoreInt32(&p.connected, 1)
+	p.connMtx.Unlock()
 
 	if p.cfg.UsingV2Conn {
 		p.V2Transport.UseReadWriter(conn)

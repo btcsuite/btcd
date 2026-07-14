@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -48,6 +49,18 @@ type conn struct {
 	proxy bool
 }
 
+// countingConn records how many times its embedded connection is closed.
+type countingConn struct {
+	net.Conn
+	closes int32
+}
+
+// Close closes the embedded connection and records the call.
+func (c *countingConn) Close() error {
+	atomic.AddInt32(&c.closes, 1)
+	return c.Conn.Close()
+}
+
 // LocalAddr returns the local address for the connection.
 func (c conn) LocalAddr() net.Addr {
 	return &addr{c.lnet, c.laddr}
@@ -78,6 +91,81 @@ func (c conn) Close() error {
 func (c conn) SetDeadline(t time.Time) error      { return nil }
 func (c conn) SetReadDeadline(t time.Time) error  { return nil }
 func (c conn) SetWriteDeadline(t time.Time) error { return nil }
+
+// TestDisconnectBeforeAssociateConnection verifies a connection handed to an
+// already-disconnected peer is closed instead of being published and leaked.
+func TestDisconnectBeforeAssociateConnection(t *testing.T) {
+	local, remote := net.Pipe()
+	defer local.Close()
+	defer remote.Close()
+
+	trackedConn := &countingConn{Conn: local}
+	p := peer.NewInboundPeer(&peer.Config{})
+	p.Disconnect()
+	p.Disconnect()
+	p.WaitForDisconnect()
+
+	p.AssociateConnection(trackedConn)
+
+	if got := atomic.LoadInt32(&trackedConn.closes); got != 1 {
+		t.Fatalf("unexpected connection close count: got %d, want 1", got)
+	}
+	if p.Connected() {
+		t.Fatal("disconnected peer accepted a connection")
+	}
+}
+
+// TestAssociateConnectionDisconnectRace verifies concurrent association and
+// disconnection always close the transferred connection exactly once.
+func TestAssociateConnectionDisconnectRace(t *testing.T) {
+	const iterations = 100
+
+	for i := 0; i < iterations; i++ {
+		local, remote := net.Pipe()
+		trackedConn := &countingConn{Conn: local}
+		p, err := peer.NewOutboundPeer(
+			&peer.Config{
+				NewestBlock: func() (*chainhash.Hash, int32, error) {
+					return &chainhash.Hash{}, 0, nil
+				},
+				AllowSelfConns: true,
+			},
+			"127.0.0.1:8333",
+		)
+		if err != nil {
+			t.Fatalf("NewOutboundPeer: unexpected error: %v", err)
+		}
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			p.AssociateConnection(trackedConn)
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			p.Disconnect()
+		}()
+
+		close(start)
+		wg.Wait()
+		p.WaitForDisconnect()
+
+		if got := atomic.LoadInt32(&trackedConn.closes); got != 1 {
+			t.Fatalf("iteration %d: unexpected connection close count: "+
+				"got %d, want 1", i, got)
+		}
+		if p.Connected() {
+			t.Fatalf("iteration %d: peer remained connected", i)
+		}
+
+		_ = local.Close()
+		_ = remote.Close()
+	}
+}
 
 // addr mocks a network address
 type addr struct {
