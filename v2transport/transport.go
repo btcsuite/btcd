@@ -106,6 +106,30 @@ var (
 	ErrShouldDowngradeToV1 = fmt.Errorf("should downgrade to v1")
 )
 
+// HandshakeAdmission controls access to the CPU-bound portion of an inbound
+// v2 handshake.
+type HandshakeAdmission interface {
+	// Acquire reserves the resources needed to generate the responder key
+	// and perform key agreement. The returned function releases the
+	// reservation once those operations are complete.
+	Acquire() (release func(), err error)
+}
+
+// PeerOption customizes a v2 transport peer.
+type PeerOption func(*Peer)
+
+// WithResponderHandshakeAdmission installs an admission policy that runs
+// after a responder has received a complete v2 key candidate and before it
+// performs key generation or key agreement.
+func WithResponderHandshakeAdmission(
+	admission HandshakeAdmission,
+) PeerOption {
+
+	return func(p *Peer) {
+		p.responderAdmission = admission
+	}
+}
+
 // Peer defines the components necessary for sending/receiving data over the v2
 // transport.
 type Peer struct {
@@ -120,8 +144,9 @@ type Peer struct {
 	// 4095 bytes.
 	sentGarbage []byte
 
-	// receivedPrefix is used to determine which transport protocol we're
-	// using.
+	// receivedPrefix contains the bytes consumed while classifying the
+	// transport.  For a v2 responder, it eventually contains the initiator's
+	// complete ElligatorSwift encoding.
 	receivedPrefix []byte
 
 	// sendL is the cipher used to send encrypted packet lengths.
@@ -166,14 +191,27 @@ type Peer struct {
 	// rw is the underlying object that will be read from / written to in
 	// calls to V2EncPacket and V2ReceivePacket.
 	rw io.ReadWriter
+
+	// responderAdmission optionally reserves resources for the CPU-bound
+	// portion of an inbound handshake.
+	responderAdmission HandshakeAdmission
+
+	// responderReady is set after the responder has completed key agreement
+	// and initialized its packet ciphers.
+	responderReady bool
 }
 
 // NewPeer returns a new instance of Peer.
 func NewPeer() *Peer {
+	return NewPeerWithOptions()
+}
+
+// NewPeerWithOptions returns a new Peer configured with the provided options.
+func NewPeerWithOptions(options ...PeerOption) *Peer {
 	// The keys (initiatorL, initiatorP, responderL, responderP) as well as
 	// the sessionID must have space for the hkdf Expand-derived Reader to
 	// work.
-	return &Peer{
+	p := &Peer{
 		receivedPrefix: make([]byte, 0),
 		initiatorL:     make([]byte, 32),
 		initiatorP:     make([]byte, 32),
@@ -181,6 +219,11 @@ func NewPeer() *Peer {
 		responderP:     make([]byte, 32),
 		sessionID:      make([]byte, 32),
 	}
+	for _, option := range options {
+		option(p)
+	}
+
+	return p
 }
 
 // createV2Ciphers constructs the packet-length and packet encryption ciphers.
@@ -373,15 +416,15 @@ func (p *Peer) InitiateV2Handshake(garbageLen int) error {
 	log.Debugf("Sending ellswift pubkey and garbage (total_len=%d)",
 		len(data))
 
-	p.Send(data)
-
-	return nil
+	_, err = p.Send(data)
+	return err
 }
 
-// RespondV2Handshake responds to the initiator, determines if the initiator
-// wants to use the v2 protocol and if so returns our ElligatorSwift-encoded
-// public key followed by our garbage data over. If the initiator does not want
-// to use the v2 protocol, we'll instead revert to the v1 protocol.
+// RespondV2Handshake determines whether the initiator wants to use the v2
+// protocol.  For a v2 initiator, it receives the complete key candidate before
+// reserving CPU resources, initializes the responder ciphers, and sends the
+// responder's ElligatorSwift-encoded public key followed by garbage.  For a v1
+// initiator, it returns ErrUseV1Protocol without performing v2 cryptography.
 func (p *Peer) RespondV2Handshake(garbageLen int, net BitcoinNet) error {
 	v1Prefix := createV1Prefix(net)
 
@@ -402,7 +445,7 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net BitcoinNet) error {
 		var receiveBytes []byte
 		receiveBytes, _, err = p.Receive(1)
 		if err != nil {
-			log.Errorf("Failed to receive byte for v1 prefix "+
+			log.Debugf("Failed to receive byte for v1 prefix "+
 				"check: %v", err)
 			return err
 		}
@@ -418,34 +461,97 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net BitcoinNet) error {
 				"prefix at index %d, assuming v2 peer",
 				p.receivedPrefix[lastIdx], lastIdx)
 
-			p.privkeyOurs, p.ellswiftOurs, err = ellswift.EllswiftCreate()
-			if err != nil {
-				log.Errorf("Failed to create ellswift "+
-					"keypair: %v", err)
-				return err
-			}
-
-			log.Tracef("Created ellswift keypair, pubkey=%x",
-				p.ellswiftOurs)
-
-			data, err := p.generateKeyAndGarbage(garbageLen)
-			if err != nil {
-				return err
-			}
-
-			// Send over our ElligatorSwift-encoded pubkey followed
-			// by our randomly generated garbage.
-			log.Debugf("Sending ellswift pubkey and garbage "+
-				"(total_len=%d)", len(data))
-			p.Send(data)
-
-			return nil
+			return p.prepareResponderHandshake(garbageLen, net)
 		}
 	}
 
 	log.Infof("Received full v1 prefix match, reverting to v1 protocol")
 
 	return ErrUseV1Protocol
+}
+
+// prepareResponderHandshake receives the rest of the initiator's key and
+// performs all CPU-bound responder setup without holding a resource admission
+// across a network read or write.
+func (p *Peer) prepareResponderHandshake(garbageLen int, net BitcoinNet) error {
+	remaining := 64 - len(p.receivedPrefix)
+	recvData, _, err := p.Receive(remaining)
+	if err != nil {
+		return err
+	}
+	p.receivedPrefix = append(p.receivedPrefix, recvData...)
+
+	if len(p.receivedPrefix) != 64 {
+		return errInsufficientBytes
+	}
+
+	v1Prefix := createV1Prefix(net)
+	if bytes.Equal(p.receivedPrefix[4:16], v1Prefix[4:16]) {
+		log.Warnf("Peer sent v1 version message for wrong network "+
+			"(expected %v)", net)
+		return errWrongNetV1Peer
+	}
+
+	release := func() {}
+	if p.responderAdmission != nil {
+		release, err = p.responderAdmission.Acquire()
+		if err != nil {
+			return err
+		}
+		if release == nil {
+			release = func() {}
+		}
+	}
+
+	err = p.initializeResponder(net, release)
+	if err != nil {
+		return err
+	}
+
+	data, err := p.generateKeyAndGarbage(garbageLen)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("Sending ellswift pubkey and garbage (total_len=%d)",
+		len(data))
+	_, err = p.Send(data)
+
+	return err
+}
+
+// initializeResponder performs the responder's CPU-bound key generation, key
+// agreement, and cipher setup.  The admission is released before this method
+// returns so callers never hold it across a network write.
+func (p *Peer) initializeResponder(net BitcoinNet, release func()) error {
+	defer release()
+
+	var err error
+	p.privkeyOurs, p.ellswiftOurs, err = ellswift.EllswiftCreate()
+	if err != nil {
+		log.Errorf("Failed to create ellswift keypair: %v", err)
+		return err
+	}
+
+	log.Tracef("Created ellswift keypair, pubkey=%x", p.ellswiftOurs)
+
+	var ellswiftTheirs [64]byte
+	copy(ellswiftTheirs[:], p.receivedPrefix)
+
+	ecdhSecret, err := ellswift.V2Ecdh(
+		p.privkeyOurs, ellswiftTheirs, p.ellswiftOurs, false,
+	)
+	if err != nil {
+		log.Errorf("Failed to calculate ECDH shared secret: %v", err)
+		return err
+	}
+
+	if err := p.createV2Ciphers(ecdhSecret[:], false, net); err != nil {
+		return err
+	}
+
+	p.responderReady = true
+	return nil
 }
 
 // generateKeyAndGarbage returns a byte slice containing our ellswift-encoded
@@ -496,80 +602,53 @@ func createV1Prefix(net BitcoinNet) []byte {
 	return v1Prefix
 }
 
-// CompleteHandshake finishes the v2 protocol negotiation and optionally sends
-// decoy packets after sending the garbage terminator.
-func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
-	btcnet BitcoinNet) error {
-
-	log.Debugf("Completing v2 handshake (initiating=%v, "+
-		"num_decoys=%d, net=%v)", initiating, len(decoyContentLens),
-		btcnet)
+// completeKeyExchange receives the remote key and initializes the packet
+// ciphers.  RespondV2Handshake performs this phase early for responders so its
+// CPU admission can be released before any response is written.
+func (p *Peer) completeKeyExchange(initiating bool, net BitcoinNet) error {
+	if p.responderReady {
+		return nil
+	}
 
 	var receivedPrefix []byte
 	if initiating {
-		log.Trace("Initiator expecting 64 bytes for peer's " +
-			"ellswift key")
-
+		log.Trace("Initiator expecting 64 bytes for peer's ellswift key")
 		receivedPrefix = make([]byte, 0, 16)
 	} else {
-		// If we are the responder, we have already received bytes to
-		// compare against the v1 transport protocol's starting bytes.
-		// We have to account for these when reading the rest of the 64
-		// bytes off the wire to properly parse the remote's
-		// ellswift-encoded public key.
+		// A responder might have already received bytes while comparing the
+		// start of the stream against a v1 version message.
 		receivedPrefix = p.receivedPrefix
-
 		log.Tracef("Responder already has prefix_len=%d, expecting %d "+
-			"more bytes for peer's ellswift key",
-			len(receivedPrefix), 64-len(receivedPrefix))
+			"more bytes for peer's ellswift key", len(receivedPrefix),
+			64-len(receivedPrefix))
 	}
 
 	recvData, numRead, err := p.Receive(64 - len(receivedPrefix))
 	if err != nil {
-		// If we receive an error when reading off the wire and we read
-		// zero bytes, then we will reconnect to the peer using v1.
-		// There are several different errors that Receive can return
-		// that indicate we should reconnect. Instead of special-casing
-		// them all, just perform these checks if any error was
-		// returned.
+		// An initiator which receives no response most likely connected to a
+		// v1-only peer.  Signal the caller to reconnect using v1.
 		if numRead == 0 && initiating {
-			// The peer most likely attempted to parse our 64-byte
-			// elligator-swift key as a version message and failed
-			// when trying to parse the message header into
-			// something valid. In this case, return a special
-			// error that signals to the server that we can
-			// reconnect with the OG v1 scheme.
-			log.Debugf("Received transport error during " +
-				"v2 handshake, retying downgraded v1 " +
-				"connection.")
-
+			log.Debugf("Received transport error during v2 handshake, " +
+				"retrying downgraded v1 connection.")
 			p.shouldDowngradeToV1.Store(true)
 
 			return ErrShouldDowngradeToV1
 		}
 
-		// If we are the recipient, we can fail.
-		log.Errorf("Failed to receive peer's ellswift key data: %v",
-			err)
+		log.Errorf("Failed to receive peer's ellswift key data: %v", err)
 		return err
 	}
 
 	log.Tracef("Received %d bytes for peer's ellswift key", len(recvData))
 
 	var ellswiftTheirs [64]byte
-
 	if initiating {
-		// If we are initiating, read all 64 bytes into ellswiftTheirs.
 		copy(ellswiftTheirs[:], recvData)
 	} else {
-		// If we are the responder, then we need to account for the
-		// bytes already received as part of matching against the
-		// starting v1 transport bytes. We sanity check receivedPrefix
-		// in case it is too large for some reason.
 		prefixLen := len(receivedPrefix)
 		if prefixLen > 16 {
-			log.Errorf("Responder's received prefix length %d is "+
-				"too large (> 16)", prefixLen)
+			log.Errorf("Responder's received prefix length %d is too "+
+				"large (> 16)", prefixLen)
 
 			return errPrefixTooLarge
 		}
@@ -580,29 +659,14 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	log.Tracef("Assembled peer's ellswift key: %x", ellswiftTheirs)
 
-	// Calculate the v1 protocol's message prefix and see if the bytes read
-	// read into ellswiftTheirs matches it.
-	v1Prefix := createV1Prefix(btcnet)
-
-	// ellswiftTheirs should be at least 16 bytes if receive succeeded, but
-	// just in case, check the size.
-	if len(ellswiftTheirs) < 16 {
-		log.Errorf("Received insufficient bytes (%d) for "+
-
-			"ellswift key", len(ellswiftTheirs))
-		return errInsufficientBytes
-	}
-
+	v1Prefix := createV1Prefix(net)
 	if !initiating && bytes.Equal(ellswiftTheirs[4:16], v1Prefix[4:16]) {
 		log.Warnf("Peer sent v1 version message for wrong network "+
-			"(expected %v)", btcnet)
+			"(expected %v)", net)
 		return errWrongNetV1Peer
 	}
 
 	log.Debug("Calculating ECDH shared secret")
-
-	// Calculate the shared secret to be used in creating the packet
-	// ciphers.
 	ecdhSecret, err := ellswift.V2Ecdh(
 		p.privkeyOurs, ellswiftTheirs, p.ellswiftOurs, initiating,
 	)
@@ -613,14 +677,28 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 	log.Tracef("Calculated ECDH shared secret: %x", ecdhSecret)
 
-	err = p.createV2Ciphers(ecdhSecret[:], initiating, btcnet)
-	if err != nil {
+	return p.createV2Ciphers(ecdhSecret[:], initiating, net)
+}
+
+// CompleteHandshake finishes the v2 protocol negotiation and optionally sends
+// decoy packets after sending the garbage terminator.
+func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
+	btcnet BitcoinNet) error {
+
+	log.Debugf("Completing v2 handshake (initiating=%v, "+
+		"num_decoys=%d, net=%v)", initiating, len(decoyContentLens),
+		btcnet)
+
+	if err := p.completeKeyExchange(initiating, btcnet); err != nil {
 		return err
 	}
 
 	// Send garbage terminator.
 	log.Debugf("Sending garbage terminator: %x", p.sendGarbageTerm)
-	p.Send(p.sendGarbageTerm[:])
+	_, err := p.Send(p.sendGarbageTerm[:])
+	if err != nil {
+		return err
+	}
 
 	// Optionally send decoy packets after garbage terminator.
 	aad := p.sentGarbage
@@ -630,14 +708,12 @@ func (p *Peer) CompleteHandshake(initiating bool, decoyContentLens []int,
 
 		decoyContent := make([]byte, decoyContentLens[i])
 
-		encPacket, _, err := p.V2EncPacket(decoyContent, aad, true)
+		_, _, err := p.V2EncPacket(decoyContent, aad, true)
 		if err != nil {
 			log.Errorf("Failed to encrypt/send decoy "+
 				"packet %d: %v", i+1, err)
 			return err
 		}
-
-		p.Send(encPacket)
 
 		// AAD is only used for the first packet after the handshake.
 		aad = nil
@@ -872,7 +948,7 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 	}
 }
 
-// ReceivedPrefix returns the partial header bytes we've already received.
+// ReceivedPrefix returns the transport-classification bytes already received.
 func (p *Peer) ReceivedPrefix() []byte {
 	return p.receivedPrefix
 }
@@ -894,6 +970,9 @@ func (p *Peer) UseReadWriter(rw io.ReadWriter) {
 func (p *Peer) Send(data []byte) (int, error) {
 	log.Tracef("Sending %d bytes", len(data))
 	n, err := p.rw.Write(data)
+	if err == nil && n != len(data) {
+		err = io.ErrShortWrite
+	}
 	if err != nil {
 		log.Errorf("Send failed after %d bytes: %v", n, err)
 	} else {
@@ -930,7 +1009,7 @@ func (p *Peer) Receive(numBytes int) ([]byte, int, error) {
 
 		n, err := p.rw.Read(b[index:])
 		if err != nil {
-			log.Errorf("Receive failed after reading %d bytes "+
+			log.Debugf("Receive failed after reading %d bytes "+
 				"(target %d): %v", total+n, numBytes, err)
 			return nil, total, err
 		}
