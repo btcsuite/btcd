@@ -1277,7 +1277,7 @@ func (b *BlockChain) initChainState() error {
 		if err != nil {
 			return err
 		}
-		block, err := btcutil.NewBlockFromBytes(blockBytes)
+		block, err := DBBlockFromBytes(blockBytes, state.hash)
 		if err != nil {
 			return err
 		}
@@ -1301,8 +1301,15 @@ func (b *BlockChain) initChainState() error {
 			}
 		}
 
-		// Initialize the state related to the best block.
-		blockSize := uint64(len(blockBytes))
+		// Initialize the state related to the best block.  The block
+		// bytes are re-derived from the block itself so any trailing
+		// bytes ignored during deserialization are excluded from the
+		// recorded size.
+		serializedBlock, err := block.Bytes()
+		if err != nil {
+			return err
+		}
+		blockSize := uint64(len(serializedBlock))
 		blockWeight := uint64(GetBlockWeight(block))
 		numTxns := uint64(len(block.MsgBlock().Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
@@ -1367,6 +1374,35 @@ func dbFetchHeaderByHeight(dbTx database.Tx, height int32) (*wire.BlockHeader, e
 	return dbFetchHeaderByHash(dbTx, hash)
 }
 
+// DBBlockFromBytes deserializes a block fetched from the local database,
+// tolerating trailing bytes rather than rejecting them outright.  Databases
+// written by older btcd versions may have persisted blocks with trailing
+// bytes, and failing here would make such blocks permanently unreadable.
+// Instead, any trailing bytes are logged, ignored, and excluded from the
+// serialization cached in the returned block.
+//
+// This lenient parsing is only appropriate for blocks read back from the
+// node's own database.  Blocks from external sources (p2p, RPC) should be
+// parsed with the strict btcutil.NewBlockFromBytes instead.
+func DBBlockFromBytes(blockBytes []byte, hash chainhash.Hash) (*btcutil.Block,
+	error) {
+
+	blockReader := bytes.NewReader(blockBytes)
+	var msgBlock wire.MsgBlock
+	if err := msgBlock.Deserialize(blockReader); err != nil {
+		return nil, err
+	}
+	if trailing := blockReader.Len(); trailing > 0 {
+		log.Warnf("Block %v has %d trailing bytes in the database; "+
+			"ignoring them", hash, trailing)
+		blockBytes = blockBytes[:len(blockBytes)-trailing]
+	}
+
+	// Cache the exact serialization on the block so downstream consumers
+	// of the raw bytes never observe the trailing bytes.
+	return btcutil.NewBlockFromBlockAndBytes(&msgBlock, blockBytes), nil
+}
+
 // dbFetchBlockByNode uses an existing database transaction to retrieve the
 // raw block for the provided node, deserialize it, and return a btcutil.Block
 // with the height set.
@@ -1378,7 +1414,7 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*btcutil.Block, erro
 	}
 
 	// Create the encapsulated block and set the height appropriately.
-	block, err := btcutil.NewBlockFromBytes(blockBytes)
+	block, err := DBBlockFromBytes(blockBytes, node.hash)
 	if err != nil {
 		return nil, err
 	}

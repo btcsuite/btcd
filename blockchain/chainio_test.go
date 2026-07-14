@@ -9,10 +9,10 @@ import (
 	"errors"
 	"math/big"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -40,11 +40,13 @@ func TestErrNotInMainChain(t *testing.T) {
 	}
 }
 
-// TestInitChainStateRejectsTrailingBestBlockBytes ensures startup rejects a
+// TestInitChainStateToleratesTrailingBestBlockBytes ensures startup loads a
 // stored best block whose bytes contain a valid block plus trailing data.
-func TestInitChainStateRejectsTrailingBestBlockBytes(t *testing.T) {
+// Databases written by older btcd versions may contain such blocks, so
+// rejecting them would prevent the node from ever starting.
+func TestInitChainStateToleratesTrailingBestBlockBytes(t *testing.T) {
 	chain, params, teardown := utxoCacheTestChain(
-		"TestInitChainStateRejectsTrailingBestBlockBytes")
+		"TestInitChainStateToleratesTrailingBestBlockBytes")
 	defer teardown()
 
 	tip := btcutil.NewBlock(params.GenesisBlock)
@@ -72,17 +74,83 @@ func TestInitChainStateRejectsTrailingBestBlockBytes(t *testing.T) {
 		t.Fatalf("failed to process block: %v", err)
 	}
 
-	_, err = New(&Config{
+	restarted, err := New(&Config{
 		DB:          chain.db,
 		ChainParams: params,
 		TimeSource:  NewMedianTime(),
 		SigCache:    txscript.NewSigCache(1000),
 	})
-	if err == nil {
-		t.Fatal("expected trailing best block bytes to fail startup")
+	if err != nil {
+		t.Fatalf("expected trailing best block bytes to be "+
+			"tolerated at startup, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "trailing bytes") {
-		t.Fatalf("expected trailing byte error, got: %v", err)
+
+	// The best state must reflect the stored block, with the trailing
+	// byte excluded from the recorded block size.
+	snapshot := restarted.BestSnapshot()
+	if snapshot.Hash != *block.Hash() {
+		t.Fatalf("unexpected best block hash - got %v, want %v",
+			snapshot.Hash, block.Hash())
+	}
+	wantSize := uint64(len(serialized.Bytes()))
+	if snapshot.BlockSize != wantSize {
+		t.Fatalf("unexpected best block size - got %d, want %d",
+			snapshot.BlockSize, wantSize)
+	}
+}
+
+// TestDBBlockFromBytes ensures database block parsing strips trailing bytes
+// from the cached serialization, passes exact serializations through
+// untouched, and still rejects truncated blocks.
+func TestDBBlockFromBytes(t *testing.T) {
+	t.Parallel()
+
+	params := &chaincfg.MainNetParams
+	var serialized bytes.Buffer
+	err := params.GenesisBlock.Serialize(&serialized)
+	if err != nil {
+		t.Fatalf("failed to serialize block: %v", err)
+	}
+	cleanBytes := serialized.Bytes()
+	wantHash := params.GenesisBlock.BlockHash()
+
+	// A block with trailing bytes must parse, and the cached
+	// serialization must exclude the trailing data.
+	block, err := DBBlockFromBytes(
+		append(append([]byte(nil), cleanBytes...), 0x00), wantHash,
+	)
+	if err != nil {
+		t.Fatalf("failed to parse block with trailing bytes: %v", err)
+	}
+	gotBytes, err := block.Bytes()
+	if err != nil {
+		t.Fatalf("failed to serialize parsed block: %v", err)
+	}
+	if !bytes.Equal(gotBytes, cleanBytes) {
+		t.Fatal("cached serialization includes trailing bytes")
+	}
+	if *block.Hash() != wantHash {
+		t.Fatalf("unexpected block hash - got %v, want %v",
+			block.Hash(), wantHash)
+	}
+
+	// An exact serialization must pass through untouched.
+	block, err = DBBlockFromBytes(cleanBytes, wantHash)
+	if err != nil {
+		t.Fatalf("failed to parse exact block: %v", err)
+	}
+	gotBytes, err = block.Bytes()
+	if err != nil {
+		t.Fatalf("failed to serialize parsed block: %v", err)
+	}
+	if !bytes.Equal(gotBytes, cleanBytes) {
+		t.Fatal("exact serialization was not preserved")
+	}
+
+	// A truncated block must still fail to parse.
+	_, err = DBBlockFromBytes(cleanBytes[:len(cleanBytes)-1], wantHash)
+	if err == nil {
+		t.Fatal("expected truncated block to fail to parse")
 	}
 }
 
