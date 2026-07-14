@@ -112,19 +112,20 @@ func (sig Signature) IsEqual(otherSig *Signature) bool {
 // error to support better testing while the exported method simply returns a
 // bool indicating success or failure.
 func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
-	// The algorithm for producing a BIP-340 signature is described in
-	// README.md and is reproduced here for reference:
+	// The reference algorithm for verifying a BIP-340 signature:
 	//
-	// 1. Fail if m is not 32 bytes
-	// 2. P = lift_x(int(pk)).
-	// 3. r = int(sig[0:32]); fail is r >= p.
-	// 4. s = int(sig[32:64]); fail if s >= n.
-	// 5. e = int(tagged_hash("BIP0340/challenge", bytes(r) || bytes(P) || M)) mod n.
-	// 6. R = s*G - e*P
-	// 7. Fail if is_infinite(R)
-	// 8. Fail if not hash_even_y(R)
-	// 9. Fail is x(R) != r.
-	// 10. Return success iff failure did not occur before reaching this point.
+	// 01. Fail if m is not 32 bytes
+	// 02. P = lift_x(int(pk)); fail if if that fails.
+	// 03. r = int(sig[0:32]); fail if r >= p.
+	// 04. s = int(sig[32:64]); fail if s >= n.
+	// 05. e = int(tagged_hash(
+	//     "BIP0340/challenge", bytes(r) || bytes(P) || m)) mod n.
+	// 06. R = s*G - e*P
+	// 07. Fail if is_infinite(R)
+	// 08. Fail if not hash_even_y(R)
+	// 09. Fail is x(R) != r.
+	// 10. Return success if failure did not occur before reaching this
+	//     point.
 
 	// Step 1.
 	//
@@ -163,7 +164,9 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 
 	// Step 5.
 	//
-	// e = int(tagged_hash("BIP0340/challenge", bytes(r) || bytes(P) || M)) mod n.
+	// e = int(tagged_hash("BIP0340/challenge", bytes(r) || bytes(P) || M))
+	// mod n.
+
 	var rBytes [32]byte
 	sig.r.PutBytesUnchecked(rBytes[:])
 	pBytes := SerializePubKey(pubKey)
@@ -219,7 +222,7 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 
 	// Step 10.
 	//
-	// Return success iff failure did not occur before reaching this point.
+	// Return success if failure did not occur before reaching this point.
 	return nil
 }
 
@@ -237,49 +240,53 @@ func zeroArray(a *[scalarSize]byte) {
 	}
 }
 
-// schnorrSign generates a BIP-340 signature over the secp256k1 curve for the
-// provided hash (which should be the result of hashing a larger message) using
-// the given nonce and private key.  The produced signature is deterministic
-// (same message, nonce, and key yield the same signature) and canonical.
+// schnorrSign generates a signature over the secp256k1 curve for the provided
+// hash (which should be the result of hashing a larger message) using the given
+// nonce and private key.  The produced signature is deterministic (same
+// message, nonce, and key yield the same signature) and canonical.
+//
+// NOTE: To generate signatures matching libsecp256k1 and BIP-340 when auxiliary
+// randomness is not provided, the CustomNonce option should be used with an
+// empty 32 byte array (32 zeroes).
 //
 // WARNING: The hash MUST be 32 bytes and both the nonce and private keys must
 // NOT be 0.  Since this is an internal use function, these preconditions MUST
 // be satisfied by the caller.
-func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash []byte,
-	opts *signOptions) (*Signature, error) {
+func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey,
+	hash []byte, opts *signOptions) (*Signature, error) {
 
-	// The algorithm for producing a BIP-340 signature is described in
-	// README.md and is reproduced here for reference:
+	// The reference algorithm for producing a BIP-340 signature:
 	//
 	// G = curve generator
 	// n = curve order
 	// d = private key
 	// m = message
-	// a = input randomness
+	// a = auxiliary random data
 	// r, s = signature
 	//
-	// 1. d' = int(d)
-	// 2. Fail if m is not 32 bytes
-	// 3. Fail if d = 0 or d >= n
-	// 4. P = d'*G
-	// 5. Negate d if P.y is odd
-	// 6. t = bytes(d) xor tagged_hash("BIP0340/aux", t || bytes(P) || m)
-	// 7. rand = tagged_hash("BIP0340/nonce", a)
-	// 8. k' = int(rand) mod n
-	// 9. Fail if k' = 0
+	// 01. d' = int(d)
+	// 02. Fail if m is not 32 bytes
+	// 03. Fail if d = 0 or d >= n
+	// 04. P = d'*G
+	// 05. Negate d if P.y is odd
+	// 06. t = bytes(d) xor tagged_hash("BIP0340/aux", a)
+	// 07. rand = tagged_hash("BIP0340/nonce", t || bytes(P) || m)
+	// 08. k' = int(rand) mod n
+	// 09. Fail if k' = 0
 	// 10. R = 'k*G
 	// 11. Negate k if R.y id odd
-	// 12. e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m) mod n
+	// 12. e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m)
+	//     mod n
 	// 13. sig = bytes(R) || bytes((k + e*d)) mod n
 	// 14. If Verify(bytes(P), m, sig) fails, abort.
 	// 15. return sig.
 	//
 	// Note that the set of functional options passed in may modify the
 	// above algorithm. If CustomNonce is used, steps 6-8 follow BIP-340's
-	// nonce derivation using the provided auxiliary randomness. If CustomNonce
-	// is NOT used (the default), steps 6-8 are replaced with RFC6979 nonce
-	// generation for deterministic signing. If FastSign is passed, we skip
-	// step 14 (signature verification).
+	// nonce derivation using the provided auxiliary randomness. If
+	// CustomNonce is NOT used (the default), steps 6-8 are replaced with
+	// RFC6979 nonce generation for deterministic signing. If FastSign is
+	// passed, we skip step 14 (signature verification).
 
 	// NOTE: Steps 1-9 are performed by the caller.
 
@@ -350,8 +357,8 @@ type signOptions struct {
 	// where we attempt to verify the produced signature.
 	fastSign bool
 
-	// authNonce allows the user to pass in their own nonce information, which
-	// is useful for schemes like mu-sig.
+	// authNonce allows the user to pass in their own nonce information,
+	// which is useful for schemes like mu-sig.
 	authNonce *[32]byte
 }
 
@@ -374,6 +381,10 @@ func FastSign() SignOption {
 // to specify this custom value when using multi-signatures schemes such as
 // Mu-Sig2. If this option isn't set, then rfc6979 will be used to generate the
 // nonce material.
+//
+// NOTE: To generate signatures matching libsecp256k1 and BIP-340 when auxiliary
+// randomness is not provided, the CustomNonce option should be used with an
+// empty 32 byte array (32 zeroes).
 func CustomNonce(auxData [32]byte) SignOption {
 	return func(o *signOptions) {
 		o.authNonce = &auxData
@@ -382,14 +393,20 @@ func CustomNonce(auxData [32]byte) SignOption {
 
 // Sign generates an BIP-340 signature over the secp256k1 curve for the
 // provided hash (which should be the result of hashing a larger message) using
-// the given private key.  The produced signature is deterministic (same
-// message and same key yield the same signature) and canonical.
+// the given private key. The produced signature is deterministic (same message
+// and same key yield the same signature) and canonical.
 //
 // Note that the current signing implementation has a few remaining variable
-// time aspects which make use of the private key and the generated nonce,
-// which can expose the signer to constant time attacks.  As a result, this
-// function should not be used in situations where there is the possibility of
-// someone having EM field/cache/etc access.
+// time aspects which make use of the private key and the generated nonce, which
+// can expose the signer to constant time attacks.  As a result, this function
+// should not be used in situations where there is the possibility of someone
+// having EM field/cache/etc access.
+//
+// NOTE: To generate signatures matching libsecp256k1 and BIP-340 when auxiliary
+// randomness is not provided, the CustomNonce option should be used with an
+// empty 32 byte array (32 zeroes). The current implementation also deviates
+// from BIP-340 by not allowing messages of arbitrary size to be signed, the
+// length of the message to be signed must be exactly 32 bytes.
 func Sign(privKey *btcec.PrivateKey, hash []byte,
 	signOpts ...SignOption) (*Signature, error) {
 
@@ -399,43 +416,44 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		option(opts)
 	}
 
-	// The algorithm for producing a BIP-340 signature is described in
-	// README.md and is reproduced here for reference:
+	// The reference algorithm for producing a BIP-340 signature:
 	//
 	// G = curve generator
 	// n = curve order
 	// d = private key
 	// m = message
-	// a = input randomness
+	// a = auxiliary random data
 	// r, s = signature
 	//
-	// 1. d' = int(d)
-	// 2. Fail if m is not 32 bytes
-	// 3. Fail if d = 0 or d >= n
-	// 4. P = d'*G
-	// 5. Negate d if P.y is odd
-	// 6. t = bytes(d) xor tagged_hash("BIP0340/aux", t || bytes(P) || m)
-	// 7. rand = tagged_hash("BIP0340/nonce", a)
-	// 8. k' = int(rand) mod n
-	// 9. Fail if k' = 0
+	// 01. d' = int(d)
+	// 02. Fail if m is not 32 bytes
+	// 03. Fail if d = 0 or d >= n
+	// 04. P = d'*G
+	// 05. Negate d if P.y is odd
+	// 06. t = bytes(d) xor tagged_hash("BIP0340/aux", a)
+	// 07. rand = tagged_hash("BIP0340/nonce", t || bytes(P) || m)
+	// 08. k' = int(rand) mod n
+	// 09. Fail if k' = 0
 	// 10. R = 'k*G
 	// 11. Negate k if R.y id odd
-	// 12. e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || mod) mod n
+	// 12. e = tagged_hash("BIP0340/challenge", bytes(R) || bytes(P) || m)
+	//     mod n
 	// 13. sig = bytes(R) || bytes((k + e*d)) mod n
 	// 14. If Verify(bytes(P), m, sig) fails, abort.
 	// 15. return sig.
 	//
 	// Note that the set of functional options passed in may modify the
 	// above algorithm. If CustomNonce is used, steps 6-8 follow BIP-340's
-	// nonce derivation using the provided auxiliary randomness. If CustomNonce
-	// is NOT used (the default), steps 6-8 are replaced with RFC6979 nonce
-	// generation for deterministic signing. If FastSign is passed, we skip
-	// step 14 (signature verification).
+	// nonce derivation using the provided auxiliary randomness. If
+	// CustomNonce is NOT used (the default), steps 6-8 are replaced with
+	// RFC6979 nonce generation for deterministic signing. If FastSign is
+	// passed, we skip step 14 (signature verification).
 
 	// Step 1.
 	//
 	// d' = int(d)
 	var privKeyScalar btcec.ModNScalar
+	defer privKeyScalar.Zero()
 	privKeyScalar.Set(&privKey.Key)
 
 	// Step 2.
@@ -452,7 +470,9 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// Fail if d = 0 or d >= n
 	if privKeyScalar.IsZero() {
 		str := "private key is zero"
-		return nil, signatureError(ecdsa_schnorr.ErrPrivateKeyIsZero, str)
+		return nil, signatureError(
+			ecdsa_schnorr.ErrPrivateKeyIsZero, str,
+		)
 	}
 
 	// Step 4.
@@ -472,13 +492,17 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// and if so, then we'll deviate from the main routine here by
 	// generating the nonce value as specified by BIP-0340.
 	if opts.authNonce != nil {
+		defer clear(opts.authNonce[:])
+
 		// Step 6.
 		//
 		// t = bytes(d) xor tagged_hash("BIP0340/aux", a)
 		privBytes := privKeyScalar.Bytes()
+		defer clear(privBytes[:])
 		t := chainhash.TaggedHash(
 			chainhash.TagBIP0340Aux, (*opts.authNonce)[:],
 		)
+		defer clear(t[:])
 		for i := 0; i < len(t); i++ {
 			t[i] ^= privBytes[i]
 		}
@@ -492,11 +516,13 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		rand := chainhash.TaggedHash(
 			chainhash.TagBIP0340Nonce, t[:], pubKeyBytes[1:], hash,
 		)
+		defer clear(rand[:])
 
 		// Step 8.
 		//
 		// k'= int(rand) mod n
 		var kPrime btcec.ModNScalar
+		defer kPrime.Zero()
 		kPrime.SetBytes((*[32]byte)(rand))
 
 		// Step 9.
@@ -504,11 +530,15 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		// Fail if k' = 0
 		if kPrime.IsZero() {
 			str := fmt.Sprintf("generated nonce is zero")
-			return nil, signatureError(ecdsa_schnorr.ErrSchnorrHashValue, str)
+			return nil, signatureError(
+				ecdsa_schnorr.ErrSchnorrHashValue, str,
+			)
 		}
 
-		sig, err := schnorrSign(&privKeyScalar, &kPrime, pub, hash, opts)
-		kPrime.Zero()
+		// Steps 10-15.
+		sig, err := schnorrSign(
+			&privKeyScalar, &kPrime, pub, hash, opts,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -518,15 +548,16 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 
 	var privKeyBytes [scalarSize]byte
 	privKeyScalar.PutBytes(&privKeyBytes)
-	defer zeroArray(&privKeyBytes)
+	defer clear(privKeyBytes[:])
 	for iteration := uint32(0); ; iteration++ {
 		// Step 6-9.
 		//
 		// Use RFC6979 to generate a deterministic nonce k in [1, n-1]
-		// parameterized by the private key, message being signed, extra data
-		// that identifies the scheme, and an iteration count
+		// parameterized by the private key, message being signed, extra
+		// data that identifies the scheme, and an iteration count.
 		k := btcec.NonceRFC6979(
-			privKeyBytes[:], hash, rfc6979ExtraDataV0[:], nil, iteration,
+			privKeyBytes[:], hash, rfc6979ExtraDataV0[:], nil,
+			iteration,
 		)
 
 		// Steps 10-15.
