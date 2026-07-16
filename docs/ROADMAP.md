@@ -289,8 +289,8 @@ headline, all confined to blocks older than the 2016 hot window):
 |---|---|
 | A-1 | `blockcompress` codec + witness-split measurement + dictionary training + unit tests. No ffldb changes. **This phase alone produces the go/no-go ratio number.** (Status: codec, tests, and witness-split measurement done and race-clean; dictionary training pending.) |
 | A-2 | Cold-tier file format: per-file header, `writeBlock`/`readBlock` paths that handle both headerless-uncompressed (hot/legacy) and compressed-stripped (cold) files via the header check, `readBlockRegion` decompress for cold files. Whitebox unit tests. No age-out job yet — blocks are written cold directly in tests. |
-| A-3 | Age-out compaction job: background read-hot → strip+compress → write-cold → update block index → reclaim hot space. 2016-block rolling window. LRU decompressed-block cache. Indexer catch-up benchmark. (Status: compaction primitive `CompactBlockToCold` + `ColdCompactor` interface + LRU cache done and race-clean. The age-out **driver** — deciding which blocks to compact based on height — lives in the blockchain layer and is the remaining piece.) |
-| A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-prune verification, integration test on existing datadir. |
+| A-3 | Age-out compaction job: background read-hot → strip+compress → write-cold → update block index → reclaim hot space. 2016-block rolling window. LRU decompressed-block cache. Indexer catch-up benchmark. (Status: compaction primitive `CompactBlockToCold` + `ColdCompactor` interface + LRU cache + blockchain-layer age-out driver done and race-clean. `TestFullBlocks` consensus suite passes. Hot-tier space reclaim is the remaining piece.) |
+| A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-prune verification, integration test on existing datadir. (Status: `--witness-buffer` config flag + `blockchain.Config.WitnessBuffer` + validation done. Service-bit handling `NODE_WITNESS` for hot window only is the remaining piece.) |
 
 ---
 
