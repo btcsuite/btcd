@@ -70,6 +70,13 @@ const (
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	pruneMinSize                 = 1536
+
+	// defaultWitnessBuffer is the default number of recent blocks kept in the
+	// hot tier (full, with witness, uncompressed) before age-out compaction
+	// moves them to the cold tier (witness-stripped, zstd-compressed). 2016
+	// blocks is roughly two weeks and covers any realistic reorg depth plus
+	// Lightning channel CSV windows. See docs/ROADMAP.md, M1.
+	defaultWitnessBuffer          = 2016
 )
 
 var (
@@ -183,6 +190,7 @@ type config struct {
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	ShowVersion          bool          `short:"V" long:"version" description:"Display version information and exit"`
 	Whitelists           []string      `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
+	WitnessBuffer         int32         `long:"witness-buffer" description:"Number of recent blocks to keep with witness data before age-out compaction strips and compresses older blocks. Default 2016 (~2 weeks). 0 disables compaction (full archival node)."`
 	lookup               func(string) ([]net.IP, error)
 	oniondial            func(string, string, time.Duration) (net.Conn, error)
 	dial                 func(string, string, time.Duration) (net.Conn, error)
@@ -445,6 +453,7 @@ func loadConfig() (*config, []string, error) {
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,
 		V2Transport:          false,
+		WitnessBuffer:        defaultWitnessBuffer,
 	}
 
 	// Service options which are only added on Windows.
@@ -1165,6 +1174,28 @@ func loadConfig() (*config, []string, error) {
 	if cfg.Prune != 0 && cfg.AddrIndex {
 		err := fmt.Errorf("%s: the --prune and --addrindex options may "+
 			"not be activated at the same time", funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// --prune and --witness-buffer are mutually exclusive: pruning deletes
+	// old blocks entirely (no historical data), while witness-buffer strips
+	// and compresses them (keeps the base ledger). Combining them would
+	// delete the cold-tier records that witness-buffer worked to create.
+	if cfg.Prune != 0 && cfg.WitnessBuffer != 0 {
+		err := fmt.Errorf("%s: the --prune and --witness-buffer options "+
+			"may not be activated at the same time -- --prune deletes "+
+			"old blocks, --witness-buffer compresses them", funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	// A negative witness buffer makes no sense.
+	if cfg.WitnessBuffer < 0 {
+		err := fmt.Errorf("%s: the --witness-buffer option may not be "+
+			"negative. Got %d", funcName, cfg.WitnessBuffer)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

@@ -119,6 +119,11 @@ type BlockChain struct {
 	// is pruned.
 	pruneTarget uint64
 
+	// witnessBuffer is the number of recent blocks kept in the hot tier before
+	// age-out compaction to the cold tier. 0 = disabled (full archival). Set
+	// from Config.WitnessBuffer.
+	witnessBuffer int32
+
 	// These fields are related to the memory block index.  They both have
 	// their own locks, however they are often also protected by the chain
 	// lock to help prevent logic races when blocks are being processed.
@@ -683,6 +688,31 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			err := b.indexManager.ConnectBlock(dbTx, block, stxos)
 			if err != nil {
 				return err
+			}
+		}
+
+		// Age-out compaction: if the witness buffer is configured, compact
+		// the block that just fell out of the hot window to the cold tier.
+		// The block at height (node.height - witnessBuffer) is still in the
+		// best chain (the new tip hasn't been set yet, so the current tip is
+		// at node.height-1, putting the target at witnessBuffer-1 blocks
+		// back). This is a no-op if the block is already cold (e.g. after a
+		// reorg that reconnected it).
+		if b.witnessBuffer > 0 && node.height > b.witnessBuffer {
+			ageOutHeight := node.height - b.witnessBuffer
+			ageOutNode := b.bestChain.NodeByHeight(ageOutHeight)
+			if ageOutNode != nil {
+				if cc, ok := dbTx.(database.ColdCompactor); ok {
+					err := cc.CompactBlockToCold(&ageOutNode.hash)
+					if err != nil {
+						// An error here is not fatal: the block
+						// just stays hot and will be retried on
+						// the next connection. Log and continue.
+						log.Debugf("Age-out compaction of "+
+							"block %s (height %d) failed: %v",
+							ageOutNode.hash, ageOutHeight, err)
+					}
+				}
 			}
 		}
 
@@ -2213,6 +2243,15 @@ type Config struct {
 	// will target for with block files.  Prune at 0 specifies that no
 	// blocks will be deleted.
 	Prune uint64
+
+	// WitnessBuffer is the number of most recent blocks to keep in the hot
+	// tier (full, uncompressed, with witness) before age-out compaction
+	// moves them to the cold tier (witness-stripped, zstd-compressed).
+	// A value of 0 disables cold-tier compaction entirely (full archival
+	// node, same as upstream btcd). The default is 2016 (roughly two weeks
+	// of blocks), which covers any realistic reorg depth and Lightning
+	// channel CSV windows. See docs/ROADMAP.md, M1.
+	WitnessBuffer int32
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -2271,6 +2310,7 @@ func New(config *Config) (*BlockChain, error) {
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 		pruneTarget:         config.Prune,
+		witnessBuffer:       config.WitnessBuffer,
 	}
 
 	// Ensure all the deployments are synchronized with our clock if
