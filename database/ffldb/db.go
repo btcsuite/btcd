@@ -14,6 +14,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/btcsuite/btcd/blockcompress"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
@@ -949,6 +950,16 @@ type pendingBlock struct {
 	bytes []byte
 }
 
+// pendingColdCompaction is a block scheduled to be moved from the hot tier to
+// the cold tier at commit time. The hot block bytes and its hash are captured
+// when CompactBlockToCold is called; the cold write and block-index update
+// happen in writePendingAndCommit so a rolled-back tx leaves no orphaned cold
+// data (matching how StoreBlock defers hot writes to commit).
+type pendingColdCompaction struct {
+	hash  *chainhash.Hash
+	bytes []byte // full hot block bytes, with witness
+}
+
 // transaction represents a database transaction.  It can either be read-only or
 // read-write and implements the database.Tx interface.  The transaction
 // provides a root bucket against which all read and writes occur.
@@ -965,6 +976,10 @@ type transaction struct {
 	// kept to allow quick lookups of pending data by block hash.
 	pendingBlocks    map[chainhash.Hash]int
 	pendingBlockData []pendingBlock
+
+	// Blocks scheduled to be compacted from the hot tier to the cold tier
+	// at commit time (witness stripped + compressed). See pendingColdCompaction.
+	pendingColdCompactions []pendingColdCompaction
 
 	// Files that need to be deleted on commit.  These are the files that
 	// are marked as files to be deleted during pruning.
@@ -1190,6 +1205,63 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 	})
 	log.Tracef("Added block %s to pending blocks", blockHash)
 
+	return nil
+}
+
+// CompactBlockToCold schedules a block to be moved from the hot tier to the
+// cold tier at commit time: the block's witness is stripped, the non-witness
+// bytes are zstd-compressed, and the block index entry is updated to point at
+// the new cold location. The original hot-tier bytes are left in place until
+// their file is reclaimed by a separate sweep.
+//
+// This is the age-out compaction primitive used by the rolling 2016-block
+// witness window (see docs/ROADMAP.md, M1 A-3). It must be called within a
+// writable transaction. The block must currently be in the hot tier (not
+// already cold and not pending store). The cold write is deferred to commit so
+// a rolled-back transaction leaves no orphaned cold data.
+//
+// This method is NOT part of the database.Tx interface; it is an ffldb-specific
+// extension exposed via the database.ColdCompactor optional interface.
+func (tx *transaction) CompactBlockToCold(hash *chainhash.Hash) error {
+	if err := tx.checkClosed(); err != nil {
+		return err
+	}
+	if !tx.writable {
+		str := "compact block to cold requires a writable database transaction"
+		return makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+
+	// A block pending store in this tx cannot be compacted: it is not on disk
+	// yet and age-out should never race with acceptance.
+	if _, exists := tx.pendingBlocks[*hash]; exists {
+		str := fmt.Sprintf("block %s is pending store; cannot compact", hash)
+		return makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	// Look up the current location and verify the block is in the hot tier.
+	blockRow, err := tx.fetchBlockRow(hash)
+	if err != nil {
+		return err
+	}
+	loc := deserializeBlockLoc(blockRow)
+	if loc.blockFileNum&coldFlag != 0 {
+		str := fmt.Sprintf("block %s is already in the cold tier", hash)
+		return makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	// Read the full hot block (with witness) now; the cold write happens at
+	// commit. Blocks are immutable, so reading now is safe.
+	rawBlock, err := tx.db.store.readBlock(hash, loc)
+	if err != nil {
+		return err
+	}
+
+	hashCopy := *hash
+	tx.pendingColdCompactions = append(tx.pendingColdCompactions, pendingColdCompaction{
+		hash:  &hashCopy,
+		bytes: rawBlock,
+	})
+	log.Tracef("Scheduled cold compaction of block %s", hash)
 	return nil
 }
 
@@ -1597,6 +1669,9 @@ func (tx *transaction) close() {
 	tx.pendingBlocks = nil
 	tx.pendingBlockData = nil
 
+	// Clear pending cold compactions that would have been written on commit.
+	tx.pendingColdCompactions = nil
+
 	// Clear pending file deletions.
 	tx.pendingDelFileNums = nil
 
@@ -1651,11 +1726,25 @@ func (tx *transaction) writePendingAndCommit() error {
 	oldBlkOffset := wc.curOffset
 	wc.RUnlock()
 
+	// Save the cold write cursor position too, so a failure during cold
+	// compaction rolls back both tiers.
+	var oldColdFileNum, oldColdOffset uint32
+	if tx.db.cold != nil && len(tx.pendingColdCompactions) > 0 {
+		cwc := tx.db.cold.writeCursor
+		cwc.RLock()
+		oldColdFileNum = cwc.curFileNum
+		oldColdOffset = cwc.curOffset
+		cwc.RUnlock()
+	}
+
 	// rollback is a closure that is used to rollback all writes to the
 	// block files.
 	rollback := func() {
 		// Rollback any modifications made to the block files if needed.
 		tx.db.store.handleRollback(oldBlkFileNum, oldBlkOffset)
+		if tx.db.cold != nil && len(tx.pendingColdCompactions) > 0 {
+			tx.db.cold.handleRollback(oldColdFileNum, oldColdOffset)
+		}
 	}
 
 	// Loop through all of the pending blocks to store and write them.
@@ -1674,6 +1763,23 @@ func (tx *transaction) writePendingAndCommit() error {
 		blockRow := serializeBlockLoc(location)
 		err = tx.blockIdxBucket.Put(blockData.hash[:], blockRow)
 		if err != nil {
+			rollback()
+			return err
+		}
+	}
+
+	// Compact pending blocks from the hot tier to the cold tier: write the
+	// stripped+compressed record and update the block index to the new cold
+	// location. The hot-tier bytes remain on disk for a later reclaim sweep.
+	for _, comp := range tx.pendingColdCompactions {
+		log.Tracef("Compacting block %s to cold tier", comp.hash)
+		coldLoc, err := tx.db.cold.writeColdBlock(comp.bytes)
+		if err != nil {
+			rollback()
+			return err
+		}
+		blockRow := serializeBlockLoc(coldLoc)
+		if err := tx.blockIdxBucket.Put(comp.hash[:], blockRow); err != nil {
 			rollback()
 			return err
 		}
@@ -1864,6 +1970,7 @@ type db struct {
 	closeLock sync.RWMutex // Make database close block while txns active.
 	closed    bool         // Is the database closed?
 	store     *blockStore  // Handles read/writing blocks to flat files.
+	cold      *coldStore   // Handles witness-stripped compressed cold-tier writes.
 	cache     *dbCache     // Cache layer which wraps underlying leveldb DB.
 }
 
@@ -2071,6 +2178,11 @@ func (db *db) Close() error {
 	db.store.openBlocksLRU.Init()
 	db.store.fileNumToLRUElem = nil
 
+	// Close the cold-tier store (codec + write file).
+	if db.cold != nil {
+		db.cold.Close()
+	}
+
 	return closeErr
 }
 
@@ -2153,8 +2265,12 @@ func openDB(dbPath string, network wire.BitcoinNet, create bool) (database.DB, e
 	if err != nil {
 		return nil, convertErr(err.Error(), err)
 	}
+	cold, err := newColdStore(dbPath, network, blockcompress.FormatV1)
+	if err != nil {
+		return nil, convertErr(err.Error(), err)
+	}
 	cache := newDbCache(ldb, store, defaultCacheSize, defaultFlushSecs)
-	pdb := &db{store: store, cache: cache}
+	pdb := &db{store: store, cold: cold, cache: cache}
 
 	// Perform any reconciliation needed between the block and metadata as
 	// well as database initialization, if needed.

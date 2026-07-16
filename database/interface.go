@@ -428,6 +428,22 @@ type Tx interface {
 	Rollback() error
 }
 
+// ColdCompactor is an optional interface implemented by database backends that
+// support witness-separated cold-tier storage (see docs/ROADMAP.md, M1). A Tx
+// that also implements ColdCompactor can move a block from the hot tier (full,
+// uncompressed, with witness) to the cold tier (witness-stripped,
+// zstd-compressed) and update its block-index location atomically.
+//
+// Callers should type-assert: `cc, ok := tx.(database.ColdCompactor); if ok { ... }`.
+// Backends without cold-tier support simply do not implement this interface.
+type ColdCompactor interface {
+	// CompactBlockToCold moves the block identified by hash from the hot tier
+	// to the cold tier. The block must currently be hot. The cold write is
+	// deferred to transaction commit, so a rolled-back transaction leaves no
+	// orphaned cold data.
+	CompactBlockToCold(hash *chainhash.Hash) error
+}
+
 // DB provides a generic interface that is used to store bitcoin blocks and
 // related metadata.  This interface is intended to be agnostic to the actual
 // mechanism used for backend data storage.  The RegisterDriver function can be

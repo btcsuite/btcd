@@ -330,3 +330,62 @@ func writeAt(wc *writeCursor, data []byte, fieldName string) error {
 	}
 	return nil
 }
+
+// handleRollback reverts the cold write cursor to the given file number and
+// offset, deleting any cold files created since and truncating the current one.
+// It is the cold analog of blockStore.handleRollback and is called when a
+// compaction transaction is rolled back so orphaned cold records do not
+// accumulate. Errors are logged, not returned, matching the hot path.
+func (cs *coldStore) handleRollback(oldFileNum, oldOffset uint32) {
+	wc := cs.writeCursor
+	wc.Lock()
+	defer wc.Unlock()
+
+	if wc.curFileNum == oldFileNum && wc.curOffset == oldOffset {
+		return
+	}
+
+	defer func() {
+		wc.curFileNum = oldFileNum
+		wc.curOffset = oldOffset
+	}()
+
+	if wc.curFileNum > oldFileNum {
+		wc.curFile.Lock()
+		if wc.curFile.file != nil {
+			_ = wc.curFile.file.Close()
+			wc.curFile.file = nil
+		}
+		wc.curFile.Unlock()
+	}
+	for ; wc.curFileNum > oldFileNum; wc.curFileNum-- {
+		path := coldBlockFilePath(cs.basePath, wc.curFileNum)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Warnf("ROLLBACK: failed to delete cold file %d: %v",
+				wc.curFileNum, err)
+			return
+		}
+	}
+
+	wc.curFile.Lock()
+	if wc.curFile.file == nil {
+		file, _, err := cs.openWriteFileFunc(wc.curFileNum)
+		if err != nil {
+			wc.curFile.Unlock()
+			log.Warnf("ROLLBACK: cold open: %v", err)
+			return
+		}
+		wc.curFile.file = file
+	}
+	if err := wc.curFile.file.Truncate(int64(oldOffset)); err != nil {
+		wc.curFile.Unlock()
+		log.Warnf("ROLLBACK: cold truncate %d: %v", wc.curFileNum, err)
+		return
+	}
+	if err := wc.curFile.file.Sync(); err != nil {
+		wc.curFile.Unlock()
+		log.Warnf("ROLLBACK: cold sync %d: %v", wc.curFileNum, err)
+		return
+	}
+	wc.curFile.Unlock()
+}

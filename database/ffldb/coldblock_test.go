@@ -9,11 +9,14 @@ package ffldb
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/btcsuite/btcd/blockcompress"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
@@ -271,5 +274,174 @@ func TestColdSavingsOnDisk(t *testing.T) {
 	// still clear a meaningful bar.
 	if blended < 30.0 {
 		t.Errorf("blended cold reduction %.1f%% below 30%% threshold", blended)
+	}
+}
+
+// TestCompactBlockToCold verifies the end-to-end age-out compaction primitive via
+// the full database stack: store a block hot (StoreBlock), compact it to cold
+// (CompactBlockToCold via the ColdCompactor interface), commit, and confirm
+// FetchBlock returns the stripped serialization and the block index location
+// now points to the cold tier.
+func TestCompactBlockToCold(t *testing.T) {
+	dbPath := t.TempDir()
+	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer pdb.Close()
+
+	fixtures := loadColdFixtures(t)
+	raw := fixtures[0]
+	block, err := btcutil.NewBlockFromBytes(raw)
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	hash := block.Hash()
+	wantStripped := strippedSerialization(t, raw)
+
+	// Store the block hot.
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.StoreBlock(block)
+	}); err != nil {
+		t.Fatalf("StoreBlock: %v", err)
+	}
+
+	// Confirm it reads back as a full block (hot tier) before compaction.
+	if err := pdb.View(func(tx database.Tx) error {
+		got, err := tx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, raw) {
+			t.Errorf("pre-compact: FetchBlock != stored full block")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("pre-compact FetchBlock: %v", err)
+	}
+
+	// Compact it to cold via the ColdCompactor optional interface.
+	if err := pdb.Update(func(tx database.Tx) error {
+		cc, ok := tx.(database.ColdCompactor)
+		if !ok {
+			t.Fatal("tx does not implement ColdCompactor")
+		}
+		return cc.CompactBlockToCold(hash)
+	}); err != nil {
+		t.Fatalf("CompactBlockToCold: %v", err)
+	}
+
+	// After compaction, FetchBlock returns the stripped (non-witness) block.
+	if err := pdb.View(func(tx database.Tx) error {
+		got, err := tx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, wantStripped) {
+			t.Errorf("post-compact: FetchBlock != stripped serialization "+
+				"(got len %d, want len %d)", len(got), len(wantStripped))
+		}
+		// The block index location must now carry the cold flag.
+		row := tx.(*transaction).blockIdxBucket.Get(hash[:])
+		loc := deserializeBlockLoc(row)
+		if loc.blockFileNum&coldFlag == 0 {
+			t.Errorf("post-compact: block index location is not cold")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("post-compact FetchBlock: %v", err)
+	}
+}
+
+// TestCompactBlockToColdRollback verifies that rolling back a compaction
+// transaction leaves the block in the hot tier (no orphaned cold data, block
+// index unchanged).
+func TestCompactBlockToColdRollback(t *testing.T) {
+	dbPath := t.TempDir()
+	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer pdb.Close()
+
+	raw := loadColdFixtures(t)[0]
+	block, err := btcutil.NewBlockFromBytes(raw)
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	hash := block.Hash()
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.StoreBlock(block)
+	}); err != nil {
+		t.Fatalf("StoreBlock: %v", err)
+	}
+
+	// Schedule a compaction then roll back.
+	if err := pdb.Update(func(tx database.Tx) error {
+		cc := tx.(database.ColdCompactor)
+		if err := cc.CompactBlockToCold(hash); err != nil {
+			return err
+		}
+		return errors.New("test: force rollback") // force rollback
+	}); err == nil {
+		t.Fatal("expected rollback error")
+	}
+
+	// The block must still be hot and return the full block.
+	if err := pdb.View(func(tx database.Tx) error {
+		got, err := tx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, raw) {
+			t.Errorf("after rollback: FetchBlock != full block "+
+				"(got len %d, want len %d)", len(got), len(raw))
+		}
+		row := tx.(*transaction).blockIdxBucket.Get(hash[:])
+		loc := deserializeBlockLoc(row)
+		if loc.blockFileNum&coldFlag != 0 {
+			t.Errorf("after rollback: block index location is cold")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("post-rollback FetchBlock: %v", err)
+	}
+
+	// No cold files should exist.
+	matches, _ := filepath.Glob(filepath.Join(dbPath, coldFileSubdir, "*"))
+	if len(matches) != 0 {
+		t.Errorf("after rollback: %d cold files exist", len(matches))
+	}
+}
+
+// TestCompactAlreadyCold verifies compacting a block that is already cold fails.
+func TestCompactAlreadyCold(t *testing.T) {
+	dbPath := t.TempDir()
+	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer pdb.Close()
+
+	raw := loadColdFixtures(t)[0]
+	block, _ := btcutil.NewBlockFromBytes(raw)
+	hash := block.Hash()
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.StoreBlock(block)
+	}); err != nil {
+		t.Fatalf("StoreBlock: %v", err)
+	}
+	// Compact once.
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.(database.ColdCompactor).CompactBlockToCold(hash)
+	}); err != nil {
+		t.Fatalf("first compact: %v", err)
+	}
+	// Compact again -> error.
+	err = pdb.Update(func(tx database.Tx) error {
+		return tx.(database.ColdCompactor).CompactBlockToCold(hash)
+	})
+	if err == nil {
+		t.Fatal("second compact succeeded; expected error (already cold)")
 	}
 }
