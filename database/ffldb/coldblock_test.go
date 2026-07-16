@@ -445,3 +445,136 @@ func TestCompactAlreadyCold(t *testing.T) {
 		t.Fatal("second compact succeeded; expected error (already cold)")
 	}
 }
+
+// TestColdCacheHit verifies that the decompressed-block cache serves repeated
+// cold reads from memory: after an initial read populates the cache, a second
+// read of the same block returns identical bytes without re-decompressing.
+func TestColdCacheHit(t *testing.T) {
+	ct, cleanup := newColdTestStore(t)
+	defer cleanup()
+
+	raw := loadColdFixtures(t)[0]
+	loc, err := ct.cold.writeColdBlock(raw)
+	if err != nil {
+		t.Fatalf("writeColdBlock: %v", err)
+	}
+	want := strippedSerialization(t, raw)
+
+	// First read: cache miss, decompresses, populates cache.
+	got1, err := ct.hot.readBlock(nil, loc)
+	if err != nil {
+		t.Fatalf("first readBlock: %v", err)
+	}
+	if !bytes.Equal(got1, want) {
+		t.Fatalf("first read: mismatch")
+	}
+	if ct.hot.coldCache.len() != 1 {
+		t.Fatalf("cache should have 1 entry after first read, got %d",
+			ct.hot.coldCache.len())
+	}
+
+	// Second read: cache hit, same bytes, no decompression.
+	got2, err := ct.hot.readBlock(nil, loc)
+	if err != nil {
+		t.Fatalf("second readBlock: %v", err)
+	}
+	if !bytes.Equal(got2, want) {
+		t.Fatalf("second read: mismatch")
+	}
+	// Cache still holds one entry (hit doesn't add a new one).
+	if ct.hot.coldCache.len() != 1 {
+		t.Fatalf("cache should still have 1 entry, got %d",
+			ct.hot.coldCache.len())
+	}
+}
+
+// TestColdCacheRegion verifies that readBlockRegion on a cold block populates
+// the cache and a subsequent readBlock of the same block is a cache hit.
+func TestColdCacheRegion(t *testing.T) {
+	ct, cleanup := newColdTestStore(t)
+	defer cleanup()
+
+	raw := loadColdFixtures(t)[0]
+	loc, err := ct.cold.writeColdBlock(raw)
+	if err != nil {
+		t.Fatalf("writeColdBlock: %v", err)
+	}
+
+	// Read the header region (offset 0, 80 bytes) — populates cache.
+	hdr, err := ct.hot.readBlockRegion(loc, 0, 80)
+	if err != nil {
+		t.Fatalf("readBlockRegion: %v", err)
+	}
+	if !bytes.Equal(hdr, raw[:80]) {
+		t.Fatalf("header region mismatch")
+	}
+	if ct.hot.coldCache.len() != 1 {
+		t.Fatalf("cache should have 1 entry after region read, got %d",
+			ct.hot.coldCache.len())
+	}
+
+	// Now read the full block — should be a cache hit (no file open needed).
+	got, err := ct.hot.readBlock(nil, loc)
+	if err != nil {
+		t.Fatalf("readBlock after region: %v", err)
+	}
+	want := strippedSerialization(t, raw)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("full block after region read: mismatch")
+	}
+}
+
+// TestColdCacheEviction verifies the cache evicts the least recently used entry
+// when it exceeds maxColdCacheBlocks.
+func TestColdCacheEviction(t *testing.T) {
+	ct, cleanup := newColdTestStore(t)
+	defer cleanup()
+
+	fixtures := loadColdFixtures(t)
+	if len(fixtures) < 2 {
+		t.Skip("need >= 2 fixtures")
+	}
+
+	// Write more cold blocks than the cache can hold. Cycle the two fixtures
+	// to produce distinct locations.
+	var locs []blockLocation
+	for i := 0; i < maxColdCacheBlocks+2; i++ {
+		raw := fixtures[i%len(fixtures)]
+		loc, err := ct.cold.writeColdBlock(raw)
+		if err != nil {
+			t.Fatalf("writeColdBlock %d: %v", i, err)
+		}
+		locs = append(locs, loc)
+	}
+
+	// Read each block once to populate the cache. After this, the cache
+	// should be at capacity and the first two entries (locs[0], locs[1])
+	// should have been evicted.
+	for _, loc := range locs {
+		if _, err := ct.hot.readBlock(nil, loc); err != nil {
+			t.Fatalf("readBlock: %v", err)
+		}
+	}
+
+	if ct.hot.coldCache.len() != maxColdCacheBlocks {
+		t.Fatalf("cache should have %d entries, got %d",
+			maxColdCacheBlocks, ct.hot.coldCache.len())
+	}
+
+	// The first two locations should no longer be in the cache (evicted as
+	// LRU). Verify by checking the cache directly.
+	if ct.hot.coldCache.get(locs[0]) != nil {
+		t.Errorf("locs[0] should have been evicted")
+	}
+	if ct.hot.coldCache.get(locs[1]) != nil {
+		t.Errorf("locs[1] should have been evicted")
+	}
+
+	// The last two locations should still be cached.
+	if ct.hot.coldCache.get(locs[len(locs)-1]) == nil {
+		t.Errorf("last loc should still be cached")
+	}
+	if ct.hot.coldCache.get(locs[len(locs)-2]) == nil {
+		t.Errorf("second-to-last loc should still be cached")
+	}
+}

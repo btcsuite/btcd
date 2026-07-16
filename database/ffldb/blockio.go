@@ -219,6 +219,11 @@ type blockStore struct {
 	// all concurrent cold reads. Created lazily and guarded by coldDecodersMu.
 	coldDecodersMu sync.Mutex
 	coldDecoders   map[blockcompress.FormatVersion]*blockcompress.Codec
+
+	// coldCache holds recently decompressed cold-tier stripped blocks so region
+	// reads (indexers, header fetches) don't re-decompress the same block per
+	// call. Cold blocks are immutable, so entries are never invalidated.
+	coldCache *coldBlockCache
 }
 
 // blockLocation identifies a particular block file and location.
@@ -595,6 +600,15 @@ func (s *blockStore) writeBlock(rawBlock []byte) (blockLocation, error) {
 //
 // Format: <network><block length><serialized block><checksum>
 func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte, error) {
+	// Cold-tier blocks are compressed-stripped records. Try the decompressed
+	// block cache first to avoid the file open + decompression on repeated
+	// reads of the same cold block (e.g. header fetch then full block fetch).
+	if loc.blockFileNum&coldFlag != 0 {
+		if cached := s.coldCache.get(loc); cached != nil {
+			return cached, nil
+		}
+	}
+
 	// Get the referenced block file handle opening the file as needed.  The
 	// function also handles closing files as needed to avoid going over the
 	// max allowed open files.
@@ -611,6 +625,7 @@ func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte,
 		if err != nil {
 			return nil, err
 		}
+		s.coldCache.put(loc, decoded)
 		return decoded, nil
 	}
 
@@ -662,6 +677,23 @@ func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte,
 //
 // Returns ErrDriverSpecific if the data fails to read for any reason.
 func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32) ([]byte, error) {
+	// Cold-tier blocks are compressed: a region read requires decompressing
+	// the whole stripped block and then slicing. Check the decompressed-block
+	// cache first so repeated region reads (indexers fetching header then txs)
+	// avoid re-decompression.
+	if loc.blockFileNum&coldFlag != 0 {
+		if cached := s.coldCache.get(loc); cached != nil {
+			end := offset + numBytes
+			if end > uint32(len(cached)) {
+				str := fmt.Sprintf("region exceeds cold block bounds: "+
+					"offset %d len %d, block %d", offset, numBytes,
+					len(cached))
+				return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+			}
+			return cached[offset:end], nil
+		}
+	}
+
 	// Get the referenced block file handle opening the file as needed.  The
 	// function also handles closing files as needed to avoid going over the
 	// max allowed open files.
@@ -671,16 +703,15 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 	}
 
 	// Cold-tier blocks are compressed: a region read requires decompressing
-	// the whole stripped block and then slicing. A-3 adds an LRU cache so
-	// repeated region reads (indexers) avoid re-decompression; for now this
-	// decompresses per call. The offset is relative to the start of the
-	// stripped block, identical to the hot-tier contract.
+	// the whole stripped block and then slicing. The offset is relative to
+	// the start of the stripped block, identical to the hot-tier contract.
 	if blockFile.format == formatCold {
 		decoded, err := s.readColdBlockRecord(nil, blockFile, loc)
 		blockFile.RUnlock()
 		if err != nil {
 			return nil, err
 		}
+		s.coldCache.put(loc, decoded)
 		end := offset + numBytes
 		if end > uint32(len(decoded)) {
 			str := fmt.Sprintf("region exceeds cold block bounds: "+
@@ -993,6 +1024,7 @@ func newBlockStore(basePath string, network wire.BitcoinNet) (*blockStore, error
 		openBlocksLRU:    list.New(),
 		fileNumToLRUElem: make(map[uint32]*list.Element),
 		coldDecoders:     make(map[blockcompress.FormatVersion]*blockcompress.Codec),
+		coldCache:        newColdBlockCache(),
 
 		writeCursor: &writeCursor{
 			curFile:    &lockableFile{},
