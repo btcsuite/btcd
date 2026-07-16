@@ -446,6 +446,151 @@ func TestCompactAlreadyCold(t *testing.T) {
 	}
 }
 
+// TestReclaimHotSpace verifies that after compacting blocks to cold, the
+// hot-tier files are deleted by ReclaimHotSpace and the cold blocks remain
+// readable.
+func TestReclaimHotSpace(t *testing.T) {
+	dbPath := t.TempDir()
+	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer pdb.Close()
+
+	fixtures := loadColdFixtures(t)
+	raw := fixtures[0]
+	block, err := btcutil.NewBlockFromBytes(raw)
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	hash := block.Hash()
+	wantStripped := strippedSerialization(t, raw)
+
+	// Store the block hot.
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.StoreBlock(block)
+	}); err != nil {
+		t.Fatalf("StoreBlock: %v", err)
+	}
+
+	// Compact it to cold.
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.(database.ColdCompactor).CompactBlockToCold(hash)
+	}); err != nil {
+		t.Fatalf("CompactBlockToCold: %v", err)
+	}
+
+	// Reclaim hot space. The hot file (file 0) should be deleted since all
+	// its blocks are now cold.
+	var reclaimed uint64
+	if err := pdb.Update(func(tx database.Tx) error {
+		var err error
+		reclaimed, err = tx.(database.ColdCompactor).ReclaimHotSpace()
+		return err
+	}); err != nil {
+		t.Fatalf("ReclaimHotSpace: %v", err)
+	}
+	t.Logf("reclaimed %d bytes", reclaimed)
+	if reclaimed == 0 {
+		t.Errorf("expected nonzero reclaim")
+	}
+
+	// The block must still be readable from the cold tier.
+	if err := pdb.View(func(tx database.Tx) error {
+		got, err := tx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, wantStripped) {
+			t.Errorf("post-reclaim: FetchBlock != stripped (got len %d, want %d)",
+				len(got), len(wantStripped))
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("post-reclaim FetchBlock: %v", err)
+	}
+}
+
+// TestReclaimHotSpacePartial verifies that ReclaimHotSpace does NOT delete a
+// hot file that still contains hot (non-compacted) blocks.
+func TestReclaimHotSpacePartial(t *testing.T) {
+	dbPath := t.TempDir()
+	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer pdb.Close()
+
+	fixtures := loadColdFixtures(t)
+	if len(fixtures) < 2 {
+		t.Skip("need >= 2 fixtures")
+	}
+
+	// Store two blocks hot.
+	block0, err := btcutil.NewBlockFromBytes(fixtures[0])
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	block1, err := btcutil.NewBlockFromBytes(fixtures[1])
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	hash0 := block0.Hash()
+	hash1 := block1.Hash()
+
+	if err := pdb.Update(func(tx database.Tx) error {
+		if err := tx.StoreBlock(block0); err != nil {
+			return err
+		}
+		return tx.StoreBlock(block1)
+	}); err != nil {
+		t.Fatalf("StoreBlock: %v", err)
+	}
+
+	// Compact only block0 to cold. block1 stays hot.
+	if err := pdb.Update(func(tx database.Tx) error {
+		return tx.(database.ColdCompactor).CompactBlockToCold(hash0)
+	}); err != nil {
+		t.Fatalf("CompactBlockToCold: %v", err)
+	}
+
+	// Reclaim hot space. Both blocks are in file 0, so nothing should be
+	// reclaimed (file 0 still has a hot block).
+	var reclaimed uint64
+	if err := pdb.Update(func(tx database.Tx) error {
+		var err error
+		reclaimed, err = tx.(database.ColdCompactor).ReclaimHotSpace()
+		return err
+	}); err != nil {
+		t.Fatalf("ReclaimHotSpace: %v", err)
+	}
+	if reclaimed != 0 {
+		t.Errorf("expected 0 reclaim (file 0 still has hot block), got %d",
+			reclaimed)
+	}
+
+	// Both blocks must still be readable.
+	if err := pdb.View(func(tx database.Tx) error {
+		got0, err := tx.FetchBlock(hash0)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got0, strippedSerialization(t, fixtures[0])) {
+			t.Errorf("block0 (cold) mismatch")
+		}
+		got1, err := tx.FetchBlock(hash1)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got1, fixtures[1]) {
+			t.Errorf("block1 (hot) mismatch")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("post-reclaim FetchBlock: %v", err)
+	}
+}
+
 // TestColdCacheHit verifies that the decompressed-block cache serves repeated
 // cold reads from memory: after an initial read populates the cache, a second
 // read of the same block returns identical bytes without re-decompressing.

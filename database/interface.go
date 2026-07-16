@@ -442,6 +442,16 @@ type ColdCompactor interface {
 	// deferred to transaction commit, so a rolled-back transaction leaves no
 	// orphaned cold data.
 	CompactBlockToCold(hash *chainhash.Hash) error
+
+	// ReclaimHotSpace deletes hot-tier block files whose blocks have all been
+	// compacted to the cold tier. It scans the block index for the lowest hot
+	// file number still in use and deletes all hot files below it. Block index
+	// entries are NOT deleted (they now point to cold locations). Returns the
+	// number of bytes reclaimed.
+	//
+	// This is an O(n) scan of the block index, so callers should invoke it
+	// periodically (e.g. once per difficulty period) rather than per block.
+	ReclaimHotSpace() (uint64, error)
 }
 
 // DB provides a generic interface that is used to store bitcoin blocks and

@@ -1265,6 +1265,90 @@ func (tx *transaction) CompactBlockToCold(hash *chainhash.Hash) error {
 	return nil
 }
 
+// ReclaimHotSpace deletes hot-tier block files whose blocks have all been
+// compacted to the cold tier. It finds the lowest hot file number still
+// referenced by the block index and deletes all hot files below it. Block
+// index entries are preserved (they point to cold locations).
+//
+// This is an O(n) scan of the block index and should be called periodically,
+// not per block. Returns the number of bytes reclaimed on disk.
+//
+// This method is part of the database.ColdCompactor optional interface.
+func (tx *transaction) ReclaimHotSpace() (uint64, error) {
+	if err := tx.checkClosed(); err != nil {
+		return 0, err
+	}
+	if !tx.writable {
+		str := "reclaim hot space requires a writable database transaction"
+		return 0, makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+
+	// Scan the block index for the lowest hot file number. A hot entry has
+	// coldFlag NOT set in its blockFileNum. Cold entries are skipped.
+	minHotFileNum := uint32(^uint32(0)) // max uint32
+	cursor := tx.blockIdxBucket.Cursor()
+	for ok := cursor.First(); ok; ok = cursor.Next() {
+		loc := deserializeBlockLoc(cursor.Value())
+		if loc.blockFileNum&coldFlag != 0 {
+			continue // cold, skip
+		}
+		if loc.blockFileNum < minHotFileNum {
+			minHotFileNum = loc.blockFileNum
+		}
+	}
+
+	// If no hot entries exist, all blocks are cold — reclaim everything.
+	// If minHotFileNum is 0, the first file still has hot blocks.
+	if minHotFileNum == 0 {
+		return 0, nil
+	}
+
+	// Find the range of hot files on disk.
+	first, last, _, err := scanBlockFiles(tx.db.store.basePath)
+	if err != nil {
+		return 0, err
+	}
+	if first == -1 {
+		return 0, nil // no hot files
+	}
+
+	// Determine the upper bound for deletion. If there are no hot entries
+	// at all (all blocks are cold), we can delete all hot files. Otherwise,
+	// delete all hot files strictly below minHotFileNum (the file at
+	// minHotFileNum still has at least one hot block).
+	var upperBound uint32
+	if minHotFileNum == ^uint32(0) {
+		// No hot entries — all hot files can be reclaimed.
+		upperBound = uint32(last) + 1
+	} else {
+		upperBound = minHotFileNum
+	}
+
+	// Delete hot files in [first, upperBound). These files contain only
+	// blocks that have been compacted to cold.
+	var reclaimed uint64
+	for i := uint32(first); i < upperBound; i++ {
+		// Get the file size before deleting for accounting.
+		path := blockFilePath(tx.db.store.basePath, i)
+		var fileSize uint64
+		if st, err := os.Stat(path); err == nil {
+			fileSize = uint64(st.Size())
+		}
+
+		// Close the file if open.
+		tx.db.store.closeFile(i)
+
+		// Queue the file for deletion at commit (same mechanism as PruneBlocks).
+		if tx.pendingDelFileNums == nil {
+			tx.pendingDelFileNums = make([]uint32, 0, 1)
+		}
+		tx.pendingDelFileNums = append(tx.pendingDelFileNums, i)
+		reclaimed += fileSize
+	}
+
+	return reclaimed, nil
+}
+
 // HasBlock returns whether or not a block with the given hash exists in the
 // database.
 //

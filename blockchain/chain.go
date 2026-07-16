@@ -712,6 +712,20 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 							"block %s (height %d) failed: %v",
 							ageOutNode.hash, ageOutHeight, err)
 					}
+
+					// Reclaim hot-tier files once per difficulty period
+					// (2016 blocks). This deletes hot files whose blocks
+					// have all been compacted to cold. The O(n) block index
+					// scan is amortized over 2016 blocks, so the per-block
+					// cost is negligible.
+					if node.height%b.blocksPerRetarget == 0 {
+						if reclaimed, err := cc.ReclaimHotSpace(); err != nil {
+							log.Debugf("Hot-tier reclaim failed: %v", err)
+						} else if reclaimed > 0 {
+							log.Debugf("Reclaimed %d bytes of hot-tier "+
+								"space", reclaimed)
+						}
+					}
 				}
 			}
 		}
