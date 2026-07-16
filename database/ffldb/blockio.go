@@ -22,6 +22,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/btcsuite/btcd/blockcompress"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -83,12 +84,40 @@ type filer interface {
 	Sync() error
 }
 
+// fileFormat identifies how the records in a block file are encoded.
+type fileFormat uint8
+
+const (
+	// formatLegacy is the original btcd block file format: no per-file
+	// header, records are <network><len><rawFullBlock><crc>, uncompressed,
+	// with witness. All pre-cold-tier files and all hot-tier (recent) files
+	// use this format.
+	formatLegacy fileFormat = 0
+	// formatCold is the cold-tier format: a per-file cold header
+	// (coldFileMagic + blockcompress format version) followed by records of
+	// <network><origStrippedLen><compressedStrippedBlock><crc>. Witness is
+	// absent; the block is the stripped serialization, compressed.
+	formatCold fileFormat = 1
+)
+
 // lockableFile represents a block file on disk that has been opened for either
 // read or read/write access.  It also contains a read-write mutex to support
 // multiple concurrent readers.
 type lockableFile struct {
 	sync.RWMutex
 	file filer
+
+	// format identifies the file's record encoding. It is detected once when
+	// the file is opened for read (see blockStore.openFile) and cached here so
+	// readBlock/readBlockRegion can route without re-reading the header. It is
+	// only meaningful for read-opened files; write-opened hot files are always
+	// formatLegacy and cold write files are always formatCold.
+	format fileFormat
+
+	// coldCodecVersion is the blockcompress format version read from a cold
+	// file's header, used to select the decompression dictionary. Only set when
+	// format == formatCold.
+	coldCodecVersion blockcompress.FormatVersion
 }
 
 // writeCursor represents the current file and offset of the block file on disk
@@ -183,6 +212,13 @@ type blockStore struct {
 	openFileFunc      func(fileNum uint32) (*lockableFile, error)
 	openWriteFileFunc func(fileNum uint32) (filer, error)
 	deleteFileFunc    func(fileNum uint32) error
+
+	// coldDecoders caches a blockcompress decoder per format version, used to
+	// decompress cold-tier blocks. Decoders are goroutine-safe per the
+	// klauspost/compress/zstd contract, so a single decoder per version serves
+	// all concurrent cold reads. Created lazily and guarded by coldDecodersMu.
+	coldDecodersMu sync.Mutex
+	coldDecoders   map[blockcompress.FormatVersion]*blockcompress.Codec
 }
 
 // blockLocation identifies a particular block file and location.
@@ -259,14 +295,37 @@ func (s *blockStore) openWriteFile(fileNum uint32) (filer, error) {
 // This function MUST be called with the overall files mutex (s.obfMutex) locked
 // for WRITES.
 func (s *blockStore) openFile(fileNum uint32) (*lockableFile, error) {
-	// Open the appropriate file as read-only.
-	filePath := blockFilePath(s.basePath, fileNum)
+	// Open the appropriate file as read-only. Cold-flagged numbers live in
+	// the cold subdirectory; hot/legacy numbers live in the base directory.
+	isCold := fileNum&coldFlag != 0
+	var filePath string
+	if isCold {
+		filePath = coldBlockFilePath(s.basePath, fileNum&^coldFlag)
+	} else {
+		filePath = blockFilePath(s.basePath, fileNum)
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, makeDbErr(database.ErrDriverSpecific, err.Error(),
 			err)
 	}
 	blockFile := &lockableFile{file: file}
+
+	// Detect the file format for cold files by reading the per-file header.
+	// Hot/legacy files have no header and stay formatLegacy (the zero value).
+	// The format is cached on the lockableFile so readBlock/readBlockRegion
+	// route without re-reading the header.
+	if isCold {
+		v, err := readColdHeader(file)
+		if err != nil {
+			_ = file.Close()
+			return nil, makeDbErr(database.ErrDriverSpecific,
+				fmt.Sprintf("failed to read cold header %q: %v",
+					filePath, err), err)
+		}
+		blockFile.format = formatCold
+		blockFile.coldCodecVersion = v
+	}
 
 	// Close the least recently used file if the file exceeds the max
 	// allowed open files.  This is not done until after the file open in
@@ -544,6 +603,17 @@ func (s *blockStore) readBlock(hash *chainhash.Hash, loc blockLocation) ([]byte,
 		return nil, err
 	}
 
+	// Cold-tier blocks are compressed-stripped records: route to the cold
+	// read path. The format was detected at open time and cached on the file.
+	if blockFile.format == formatCold {
+		decoded, err := s.readColdBlockRecord(hash, blockFile, loc)
+		blockFile.RUnlock()
+		if err != nil {
+			return nil, err
+		}
+		return decoded, nil
+	}
+
 	serializedData := make([]byte, loc.blockLen)
 	n, err := blockFile.file.ReadAt(serializedData, int64(loc.fileOffset))
 	blockFile.RUnlock()
@@ -600,6 +670,27 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 		return nil, err
 	}
 
+	// Cold-tier blocks are compressed: a region read requires decompressing
+	// the whole stripped block and then slicing. A-3 adds an LRU cache so
+	// repeated region reads (indexers) avoid re-decompression; for now this
+	// decompresses per call. The offset is relative to the start of the
+	// stripped block, identical to the hot-tier contract.
+	if blockFile.format == formatCold {
+		decoded, err := s.readColdBlockRecord(nil, blockFile, loc)
+		blockFile.RUnlock()
+		if err != nil {
+			return nil, err
+		}
+		end := offset + numBytes
+		if end > uint32(len(decoded)) {
+			str := fmt.Sprintf("region exceeds cold block bounds: "+
+				"offset %d len %d, block %d", offset, numBytes,
+				len(decoded))
+			return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+		}
+		return decoded[offset:end], nil
+	}
+
 	// Regions are offsets into the actual block, however the serialized
 	// data for a block includes an initial 4 bytes for network + 4 bytes
 	// for block length.  Thus, add 8 bytes to adjust.
@@ -615,6 +706,95 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 	}
 
 	return serializedData, nil
+}
+
+// coldDecoder returns a cached blockcompress codec for the given format
+// version, creating it lazily on first use. Decoders are goroutine-safe, so a
+// single instance per version serves all concurrent cold reads.
+func (s *blockStore) coldDecoder(v blockcompress.FormatVersion) (*blockcompress.Codec, error) {
+	s.coldDecodersMu.Lock()
+	defer s.coldDecodersMu.Unlock()
+	if c, ok := s.coldDecoders[v]; ok {
+		return c, nil
+	}
+	c, err := blockcompress.NewCodec(v)
+		if err != nil {
+			return nil, fmt.Errorf("cold decoder for version %d: %w", v, err)
+		}
+		s.coldDecoders[v] = c
+		return c, nil
+}
+
+// readColdBlockRecord reads and decodes a single cold-tier record. It reads the
+// on-disk record <network><origStrippedLen><compressed><crc>, verifies the CRC
+// over the ORIGINAL uncompressed stripped bytes, decompresses the payload, and
+// returns the stripped block bytes. The caller MUST hold blockFile's read lock
+// and MUST release it. hash may be nil when called from readBlockRegion.
+//
+// The returned bytes are the stripped (non-witness) block serialization, as
+// produced by wire.MsgBlock.SerializeNoWitness. Callers that need a full block
+// must re-attach witness from elsewhere; for the cold tier witness is gone by
+// design (only the hot window retains it).
+func (s *blockStore) readColdBlockRecord(hash *chainhash.Hash, blockFile *lockableFile, loc blockLocation) ([]byte, error) {
+	serializedData := make([]byte, loc.blockLen)
+	n, err := blockFile.file.ReadAt(serializedData, int64(loc.fileOffset))
+	if err != nil {
+		hashStr := "<nil>"
+		if hash != nil {
+			hashStr = hash.String()
+		}
+		str := fmt.Sprintf("failed to read cold block %s from file %d, "+
+			"offset %d: %v", hashStr, loc.blockFileNum, loc.fileOffset, err)
+		return nil, makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	// Network check (same guard as the hot path).
+	serializedNet := byteOrder.Uint32(serializedData[:4])
+	if serializedNet != uint32(s.network) {
+		str := fmt.Sprintf("cold block data is for the wrong network "+
+			"- got %d, want %d", serializedNet, uint32(s.network))
+		return nil, makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	// The record is <network:4><origStrippedLen:4><compressed><crc:4>.
+	origStrippedLen := byteOrder.Uint32(serializedData[4:8])
+	compressed := serializedData[8 : n-4]
+	serializedChecksum := binary.BigEndian.Uint32(serializedData[n-4:])
+
+	// Decompress via the codec pinned to this file's format version.
+	codec, err := s.coldDecoder(blockFile.coldCodecVersion)
+	if err != nil {
+		return nil, makeDbErr(database.ErrDriverSpecific, err.Error(), err)
+	}
+	stripped, err := codec.DecompressBlock(compressed)
+	if err != nil {
+		str := fmt.Sprintf("cold block decompress failed: %v", err)
+		return nil, makeDbErr(database.ErrCorruption, str, err)
+	}
+	if uint32(len(stripped)) != origStrippedLen {
+		str := fmt.Sprintf("cold block length mismatch: got %d, want %d",
+			len(stripped), origStrippedLen)
+		return nil, makeDbErr(database.ErrCorruption, str, nil)
+	}
+
+	// CRC over the ORIGINAL uncompressed stripped bytes, matching how
+	// writeColdBlock computed it (crc32(network || origStrippedLen || stripped)).
+	// This catches a codec that decompresses to the wrong bytes the same way
+	// the hot path catches storage corruption.
+	hasher := crc32.New(castagnoli)
+	var scratch [4]byte
+	byteOrder.PutUint32(scratch[:], uint32(s.network))
+	_, _ = hasher.Write(scratch[:])
+	byteOrder.PutUint32(scratch[:], origStrippedLen)
+	_, _ = hasher.Write(scratch[:])
+	_, _ = hasher.Write(stripped)
+	if calc := hasher.Sum32(); calc != serializedChecksum {
+		str := fmt.Sprintf("cold block checksum mismatch - got %x, want %x",
+			calc, serializedChecksum)
+		return nil, makeDbErr(database.ErrCorruption, str, nil)
+	}
+
+	return stripped, nil
 }
 
 // syncBlocks performs a file system sync on the flat file associated with the
@@ -812,6 +992,7 @@ func newBlockStore(basePath string, network wire.BitcoinNet) (*blockStore, error
 		openBlockFiles:   make(map[uint32]*lockableFile),
 		openBlocksLRU:    list.New(),
 		fileNumToLRUElem: make(map[uint32]*list.Element),
+		coldDecoders:     make(map[blockcompress.FormatVersion]*blockcompress.Codec),
 
 		writeCursor: &writeCursor{
 			curFile:    &lockableFile{},
