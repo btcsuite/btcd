@@ -34,6 +34,7 @@ require (
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/kcalvinalvin/anet v0.0.0-20251112173137-d8ddc1f6dbee // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
+	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
