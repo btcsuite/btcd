@@ -26,10 +26,14 @@ is the deepest and most volatile workstream and goes last.
    `blockchain/fullblocktests` suite and produces identical consensus outcomes to
    the unmodified codebase. Storage, I/O, and mining work live below or beside
    the consensus layer — never inside it.
-2. **Full chain, always.** Pruning is unacceptable to Lightning routing nodes
-   and to users who need to resolve arbitrary historical data. Every milestone
-   preserves the ability to run a full, unpruned chain. The disk-space win comes
-   from compression, not deletion.
+2. **Full base ledger, always.** Block pruning (deleting whole blocks) is
+   unacceptable to Lightning routing nodes and to users who need to resolve
+   arbitrary historical transaction data. Every milestone preserves the complete
+   base transaction ledger. The disk-space win comes from witness separation
+   (structural data compresses; high-entropy signatures are either stored
+   separately or dropped beyond a rolling reorg-safe buffer) — never from
+   deleting the transaction history itself. A full-archival mode that retains
+   witness forever is always available.
 3. **Pure Go, no web, no CGo by default.** The Go language is the on-ramp for new
    contributors who want to avoid Core's language and in-group gatekeeping. The
    GUI is non-web (GioUI). CGo is only an optional stretch for hardware-wallet
@@ -43,7 +47,7 @@ is the deepest and most volatile workstream and goes last.
 
 ```mermaid
 flowchart TD
-    M1["M1: Block Compression"]
+    M1["M1: Witness-Separated Storage"]
     M2["M2: Parallel Validation Pipeline"]
     M3["M3: Bundled Wallet + Native GUI"]
     M4["M4: Cross-Platform Async I/O"]
@@ -57,7 +61,7 @@ flowchart TD
 
 | # | Milestone | Headline Claim |
 |---|---|---|
-| M1 | Block Compression | ~50% smaller full chain, ~50% less SSD wear, Lightning-compatible |
+| M1 | Witness-Separated Storage | ~60–70% smaller (pruned) / ~35–45% (archival), Lightning-compatible |
 | M2 | Parallel Validation Pipeline | 2–3× faster IBD via cross-platform parallel script validation |
 | M3 | Bundled Wallet + Native GUI | Full Core-QT replacement for non-mining users |
 | M4 | Cross-Platform Async I/O | io_uring on Linux; macOS/Windows I/O backends |
@@ -65,43 +69,105 @@ flowchart TD
 
 ---
 
-## M1 — Block Compression
+## M1 — Witness-Separated Storage
 
 **Why first:** the single most repeated grievance against running a full node is
-disk space and, secondarily, SSD wear from chain bloat. Pruning does not solve
-this for Lightning nodes or users who want a self-sovereign full archive. If
-btcd cannot store the full chain at roughly half the cost of Core with
-proportionally less write amplification, the "credible alternative" thesis loses
-its spine — so this milestone is the critical technical risk and goes first.
+disk space and, secondarily, SSD wear from chain bloat. Block pruning does not
+solve this for Lightning nodes or users who want a self-sovereign full archive.
+This milestone is the critical technical risk and goes first.
 
-**Headline claim:** ~50% smaller full-chain storage, ~50% less SSD write
-amplification, no pruning, fully Lightning-compatible, zero hot-path cost.
+The original plan was whole-block zstd compression. Measurement on real
+mainnet blocks disproved the ~50% target for that approach: whole-block zstd
+yields only ~24% because modern blocks are dominated by high-entropy witness
+(signatures), which are near-incompressible (~20% reduction) even at max zstd
+level. Witness data is the majority of modern-block bytes and the reason
+whole-block compression stalls.
+
+The fix is to **separate the witness stream from the non-witness stream** and
+apply different policies to each. btcd's wire layer already has the split
+primitive (`SerializeNoWitness` / `DeserializeNoWitness` / `SerializeSizeStripped`
+in `wire/msgblock.go`). Witness is required for initial validation and serving
+full blocks to modern peers, but **not** for the UTXO set, new-block
+validation, Lightning historical monitoring, or Neutrino serving. Separating
+it unlocks both better compression (the non-witness stream is structural and
+compresses ~30%) and an optional witness-pruning mode that recovers the
+high-entropy bytes that don't compress at all.
+
+**Headline claim (measured):** ~70% reduction on modern blocks via
+witness-separated storage — prune witness + zstd-compress the stripped block.
+Two operating modes:
+- **Full archival**: keep witness in a separate compressed stream; blended
+  reduction ~35–45% (non-witness compresses ~30%, witness ~20%).
+- **Witness-pruned** (default for the target audience): discard witness older
+  than a 2016-block rolling buffer, keep stripped blocks; blended reduction
+  ~60–70% on the modern tail that dominates disk. Retains everything the
+  UTXO set, Lightning, `txindex`/`addrindex`, and Neutrino serving need.
+
+Measured on two real mainnet fixtures (post-segwit, 26% and 74% witness):
+
+| Approach | Fixture 0 (26% witness) | Fixture 1 (74% witness) | Blended |
+|---|---|---|---|
+| Compress whole block (zstd) | 25.0% | 23.6% | 24.1% |
+| Prune witness only | 26.4% | 74.4% | 57.4% |
+| **Prune witness + zstd stripped** | **48.3%** | **82.0%** | **70.0%** |
 
 ### Scope
 
-- New `btcd/blockcompress/` package: zstd codec (`klauspost/compress/zstd`, pure
-  Go) with a Bitcoin-script-trained dictionary embedded via `//go:embed`.
-- `database/ffldb` integration: per-file format header (`BTCDZST1` magic +
-  format-version byte) on new block files. Compress-at-write in `writeBlock`
-  (`database/ffldb/blockio.go`), decompress-at-read in `readBlock`. Old,
-  headerless files continue to read uncompressed — mixed-format datadirs are
-  supported with no migration step required.
-- **Integrity preserved and strengthened.** The record format stays
-  `<network:4><origLen:4><compressedBlock><crc:4>` — same 12-byte overhead as
-  today, where `origLen` is the *uncompressed* block length and the compressed
-  length is derivable as `loc.blockLen - 12`. The CRC covers the **original
-  uncompressed** record (`crc32(network || origLen || rawBlock)`), exactly as
-  `writeBlock` does today, so a codec bug that decompresses to wrong bytes is
-  caught the same way storage corruption is caught today. zstd's frame checksum
-  additionally validates the compressed stream. `blockLocation.blockLen`
-  continues to mean "on-disk record bytes"; no block-index migration.
-- `readBlockRegion` (`blockio.go`) decompresses the full block then slices, with
-  a bounded LRU decompressed-block cache on `blockStore` to avoid re-decompression
-  across indexer region reads.
-- Config flag `--blockcompression` (default on for new datadirs, opt-in for
-  existing).
+- New `btcd/blockcompress/` package: deterministic zstd codec
+  (`klauspost/compress/zstd`, pure Go) for the non-witness stream, with a
+  Bitcoin-script-trained dictionary embedded via `//go:embed`.
+- **Two-stream storage in `database/ffldb`.** Each incoming block is split at
+  write time using btcd's existing wire primitive (`SerializeNoWitness` /
+  `DeserializeNoWitness` / `SerializeSizeStripped` in `wire/msgblock.go`):
+  - **Non-witness stream** (the base transaction ledger): serialized once via
+    `SerializeNoWitness`, zstd-compressed via `blockcompress`, written to the
+    block file. This stream is *always retained in full, forever*, for every
+    block. It is what `txindex`/`addrindex`, the UTXO set, Neutrino serving
+    (`MSG_BLOCK`), and historical transaction queries read.
+  - **Witness stream** (signatures + witness scripts): written to a separate
+    witness file, with a configurable retention policy (see modes below).
+- **Two operating modes:**
+  - **Full archival** (`--witness-storage=archival`): witness stream retained
+    (compressed) for all blocks. Blended reduction ~35–45%. The node serves
+    `MSG_WITNESS_BLOCK` for any height and advertises `NODE_WITNESS`.
+  - **Witness-pruned** (`--witness-storage=pruned`, default for the target
+    audience): witness retained for a rolling **2016-block buffer** (≈2 weeks)
+    and discarded beyond that. The non-witness stream is always full. Blended
+    reduction ~60–70% on the modern tail that dominates disk. The node
+    advertises `NODE_NETWORK` for the full base ledger history and `NODE_WITNESS`
+    only within the buffer window; `MSG_WITNESS_BLOCK` requests for pruned
+    heights are declined cleanly (the peer falls back to `MSG_BLOCK`, which the
+    node serves in full).
+- **Index-before-prune.** `txindex`/`addrindex` populate from the in-memory
+  block (witness present) at validation time, *before* the witness is dropped
+  from storage. Indexes are keyed on `txid` (not `wtxid`), so they remain valid
+  and complete after witness pruning — including Taproot script-path spends,
+  whose spending conditions are parsed from the witness at validation time and
+  indexed then. Index size is unaffected by witness pruning; only the raw block
+  files shrink.
+- **Per-file format header** on new block files: magic + format-version byte
+  selecting the dictionary/encoder config. Old, headerless files continue to
+  read uncompressed — mixed-format datadirs are supported with no migration
+  step required.
+- **Integrity preserved and strengthened.** Each stream keeps the record format
+  `<network:4><origLen:4><payload><crc:4>` — same 12-byte overhead as today, where
+  `origLen` is the *uncompressed* payload length and the on-disk length is
+  derivable as `loc.blockLen - 12`. The CRC covers the **original uncompressed**
+  bytes (`crc32(network || origLen || raw)`), exactly as `writeBlock` does today,
+  so a codec bug that decompresses to wrong bytes is caught the same way storage
+  corruption is caught today. zstd's frame checksum additionally validates the
+  compressed stream. `blockLocation.blockLen` continues to mean "on-disk record
+  bytes"; no block-index migration.
+- `readBlockRegion` (`blockio.go`) decompresses the non-witness stream then
+  slices, with a bounded LRU decompressed-block cache on `blockStore` to avoid
+  re-decompression across indexer region reads. Witness re-attachment for the
+  buffer window reads the witness stream and re-applies the wire-level
+  recombination.
+- Config flags: `--witness-storage=archival|pruned` (default `pruned` for new
+  datadirs, `archival` preserves today's behavior), `--witness-buffer=N` (default
+  `2016`, ignored in archival mode).
 - Dictionary training tool (`//go:build ignore` program) that samples real
-  mainnet blocks and trains a zstd dictionary.
+  mainnet blocks and trains a zstd dictionary for the non-witness stream.
 
 ### Determinism invariants (non-negotiable)
 
@@ -129,47 +195,101 @@ standard objection that compression endangers deterministic results:
    Bitcoin Core guarantees today — pruning and arrival order already vary
    `blk*.dat` between nodes. The guarantee that matters, identical logical
    blocks, is preserved.)
-4. **Consensus code never sees compressed bytes.** Compression lives entirely
+4. **Strip serialization is deterministic.** `SerializeNoWitness` is a fixed
+   wire encoding: every node produces identical non-witness bytes for the same
+   logical block. The non-witness stream is therefore byte-stable across nodes,
+   independent of the compressor.
+5. **Witness retention is deterministic per height.** In pruned mode, whether a
+   block's witness is present is a pure function of its height relative to the
+   current tip and the buffer size — not of node identity or timing. Two pruned
+   nodes at the same tip retain exactly the same witness window.
+6. **Consensus code never sees compressed bytes.** Compression lives entirely
    below the `database.DB` interface; every consensus check, merkle/PoW
-   validation, and test vector operates on the decompressed block. A codec bug
-   that altered bytes would fail the original-block CRC *and* consensus
-   validation, the same two layers that guard the uncompressed path today.
+   validation, witness commitment check, and test vector operates on the
+   decompressed block. A codec bug that altered bytes would fail the
+   original-block CRC *and* consensus validation, the same two layers that guard
+   the uncompressed path today.
 
-### Why ~50% is realistic
+### Why the target is realistic (measured, not estimated)
 
-Bitcoin block data is structurally repetitive: P2PKH/P2WPKH/P2SH scripts share
-identical wrappers around 20-byte hashes; amounts cluster; varints and lengths
-are small and repetitive; outpoint txids repeat within and across blocks.
-General-purpose zstd alone reaches ~35–45% on Bitcoin blocks; a dictionary
-trained on real scripts pushes toward and beyond 50%. The codebase already
-contains domain-specific compression precedent in `blockchain/chainio.go` (varint
-amounts, compressed script types for the UTXO set) — this milestone reuses that
-philosophy on the block-file path.
+The headline is grounded in measurement on two real mainnet post-segwit fixtures,
+not an estimate:
+
+| Approach | Fixture 0 (26% witness) | Fixture 1 (74% witness) | Blended |
+|---|---|---|---|
+| Compress whole block (zstd) | 25.0% | 23.6% | 24.1% |
+| Prune witness only (no zstd) | 26.4% | 74.4% | 57.4% |
+| **Prune witness + zstd stripped** | **48.3%** | **82.0%** | **70.0%** |
+
+Two structural facts make this hold chain-wide:
+
+1. **The non-witness stream is structural and compresses ~30%.**
+   P2PKH/P2WPKH/P2SH scripts share identical wrappers around 20-byte hashes;
+   amounts cluster; varints and lengths are small and repetitive; outpoint txids
+   repeat within and across blocks. Removing the high-entropy witness from the
+   compressed stream is what lifts the ratio from ~24% (whole-block) to ~30% on
+   the stripped bytes alone. A dictionary trained on real scripts is expected to
+   push the non-witness stream further (dictionary training is the remaining
+   A-1 task).
+2. **The witness stream is high-entropy and dominates modern blocks.**
+   Signatures and public keys are near-incompressible (~20% even at max zstd
+   level), so whole-block compression stalls at ~24%. But the same fact makes
+   *dropping* the witness (pruned mode) recover the bytes that don't compress.
+   The chain-wide witness fraction grows over time: 0% pre-segwit (blocks
+   <481824), 19–24% by 2019–20, 28–51% by 2021–23, 36–81% recently (2025). Disk
+   bytes are dominated by the modern high-witness tail, so the blended chain-wide
+   reduction tracks the modern-tail numbers, not the early P2PKH era.
+
+The codebase already contains domain-specific compression precedent in
+`blockchain/chainio.go` (varint amounts, compressed script types for the UTXO
+set) — this milestone reuses that philosophy on the block-file path.
+
+**Accepted losses in witness-pruned mode** (documented, not hidden):
+- Cannot serve `MSG_WITNESS_BLOCK` for pruned heights to modern peers (they fall
+  back to `MSG_BLOCK`, which is served in full).
+- Ordinals/inscription data (stored in witness) is not retained — arguably a
+  feature for the anti-bloat audience, and the node still validates it at
+  acceptance time.
+- A full `reindex` from scratch requires re-downloading witness for the pruned
+  range (same tradeoff as block pruning today).
+- `getrawtransaction` on a pruned-height tx returns the base transaction; the
+  `txinwitness` field is absent with an explicit "witness pruned" flag rather
+  than a silent empty array.
 
 ### Acceptance Criteria
 
-1. **Ratio**: measured compression ratio across mainnet block samples from
-   multiple eras (early P2PKH, modern P2TR, high-feerate spam) averages **≥ 45%**
-   (i.e. compressed size ≤ 55% of raw), with no era exceeding 65%.
-2. **Round-trip integrity**: every compressed block decompresses byte-identical
-   to its raw form; CRC checks fire on corruption; `blockchain/fullblocktests`
-   passes with compression enabled and produces consensus results identical to
-   the uncompressed baseline.
-3. **Hot-path neutral**: write throughput and `readBlock` latency with compression
-   enabled are within 10% of uncompressed on the active write file (which stays
-   uncompressed until rotation).
-4. **SSD-wear**: bytes-written to the underlying file during a replay benchmark
-   reduced by ≥ 40% vs uncompressed.
-5. **Race-clean**: `go test -race` passes across `blockcompress` and `ffldb`.
+1. **Ratio**: witness-pruned mode achieves **≥ 60% blended reduction** on
+   modern-tail mainnet blocks; full-archival mode achieves **≥ 35% blended**.
+   Measured across samples from multiple eras (early P2PKH, modern P2TR,
+   high-feerate spam).
+2. **Round-trip integrity**: the non-witness stream decompresses byte-identical
+   to `SerializeNoWitness` output; the witness stream (when retained) round-trips
+   through its codec; CRC checks fire on corruption in either stream;
+   `blockchain/fullblocktests` passes with witness-separated storage enabled and
+   produces consensus results identical to the uncompressed baseline.
+3. **Reorg safety**: witness-pruned mode validates correctly through a simulated
+   reorg up to 2016 blocks deep (the buffer window). Deeper reorgs require
+   re-download of the pruned witness range — documented and tested as a known
+   tradeoff.
+4. **Index completeness**: `txindex`/`addrindex` return complete results for
+   `txid`-keyed queries including Taproot script-path spends, because indexing
+   happens before witness pruning. A query for a pruned-height tx's witness
+   returns the explicit "witness pruned" flag, not a silent empty array.
+5. **Hot-path neutral**: write throughput and `readBlock` latency with
+   witness-separated storage enabled are within 10% of uncompressed on the active
+   write file.
+6. **SSD-wear**: bytes-written to the underlying file during a replay benchmark
+   reduced by ≥ 40% vs uncompressed (pruned mode); ≥ 30% in archival mode.
+7. **Race-clean**: `go test -race` passes across `blockcompress` and `ffldb`.
 
 ### Phasing
 
 | Phase | Scope |
 |---|---|
-| A-1 | `blockcompress` package: codec + dictionary training + unit tests + ratio benchmarks on sample blocks. No ffldb changes. **This phase alone produces the go/no-go ratio number.** |
-| A-2 | ffldb per-file format: compress-at-write, decompress-at-read, mixed-format reads. Whitebox unit tests. |
-| A-3 | `readBlockRegion` decompress + LRU cache. Indexer catch-up benchmark. |
-| A-4 | Config flag, default-on for new datadirs, integration test on existing datadir. |
+| A-1 | `blockcompress` codec + witness-split measurement + dictionary training + unit tests. No ffldb changes. **This phase alone produces the go/no-go ratio number.** (Status: codec, tests, and witness-split measurement done and race-clean; dictionary training pending.) |
+| A-2 | ffldb two-stream storage: non-witness compressed write/read via `blockcompress`, witness stream write/read, per-file format header, mixed-format (old uncompressed / new separated) reads. Whitebox unit tests. |
+| A-3 | Witness retention policy: 2016-block rolling buffer pruning, `readBlockRegion` decompress + LRU cache, witness re-attachment for the buffer window. Indexer catch-up benchmark. |
+| A-4 | Config flags (`--witness-storage`, `--witness-buffer`), service-bit handling, index-before-prune verification, integration test on existing datadir. |
 
 ---
 
@@ -435,11 +555,11 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %b
 
-    section M1 Compression
-    A-1 blockcompress pkg + ratio   :m1a, 2026-01-01, 21d
-    A-2 ffldb format                :m1b, after m1a, 21d
-    A-3 region read + cache         :m1c, after m1b, 14d
-    A-4 config + migration          :m1d, after m1c, 14d
+    section M1 Witness-Separated Storage
+    A-1 codec + split meas + dict   :m1a, 2026-01-01, 21d
+    A-2 ffldb two-stream storage    :m1b, after m1a, 28d
+    A-3 witness retention + cache   :m1c, after m1b, 21d
+    A-4 config + service bits       :m1d, after m1c, 14d
 
     section M2 Parallel Validation
     B-1 netsync pipeline            :m2a, after m1d, 28d

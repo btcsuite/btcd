@@ -21,9 +21,10 @@ type versionConfig struct {
 //
 // Dictionaries are embedded via //go:embed in dictionary_assets.go once
 // trained. Until a trained dictionary is available, FormatV1 ships without a
-// dictionary; general-purpose zstd already yields ~35-45% on Bitcoin blocks,
-// and a trained dictionary pushes toward and beyond 50% (see docs/ROADMAP.md,
-// M1 acceptance criteria).
+// dictionary; general-purpose zstd yields ~30% on the non-witness stream
+// (stripped blocks), and a trained dictionary is expected to push higher (see
+// docs/ROADMAP.md, M1). The whole-block ratio (~24%) is not the target —
+// witness separation is what delivers the headline reduction.
 var registeredVersions = map[FormatVersion]versionConfig{
 	FormatV1: {
 		dict:  nil, // populated by dictionary_assets.go when a dictionary is trained
