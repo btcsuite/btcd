@@ -2876,6 +2876,14 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if cfg.Prune != 0 {
 		services &^= wire.SFNodeNetwork
 	}
+	// When witness-buffer compaction is active, the node does not retain
+	// witness data for blocks older than the hot window. It cannot serve
+	// MSG_WITNESS_BLOCK for those heights, so it must not advertise
+	// NODE_WITNESS. It still advertises NODE_NETWORK (the base ledger is
+	// complete) and serves MSG_BLOCK for all heights. See docs/ROADMAP.md, M1.
+	if cfg.WitnessBuffer > 0 {
+		services &^= wire.SFNodeWitness
+	}
 	if !cfg.V2Transport {
 		services &^= wire.SFNodeP2PV2
 	}
