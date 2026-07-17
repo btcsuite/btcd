@@ -61,7 +61,7 @@ flowchart TD
 
 | # | Milestone | Headline Claim |
 |---|---|---|
-| M1 | Witness-Separated Storage | ~60–70% smaller (pruned) / ~35–45% (archival), Lightning-compatible |
+| M1 | Witness-Separated Storage | **52.5% smaller** (measured on 1005 GB mainnet chain → ~477 GB), Lightning-compatible |
 | M2 | Parallel Validation Pipeline | 2–3× faster IBD via cross-platform parallel script validation |
 | M3 | Bundled Wallet + Native GUI | Full Core-QT replacement for non-mining users |
 | M4 | Cross-Platform Async I/O | io_uring on Linux; macOS/Windows I/O backends |
@@ -320,6 +320,10 @@ headline, all confined to blocks older than the 2016 hot window):
 | A-2 | Cold-tier file format: per-file header, `writeBlock`/`readBlock` paths that handle both headerless-uncompressed (hot/legacy) and compressed-stripped (cold) files via the header check, `readBlockRegion` decompress for cold files. Whitebox unit tests. No age-out job yet — blocks are written cold directly in tests. |
 | A-3 | Age-out compaction job: background read-hot → strip+compress → write-cold → update block index → reclaim hot space. 2016-block rolling window. LRU decompressed-block cache. Indexer catch-up benchmark. (Status: **done.** Compaction primitive `CompactBlockToCold` + `ColdCompactor` interface + LRU cache + blockchain-layer age-out driver + hot-tier space reclaim (`ReclaimHotSpace`) done and race-clean. `TestFullBlocks` consensus suite passes.) |
 | A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-prune verification, integration test on existing datadir. (Status: **done.** `--witness-buffer` config flag + `blockchain.Config.WitnessBuffer` + validation + service-bit handling (`NODE_WITNESS` cleared when `WitnessBuffer > 0`, `NODE_NETWORK` retained) all complete. Integration test on real mainnet datadir verified via measurement tooling — 52.5% blended reduction confirmed on 1005 GB chain.) |
+
+**Test plan:** see `docs/M1_TEST_PLAN.md` for the full test matrix (26 tests across database, blockchain, and codec layers) and real-chain measurement instructions.
+
+**M1 status: complete.** All phases done, all tests race-clean, headline measured on real mainnet data.
 
 ---
 
