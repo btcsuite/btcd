@@ -787,6 +787,32 @@ func TestPsbtExtractor(t *testing.T) {
 	}
 }
 
+// TestExtractRejectsTrailingFinalScriptWitnessData ensures a final witness
+// value must contain exactly one serialized witness stack.
+func TestExtractRejectsTrailingFinalScriptWitnessData(t *testing.T) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(0, []byte{0x6a}))
+
+	var witness bytes.Buffer
+	err := WriteTxWitness(&witness, [][]byte{{0x51}})
+	require.NoError(t, err)
+
+	finalWitness := append([]byte{}, witness.Bytes()...)
+	finalWitness = append(finalWitness, 0x00)
+
+	packet := &Packet{
+		UnsignedTx: tx,
+		Inputs: []PInput{{
+			FinalScriptWitness: finalWitness,
+		}},
+		Outputs: []POutput{{}},
+	}
+
+	_, err = Extract(packet)
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
 func TestFinalizerAddSigHashFlags(t *testing.T) {
 	var signedPsbtData = map[string]string{
 		"Default":            "70736274ff01005e0200000001f1aabce974f1b242b36913f4f8a9f138a8042914dddc4117a578813a4dc32ee10000000000ffffffff017b0a0000000000002251209c1f4b7970d790c99b7265b53adec03551708fd7d67db78359f9c472fe642ad1000000000001012b430b0000000000002251209c1f4b7970d790c99b7265b53adec03551708fd7d67db78359f9c472fe642ad1011340e80246ac1955def419572514e50e4be47f56ccd51beae41ec80ad30cb77ed59ebca3c38dd8506e1b7c28fafa4bdf7d821464be1ee152416bdaf2c056fb4fb3290117206b1a4876464d6bfc6a7c106dd4c5a0f08af94b45a8200e47e02a7dc6148fd7b00000",
