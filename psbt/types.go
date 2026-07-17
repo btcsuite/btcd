@@ -30,6 +30,14 @@ const (
 	// extended public key.
 	XPubType GlobalType = 1
 
+	// SilentPaymentShareType is used to house the ECDH shares for silent
+	// payments.
+	SilentPaymentShareType GlobalType = 0x07
+
+	// SilentPaymentDLEQType is used to house the DLEQ proofs for silent
+	// payments.
+	SilentPaymentDLEQType GlobalType = 0x08
+
 	// VersionType houses the global version number of this PSBT. There is
 	// no key (only contains the byte type), then the value if omitted, is
 	// assumed to be zero.
@@ -151,6 +159,14 @@ const (
 	// 32-byte hash denoting the root hash of a merkle tree of scripts.
 	TaprootMerkleRootType InputType = 0x18
 
+	// SilentPaymentShareInputType is used to house the ECDH share for a
+	// single input in silent payments.
+	SilentPaymentShareInputType InputType = 0x1d
+
+	// SilentPaymentDLEQInputType is used to house the DLEQ proofs for a
+	// single input in silent payments.
+	SilentPaymentDLEQInputType InputType = 0x1e
+
 	// ProprietaryInputType is a custom type for use by devs.
 	//
 	// The key ({0xFC}|<prefix>|{subtype}|{key data}), is a Variable length
@@ -200,4 +216,13 @@ const (
 	// followed by said number of 32-byte leaf hashes. The rest of the value
 	// is then identical to the Bip32DerivationInputType value.
 	TaprootBip32DerivationOutputType OutputType = 7
+
+	// SilentPaymentV0InfoOutputType is used to house the silent payment
+	// recipient information for a version 0 silent payment output.
+	SilentPaymentV0InfoOutputType OutputType = 0x09
+
+	// SilentPaymentV0LabelOutputType is used to house the silent payment
+	// label for a version 0 silent payment output, which is used to compute
+	// the spend key of the silent payments address to verify change.
+	SilentPaymentV0LabelOutputType OutputType = 0x0a
 )
