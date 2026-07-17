@@ -121,7 +121,9 @@ func extractKeyOrderFromScript(script []byte, expectedPubkeys [][]byte,
 	for _, p := range pubsSigs {
 		pos := bytes.Index(script, p.pubKey)
 		if pos < 0 {
-			return nil, errors.New("script does not contain pubkeys")
+			return nil, errors.New(
+				"script does not contain pubkeys",
+			)
 		}
 
 		positionMap = append(positionMap, positionEntry{
@@ -346,12 +348,19 @@ func readTransaction(txBytes []byte, noWitness bool) (*wire.MsgTx, error) {
 // UTXO fields of the PSBT. An error is returned if an input is specified that
 // does not contain any UTXO information.
 func SumUtxoInputValues(packet *Packet) (int64, error) {
-	// We take the TX ins of the unsigned TX as the truth for how many
-	// inputs there should be, as the fields in the extra data part of the
-	// PSBT can be empty.
-	if len(packet.UnsignedTx.TxIn) != len(packet.Inputs) {
-		return 0, fmt.Errorf("TX input length doesn't match PSBT " +
-			"input length")
+	// For v0 PSBTs we cross-check against the unsigned transaction.
+	switch packet.Version {
+	case PsbtVersion0:
+		if packet.UnsignedTx == nil {
+			return 0, fmt.Errorf("v0 PSBT missing unsigned tx")
+		}
+		if len(packet.UnsignedTx.TxIn) != len(packet.Inputs) {
+			return 0, fmt.Errorf("TX input length doesn't match " +
+				"PSBT input length")
+		}
+
+	case PsbtVersion2:
+		// No extra checks needed for v2 here.
 	}
 
 	inputSum := int64(0)
@@ -365,17 +374,19 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 			// Non-witness UTXOs reference to the whole transaction
 			// the UTXO resides in.
 			utxOuts := in.NonWitnessUtxo.TxOut
-			txIn := packet.UnsignedTx.TxIn[idx]
 
-			// Check that utxOuts actually has enough space to
-			// contain the previous outpoint's index.
-			opIdx := txIn.PreviousOutPoint.Index
+			// For v2, the output index is stored directly in the
+			// PInput. For v0, it comes from the unsigned tx.
+			opIdx, err := packet.outIndex(idx)
+			if err != nil {
+				return 0, err
+			}
 			if opIdx >= uint32(len(utxOuts)) {
 				return 0, fmt.Errorf("input %d has malformed "+
 					"TxOut field", idx)
 			}
 
-			inputSum += utxOuts[txIn.PreviousOutPoint.Index].Value
+			inputSum += utxOuts[opIdx].Value
 
 		default:
 			return 0, fmt.Errorf("input %d has no UTXO information",
