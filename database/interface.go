@@ -438,9 +438,12 @@ type Tx interface {
 // Backends without cold-tier support simply do not implement this interface.
 type ColdCompactor interface {
 	// CompactBlockToCold moves the block identified by hash from the hot tier
-	// to the cold tier. The block must currently be hot. The cold write is
-	// deferred to transaction commit, so a rolled-back transaction leaves no
-	// orphaned cold data.
+	// to the cold tier. If the block is already cold, it is an idempotent
+	// no-op and returns nil — callers rely on this to proceed with
+	// post-compaction bookkeeping (rewriting offset-bearing index entries)
+	// unconditionally, which is important when a reorg reconnects a block
+	// that was already cold. The cold write is deferred to transaction
+	// commit, so a rolled-back transaction leaves no orphaned cold data.
 	CompactBlockToCold(hash *chainhash.Hash) error
 
 	// ReclaimHotSpace deletes hot-tier block files whose blocks have all been

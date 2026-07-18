@@ -32,6 +32,27 @@ type NeedsInputser interface {
 	NeedsInputs() bool
 }
 
+// OffsetRewriter is implemented by indexers that store block-relative byte
+// offsets (e.g. the transaction index and the address index, which store
+// wire.TxLoc.TxStart/TxLen per entry). When a block is compacted from the hot
+// tier (stored with witness) to the cold tier (stored stripped), those offsets
+// change because witness bytes are removed. The index manager calls
+// RewriteTxOffsetsForColdCompaction for every enabled indexer implementing this
+// interface, in the same database transaction as CompactBlockToCold, so the
+// offset entries are rewritten to the stripped serialization's offset space.
+//
+// The block is still readable as its full (hot) serialization during the
+// transaction; the implementation re-derives TxLoc from the stripped
+// serialization and overwrites the existing entries. stxos is nil when the
+// spend journal entry is unavailable (e.g. the block has been pruned);
+// implementations that require it to locate entries (e.g. the address index,
+// which keys entries by address and needs input addresses) should skip their
+// rewrite in that case.
+type OffsetRewriter interface {
+	RewriteTxOffsetsForColdCompaction(dbTx database.Tx, block *btcutil.Block,
+		stxos []blockchain.SpentTxOut) error
+}
+
 // Indexer provides a generic interface for an indexer that is managed by an
 // index manager such as the Manager type provided by this package.
 type Indexer interface {

@@ -533,6 +533,28 @@ func (m *Manager) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return nil
 }
 
+// RewriteTxOffsetsForColdCompaction is called by the blockchain layer after a
+// block has been compacted from the hot tier to the cold tier (or was already
+// cold, e.g. after a reorg). It delegates to every enabled indexer that
+// implements OffsetRewriter, so that index entries carrying block-relative byte
+// offsets are rewritten to the stripped serialization's offset space.
+//
+// This is part of the blockchain.ColdCompactionIndexManager optional interface.
+func (m *Manager) RewriteTxOffsetsForColdCompaction(dbTx database.Tx,
+	block *btcutil.Block, stxos []blockchain.SpentTxOut) error {
+
+	for _, index := range m.enabledIndexes {
+		r, ok := index.(OffsetRewriter)
+		if !ok {
+			continue
+		}
+		if err := r.RewriteTxOffsetsForColdCompaction(dbTx, block, stxos); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // NewManager returns a new index manager with the provided indexes enabled.
 //
 // The manager returned satisfies the blockchain.IndexManager interface and thus

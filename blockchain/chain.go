@@ -696,13 +696,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 		// The block at height (node.height - witnessBuffer) is still in the
 		// best chain (the new tip hasn't been set yet, so the current tip is
 		// at node.height-1, putting the target at witnessBuffer-1 blocks
-		// back). This is a no-op if the block is already cold (e.g. after a
-		// reorg that reconnected it).
+		// back). CompactBlockToCold is idempotent: it returns nil if the
+		// block is already cold (e.g. after a reorg that reconnected it).
 		if b.witnessBuffer > 0 && node.height > b.witnessBuffer {
 			ageOutHeight := node.height - b.witnessBuffer
 			ageOutNode := b.bestChain.NodeByHeight(ageOutHeight)
 			if ageOutNode != nil {
 				if cc, ok := dbTx.(database.ColdCompactor); ok {
+					compacted := false
 					err := cc.CompactBlockToCold(&ageOutNode.hash)
 					if err != nil {
 						// An error here is not fatal: the block
@@ -711,6 +712,62 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 						log.Debugf("Age-out compaction of "+
 							"block %s (height %d) failed: %v",
 							ageOutNode.hash, ageOutHeight, err)
+					} else {
+						compacted = true
+					}
+
+					// Rewrite block-relative byte offsets in offset-bearing
+					// indexes (txindex, addrindex) to be relative to the
+					// stripped serialization. This MUST happen whenever the
+					// block is cold (either just compacted above or already
+					// cold from a prior compaction that survived a reorg).
+					// Without it, FetchBlockRegion reads wrong bytes from
+					// the stripped cold block using the witness-relative
+					// offsets the index was originally built with.
+					//
+					// The rewrite is fatal on failure: if it fails the
+					// block is cold but the index has witness-relative
+					// offsets, so getrawtransaction / wallet rescans would
+					// return garbage. Aborting the whole connectBlock is
+					// preferable to silently corrupting the index.
+					if compacted && b.indexManager != nil {
+						if cm, ok := b.indexManager.(ColdCompactionIndexManager); ok {
+							ageOutBlockBytes, err := dbTx.FetchBlock(&ageOutNode.hash)
+							if err != nil {
+								return fmt.Errorf("cold compaction index "+
+									"rewrite: fetch block %s: %v",
+									ageOutNode.hash, err)
+							}
+							ageOutBlock, err := btcutil.NewBlockFromBytes(ageOutBlockBytes)
+							if err != nil {
+								return fmt.Errorf("cold compaction index "+
+									"rewrite: parse block %s: %v",
+									ageOutNode.hash, err)
+							}
+
+							// The address index needs the spent outputs
+							// (stxos) to locate entries by input address.
+							// Fetch them from the spend journal; pass nil
+							// if unavailable (e.g. pruned) so addrindex
+							// can skip its input-address rewrite.
+							var ageOutStxos []SpentTxOut
+							ageOutStxos, err = dbFetchSpendJournalEntry(dbTx, ageOutBlock)
+							if err != nil {
+								log.Debugf("Cold compaction index rewrite: "+
+									"spend journal for block %s "+
+									"unavailable, skipping addrindex "+
+									"input rewrite: %v",
+									ageOutNode.hash, err)
+								ageOutStxos = nil
+							}
+
+							if err := cm.RewriteTxOffsetsForColdCompaction(
+								dbTx, ageOutBlock, ageOutStxos); err != nil {
+								return fmt.Errorf("cold compaction index "+
+									"rewrite for block %s: %v",
+									ageOutNode.hash, err)
+							}
+						}
 					}
 
 					// Reclaim hot-tier files once per difficulty period
@@ -2183,6 +2240,34 @@ type IndexManager interface {
 	// this block is also returned so indexers can clean up the prior index
 	// state for this block.
 	DisconnectBlock(database.Tx, *btcutil.Block, []SpentTxOut) error
+}
+
+// ColdCompactionIndexManager is an optional interface implemented by index
+// managers that maintain index entries carrying block-relative byte offsets
+// (e.g. the transaction index and the address index). When a block is
+// compacted from the hot tier (stored with witness) to the cold tier (stored
+// stripped), the byte offsets of transactions within the block change because
+// witness bytes are removed. Index entries that still reference the old
+// (witness-relative) offsets would cause FetchBlockRegion to read wrong bytes
+// from the cold (stripped) block, corrupting getrawtransaction and
+// searchrawtransactions RPC results and breaking wallet rescans.
+//
+// RewriteTxOffsetsForColdCompaction is called in the same database transaction
+// as CompactBlockToCold, after the compaction has been scheduled. It rewrites
+// the offset-bearing index entries for the block to be relative to the stripped
+// serialization. The block is still readable as its full (hot) serialization
+// during this transaction, so the stripped offsets can be computed. The rewrite
+// and the compaction commit atomically: a rolled-back transaction leaves both
+// the block index and the offset index unchanged.
+//
+// The stxos parameter is the spent transaction outputs for the block (from the
+// spend journal); indexers that need to locate entries by input address (e.g.
+// the address index) require it. Callers should pass nil when the spend journal
+// entry is unavailable (e.g. the block has been pruned); in that case
+// indexers that require stxos will skip their rewrite for this block.
+type ColdCompactionIndexManager interface {
+	RewriteTxOffsetsForColdCompaction(dbTx database.Tx, block *btcutil.Block,
+		stxos []SpentTxOut) error
 }
 
 // Config is a descriptor which specifies the blockchain instance configuration.

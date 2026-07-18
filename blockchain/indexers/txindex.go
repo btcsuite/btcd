@@ -430,6 +430,65 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	return nil
 }
 
+// RewriteTxOffsetsForColdCompaction rewrites the transaction index entries for
+// every transaction in the block so that the stored byte offsets are relative
+// to the stripped (non-witness) serialization instead of the full
+// (witness-included) serialization.
+//
+// This is required because the block is being (or has been) compacted from the
+// hot tier (stored with witness) to the cold tier (stored stripped). The
+// original entries were written by ConnectBlock using block.TxLoc(), which
+// computes offsets via DeserializeTxLoc with WitnessEncoding — i.e. offsets
+// into the full block. FetchBlockRegion on a cold block reads from the stripped
+// block, so those offsets would point at the wrong bytes for any block
+// containing a segwit transaction.
+//
+// The fix is to re-derive TxLoc from the stripped serialization and overwrite
+// the existing entries. Transaction hashes (the index keys) are unaffected
+// because witness data does not contribute to the txid, so dbAddTxIndexEntries
+// updates the same keys with the same blockID but the corrected offsets. The
+// blockID is fetched from the existing index entry so it does not change.
+//
+// This is part of the OffsetRewriter optional interface.
+func (idx *TxIndex) RewriteTxOffsetsForColdCompaction(dbTx database.Tx,
+	block *btcutil.Block, stxos []blockchain.SpentTxOut) error {
+
+	// Re-serialize the block without witness to obtain the stripped
+	// serialization. For a block fetched hot during the compaction transaction
+	// this is the full block re-serialized without witness; for a block that
+	// was already cold (reorg case) FetchBlock already returned the stripped
+	// bytes, so BytesNoWitness is a no-op round-trip. Either way the result is
+	// the stripped serialization.
+	strippedBytes, err := block.BytesNoWitness()
+	if err != nil {
+		return fmt.Errorf("cold compaction txindex rewrite: "+
+			"serialize stripped block %s: %v", block.Hash(), err)
+	}
+
+	// Build a Block from the stripped bytes. Block.TxLoc() calls
+	// DeserializeTxLoc, which decodes each transaction with WitnessEncoding.
+	// For stripped input (no witness marker/flag) every transaction decodes
+	// as a legacy transaction, so TxStart/TxLen are offsets into the stripped
+	// serialization — exactly what FetchBlockRegion needs for a cold block.
+	strippedBlock, err := btcutil.NewBlockFromBytes(strippedBytes)
+	if err != nil {
+		return fmt.Errorf("cold compaction txindex rewrite: "+
+			"parse stripped block %s: %v", block.Hash(), err)
+	}
+
+	// The blockID does not change when a block is compacted; reuse the
+	// existing one so the index entry still maps to the same block hash.
+	blockID, err := dbFetchBlockIDByHash(dbTx, block.Hash())
+	if err != nil {
+		return fmt.Errorf("cold compaction txindex rewrite: "+
+			"fetch block id for %s: %v", block.Hash(), err)
+	}
+
+	// Overwrite the entries. dbAddTxIndexEntries writes the same keys (tx
+	// hashes) with the same blockID but the new stripped-relative offsets.
+	return dbAddTxIndexEntries(dbTx, strippedBlock, blockID)
+}
+
 // TxBlockRegion returns the block region for the provided transaction hash
 // from the transaction index.  The block region can in turn be used to load the
 // raw transaction bytes.  When there is no entry for the provided hash, nil

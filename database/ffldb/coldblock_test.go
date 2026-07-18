@@ -414,7 +414,12 @@ func TestCompactBlockToColdRollback(t *testing.T) {
 	}
 }
 
-// TestCompactAlreadyCold verifies compacting a block that is already cold fails.
+// TestCompactAlreadyCold verifies compacting a block that is already cold is
+// an idempotent no-op (returns nil). This is required so the blockchain layer
+// can call CompactBlockToCold unconditionally and then rewrite offset index
+// entries — which is important after a reorg reconnects a cold block, because
+// ConnectBlock rebuilds those indexes with witness-relative offsets that must
+// be rewritten even though the block is already cold.
 func TestCompactAlreadyCold(t *testing.T) {
 	dbPath := t.TempDir()
 	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
@@ -437,12 +442,11 @@ func TestCompactAlreadyCold(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("first compact: %v", err)
 	}
-	// Compact again -> error.
-	err = pdb.Update(func(tx database.Tx) error {
+	// Compact again -> idempotent no-op (nil, not an error).
+	if err := pdb.Update(func(tx database.Tx) error {
 		return tx.(database.ColdCompactor).CompactBlockToCold(hash)
-	})
-	if err == nil {
-		t.Fatal("second compact succeeded; expected error (already cold)")
+	}); err != nil {
+		t.Fatalf("second compact: %v", err)
 	}
 }
 

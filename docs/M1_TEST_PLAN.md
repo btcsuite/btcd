@@ -21,12 +21,19 @@ and the disk-reduction headline.
 | `TestColdSavingsOnDisk` | `database/ffldb/coldblock_test.go` | Cold file is smaller than hot file on disk |
 | `TestCompactBlockToCold` | `database/ffldb/coldblock_test.go` | `CompactBlockToCold` through full `database.Tx`: store hot → compact → FetchBlock returns stripped, block index has cold flag |
 | `TestCompactBlockToColdRollback` | `database/ffldb/coldblock_test.go` | Rolled-back compaction leaves block in hot tier, no orphaned cold data |
-| `TestCompactAlreadyCold` | `database/ffldb/coldblock_test.go` | Compacting an already-cold block is a no-op |
+| `TestCompactAlreadyCold` | `database/ffldb/coldblock_test.go` | Compacting an already-cold block is an idempotent no-op (returns nil) |
 | `TestReclaimHotSpace` | `database/ffldb/coldblock_test.go` | Hot file deleted after reclaim, block still readable from cold |
 | `TestReclaimHotSpacePartial` | `database/ffldb/coldblock_test.go` | Hot file with remaining hot blocks is NOT deleted |
 | `TestColdCacheHit` | `database/ffldb/coldblock_test.go` | LRU cache returns cached decompressed block without file I/O |
 | `TestColdCacheRegion` | `database/ffldb/coldblock_test.go` | Region reads populate and hit the cache |
 | `TestColdCacheEviction` | `database/ffldb/coldblock_test.go` | Cache evicts oldest entries when full |
+| `TestTxIndexColdCompactionRewrite` | `blockchain/indexers/txindex_cold_test.go` | txindex offsets are rewritten to stripped-relative on compaction; every tx in a cold block round-trips through `dbFetchTxIndexEntry` → `FetchBlockRegion` with the correct txid |
+| `TestTxIndexColdCompactionWithoutRewrite` | `blockchain/indexers/txindex_cold_test.go` | Proves the bug exists without the rewrite: witness-relative offsets from `ConnectBlock` point past the stripped block boundary, so `FetchBlockRegion` fails for segwit txs |
+| `FuzzColdCompactionOffsets` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the offset-rewrite core: for any deserializable block, the stripped serialization's TxLocs point at byte ranges that deserialize to txs with the correct txid (pure-data, ~40k execs/s) |
+| `FuzzColdCompactionTxIndex` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the integrated path: compact → rewrite → txindex → `FetchBlockRegion` → txid match, including the idempotent reorg model (compact-already-cold + double rewrite) |
+| `TestAddrIndexColdCompactionRewrite` | `blockchain/indexers/addrindex_cold_test.go` | addrindex offsets are rewritten to stripped-relative on compaction; every address's tx regions round-trip through `TxRegionsForAddress` → `FetchBlockRegions` with correct txids (the `searchrawtransactions` RPC path) |
+| `TestAddrIndexColdCompactionWithoutRewrite` | `blockchain/indexers/addrindex_cold_test.go` | Proves the addrindex bug exists without the rewrite: witness-relative offsets point past the stripped block, so `FetchBlockRegions` returns wrong bytes / EOF for addresses in segwit blocks |
+| `TestAddrIndexRewriteNilStxosNoPanic` | `blockchain/indexers/addrindex_cold_test.go` | Regression for a crash bug: `RewriteTxOffsetsForColdCompaction` with nil stxos (pruned spend journal) must not panic on blocks with non-coinbase inputs; output-address entries remain correct |
 | `TestWitnessBufferAgeOut` | `blockchain/ageout_test.go` | Blockchain-layer age-out driver: blocks beyond buffer are compacted, cold files created on disk, all blocks remain readable |
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
 | `TestWitnessBufferConfig` | `blockchain/ageout_test.go` | `Config.WitnessBuffer` wires through to `BlockChain.witnessBuffer` |
@@ -76,6 +83,15 @@ go test -race -timeout 120s ./blockcompress/
 
 # Real-chain measurement (requires synced datadir, //go:build ignore)
 go run blockcompress/dicttrain/measure.go -datadir /path/to/blocks_ffldb
+
+# Cold-compaction fuzz targets (seed-corpus regression run, ~3s)
+go test -race -timeout 120s -run='FuzzColdCompaction' ./blockchain/indexers/
+
+# Cold-compaction fuzz exploration (run in CI or locally for a fixed budget):
+go test -run='^$' -fuzz=FuzzColdCompactionOffsets -fuzztime=30s ./blockchain/indexers/
+go test -run='^$' -fuzz=FuzzColdCompactionTxIndex -fuzztime=30s ./blockchain/indexers/
+# Failing inputs are persisted to blockchain/indexers/testdata/fuzz/ and
+# replayed automatically on subsequent normal test runs as regression cases.
 ```
 
 ## What the Tests Prove
@@ -108,3 +124,51 @@ go run blockcompress/dicttrain/measure.go -datadir /path/to/blocks_ffldb
 8. **Reclaim works**: Hot files are deleted after all their blocks are compacted,
    and blocks remain readable from cold. Files with remaining hot blocks are
    preserved.
+
+9. **Offset-bearing indexes survive compaction**: The transaction index and
+   address index store block-relative byte offsets that change when a block is
+   compacted from the hot tier (witness-included) to the cold tier
+   (witness-stripped). `RewriteTxOffsetsForColdCompaction` rewrites those
+   offsets to the stripped serialization's offset space in the same database
+   transaction as `CompactBlockToCold`. Without it, `getrawtransaction` and
+   `searchrawtransactions` would return garbled bytes for any compacted block
+   containing a segwit transaction, and wallet rescans would break. The rewrite
+   is also applied when `CompactBlockToCold` is a no-op on an already-cold
+   block (e.g. after a reorg reconnection), because `ConnectBlock` rebuilds
+   those index entries with witness-relative offsets that must be corrected.
+
+10. **`FetchBlockRegion` bounds check is correct for cold blocks**: The
+    `blockLen` stored in the block index for a cold block is the on-disk
+    compressed record length, but region offsets are relative to the
+    uncompressed stripped block. The `FetchBlockRegion` bounds check skips
+    cold blocks (the per-record `readBlockRegion` check against the
+    decompressed length is authoritative for cold blocks).
+
+11. **Offset rewrite is robust under fuzzing**: `FuzzColdCompactionOffsets`
+    asserts the pure-data core of the rewrite — stripped TxLocs point at
+    deserializable bytes hashing to the correct txid — for any deserializable
+    block, at ~40k execs/s. `FuzzColdCompactionTxIndex` asserts the full
+    integrated read path end to end, including the idempotent reorg model
+    (compacting an already-cold block + re-running the rewrite). Both are
+    seeded with the real mainnet fixtures plus a small synthetic
+    witness-containing block so coverage-guided exploration is fast. This is
+    the direct evidence that witness removal cannot silently corrupt a
+    wallet's view of historical transactions.
+
+12. **`searchrawtransactions` survives compaction**: The address-index
+    rewrite is verified end to end (`TestAddrIndexColdCompactionRewrite`):
+    after compaction + rewrite, every output address's tx regions resolve to
+    the same tx hashes as before compaction. Without the rewrite the negative
+    test shows `FetchBlockRegions` returning wrong bytes / EOF. This is the
+    btcwallet address-history rescan path.
+
+13. **Pruned spend journal cannot crash the node**: `RewriteTxOffsetsForColdCompaction`
+    with nil stxos (the state when the spend journal for an old block has been
+    pruned, which is the normal case for blocks aging out past the witness
+    buffer) previously panicked inside `indexBlock` on any block with
+    non-coinbase inputs — crashing the node during `connectBlock`.
+    `TestAddrIndexRewriteNilStxosNoPanic` is the regression guard. The fix
+    makes `indexBlock` skip input-address indexing when stxos is nil, so only
+    output-address entries are rewritten (input-address entries are left
+    stale, which is acceptable because pruned blocks' input addresses are not
+    reachable via `FetchBlockRegion` anyway).

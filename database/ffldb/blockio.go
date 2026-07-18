@@ -704,7 +704,12 @@ func (s *blockStore) readBlockRegion(loc blockLocation, offset, numBytes uint32)
 
 	// Cold-tier blocks are compressed: a region read requires decompressing
 	// the whole stripped block and then slicing. The offset is relative to
-	// the start of the stripped block, identical to the hot-tier contract.
+	// the start of the stripped block. This works because the blockchain
+	// layer rewrites offset-bearing index entries (txindex, addrindex) to
+	// stripped-relative offsets at compaction time via
+	// ColdCompactionIndexManager.RewriteTxOffsetsForColdCompaction; without
+	// that rewrite, the witness-relative offsets stored by ConnectBlock would
+	// point at the wrong bytes here for any block containing a segwit tx.
 	if blockFile.format == formatCold {
 		decoded, err := s.readColdBlockRecord(nil, blockFile, loc)
 		blockFile.RUnlock()
@@ -749,11 +754,11 @@ func (s *blockStore) coldDecoder(v blockcompress.FormatVersion) (*blockcompress.
 		return c, nil
 	}
 	c, err := blockcompress.NewCodec(v)
-		if err != nil {
-			return nil, fmt.Errorf("cold decoder for version %d: %w", v, err)
-		}
-		s.coldDecoders[v] = c
-		return c, nil
+	if err != nil {
+		return nil, fmt.Errorf("cold decoder for version %d: %w", v, err)
+	}
+	s.coldDecoders[v] = c
+	return c, nil
 }
 
 // readColdBlockRecord reads and decodes a single cold-tier record. It reads the

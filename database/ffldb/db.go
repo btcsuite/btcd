@@ -1216,9 +1216,14 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 //
 // This is the age-out compaction primitive used by the rolling 2016-block
 // witness window (see docs/ROADMAP.md, M1 A-3). It must be called within a
-// writable transaction. The block must currently be in the hot tier (not
-// already cold and not pending store). The cold write is deferred to commit so
-// a rolled-back transaction leaves no orphaned cold data.
+// writable transaction. If the block is already cold, the call is an idempotent
+// no-op (returns nil) so callers can proceed with post-compaction bookkeeping —
+// notably rewriting offset-bearing index entries (txindex, addrindex) to the
+// stripped offset space, which must happen even for an already-cold block that
+// a reorg disconnected and reconnected (ConnectBlock rebuilds those entries with
+// witness-relative offsets). A block pending store in this transaction cannot be
+// compacted. The cold write is deferred to commit so a rolled-back transaction
+// leaves no orphaned cold data.
 //
 // This method is NOT part of the database.Tx interface; it is an ffldb-specific
 // extension exposed via the database.ColdCompactor optional interface.
@@ -1245,8 +1250,16 @@ func (tx *transaction) CompactBlockToCold(hash *chainhash.Hash) error {
 	}
 	loc := deserializeBlockLoc(blockRow)
 	if loc.blockFileNum&coldFlag != 0 {
-		str := fmt.Sprintf("block %s is already in the cold tier", hash)
-		return makeDbErr(database.ErrDriverSpecific, str, nil)
+		// Already cold. This is a no-op: the block is already in the cold
+		// tier and its index entries are expected to already carry
+		// stripped-relative offsets. Return nil so callers can proceed
+		// with any post-compaction bookkeeping (e.g. rewriting offset
+		// indexes) unconditionally — which is important when a reorg
+		// disconnected and reconnected a cold block, because ConnectBlock
+		// will have rebuilt those indexes with witness-relative offsets
+		// that must now be rewritten.
+		log.Tracef("CompactBlockToCold: block %s already cold, no-op", hash)
+		return nil
 	}
 
 	// Read the full hot block (with witness) now; the cold write happens at
@@ -1616,13 +1629,26 @@ func (tx *transaction) FetchBlockRegion(region *database.BlockRegion) ([]byte, e
 	location := deserializeBlockLoc(blockRow)
 
 	// Ensure the region is within the bounds of the block.
-	endOffset := region.Offset + region.Len
-	if endOffset < region.Offset || endOffset > location.blockLen {
-		str := fmt.Sprintf("block %s region offset %d, length %d "+
-			"exceeds block length of %d", region.Hash,
-			region.Offset, region.Len, location.blockLen)
-		return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
-
+	//
+	// For hot blocks, blockLen is the on-disk record length (block bytes + 12
+	// bytes of network/length/checksum overhead) and region offsets are
+	// relative to the block payload, so comparing against blockLen is a safe
+	// upper bound.
+	//
+	// For cold blocks, blockLen is the on-disk record length (compressed
+	// payload + 12 bytes overhead), but region offsets are relative to the
+	// UNCOMPRESSED stripped block. The compressed record is shorter than the
+	// stripped block, so this check would reject valid offsets. Skip it for
+	// cold blocks — readBlockRegion decompresses and performs its own bounds
+	// check against the uncompressed stripped length.
+	if location.blockFileNum&coldFlag == 0 {
+		endOffset := region.Offset + region.Len
+		if endOffset < region.Offset || endOffset > location.blockLen {
+			str := fmt.Sprintf("block %s region offset %d, length %d "+
+				"exceeds block length of %d", region.Hash,
+				region.Offset, region.Len, location.blockLen)
+			return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+		}
 	}
 
 	// Read the region from the appropriate disk block file.
@@ -1713,13 +1739,20 @@ func (tx *transaction) FetchBlockRegions(regions []database.BlockRegion) ([][]by
 		}
 		location := deserializeBlockLoc(blockRow)
 
-		// Ensure the region is within the bounds of the block.
-		endOffset := region.Offset + region.Len
-		if endOffset < region.Offset || endOffset > location.blockLen {
-			str := fmt.Sprintf("block %s region offset %d, length "+
-				"%d exceeds block length of %d", region.Hash,
-				region.Offset, region.Len, location.blockLen)
-			return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+		// Ensure the region is within the bounds of the block. Skip the
+		// check for cold blocks: blockLen is the compressed on-disk record
+		// length there, but region offsets are relative to the uncompressed
+		// stripped block, so the check would reject valid offsets.
+		// readBlockRegion performs its own bounds check against the
+		// decompressed length for cold blocks.
+		if location.blockFileNum&coldFlag == 0 {
+			endOffset := region.Offset + region.Len
+			if endOffset < region.Offset || endOffset > location.blockLen {
+				str := fmt.Sprintf("block %s region offset %d, length "+
+					"%d exceeds block length of %d", region.Hash,
+					region.Offset, region.Len, location.blockLen)
+				return nil, makeDbErr(database.ErrBlockRegionInvalid, str, nil)
+			}
 		}
 
 		fetchList = append(fetchList, bulkFetchData{&location, i})
