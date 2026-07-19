@@ -508,6 +508,89 @@ func TestPublicKeyFromInputRejects(t *testing.T) {
 	}
 }
 
+// TestPublicKeyFromInputAnnex tests the BIP-0341 annex handling of taproot
+// input parsing. The annex is any last witness element whose first byte is
+// 0x50 — not only a single-byte 0x50 element, a divergence found in other
+// BIP-0352 implementations. Mishandling the annex shifts which element is
+// treated as the control block, bypassing the NUMS internal key skip.
+func TestPublicKeyFromInputAnnex(t *testing.T) {
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	outputKey := schnorr.SerializePubKey(privKey.PubKey())
+	p2trScript := append(
+		[]byte{txscript.OP_1, txscript.OP_DATA_32}, outputKey...,
+	)
+	prevOutFetcher := func(wire.OutPoint) ([]byte, error) {
+		return p2trScript, nil
+	}
+
+	// A multi-byte annex: first byte 0x50, arbitrary payload.
+	annex := []byte{0x50, 0xde, 0xad, 0xbe, 0xef}
+	keyPathSig := make([]byte, 64)
+
+	// Control blocks: leaf version/parity byte plus the 32-byte internal
+	// key. The internal key is only compared against the NUMS point, so
+	// the non-NUMS one doesn't have to be a valid key.
+	numsControlBlock := append([]byte{0xc0}, BIP0341NUMSPoint...)
+	otherInternalKey := make([]byte, 32)
+	for i := range otherInternalKey {
+		otherInternalKey[i] = 0x22
+	}
+	otherControlBlock := append([]byte{0xc0}, otherInternalKey...)
+	leafScript := []byte{txscript.OP_TRUE}
+
+	testCases := []struct {
+		name      string
+		witness   wire.TxWitness
+		expectErr bool
+	}{{
+		// A key path spend with an annex still extracts the output
+		// key from the scriptPubKey.
+		name:    "key path with annex",
+		witness: wire.TxWitness{keyPathSig, annex},
+	}, {
+		// A script path spend with a NUMS internal key must be
+		// skipped, with or without an annex: if the annex were not
+		// stripped, it would be mistaken for the control block and
+		// the NUMS check would miss.
+		name: "script path NUMS with annex",
+		witness: wire.TxWitness{
+			leafScript, numsControlBlock, annex,
+		},
+		expectErr: true,
+	}, {
+		name:      "script path NUMS without annex",
+		witness:   wire.TxWitness{leafScript, numsControlBlock},
+		expectErr: true,
+	}, {
+		// A script path spend with any other internal key uses the
+		// output key from the scriptPubKey.
+		name: "script path non-NUMS with annex",
+		witness: wire.TxWitness{
+			leafScript, otherControlBlock, annex,
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(tt *testing.T) {
+			pubKey, err := PublicKeyFromInput(&wire.TxIn{
+				Witness: tc.witness,
+			}, prevOutFetcher)
+
+			if tc.expectErr {
+				require.Error(tt, err)
+
+				return
+			}
+
+			require.NoError(tt, err)
+			require.Equal(
+				tt, outputKey, schnorr.SerializePubKey(pubKey),
+			)
+		})
+	}
+}
+
 // TestPublicKeyFromInputShortControlBlock tests that a taproot witness that
 // looks like a script path spend but carries a control block shorter than
 // the mandatory 33 bytes yields an error instead of a panic. Such witnesses

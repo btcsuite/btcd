@@ -447,6 +447,47 @@ func p2pkScript(t *testing.T, net *chaincfg.Params,
 	return addrScript(t, addr)
 }
 
+// TestCalculateInputHashTweakOrdering tests that the smallest outpoint is
+// selected by comparing the serialized form (32-byte little-endian txid
+// followed by the little-endian uint32 vout), not by integer comparison:
+// for the same txid, vout 256 serializes as 00 01 00 00 and therefore sorts
+// before vout 1 (01 00 00 00). Getting this wrong produces a valid-looking
+// but different input hash, silently breaking sender/receiver agreement.
+func TestCalculateInputHashTweakOrdering(t *testing.T) {
+	t.Parallel()
+
+	sumKey := pubKeyFromByte(t, 1)
+
+	var txid chainhash.Hash
+	for i := range txid {
+		txid[i] = 0x11
+	}
+	op1 := wire.OutPoint{Hash: txid, Index: 1}
+	op256 := wire.OutPoint{Hash: txid, Index: 256}
+
+	both, err := CalculateInputHashTweak(
+		[]wire.OutPoint{op1, op256}, sumKey,
+	)
+	require.NoError(t, err)
+
+	// The input order must not matter.
+	reversed, err := CalculateInputHashTweak(
+		[]wire.OutPoint{op256, op1}, sumKey,
+	)
+	require.NoError(t, err)
+	require.Equal(t, both, reversed)
+
+	// The hash must commit to vout 256, the lexicographically smallest
+	// serialized outpoint, despite 1 < 256 as integers.
+	only256, err := CalculateInputHashTweak([]wire.OutPoint{op256}, sumKey)
+	require.NoError(t, err)
+	require.Equal(t, only256, both)
+
+	only1, err := CalculateInputHashTweak([]wire.OutPoint{op1}, sumKey)
+	require.NoError(t, err)
+	require.NotEqual(t, only1, both)
+}
+
 // TestMaxRecipientsPerGroup tests the K_max per-scan-key-group limit: a group
 // of exactly MaxRecipientsPerGroup recipients is allowed, but one more is
 // rejected.
