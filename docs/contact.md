@@ -1,15 +1,13 @@
 # Contact
 
-## IRC
+## Issues / discussion
 
-* [irc.libera.chat](irc://irc.libera.chat), channel `#btcd`
+* [GitHub issues](https://github.com/bitcoin-praxis/bitcoin-praxis/issues) for this fork
+* [GitHub](https://github.com/bitcoin-praxis/bitcoin-praxis)
 
-## Mailing Lists
+## Upstream (btcd)
 
-* [btcd](mailto:btcd+subscribe@opensource.conformal.com): discussion of btcd and its packages.
-* [btcd-commits](mailto:btcd-commits+subscribe@opensource.conformal.com): readonly mail-out of source code changes.
+For upstream btcd heritage:
 
-## Issue Tracker
-
-The [integrated github issue tracker](https://github.com/btcsuite/btcd/issues)
-is used for this project.
+* IRC: [irc.libera.chat](irc://irc.libera.chat), channel `#btcd`
+* [btcsuite/btcd issues](https://github.com/btcsuite/btcd/issues)

@@ -65,7 +65,7 @@ goimports:
 build:
 	@$(call print, "Building all binaries")
 	$(GOBUILD) -o praxisd $(PKG)
-	$(GOBUILD) -o btcctl $(PKG)/cmd/btcctl
+	$(GOBUILD) -o praxctl $(PKG)/cmd/praxctl
 	$(GOBUILD) -o gencerts $(PKG)/cmd/gencerts
 	$(GOBUILD) -o findcheckpoint $(PKG)/cmd/findcheckpoint
 	$(GOBUILD) -o addblock $(PKG)/cmd/addblock
@@ -74,16 +74,16 @@ build:
 install:
 	@$(call print, "Installing all binaries")
 	$(GOBUILD) -o $(GO_BIN)/praxisd $(PKG)
-	$(GOINSTALL) $(PKG)/cmd/btcctl
+	$(GOBUILD) -o $(GO_BIN)/praxctl $(PKG)/cmd/praxctl
 	$(GOINSTALL) $(PKG)/cmd/gencerts
 	$(GOINSTALL) $(PKG)/cmd/findcheckpoint
 	$(GOINSTALL) $(PKG)/cmd/addblock
 
-#? release-install: Install praxisd and btcctl release binaries, place them in $GOBIN
+#? release-install: Install praxisd and praxctl release binaries, place them in $GOBIN
 release-install:
-	@$(call print, "Installing praxisd and btcctl release binaries")
+	@$(call print, "Installing praxisd and praxctl release binaries")
 	env CGO_ENABLED=0 $(GOBUILD) -o $(GO_BIN)/praxisd -trimpath -ldflags="-s -w -buildid=" $(PKG)
-	env CGO_ENABLED=0 $(GOINSTALL) -trimpath -ldflags="-s -w -buildid=" $(PKG)/cmd/btcctl
+	env CGO_ENABLED=0 $(GOBUILD) -o $(GO_BIN)/praxctl -trimpath -ldflags="-s -w -buildid=" $(PKG)/cmd/praxctl
 
 # =======
 # TESTING

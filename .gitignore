@@ -50,7 +50,7 @@ coverage.txt.bak
 # Binaries produced by "make build"
 /addblock
 /btcctl
-/btcd
+/praxctl
 /praxisd
 /findcheckpoint
 /gencerts

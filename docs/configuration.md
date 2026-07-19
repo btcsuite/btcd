@@ -144,7 +144,7 @@ on the last time it was updated.
 See [this](https://bitcointalk.org/index.php?topic=145386.0) thread on
 bitcointalk for more details.
 
-**NOTE:** Using bootstrap.dat is entirely optional.  Btcd will download the
+**NOTE:** Using bootstrap.dat is entirely optional.  praxisd will download the
 block chain from other peers through the Bitcoin protocol with no extra
 configuration needed.
 
@@ -195,11 +195,12 @@ and we prefer to keep the daemon itself as lightweight as possible.
 **Windows:**
 
 ```bat
-"%PROGRAMFILES%\Btcd Suite\Btcd\addblock" -i C:\Path\To\bootstrap.dat
+addblock.exe -i C:\Path\To\bootstrap.dat
 ```
 
 **Linux/Unix/BSD/POSIX:**
 
 ```bash
-$GOPATH/bin/addblock -i /path/to/bootstrap.dat
+./addblock -i /path/to/bootstrap.dat
+# or, if installed: $GOBIN/addblock -i /path/to/bootstrap.dat
 ```

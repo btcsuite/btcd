@@ -34,10 +34,10 @@ names are Bitcoin-Praxis / `praxisd`.
 $ git clone https://github.com/bitcoin-praxis/bitcoin-praxis.git
 $ cd bitcoin-praxis
 $ go build -o praxisd .
-$ go build -o btcctl ./cmd/btcctl
+$ go build -o praxctl ./cmd/praxctl
 ```
 
-Or `make build` (emits `praxisd`).
+Or `make build` (emits `praxisd` and `praxctl`).
 
 ## Run
 

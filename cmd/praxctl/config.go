@@ -28,9 +28,9 @@ const (
 
 var (
 	praxisdHomeDir        = btcutil.AppDataDir("praxisd", false)
-	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
+	praxctlHomeDir        = btcutil.AppDataDir("praxctl", false)
 	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
-	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
+	defaultConfigFile     = filepath.Join(praxctlHomeDir, "praxctl.conf")
 	defaultRPCServer      = "localhost"
 	defaultRPCCertFile    = filepath.Join(praxisdHomeDir, "rpc.cert")
 	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
@@ -89,7 +89,7 @@ func listCommands() {
 	}
 }
 
-// config defines the configuration options for btcctl.
+// config defines the configuration options for praxctl.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
@@ -168,7 +168,7 @@ func normalizeAddress(addr string, chain *chaincfg.Params, useWallet bool) (stri
 func cleanAndExpandPath(path string) string {
 	// Expand initial ~ to OS specific home directory.
 	if strings.HasPrefix(path, "~") {
-		homeDir := filepath.Dir(btcctlHomeDir)
+		homeDir := filepath.Dir(praxctlHomeDir)
 		path = strings.Replace(path, "~", homeDir, 1)
 	}
 
@@ -233,7 +233,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
-		// Use config file for RPC server to create default btcctl config
+		// Use config file for RPC server to create default praxctl config
 		var serverConfigPath string
 		if preCfg.Wallet {
 			serverConfigPath = filepath.Join(btcwalletHomeDir, "btcwallet.conf")
@@ -322,7 +322,7 @@ func loadConfig() (*config, []string, error) {
 }
 
 // createDefaultConfig creates a basic config file at the given destination path.
-// For this it tries to read the config file for the RPC server (either btcd or
+// For this it tries to read the config file for the RPC server (either praxisd or
 // btcwallet), and extract the RPC user and password from it.
 func createDefaultConfigFile(destinationPath, serverConfigPath string) error {
 	// Read the RPC server config

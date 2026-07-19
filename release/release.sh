@@ -22,7 +22,7 @@ fi
 go mod vendor
 tar -cvzf vendor.tar.gz vendor
 
-PACKAGE=btcd
+PACKAGE=bitcoin-praxis
 MAINDIR=$PACKAGE-$TAG
 mkdir -p $MAINDIR
 
@@ -93,8 +93,8 @@ for i in $SYS; do
     cd $PACKAGE-$i-$TAG
 
     echo "Building:" $OS $ARCH $ARM
-    env CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH GOARM=$ARM go build -v -trimpath -ldflags="-s -w -buildid=" github.com/btcsuite/btcd
-    env CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH GOARM=$ARM go build -v -trimpath -ldflags="-s -w -buildid=" github.com/btcsuite/btcd/cmd/btcctl
+    env CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH GOARM=$ARM go build -v -trimpath -ldflags="-s -w -buildid=" -o praxisd github.com/btcsuite/btcd
+    env CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH GOARM=$ARM go build -v -trimpath -ldflags="-s -w -buildid=" -o praxctl github.com/btcsuite/btcd/cmd/praxctl
     cd ..
 
     if [[ $OS = "windows" ]]; then

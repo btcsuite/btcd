@@ -13,7 +13,7 @@ represent real money and introducing bugs and security vulnerabilities can have
 far more dire consequences than in typical projects where having a small bug is
 minimal by comparison.  In the world of cryptocurrencies, even the smallest bug
 in the wrong area can cost people a significant amount of money.  For this
-reason, the btcd suite has a formalized and rigorous development process which
+reason, Bitcoin-Praxis has a formalized and rigorous development process which
 is outlined on this page.
 
 We highly encourage code contributions, however it is imperative that you adhere
@@ -59,7 +59,7 @@ security and performance implications.
 
 ## Required Reading
 
-- [Effective Go](http://golang.org/doc/effective_go.html) - The entire btcd
+- [Effective Go](http://golang.org/doc/effective_go.html) - The entire Bitcoin-Praxis
   suite follows the guidelines in this document.  For your code to be accepted,
   it must follow the guidelines therein.
 - [Original Satoshi Whitepaper](http://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&ved=0CCkQFjAA&url=http%3A%2F%2Fbitcoin.org%2Fbitcoin.pdf&ei=os3VUuH8G4SlsASV74GoAg&usg=AFQjCNEipPLigou_1MfB7DQjXCNdlylrBg&sig2=FaHDuT5z36GMWDEnybDJLg&bvm=bv.59378465,d.b2I) - This is the white paper that started it all.  Having a solid
@@ -94,7 +94,7 @@ This approach has several benefits:
 
 ## Testing
 
-One of the major design goals of all core btcd packages is to aim for complete
+One of the major design goals of all core Bitcoin-Praxis packages is to aim for complete
 test coverage.  This is financial software so bugs and regressions can cost
 people real money.  For this reason every effort must be taken to ensure the
 code is as accurate and bug-free as possible.  Thorough testing is a good way to
@@ -255,7 +255,7 @@ a good thing.
 ## Code Approval Process
 
 This section describes the code approval process that is used for code
-contributions.  This is how to get your changes into btcd.
+contributions.  This is how to get your changes into Bitcoin-Praxis.
 
 ## Code Review
 
@@ -334,5 +334,5 @@ Rejoice as you will now be listed as a [contributor](https://github.com/btcsuite
 ## Licensing of Contributions
 
 All contributions must be licensed with the
-[ISC license](https://github.com/btcsuite/btcd/blob/master/LICENSE).  This is
-the same license as all of the code in the btcd suite.
+[ISC license](https://github.com/bitcoin-praxis/bitcoin-praxis/blob/master/LICENSE).  This is
+the same license as all of the code in the Bitcoin-Praxis suite.

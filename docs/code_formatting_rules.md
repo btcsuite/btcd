@@ -10,11 +10,11 @@ eliminate many discussions, the resulting code can still look and feel very
 differently among different developers.
 
 We aim to enforce a few additional rules to unify the look and feel of all code
-in `btcd` to help improve the overall readability.
+in Bitcoin-Praxis to help improve the overall readability.
 
 ## Spacing
 
-Blocks of code within `btcd` should be segmented into logical stanzas of
+Blocks of code within Bitcoin-Praxis should be segmented into logical stanzas of
 operation. Such spacing makes the code easier to follow at a skim, and reduces
 unnecessary line noise. Coupled with the commenting scheme specified in the
 [contribution guide](./code_contribution_guidelines.md#code-documentation-and-commenting),

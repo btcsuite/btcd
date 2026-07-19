@@ -601,8 +601,8 @@ var helpDescsEnUS = map[string]string{
 	"signmessagewithprivkey--result0":  "The signature of the message encoded in base 64",
 
 	// StopCmd help.
-	"stop--synopsis": "Shutdown btcd.",
-	"stop--result0":  "The string 'btcd stopping.'",
+	"stop--synopsis": "Shutdown praxisd.",
+	"stop--result0":  "The string 'praxisd stopping.'",
 
 	// SubmitBlockOptions help.
 	"submitblockoptions-workid": "This parameter is currently ignored",
