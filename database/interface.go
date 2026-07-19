@@ -229,6 +229,17 @@ type Tx interface {
 	// Other errors are possible depending on the implementation.
 	StoreBlock(block *btcutil.Block) error
 
+	// DeleteBlock removes the block body for the given hash from block
+	// storage. Chain-index headers and validation status are the caller's
+	// responsibility. Missing blocks are a no-op (idempotent). Flat-file
+	// bytes may remain until a later reclaim/prune of the containing file.
+	//
+	// The interface contract guarantees at least the following errors will
+	// be returned (other implementation-specific errors are possible):
+	//   - ErrTxNotWritable if attempted against a read-only transaction
+	//   - ErrTxClosed if the transaction has already been closed
+	DeleteBlock(hash *chainhash.Hash) error
+
 	// HasBlock returns whether or not a block with the given hash exists
 	// in the database.
 	//

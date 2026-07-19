@@ -1208,6 +1208,50 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 	return nil
 }
 
+// DeleteBlock removes the block-index location for hash so the body is no
+// longer fetchable. It does not punch holes in flat files; reclaim is left to
+// PruneBlocks / ReclaimHotSpace. Idempotent when the block is already absent.
+// Pending cold compaction for the hash is cancelled so commit does not
+// recreate the index row.
+//
+// This function is part of the database.Tx interface implementation.
+func (tx *transaction) DeleteBlock(hash *chainhash.Hash) error {
+	if err := tx.checkClosed(); err != nil {
+		return err
+	}
+	if !tx.writable {
+		str := "delete block requires a writable database transaction"
+		return makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+
+	// Drop any pending cold compaction that would re-insert the index row.
+	if n := len(tx.pendingColdCompactions); n > 0 {
+		kept := tx.pendingColdCompactions[:0]
+		for _, pending := range tx.pendingColdCompactions {
+			if pending.hash == nil || *pending.hash != *hash {
+				kept = append(kept, pending)
+			}
+		}
+		tx.pendingColdCompactions = kept
+	}
+
+	// A block only pending-store in this tx never hit disk; drop the pending
+	// entry. The pendingBlockData slice keeps the bytes (harmless; not written
+	// if removed from the map — writePendingAndCommit iterates pendingBlockData
+	// by slice, so also clear the map entry alone is insufficient). Reject
+	// pending-store deletes: callers age-out committed side-chain bodies only.
+	if _, exists := tx.pendingBlocks[*hash]; exists {
+		str := fmt.Sprintf("block %s is pending store; cannot delete", hash)
+		return makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	if err := tx.blockIdxBucket.Delete(hash[:]); err != nil {
+		return err
+	}
+	log.Tracef("Deleted block index entry for %s", hash)
+	return nil
+}
+
 // CompactBlockToCold schedules a block to be moved from the hot tier to the
 // cold tier at commit time: the block's witness is stripped, the non-witness
 // bytes are zstd-compressed, and the block index entry is updated to point at

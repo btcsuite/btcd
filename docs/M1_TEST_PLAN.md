@@ -37,6 +37,11 @@ and the disk-reduction headline.
 | `TestWitnessBufferAgeOut` | `blockchain/ageout_test.go` | Blockchain-layer age-out driver: blocks beyond buffer are compacted, cold files created on disk, all blocks remain readable |
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
 | `TestWitnessBufferConfig` | `blockchain/ageout_test.go` | `Config.WitnessBuffer` wires through to `BlockChain.witnessBuffer` |
+| `TestInvalidatePastWitnessBufferRefused` | `blockchain/witness_prune_ops_test.go` | Deep `InvalidateBlock` past the hot window is refused with `ErrWitnessPruned`; shallow invalidate still works |
+| `TestStaleSideChainBodyDropped` | `blockchain/witness_prune_ops_test.go` | Alternate forks past the witness buffer drop bodies (headers retained); recent side tips stay hot |
+| `TestDeleteBlock` | `database/ffldb/deleteblock_test.go` | `DeleteBlock` removes body from index, is idempotent, leaves sibling blocks intact |
+| `TestColdCompactionSurvivesReopen` | `database/ffldb/cold_reopen_test.go` | After compact + close + reopen, block stays cold and FetchBlock matches stripped bytes (post-commit crash recovery) |
+| `TestCreateTxRawResultWitnessPruned` | `witness_pruned_rpc_test.go` | Verbose tx JSON sets `witness_pruned` for cold loads and does not invent a historical wtxid |
 | `TestFullBlocks` | `blockchain/fullblocktests` | Consensus suite passes with two-tier storage enabled (22s, race-clean) |
 | `TestRoundTrip` | `blockcompress/codec_test.go` | `decompress(compress(x)) == x` for representative inputs |
 | `TestDeterminismAcrossInstances` | `blockcompress/codec_test.go` | Two codecs on same version produce identical compressed output |

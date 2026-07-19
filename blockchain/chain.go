@@ -776,6 +776,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 					}
 				}
 			}
+
+			// Drop bodies of stale side-chain forks past the witness
+			// buffer. Headers stay in the block index; bodies are gone
+			// (same spirit as prune). Side chains never received
+			// txindex/spend-journal entries, so no DisconnectBlock.
+			if err := b.dropStaleSideChainBodies(dbTx, ageOutHeight); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -810,6 +818,33 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	return b.db.Update(func(dbTx database.Tx) error {
 		return b.utxoCache.flush(dbTx, FlushIfNeeded, state)
 	})
+}
+
+// dropStaleSideChainBodies deletes block bodies for non-best-chain forks at or
+// below dropHeight. Headers remain in the block index (HaveData cleared) so
+// ChainTips / fork awareness survive; FetchBlock fails until the block is
+// re-downloaded. Must run inside a writable database transaction.
+func (b *BlockChain) dropStaleSideChainBodies(dbTx database.Tx, dropHeight int32) error {
+	for _, tip := range b.index.InactiveTips(b.bestChain) {
+		for n := tip; n != nil && !b.bestChain.Contains(n); n = n.parent {
+			if n.height > dropHeight || !n.status.HaveData() {
+				continue
+			}
+			if err := dbTx.DeleteBlock(&n.hash); err != nil {
+				return fmt.Errorf("drop stale side-chain body %s (height %d): %w",
+					n.hash, n.height, err)
+			}
+			b.index.UnsetStatusFlags(n, statusDataStored)
+			// Persist header-only status: flushToDB skips !HaveData nodes.
+			if err := dbStoreBlockNode(dbTx, n); err != nil {
+				return fmt.Errorf("persist header-only status for %s: %w",
+					n.hash, err)
+			}
+			log.Debugf("Dropped stale side-chain body %s (height %d)",
+				n.hash, n.height)
+		}
+	}
+	return nil
 }
 
 // disconnectBlock handles disconnecting the passed node/block from the end of

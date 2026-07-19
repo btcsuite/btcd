@@ -144,7 +144,10 @@ The storage is split into two tiers by age:
   compresses the stripped bytes via `blockcompress`, writes the result to a cold
   block file, updates the block index to point at the new location, and reclaims
   the hot-tier space. The cold tier is what holds the vast majority of the chain
-  and is where the ~70% reduction comes from.
+  and is where the ~70% reduction comes from. Alternate forks (side chains) that
+  never become tip are not compacted: once they fall past the witness buffer their
+  **block bodies are dropped** (headers retained in the block index) — they are
+  dead for realistic reorgs, and deep cold attach is already refused.
 
 Because recent blocks are stored whole and old blocks have no witness at all,
 there is never a case where a stripped block needs witness re-attached. The
