@@ -257,6 +257,15 @@ func PublicKeyFromInput(txIn *wire.TxIn,
 		// Script path spend with NUMS internal key is not allowed.
 		if len(witness) > 1 {
 			controlBlock := witness[len(witness)-1]
+
+			// A valid control block carries at least the leaf
+			// version/parity byte and the 32-byte internal key.
+			// Anything shorter cannot be a valid script path spend
+			// and must not be extracted from (or panic on).
+			if len(controlBlock) < 33 {
+				return nil, ErrInvalidTaprootWitness
+			}
+
 			internalKey := controlBlock[1:33]
 			if bytes.Equal(internalKey, BIP0341NUMSPoint) {
 				return nil, ErrNonStandardScript
