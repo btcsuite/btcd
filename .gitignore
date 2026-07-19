@@ -51,9 +51,11 @@ coverage.txt.bak
 /addblock
 /btcctl
 /btcd
+/praxisd
 /findcheckpoint
 /gencerts
 
 .DS_Store
 .aider*
 ln-soak-cold/*
+bin/*

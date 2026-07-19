@@ -1,121 +1,95 @@
-btcd
-====
+# Bitcoin-Praxis
 
-[![Build Status](https://github.com/btcsuite/btcd/workflows/Build%20and%20Test/badge.svg)](https://github.com/btcsuite/btcd/actions)
-[![Coverage Status](https://coveralls.io/repos/github/btcsuite/btcd/badge.svg?branch=master)](https://coveralls.io/github/btcsuite/btcd?branch=master)
+[![Build Status](https://github.com/bitcoin-praxis/bitcoin-praxis/workflows/Build%20and%20Test/badge.svg)](https://github.com/bitcoin-praxis/bitcoin-praxis/actions)
 [![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/btcsuite/btcd)
 
-btcd is an alternative full node bitcoin implementation written in Go (golang).
+**Bitcoin-Praxis** is a Bitcoin full node forked from
+[btcd](https://github.com/btcsuite/btcd). The daemon binary is **`praxisd`**.
 
-This project is currently under active development and is in a Beta state.  It
-is extremely stable and has been in production use since October 2013.
+It downloads, validates, and serves the blockchain using the same consensus
+rules as Bitcoin Core (including consensus bugs), inherited from btcd's long
+production track record since October 2013. Consensus safety remains the hard
+gate: `blockchain/fullblocktests` must pass with identical outcomes.
 
-It properly downloads, validates, and serves the block chain using the exact
-rules (including consensus bugs) for block acceptance as Bitcoin Core.  We have
-taken great care to avoid btcd causing a fork to the block chain.  It includes a
-full block validation testing framework which contains all of the 'official'
-block acceptance tests (and some additional ones) that is run on every pull
-request to help ensure it properly follows consensus.  Also, it passes all of
-the JSON test data in the Bitcoin Core code.
+## What is different
 
-It also properly relays newly mined blocks, maintains a transaction pool, and
-relays individual transactions that have not yet made it into a block.  It
-ensures all individual transactions admitted to the pool follow the rules
-required by the block chain and also includes more strict checks which filter
-transactions based on miner requirements ("standard" transactions).
+- **Witness-separated cold storage (M1, shipped):** past a rolling
+  `--witness-buffer` (default 2016), witness is excised and the stripped block
+  is zstd-compressed. Measured **52.5%** smaller on a 1005 GB mainnet chain
+  (~477 GB). Distinct from `--prune`, which deletes whole blocks.
+- **Roadmap:** parallel IBD validation (M2), in-process wallet +
+  **Bitcoin-Praxis Wallet** GUI (M3), cross-platform async I/O (M4), DATUM /
+  Stratum v2 mining (M5). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
-One key difference between btcd and Bitcoin Core is that btcd does *NOT* include
-wallet functionality and this was a very intentional design decision.  See the
-blog entry [here](https://web.archive.org/web/20171125143919/https://blog.conformal.com/btcd-not-your-moms-bitcoin-daemon)
-for more details.  This means you can't actually make or receive payments
-directly with btcd.  That functionality is provided by the
-[btcwallet](https://github.com/btcsuite/btcwallet) and
-[Paymetheus](https://github.com/btcsuite/Paymetheus) (Windows-only) projects
-which are both under active development.
+The Go module path is still `github.com/btcsuite/btcd` for now; user-facing
+names are Bitcoin-Praxis / `praxisd`.
 
 ## Requirements
 
-[Go](http://golang.org) 1.25 or newer.
+[Go](https://go.dev) 1.25 or newer.
 
-## Installation
-
-https://github.com/btcsuite/btcd/releases
-
-#### Linux/BSD/MacOSX/POSIX - Build from Source
-
-- Install Go according to the installation instructions here:
-  http://golang.org/doc/install
-
-- Ensure Go was installed properly and is a supported version:
+## Build
 
 ```bash
-$ go version
-$ go env GOROOT GOPATH
+$ git clone https://github.com/bitcoin-praxis/bitcoin-praxis.git
+$ cd bitcoin-praxis
+$ go build -o praxisd .
+$ go build -o btcctl ./cmd/btcctl
 ```
 
-NOTE: The `GOROOT` and `GOPATH` above must not be the same path.  It is
-recommended that `GOPATH` is set to a directory in your home directory such as
-`~/goprojects` to avoid write permission issues.  It is also recommended to add
-`$GOPATH/bin` to your `PATH` at this point.
+Or `make build` (emits `praxisd`).
 
-- Run the following commands to obtain btcd, all dependencies, and install it:
+## Run
 
 ```bash
-$ cd $GOPATH/src/github.com/btcsuite/btcd
-$ go install -v . ./cmd/...
+$ ./praxisd
 ```
 
-- btcd (and utilities) will now be installed in ```$GOPATH/bin```.  If you did
-  not already add the bin directory to your system path during Go installation,
-  we recommend you do so now.
+Default data directory: `~/.praxisd/` (config: `~/.praxisd/praxisd.conf`).
 
-## Updating
+If you previously used upstream btcd's `~/.btcd/`, data is **not** migrated
+automatically — copy, symlink, or re-sync.
 
-#### Linux/BSD/MacOSX/POSIX - Build from Source
-
-- Run the following commands to update btcd, all dependencies, and install it:
+Useful flags:
 
 ```bash
-$ cd $GOPATH/src/github.com/btcsuite/btcd
-$ git pull
-$ go install -v . ./cmd/...
+$ ./praxisd --witness-buffer=2016   # default: hot window with full witness
+$ ./praxisd --witness-buffer=0      # full archival (keep witness forever)
+$ ./praxisd --prune=1536            # Core-style prune; forces witness-buffer off
 ```
-
-## Getting Started
-
-btcd has several configuration options available to tweak how it runs, but all
-of the basic operations described in the intro section work with zero
-configuration.
-
-#### Linux/BSD/POSIX/Source
-
-```bash
-$ ./btcd
-```
-
-## IRC
-
-- irc.libera.chat
-- channel #btcd
-- [webchat](https://web.libera.chat/gamja/?channels=btcd)
-
-## Issue Tracker
-
-The [integrated github issue tracker](https://github.com/btcsuite/btcd/issues)
-is used for this project.
 
 ## Documentation
 
-The documentation is a work-in-progress.  It is located in the [docs](https://github.com/btcsuite/btcd/tree/master/docs) folder.
+| Doc | Contents |
+|-----|----------|
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones M1–M5 |
+| [docs/M1_TEST_PLAN.md](docs/M1_TEST_PLAN.md) | M1 test matrix + **tests we ran** |
+| [docs/configuration.md](docs/configuration.md) | Config / listen options |
+| [docs/](docs/) | Full docs hub |
 
-## Release Verification
+## Tests
 
-Please see our [documentation on the current build/verification
-process](https://github.com/btcsuite/btcd/tree/master/release) for all our
-releases for information on how to verify the integrity of published releases
-using our reproducible build system.
+```bash
+$ go test ./... -test.timeout=20m
+```
+
+See [docs/M1_TEST_PLAN.md](docs/M1_TEST_PLAN.md) for the witness-storage matrix,
+fuzz targets, mainnet measurement, IBD, and LN soak notes.
+
+## Fund
+
+- **Lightning:** `lively-reindeer-84@rizful.com`
+- **On-chain:** `bc1psksl57x4nlpn08qse899jruk7t65jgj7n72gd835urgsqyu20acsq9408c`
+
+The GitHub Sponsor button also lists these via
+[`.github/FUNDING.yml`](.github/FUNDING.yml).
+
+## Upstream
+
+Bitcoin-Praxis inherits btcd's ISC license and consensus test suite. Upstream:
+[btcsuite/btcd](https://github.com/btcsuite/btcd).
 
 ## License
 
-btcd is licensed under the [copyfree](http://copyfree.org) ISC License.
+Bitcoin-Praxis is licensed under the [copyfree](http://copyfree.org) ISC License
+(inherited from btcd).

@@ -19,20 +19,20 @@ import (
 )
 
 var (
-	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
+	praxisdHomeDir  = btcutil.AppDataDir("praxisd", false)
 	knownDbTypes    = database.SupportedDrivers()
 	activeNetParams = &chaincfg.MainNetParams
 
 	// Default global config.
 	cfg = &config{
-		DataDir: filepath.Join(btcdHomeDir, "data"),
+		DataDir: filepath.Join(praxisdHomeDir, "data"),
 		DbType:  "ffldb",
 	}
 )
 
 // config defines the global configuration options.
 type config struct {
-	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
+	DataDir        string `short:"b" long:"datadir" description:"Location of the praxisd data directory"`
 	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
 	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`

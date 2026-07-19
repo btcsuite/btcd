@@ -38,11 +38,11 @@ import (
 )
 
 const (
-	defaultConfigFilename        = "btcd.conf"
+	defaultConfigFilename        = "praxisd.conf"
 	defaultDataDirname           = "data"
 	defaultLogLevel              = "info"
 	defaultLogDirname            = "logs"
-	defaultLogFilename           = "btcd.log"
+	defaultLogFilename           = "praxisd.log"
 	defaultMaxPeers              = 125
 	defaultBanDuration           = time.Hour * 24
 	defaultBanThreshold          = 100
@@ -66,7 +66,7 @@ const (
 	defaultMaxOrphanTxSize       = 100000
 	defaultSigCacheMaxSize       = 100000
 	defaultUtxoCacheMaxSizeMiB   = 250
-	sampleConfigFilename         = "sample-btcd.conf"
+	sampleConfigFilename         = "sample-praxisd.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	pruneMinSize                 = 1536
@@ -80,7 +80,7 @@ const (
 )
 
 var (
-	defaultHomeDir     = btcutil.AppDataDir("btcd", false)
+	defaultHomeDir     = btcutil.AppDataDir("praxisd", false)
 	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
 	knownDbTypes       = database.SupportedDrivers()
@@ -102,15 +102,15 @@ func minUint32(a, b uint32) uint32 {
 	return b
 }
 
-// config defines the configuration options for btcd.
+// config defines the configuration options for praxisd.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
 	AddCheckpoints       []string      `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
 	AddPeers             []string      `short:"a" long:"addpeer" description:"Add a peer to connect with at startup"`
 	AddrIndex            bool          `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
-	AgentBlacklist       []string      `long:"agentblacklist" description:"A comma separated list of user-agent substrings which will cause btcd to reject any peers whose user-agent contains any of the blacklisted substrings."`
-	AgentWhitelist       []string      `long:"agentwhitelist" description:"A comma separated list of user-agent substrings which will cause btcd to require all peers' user-agents to contain one of the whitelisted substrings. The blacklist is applied before the whitelist, and an empty whitelist will allow all agents that do not fail the blacklist."`
+	AgentBlacklist       []string      `long:"agentblacklist" description:"A comma separated list of user-agent substrings which will cause praxisd to reject any peers whose user-agent contains any of the blacklisted substrings."`
+	AgentWhitelist       []string      `long:"agentwhitelist" description:"A comma separated list of user-agent substrings which will cause praxisd to require all peers' user-agents to contain one of the whitelisted substrings. The blacklist is applied before the whitelist, and an empty whitelist will allow all agents that do not fail the blacklist."`
 	BanDuration          time.Duration `long:"banduration" description:"How long to ban misbehaving peers.  Valid time units are {s, m, h}.  Minimum 1 second"`
 	BanThreshold         uint32        `long:"banthreshold" description:"Maximum allowed ban score before disconnecting and banning misbehaving peers."`
 	BlockMaxSize         uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
@@ -419,7 +419,7 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) *fl
 //  3. Load configuration file overwriting defaults with any specified options
 //  4. Parse CLI options and overwrite/add any specified options
 //
-// The above results in btcd functioning properly without any config settings
+// The above results in praxisd functioning properly without any config settings
 // while still allowing the user to override settings with config files and
 // command line options.  Command line options always take precedence.
 func loadConfig() (*config, []string, error) {
@@ -1208,7 +1208,7 @@ func loadConfig() (*config, []string, error) {
 	return &cfg, remainingArgs, nil
 }
 
-// createDefaultConfig copies the file sample-btcd.conf to the given destination path,
+// createDefaultConfig copies the file sample-praxisd.conf to the given destination path,
 // and populates it with some randomly generated RPC username and password.
 func createDefaultConfigFile(destinationPath string) error {
 	// Create the destination directory if it does not exists

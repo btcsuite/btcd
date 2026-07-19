@@ -26,8 +26,8 @@ const (
 )
 
 var (
-	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
-	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
+	praxisdHomeDir  = btcutil.AppDataDir("praxisd", false)
+	defaultDataDir  = filepath.Join(praxisdHomeDir, "data")
 	knownDbTypes    = database.SupportedDrivers()
 	activeNetParams = &chaincfg.MainNetParams
 )
@@ -36,7 +36,7 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
+	DataDir        string `short:"b" long:"datadir" description:"Location of the praxisd data directory"`
 	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	UseGoOutput    bool   `short:"g" long:"gooutput" description:"Display the candidates using Go syntax that is ready to insert into the btcchain checkpoint list"`
 	NumCandidates  int    `short:"n" long:"numcandidates" description:"Max num of checkpoint candidates to show {1-20}"`

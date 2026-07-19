@@ -1,0 +1,8 @@
+# These funding links appear under the Sponsor button on GitHub.
+# custom supports up to four URLs (quote any value that contains ':').
+#
+# Lightning: lively-reindeer-84@rizful.com
+# On-chain:  bc1psksl57x4nlpn08qse899jruk7t65jgj7n72gd835urgsqyu20acsq9408c
+custom:
+  - "lightning:lively-reindeer-84@rizful.com"
+  - "bitcoin:bc1psksl57x4nlpn08qse899jruk7t65jgj7n72gd835urgsqyu20acsq9408c"

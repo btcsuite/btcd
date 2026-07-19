@@ -51,11 +51,11 @@ and the disk-reduction headline.
 ## Real-Chain Measurement
 
 The `dicttrain/` directory contains two `//go:build ignore` tools that run
-against a real synced btcd datadir:
+against a real synced praxisd/btcd datadir:
 
 - **`measure.go`**: Streams one block at a time from evenly-spaced `.fdb` files
   across the full chain. Reports per-file and blended witness fraction,
-  compress-only, prune-only, and combined (prune+zstd) ratios. Optionally
+  compress-only, excise-only, and combined (excise+zstd) ratios. Optionally
   benchmarks with a trained dictionary.
 
 - **`main.go`** (dicttrain): Streams blocks from evenly-spaced files, strips
@@ -98,6 +98,22 @@ go test -run='^$' -fuzz=FuzzColdCompactionTxIndex -fuzztime=30s ./blockchain/ind
 # Failing inputs are persisted to blockchain/indexers/testdata/fuzz/ and
 # replayed automatically on subsequent normal test runs as regression cases.
 ```
+
+## Tests we ran
+
+Run log for Bitcoin-Praxis M1 (witness-separated storage) and related soaks.
+This is evidence, not a substitute for the matrix above.
+
+| When (approx.) | What | Result |
+|---|---|---|
+| M1 development | Unit/integration: `database/ffldb`, `blockchain` age-out / excision ops, index cold rewrite; `go test -race` on touched packages; `TestFullBlocks` | Pass (race-clean) |
+| M1 development | Mainnet measurement via `blockcompress/dicttrain/measure.go` on a 1005 GB datadir | **52.5%** blended reduction → ~477 GB |
+| M1 development | Fuzz: `FuzzColdCompactionOffsets`, `FuzzColdCompactionTxIndex` (minutes of `-fuzztime`) | Pass |
+| Post M1 | Testnet4 IBD with parallel block fetch to tip (~144k) | ~4.8 blk/s overall on soak host |
+| Post M1 | Simnet LN cold soak vs excised witness (CSV ≪ `--witness-buffer`): warm/cold pay, coop close, force close, SCB restore | Pass |
+
+**Still planned:** longer mainnet IBD soak; M2 IBD replay benchmark; broader LN
+soak matrix; M3 Bitcoin-Praxis Wallet / GUI acceptance tests (see ROADMAP).
 
 ## What the Tests Prove
 

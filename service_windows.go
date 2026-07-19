@@ -16,13 +16,13 @@ import (
 )
 
 const (
-	// svcName is the name of btcd service.
-	svcName = "btcdsvc"
+	// svcName is the name of the praxisd service.
+	svcName = "praxisdsvc"
 
 	// svcDisplayName is the service name that will be shown in the windows
 	// services list.  Not the svcName is the "real" name which is used
 	// to control the service.  This is only for display purposes.
-	svcDisplayName = "Btcd Service"
+	svcDisplayName = "Bitcoin-Praxis Service"
 
 	// svcDesc is the description of the service.
 	svcDesc = "Downloads and stays synchronized with the bitcoin block " +

@@ -64,25 +64,25 @@ goimports:
 #? build: Build all binaries, place them in project directory
 build:
 	@$(call print, "Building all binaries")
-	$(GOBUILD) $(PKG)
-	$(GOBUILD) $(PKG)/cmd/btcctl
-	$(GOBUILD) $(PKG)/cmd/gencerts
-	$(GOBUILD) $(PKG)/cmd/findcheckpoint
-	$(GOBUILD) $(PKG)/cmd/addblock
+	$(GOBUILD) -o praxisd $(PKG)
+	$(GOBUILD) -o btcctl $(PKG)/cmd/btcctl
+	$(GOBUILD) -o gencerts $(PKG)/cmd/gencerts
+	$(GOBUILD) -o findcheckpoint $(PKG)/cmd/findcheckpoint
+	$(GOBUILD) -o addblock $(PKG)/cmd/addblock
 
 #? install: Install all binaries, place them in $GOPATH/bin
 install:
 	@$(call print, "Installing all binaries")
-	$(GOINSTALL) $(PKG)
+	$(GOBUILD) -o $(GO_BIN)/praxisd $(PKG)
 	$(GOINSTALL) $(PKG)/cmd/btcctl
 	$(GOINSTALL) $(PKG)/cmd/gencerts
 	$(GOINSTALL) $(PKG)/cmd/findcheckpoint
 	$(GOINSTALL) $(PKG)/cmd/addblock
 
-#? release-install: Install btcd and btcctl release binaries, place them in $GOBIN
+#? release-install: Install praxisd and btcctl release binaries, place them in $GOBIN
 release-install:
-	@$(call print, "Installing btcd and btcctl release binaries")
-	env CGO_ENABLED=0 $(GOINSTALL) -trimpath -ldflags="-s -w -buildid=" $(PKG)
+	@$(call print, "Installing praxisd and btcctl release binaries")
+	env CGO_ENABLED=0 $(GOBUILD) -o $(GO_BIN)/praxisd -trimpath -ldflags="-s -w -buildid=" $(PKG)
 	env CGO_ENABLED=0 $(GOINSTALL) -trimpath -ldflags="-s -w -buildid=" $(PKG)/cmd/btcctl
 
 # =======
@@ -175,7 +175,7 @@ tidy-module:
 
 #? help: Get more info on make commands
 help: Makefile
-	@echo " Choose a command run in btcd:"
+	@echo " Choose a command run in Bitcoin-Praxis:"
 	@sed -n 's/^#?//p' $< | column -t -s ':' |  sort | sed -e 's/^/ /'
 
 .PHONY: help

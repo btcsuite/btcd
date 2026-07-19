@@ -31,9 +31,9 @@ func main() {
 		},
 	}
 
-	// Connect to local btcd RPC server using websockets.
-	btcdHomeDir := btcutil.AppDataDir("btcd", false)
-	certs, err := os.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
+	// Connect to local praxisd RPC server using websockets.
+	praxisdHomeDir := btcutil.AppDataDir("praxisd", false)
+	certs, err := os.ReadFile(filepath.Join(praxisdHomeDir, "rpc.cert"))
 	if err != nil {
 		log.Fatal(err)
 	}

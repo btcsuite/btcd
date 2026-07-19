@@ -1,18 +1,18 @@
-# btcd Roadmap: A Credible, Full-Chain Alternative to Bitcoin Core
+# Bitcoin-Praxis Roadmap: A Credible, Full-Chain Alternative to Bitcoin Core
 
 ## Thesis
 
-btcd is a production-grade Bitcoin full node written in Go. It has a long track
-record of stability, consensus test vectors, and already powers a majority share
-of the Lightning Network via LND. It is not, however, a credible alternative to
-Bitcoin Core for most end users — it ships no wallet, no GUI, stores blocks
-uncompressed, and offers no mining job negotiation.
+Bitcoin-Praxis is a production-grade Bitcoin full node forked from btcd (Go).
+btcd has a long track record of stability, consensus test vectors, and already
+powers a majority share of the Lightning Network via LND. Upstream btcd is not,
+however, a credible alternative to Bitcoin Core for most end users — it ships no
+wallet, no GUI, stores blocks uncompressed, and offers no mining job negotiation.
 
-This roadmap turns btcd into that alternative: a single, self-contained binary
-that a non-mining user can run in place of Bitcoin Core, with materially lower
-disk and SSD-wear cost, faster initial block download, a bundled wallet and
-native (non-web) GUI, and — as a final milestone — a decentralized mining job
-server.
+This roadmap turns that foundation into Bitcoin-Praxis: a single self-contained
+`praxisd` binary that a non-mining user can run in place of Bitcoin Core, with
+materially lower disk and SSD-wear cost, faster initial block download, a bundled
+wallet and native (non-web) **Bitcoin-Praxis Wallet** GUI, and — as a final
+milestone — a decentralized mining job server.
 
 The ordering is deliberate: compression is the critical technical risk and goes
 first; parallel validation pairs with it as the speed headline; wallet and GUI
@@ -83,7 +83,7 @@ yields only ~24% because modern blocks are dominated by high-entropy witness
 level. Witness data is the majority of modern-block bytes and the reason
 whole-block compression stalls.
 
-The fix is to **stop storing witness data long-term**. btcd's wire layer
+The fix is to **stop storing witness data long-term**. The wire layer
 already has the split primitive (`SerializeNoWitness` /
 `DeserializeNoWitness` / `SerializeSizeStripped` in `wire/msgblock.go`).
 Witness is required for initial validation and for serving full blocks to
@@ -131,8 +131,8 @@ Earlier two-fixture measurement (post-segwit, 26% and 74% witness):
 
 The storage is split into two tiers by age:
 
-- **Hot tier (recent blocks, last 2016 ≈ 2 weeks): stored exactly as btcd does
-  today.** Full block, with witness, uncompressed. The write/acceptance path is
+- **Hot tier (recent blocks, last 2016 ≈ 2 weeks): stored exactly as praxisd does
+  today (same hot path as upstream btcd).** Full block, with witness, uncompressed. The write/acceptance path is
   *unchanged* — `writeBlock` appends the raw block as today. This keeps the IBD
   hot path free of compression CPU and keeps `FetchBlock` returning a full
   witness-included block (per the `database.Tx` contract) for everything live.
@@ -153,7 +153,7 @@ Because recent blocks are stored whole and old blocks have no witness at all,
 there is never a case where a stripped block needs witness re-attached. The
 witness re-attachment problem does not exist in this design.
 
-- New `btcd/blockcompress/` package: deterministic zstd codec
+- New `blockcompress/` package: deterministic zstd codec
   (`klauspost/compress/zstd`, pure Go) for the cold-tier non-witness stream.
   FormatV1 ships without a trained dictionary — measurement on real mainnet
   blocks showed <0.4 percentage point gain from a dictionary, since zstd's
@@ -175,7 +175,7 @@ witness re-attachment problem does not exist in this design.
   storage corruption is caught today. zstd's frame checksum additionally
   validates the compressed stream. `blockLocation.blockLen` continues to mean
   "on-disk record bytes"; no block-index migration.
-- **Index-before-prune.** `txindex`/`addrindex` populate from the in-memory
+- **Index-before-excision.** `txindex`/`addrindex` populate from the in-memory
   block (witness present) at validation time, *before* the block reaches the cold
   tier. Indexes are keyed on `txid` (not `wtxid`), so they remain valid and
   complete — including Taproot script-path spends, whose spending conditions are
@@ -216,7 +216,7 @@ standard objection that compression endangers deterministic results:
    silently yielding wrong bytes.
 3. **Encoder config pinned per format version.** The zstd encoder level and
    dictionary bytes are fixed by the format-version byte, so all nodes on the
-   same btcd version produce identical compressed files. A future format bump
+   same praxisd version produce identical compressed files. A future format bump
    changes on-disk bytes but old files still decode with their pinned
    dictionary. (Note: on-disk byte-identity across nodes is not a property
    Bitcoin Core guarantees today — pruning and arrival order already vary
@@ -390,25 +390,27 @@ dependencies.
 ## M3 — Bundled Wallet + Native GUI
 
 **Why third:** with storage and speed delivered, the next barrier to "a viable
-alternative to Core for most users" is that btcd ships no wallet and no UI. This
+alternative to Core for most users" is that upstream btcd ships no wallet and no UI. This
 milestone delivers the user-facing surface that makes the node usable as a daily
 driver for non-mining users — a direct replacement for Bitcoin Core's
 `bitcoin-qt`.
 
-**Headline claim:** a single `btcd` binary with an in-process wallet and a
-native (non-web, GioUI) GUI: UTXO management, fee estimation, send/receive,
-PSBT multisig with air-gapped QR signing, and a node dashboard.
+**Headline claim:** a single `praxisd` binary with an in-process wallet and a
+native (non-web, GioUI) **Bitcoin-Praxis Wallet**: UTXO management, fee
+estimation, send/receive, PSBT multisig with air-gapped QR signing, and a node
+dashboard.
 
 ### Scope
 
-- **Embed `btcwallet` in-process**: vendor or fork btcwallet into `btcd/wallet/`.
-  Replace its RPC-over-loopback link to btcd with direct in-process interfaces
-  against `blockchain.BlockChain`, `mempool.TxPool`, and the existing notification
-  feed. `--enable-wallet` flag; wallet state under `~/.btcd/wallet/`.
+- **Embed `btcwallet` in-process**: vendor or fork btcwallet into `wallet/`
+  (in-tree package; user binary remains `praxisd`). Replace its RPC-over-loopback
+  link to the node with direct in-process interfaces against
+  `blockchain.BlockChain`, `mempool.TxPool`, and the existing notification feed.
+  `--enable-wallet` flag; wallet state under `~/.praxisd/wallet/`.
 - **Wallet RPC surface**: extend `rpcserver.go`'s `MustRegisterCmd` registration
   with wallet RPCs (`sendtoaddress`, `getbalance`, `listunspent`, `bumpfee`,
   `walletcreatefundedpsbt`, `walletprocesspsbt`, `finalizepsbt`).
-- **PSBT multisig** on the existing in-tree `btcd/psbt/` package (which already
+- **PSBT multisig** on the existing in-tree `psbt/` package (which already
   ships creator/updater/signer/finalizer/extractor, BIP32 derivation, and Taproot
   support): watch-only multisig addresses from xpubs; create → sign → finalize →
   extract flow; **air-gapped QR signing** (pure-Go `skip2/go-qrcode`) as the
@@ -417,10 +419,11 @@ PSBT multisig with air-gapped QR signing, and a node dashboard.
   `FeeEstimator` (already exists with block registration and rollback). RBF fee
   bumping via the mempool's existing RBF support
   (`mempool.go:signalsReplacement`, `validateReplacement`).
-- **GioUI application** (`btcd/ui/`, `gioui.org` — immediate-mode, GPU, pure Go,
-  cross-platform, no web, no CGo): balance, send/receive, transaction history,
-  PSBT sign/finalize with QR display and scan, and a node dashboard (sync %,
-  peer count, mempool stats, disk usage, logs) reading in-process state.
+- **Bitcoin-Praxis Wallet (GioUI)** (`ui/`, `gioui.org` — immediate-mode,
+  GPU, pure Go, cross-platform, no web, no CGo): balance, send/receive,
+  transaction history, PSBT sign/finalize with QR display and scan, and a node
+  dashboard (sync %, peer count, mempool stats, disk usage, logs) reading
+  in-process state.
 - **Hardware wallet transport**: optional stretch within this milestone; native
   Go HID/serial via `go.bug.st/serial` for Trezor/Ledger, or HWI-compatible
   subprocess. Air-gapped QR ships first and covers the multisig use case without
@@ -432,7 +435,7 @@ M1 cold-tier storage strips witness past `--witness-buffer`. Bundling btcwallet
 must not assume historical `getrawtransaction` / block-rescan bytes always carry
 witness. **`--txindex` does not fix this** — it only locates the stripped bytes.
 
-Required modifications when embedding / forking btcwallet into `btcd/wallet/`:
+Required modifications when embedding / forking btcwallet into `wallet/`:
 
 1. **Honor `witness_excised`.** Any path that consumes verbose
    `getrawtransaction`, `getblock` (verbosity ≥ 1), or `searchrawtransactions`
@@ -464,7 +467,7 @@ Track these in C-1 (embed) and verify under C-1 acceptance with a tiny
 
 ### Acceptance Criteria
 
-1. **End-to-end wallet loop**: on regtest, a single `btcd --enable-wallet` process
+1. **End-to-end wallet loop**: on regtest, a single `praxisd --enable-wallet` process
    mines blocks (via the existing `mining/cpuminer`), sends, receives, and reports
    correct balances and confirmations — no second process, no loopback RPC.
 2. **PSBT round-trip**: create → sign → finalize → extract produces a valid,
@@ -500,7 +503,7 @@ and equivalent-but-different mechanisms on macOS and Windows.
 
 ### Scope
 
-- `btcd/asyncio/` package with a batch/async I/O abstraction above the existing
+- `asyncio/` package with a batch/async I/O abstraction above the existing
   `filer` interface (`database/ffldb/blockio.go`): batch read/write/fsync
   submission with future-based completion.
 - **Linux**: io_uring backend (`//go:build linux`) with fixed-file registration,
@@ -552,14 +555,14 @@ Stratum proxy and aligning with mining-decentralization goals.
   path for a tx index, built on the existing `BuildMerkleTreeStore` linear array)
   and `MerkleRootFromBranch` (recompute root from a coinbase hash + branch) for
   share validation.
-- **Job server** (`btcd/datum/`): generalizes the existing `gbtWorkState`
+- **Job server** (`datum/`): generalizes the existing `gbtWorkState`
   (`rpcserver.go`) template lifecycle. Holds the current
   `mining.BlockTemplate`, subscribes to mempool/block notifications
   (`NotifyMempoolTx`, `NotifyBlockConnected`), extracts the coinbase and merkle
   branch, and emits DATUM jobs. Template generation reuses
   `mining.NewBlockTemplate` and `BlkTmplGenerator` directly — no new template
   logic.
-- **DATUM/Sv2 wire protocol** (`btcd/datum/wire/`): framing, message types
+- **DATUM/Sv2 wire protocol** (`datum/wire/`): framing, message types
   (`SetupConnection`, `NewJob`, `SetNewPrevHash`, `SubmitShare`, ...), TCP
   listener, per-connection session state. Spec-version-pinned.
 - **Share validation**: recompute merkle root from the submitted coinbase + job
@@ -571,7 +574,7 @@ Stratum proxy and aligning with mining-decentralization goals.
   mempool (which already tracks fee/fee-per-kb and dependency clusters). The
   resulting template is validated via `blockchain.CheckConnectBlockTemplate`
   (`validate.go`, already takes `BFNoPowCheck`).
-- **Out of scope**: pool payout/accounting ledger. btcd exposes the job
+- **Out of scope**: pool payout/accounting ledger. praxisd exposes the job
   negotiation and share-validation surface; payout logic lives in a separate
   pool backend.
 
@@ -587,7 +590,7 @@ Stratum proxy and aligning with mining-decentralization goals.
 
 ### Acceptance Criteria
 
-1. **Full mining loop on regtest**: `btcd` regtest node + DATUM job server + a
+1. **Full mining loop on regtest**: `praxisd` regtest node + DATUM job server + a
    DATUM-client adapter around the existing `cpuminer` mines a block end-to-end
    through the job protocol, and the block is accepted by the chain.
 2. **Merkle correctness**: `MerkleRootFromBranch(MerkleBranch(txs, i)) ==
@@ -637,7 +640,7 @@ complete:
 
 ```mermaid
 gantt
-    title btcd Roadmap
+    title Bitcoin-Praxis Roadmap
     dateFormat YYYY-MM-DD
     axisFormat %b
 

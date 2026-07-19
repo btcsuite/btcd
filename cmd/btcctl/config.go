@@ -27,12 +27,12 @@ const (
 )
 
 var (
-	btcdHomeDir           = btcutil.AppDataDir("btcd", false)
+	praxisdHomeDir        = btcutil.AppDataDir("praxisd", false)
 	btcctlHomeDir         = btcutil.AppDataDir("btcctl", false)
 	btcwalletHomeDir      = btcutil.AppDataDir("btcwallet", false)
 	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
 	defaultRPCServer      = "localhost"
-	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")
+	defaultRPCCertFile    = filepath.Join(praxisdHomeDir, "rpc.cert")
 	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
 )
 
@@ -238,7 +238,7 @@ func loadConfig() (*config, []string, error) {
 		if preCfg.Wallet {
 			serverConfigPath = filepath.Join(btcwalletHomeDir, "btcwallet.conf")
 		} else {
-			serverConfigPath = filepath.Join(btcdHomeDir, "btcd.conf")
+			serverConfigPath = filepath.Join(praxisdHomeDir, "praxisd.conf")
 		}
 
 		err := createDefaultConfigFile(preCfg.ConfigFile, serverConfigPath)

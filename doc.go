@@ -3,23 +3,23 @@
 // license that can be found in the LICENSE file.
 
 /*
-btcd is a full-node bitcoin implementation written in Go.
+praxisd is the Bitcoin-Praxis full-node daemon (forked from btcd), written in Go.
 
-The default options are sane for most users.  This means btcd will work 'out of
+The default options are sane for most users.  This means praxisd will work 'out of
 the box' for most users.  However, there are also a wide variety of flags that
 can be used to control it.
 
 The following section provides a usage overview which enumerates the flags.  An
 interesting point to note is that the long form of all of these options
 (except -C) can be specified in a configuration file that is automatically
-parsed when btcd starts up.  By default, the configuration file is located at
-~/.btcd/btcd.conf on POSIX-style operating systems and %LOCALAPPDATA%\btcd\btcd.conf
+parsed when praxisd starts up.  By default, the configuration file is located at
+~/.praxisd/praxisd.conf on POSIX-style operating systems and %LOCALAPPDATA%\Praxisd\praxisd.conf
 on Windows.  The -C (--configfile) flag, as shown below, can be used to override
 this location.
 
 Usage:
 
-	btcd [OPTIONS]
+	praxisd [OPTIONS]
 
 Application Options:
 
