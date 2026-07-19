@@ -222,7 +222,8 @@ var helpDescsEnUS = map[string]string{
 	"txrawresult-size":          "The size of the transaction in bytes",
 	"txrawresult-vsize":         "The virtual size of the transaction in bytes",
 	"txrawresult-weight":        "The transaction's weight (between vsize*4-3 and vsize*4)",
-	"txrawresult-hash":          "The wtxid of the transaction",
+	"txrawresult-hash":            "The wtxid of the transaction",
+	"txrawresult-witness_excised": "True when the tx was loaded from a cold-tier block with witness excised",
 
 	// SearchRawTransactionsResult help.
 	"searchrawtransactionsresult-hex":           "Hex-encoded transaction",
@@ -238,7 +239,8 @@ var helpDescsEnUS = map[string]string{
 	"searchrawtransactionsresult-blocktime":     "Block time in seconds since the 1 Jan 1970 GMT",
 	"searchrawtransactionsresult-size":          "The size of the transaction in bytes",
 	"searchrawtransactionsresult-vsize":         "The virtual size of the transaction in bytes",
-	"searchrawtransactionsresult-weight":        "The transaction's weight (between vsize*4-3 and vsize*4)",
+	"searchrawtransactionsresult-weight":          "The transaction's weight (between vsize*4-3 and vsize*4)",
+	"searchrawtransactionsresult-witness_excised": "True when the tx was loaded from a cold-tier block with witness excised",
 
 	// GetBlockVerboseResult help.
 	"getblockverboseresult-hash":              "The hash of the block (same as provided)",
@@ -258,6 +260,7 @@ var helpDescsEnUS = map[string]string{
 	"getblockverboseresult-nextblockhash":     "The hash of the next block (only if there is one)",
 	"getblockverboseresult-strippedsize":      "The size of the block without witness data",
 	"getblockverboseresult-weight":            "The weight of the block",
+	"getblockverboseresult-witness_excised":   "True when the block was loaded from the cold tier with witness excised",
 
 	// GetBlockCountCmd help.
 	"getblockcount--synopsis": "Returns the number of blocks in the longest block chain.",

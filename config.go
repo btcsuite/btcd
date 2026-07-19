@@ -1179,19 +1179,14 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// --prune and --witness-buffer are mutually exclusive: Bitcoin Core-style
-	// pruning deletes old blocks entirely (no historical data), while
-	// witness-buffer excises witness data and compresses older blocks (keeps
-	// the base ledger on the cold tier). Combining them would delete the
-	// cold-tier records that witness-buffer worked to create.
+	// --prune deletes historical blocks entirely, so it is incompatible with
+	// witness-buffer cold-tier retention. When prune is enabled, force the
+	// witness buffer off (including the non-zero default) rather than making
+	// callers also pass --witness-buffer=0.
 	if cfg.Prune != 0 && cfg.WitnessBuffer != 0 {
-		err := fmt.Errorf("%s: the --prune and --witness-buffer options "+
-			"may not be activated at the same time -- --prune deletes "+
-			"old blocks, --witness-buffer excises witness and compresses them",
-			funcName)
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
+		btcdLog.Warnf("--prune is set; disabling --witness-buffer " +
+			"(cold-tier excision is incompatible with block deletion)")
+		cfg.WitnessBuffer = 0
 	}
 
 	// A negative witness buffer makes no sense.

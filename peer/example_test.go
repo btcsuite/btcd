@@ -15,10 +15,10 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
-// mockRemotePeer creates a basic inbound peer listening on the simnet port for
-// use with Example_peerConnection.  It does not return until the listener is
-// active.
-func mockRemotePeer() error {
+// mockRemotePeer creates a basic inbound peer on an ephemeral local port for
+// use with Example_newOutboundPeer. It does not return until the listener is
+// active. The listen address is returned so the outbound peer can dial it.
+func mockRemotePeer() (string, error) {
 	// Configure peer to act as a simnet node that offers no services.
 	peerCfg := &peer.Config{
 		UserAgentName:    "peer",  // User agent name to advertise.
@@ -28,11 +28,13 @@ func mockRemotePeer() error {
 		AllowSelfConns:   true,
 	}
 
-	// Accept connections on the simnet port.
-	listener, err := net.Listen("tcp", "127.0.0.1:18555")
+	// Accept connections on an ephemeral port to avoid colliding with a
+	// local simnet node (default listen 18555).
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return err
+		return "", err
 	}
+	addr := listener.Addr().String()
 	go func() {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -45,7 +47,7 @@ func mockRemotePeer() error {
 		p.AssociateConnection(conn)
 	}()
 
-	return nil
+	return addr, nil
 }
 
 // This example demonstrates the basic process for initializing and creating an
@@ -57,7 +59,8 @@ func Example_newOutboundPeer() {
 	// connecting to a remote peer, however, since this example is executed
 	// and tested, a mock remote peer is needed to listen for the outbound
 	// peer.
-	if err := mockRemotePeer(); err != nil {
+	addr, err := mockRemotePeer()
+	if err != nil {
 		fmt.Printf("mockRemotePeer: unexpected error %v\n", err)
 		return
 	}
@@ -84,7 +87,7 @@ func Example_newOutboundPeer() {
 		},
 		AllowSelfConns: true,
 	}
-	p, err := peer.NewOutboundPeer(peerCfg, "127.0.0.1:18555")
+	p, err := peer.NewOutboundPeer(peerCfg, addr)
 	if err != nil {
 		fmt.Printf("NewOutboundPeer: error %v\n", err)
 		return

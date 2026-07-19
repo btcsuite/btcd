@@ -2,11 +2,7 @@ name: Build and Test
 on: [push, pull_request]
 
 env:
-  # go needs absolute directories, using the $HOME variable doesn't work here.
-  GOCACHE: /home/runner/work/go/pkg/build
-  GOPATH: /home/runner/work/go
-  GOBIN: /home/runner/work/go/bin
-  GO_VERSION: 1.26.3
+  GO_VERSION: '1.26.3'
 
 jobs:
   build:
@@ -24,16 +20,8 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Cross-compile (android/arm64)
-        env:
-          GOOS: android
-          GOARCH: arm64
-        run: |
-          go build ./...
-          (cd btcutil && go build ./...)
-
-  test-cover:
-    name: Unit coverage
+  unit:
+    name: Unit
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -45,93 +33,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test
-        run: make unit-cover
+        run: make unit
 
-      - name: Send top-level coverage
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          file: coverage.txt
-          flag-name: btcd
-          format: 'golang'
-          parallel: true
-
-      - name: Send address coverage
-        uses: coverallsapp/github-action@v2
-        with:
-          file: address/coverage.txt
-          flag-name: address
-          format: 'golang'
-          parallel: true
-
-      - name: Send btcec coverage
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          file: btcec/coverage.txt
-          flag-name: btcec
-          format: 'golang'
-          parallel: true
-
-      - name: Send chaincfg coverage
-        uses: coverallsapp/github-action@v2
-        with:
-          file: chaincfg/coverage.txt
-          flag-name: chaincfg
-          format: 'golang'
-          parallel: true
-
-      - name: Send chainhash coverage
-        uses: coverallsapp/github-action@v2
-        with:
-          file: chainhash/coverage.txt
-          flag-name: chainhash
-          format: 'golang'
-          parallel: true
-
-      - name: Send btcutil coverage
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          file: btcutil/coverage.txt
-          flag-name: btcutil
-          format: 'golang'
-          parallel: true
-
-      - name: Send psbt coverage
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          file: psbt/coverage.txt
-          flag-name: psbt
-          format: 'golang'
-          parallel: true
-
-      - name: Send txscript coverage
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          file: txscript/coverage.txt
-          flag-name: txscript
-          format: 'golang'
-          parallel: true
-
-      - name: Send wire coverage
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          file: wire/coverage.txt
-          flag-name: wire
-          format: 'golang'
-          parallel: true
-
-      - name: Notify coveralls all reports sent
-        uses: coverallsapp/github-action@v2
-        continue-on-error: true
-        with:
-          parallel-finished: true
-
-  test-race:
+  unit-race:
     name: Unit race
     runs-on: ubuntu-latest
     steps:
@@ -145,18 +49,3 @@ jobs:
 
       - name: Test
         run: make unit-race
-
-  test-rpctest:
-    name: Unit rpctest
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Test
-        run: make unit

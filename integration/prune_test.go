@@ -19,7 +19,8 @@ import (
 func TestPrune(t *testing.T) {
 	t.Parallel()
 
-	// Boilerplate code to make a pruned node.
+	// Boilerplate code to make a pruned node. --prune forces witness-buffer
+	// off (they are incompatible); no need to pass --witness-buffer=0.
 	btcdCfg := []string{"--prune=1536"}
 	r, err := rpctest.New(&chaincfg.SimNetParams, nil, btcdCfg, "")
 	require.NoError(t, err)
