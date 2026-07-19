@@ -2243,7 +2243,8 @@ func (b *BlockChain) rejectColdAttachNodes(attachNodes *list.List) error {
 	if attachNodes == nil || attachNodes.Len() == 0 {
 		return nil
 	}
-	var coldHash *chainhash.Hash
+	var coldHash chainhash.Hash
+	var foundCold bool
 	err := b.db.View(func(dbTx database.Tx) error {
 		cc, ok := dbTx.(database.ColdCompactor)
 		if !ok {
@@ -2256,8 +2257,8 @@ func (b *BlockChain) rejectColdAttachNodes(attachNodes *list.List) error {
 				return err
 			}
 			if cold {
-				h := n.hash
-				coldHash = &h
+				coldHash = n.hash
+				foundCold = true
 				return nil
 			}
 		}
@@ -2266,7 +2267,7 @@ func (b *BlockChain) rejectColdAttachNodes(attachNodes *list.List) error {
 	if err != nil {
 		return err
 	}
-	if coldHash != nil {
+	if foundCold {
 		str := fmt.Sprintf("cannot reconsider block %s: witness data has "+
 			"been pruned by cold-tier compaction; re-validation requires "+
 			"a full archival node (--witness-buffer=0) or a re-download "+
