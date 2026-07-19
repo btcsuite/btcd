@@ -112,12 +112,12 @@ The witness fraction grows over time: 0% pre-segwit, 2–23% by 2018–19,
 bytes, the blended reduction tracks the high-witness tail. Modern-era files
 alone achieve 65–80% reduction.
 
-A zstd dictionary trained on 200 real mainnet blocks (16KB samples each) was
-benchmarked against the no-dictionary baseline. The dictionary added only 0.0–0.4
-percentage points on full blocks — zstd's internal match finder already
-discovers the same within-block patterns. **FormatV1 ships without a dictionary.**
-A trained dictionary can ship as a future format version if a training approach
-that helps full-block compression is found.
+A small pilot trained a zstd dictionary on ~200 real mainnet blocks (16KB
+samples each) and compared it to plain zstd. The dictionary added only 0.0–0.4
+percentage points — not a large enough sample to prove dictionaries never help,
+but enough that FormatV1 does not bake one in: cold blocks are compressed with
+plain zstd. A trained dictionary can ship as a future format version if a larger
+study finds real gain.
 
 Earlier two-fixture measurement (post-segwit, 26% and 74% witness):
 
@@ -155,11 +155,10 @@ witness re-attachment problem does not exist in this design.
 
 - New `blockcompress/` package: deterministic zstd codec
   (`klauspost/compress/zstd`, pure Go) for the cold-tier non-witness stream.
-  FormatV1 ships without a trained dictionary — measurement on real mainnet
-  blocks showed <0.4 percentage point gain from a dictionary, since zstd's
-  internal match finder already discovers within-block script patterns. A
-  dictionary can ship as a future format version if a training approach that
-  helps full-block compression is found.
+  FormatV1 uses plain zstd with no trained dictionary — a ~200-block pilot
+  gained <0.4 percentage points, not enough to justify forever-pinning dict
+  bytes in the format. A dictionary can ship as a future format version if a
+  larger study finds real gain.
 - **Per-file format header** on cold block files: magic + format-version byte
   selecting the dictionary/encoder config. Hot files (and existing legacy
   datadirs) have no header and read uncompressed — mixed-format datadirs are
@@ -261,9 +260,10 @@ Two structural facts make this hold chain-wide:
    amounts cluster; varints and lengths are small and repetitive; outpoint txids
    repeat within and across blocks. Removing the high-entropy witness from the
    compressed stream is what lifts the ratio from ~24% (whole-block) to ~25–30%
-   on the stripped bytes alone. A dictionary trained on 200 real mainnet blocks
-   was benchmarked and added only 0.0–0.4 percentage points — zstd's internal
-   match finder already discovers these patterns. FormatV1 ships dict-free.
+   on the stripped bytes alone. A small ~200-block dictionary pilot gained only
+   0.0–0.4 percentage points over plain zstd — not definitive, but enough that
+   FormatV1 uses plain zstd (no trained dictionary). A future format version can
+   add one if a larger study finds real gain.
 2. **The witness is high-entropy and dominates modern blocks.**
    Signatures and public keys are near-incompressible (~20% even at max zstd
    level), so whole-block compression stalls at ~24%. But the same fact makes
@@ -327,7 +327,7 @@ headline, all confined to blocks older than the 2016 hot window):
 
 | Phase | Scope |
 |---|---|
-| A-1 | `blockcompress` codec + witness-split measurement + dictionary training + unit tests. No ffldb changes. **This phase alone produces the go/no-go ratio number.** (Status: **done.** Codec, tests, witness-split measurement, and dictionary training all complete and race-clean. Real-chain measurement: 52.5% blended reduction. Dictionary benchmarked and found to add <0.4pp; FormatV1 ships dict-free.) |
+| A-1 | `blockcompress` codec + witness-split measurement + dictionary training + unit tests. No ffldb changes. **This phase alone produces the go/no-go ratio number.** (Status: **done.** Codec, tests, witness-split measurement, and dictionary training all complete and race-clean. Real-chain measurement: 52.5% blended reduction. A ~200-block dictionary pilot gained <0.4pp; FormatV1 uses plain zstd, with room for a future format version if a larger study finds real gain.) |
 | A-2 | Cold-tier file format: per-file header, `writeBlock`/`readBlock` paths that handle both headerless-uncompressed (hot/legacy) and compressed-stripped (cold) files via the header check, `readBlockRegion` decompress for cold files. Whitebox unit tests. No age-out job yet — blocks are written cold directly in tests. |
 | A-3 | Age-out compaction job: background read-hot → strip+compress → write-cold → update block index → reclaim hot space. 2016-block rolling window. LRU decompressed-block cache. Indexer catch-up benchmark. (Status: **done.** Compaction primitive `CompactBlockToCold` + `ColdCompactor` interface + LRU cache + blockchain-layer age-out driver + hot-tier space reclaim (`ReclaimHotSpace`) done and race-clean. `TestFullBlocks` consensus suite passes. **Critical fix:** offset-bearing index entries (txindex, addrindex) are rewritten to stripped-relative offsets at compaction time via `ColdCompactionIndexManager.RewriteTxOffsetsForColdCompaction` — without it, `getrawtransaction` / `searchrawtransactions` / wallet rescans would return garbled bytes for any compacted segwit block. `CompactBlockToCold` is idempotent (nil for already-cold) so the rewrite also fires after reorg reconnections. `FetchBlockRegion` bounds check fixed for cold blocks (compressed `blockLen` vs. uncompressed stripped length).) |
 | A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-excision verification, integration test on existing datadir. (Status: **done.** `--witness-buffer` config flag + `blockchain.Config.WitnessBuffer` + validation + service-bit handling (`NODE_WITNESS` retained for the hot window; cold `MSG_WITNESS_BLOCK` → `notfound`, `NODE_NETWORK` retained) all complete. Integration test on real mainnet datadir verified via measurement tooling — 52.5% blended reduction confirmed on 1005 GB chain.) |

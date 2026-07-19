@@ -69,7 +69,9 @@ Results on a 1005 GB mainnet datadir (156K blocks sampled from 29 files):
 | Excise witness only (no zstd) | 35.8% | 645 GB |
 | **Excise witness + zstd stripped** | **52.5%** | **477 GB** |
 
-Dictionary training added <0.4 percentage points. FormatV1 ships dict-free.
+A ~200-block dictionary pilot gained <0.4 percentage points over plain zstd.
+FormatV1 uses plain zstd (no trained dictionary); a future format version can
+revisit this.
 
 ## Running the Tests
 
