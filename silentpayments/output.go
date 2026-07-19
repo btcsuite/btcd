@@ -113,5 +113,16 @@ func outputKey(sharedSecret btcec.PublicKey, k uint32,
 	}
 
 	// Spec: Let P_mn = B_m + t_k·G
-	return ScalarBaseMultAdd(tScalar, &labelTweakedSpendPubKey), nil
+	result := ScalarBaseMultAdd(tScalar, &labelTweakedSpendPubKey)
+
+	// The addition lands on the point at infinity exactly if the spend
+	// key is the negated tweak point, which cannot happen for honestly
+	// derived keys. The affine coordinates (0, 0) the conversion yields
+	// are not a valid public key and must not be handed to the caller as
+	// if they were one.
+	if !result.IsOnCurve() {
+		return nil, fmt.Errorf("output key is at point at infinity")
+	}
+
+	return result, nil
 }
