@@ -338,6 +338,21 @@ func rpcNoTxInfoError(txHash *chainhash.Hash) *btcjson.RPCError {
 			txHash))
 }
 
+// rpcChainRuleError maps blockchain rule failures (including ErrWitnessPruned)
+// to a JSON-RPC error clients can display. Non-rule errors become internal.
+func rpcChainRuleError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if ruleErr, ok := err.(blockchain.RuleError); ok {
+		return &btcjson.RPCError{
+			Code:    btcjson.ErrRPCVerify,
+			Message: ruleErr.Description,
+		}
+	}
+	return internalRPCError(err.Error(), "")
+}
+
 // gbtWorkState houses state that is used in between multiple RPC invocations to
 // getblocktemplate.
 type gbtWorkState struct {
@@ -2899,7 +2914,7 @@ func handleInvalidateBlock(s *rpcServer, cmd interface{}, closeChan <-chan struc
 	}
 
 	err = s.cfg.Chain.InvalidateBlock(invalidateHash)
-	return nil, err
+	return nil, rpcChainRuleError(err)
 }
 
 // handleHelp implements the help command.
@@ -3191,7 +3206,7 @@ func handleReconsiderBlock(s *rpcServer, cmd interface{}, closeChan <-chan struc
 	}
 
 	err = s.cfg.Chain.ReconsiderBlock(reconsiderHash)
-	return nil, err
+	return nil, rpcChainRuleError(err)
 }
 
 // handleSearchRawTransactions implements the searchrawtransactions command.
