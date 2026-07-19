@@ -448,6 +448,15 @@ type Tx interface {
 // Callers should type-assert: `cc, ok := tx.(database.ColdCompactor); if ok { ... }`.
 // Backends without cold-tier support simply do not implement this interface.
 type ColdCompactor interface {
+	// StoreBlockCold stores the block directly into the cold tier (witness
+	// stripped, zstd-compressed) without ever writing a hot copy. Used during
+	// IBD when the headers tip already implies the block sits past the witness
+	// buffer. The cold write is deferred to transaction commit.
+	//
+	// Returns the same errors as StoreBlock for existence / writability /
+	// closed-tx cases.
+	StoreBlockCold(block *btcutil.Block) error
+
 	// CompactBlockToCold moves the block identified by hash from the hot tier
 	// to the cold tier. If the block is already cold, it is an idempotent
 	// no-op and returns nil — callers rely on this to proceed with
@@ -459,7 +468,7 @@ type ColdCompactor interface {
 
 	// IsColdBlock reports whether the block identified by hash is stored in
 	// the cold tier (witness stripped). It returns false when the block is
-	// unknown or still hot. Pending cold compactions in this transaction are
+	// unknown or still hot. Pending cold writes in this transaction are
 	// treated as cold so callers see the post-commit state.
 	IsColdBlock(hash *chainhash.Hash) (bool, error)
 

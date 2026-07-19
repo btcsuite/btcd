@@ -226,8 +226,8 @@ func dbFetchTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) (*database.Bl
 // transaction index entry for every transaction in the passed block.
 func dbAddTxIndexEntries(dbTx database.Tx, block *btcutil.Block, blockID uint32) error {
 	// The offset and length of the transactions within the serialized
-	// block.
-	txLocs, err := block.TxLoc()
+	// block. Cold blocks use stripped-relative offsets.
+	txLocs, err := blockTxLocs(dbTx, block)
 	if err != nil {
 		return err
 	}

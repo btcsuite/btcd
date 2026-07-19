@@ -1163,7 +1163,7 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Store the genesis block into the database.
-		return dbStoreBlock(dbTx, genesisBlock)
+		return b.dbStoreBlock(dbTx, genesisBlock)
 	})
 	return err
 }
@@ -1410,8 +1410,10 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 }
 
 // dbStoreBlock stores the provided block in the database if it is not already
-// there. The full block data is written to ffldb.
-func dbStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
+// there. When the headers tip already places the block past the witness buffer
+// on the best header chain, the body is written cold-direct (strip+zstd once)
+// via StoreBlockCold; otherwise it is stored hot as usual.
+func (b *BlockChain) dbStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
 	hasBlock, err := dbTx.HasBlock(block.Hash())
 	if err != nil {
 		return err
@@ -1419,7 +1421,32 @@ func dbStoreBlock(dbTx database.Tx, block *btcutil.Block) error {
 	if hasBlock {
 		return nil
 	}
+	if b.shouldStoreBlockCold(block) {
+		if cc, ok := dbTx.(database.ColdCompactor); ok {
+			return cc.StoreBlockCold(block)
+		}
+	}
 	return dbTx.StoreBlock(block)
+}
+
+// shouldStoreBlockCold reports whether block should skip the hot tier on first
+// write. True when witness-buffer compaction is enabled, the block is on the
+// best header chain at its height, and headers tip already puts that height
+// outside the final hot window (typical IBD headers-ahead case).
+func (b *BlockChain) shouldStoreBlockCold(block *btcutil.Block) bool {
+	if b.witnessBuffer <= 0 {
+		return false
+	}
+	headerTip := b.bestHeader.Tip()
+	if headerTip == nil {
+		return false
+	}
+	height := block.Height()
+	if height > headerTip.height-b.witnessBuffer {
+		return false
+	}
+	hn := b.bestHeader.NodeByHeight(height)
+	return hn != nil && hn.hash.IsEqual(block.Hash())
 }
 
 // blockIndexKey generates the binary key for an entry in the block index

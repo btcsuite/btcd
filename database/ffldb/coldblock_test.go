@@ -353,6 +353,111 @@ func TestCompactBlockToCold(t *testing.T) {
 	}
 }
 
+// TestStoreBlockCold verifies cold-direct storage: the block is never written
+// hot, FetchBlock returns the stripped serialization, and the block index
+// carries the cold flag. A rolled-back StoreBlockCold leaves no orphan data.
+func TestStoreBlockCold(t *testing.T) {
+	dbPath := t.TempDir()
+	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer pdb.Close()
+
+	fixtures := loadColdFixtures(t)
+	raw := fixtures[0]
+	block, err := btcutil.NewBlockFromBytes(raw)
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	hash := block.Hash()
+	wantStripped := strippedSerialization(t, raw)
+
+	hotBefore, err := filepath.Glob(filepath.Join(dbPath, "*.fdb"))
+	if err != nil {
+		t.Fatalf("glob hot before: %v", err)
+	}
+
+	if err := pdb.Update(func(tx database.Tx) error {
+		cc, ok := tx.(database.ColdCompactor)
+		if !ok {
+			t.Fatal("tx does not implement ColdCompactor")
+		}
+		return cc.StoreBlockCold(block)
+	}); err != nil {
+		t.Fatalf("StoreBlockCold: %v", err)
+	}
+
+	if err := pdb.View(func(tx database.Tx) error {
+		cc := tx.(database.ColdCompactor)
+		cold, err := cc.IsColdBlock(hash)
+		if err != nil {
+			return err
+		}
+		if !cold {
+			t.Error("IsColdBlock = false after StoreBlockCold")
+		}
+		got, err := tx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, wantStripped) {
+			t.Errorf("FetchBlock != stripped (got %d want %d)",
+				len(got), len(wantStripped))
+		}
+		row := tx.(*transaction).blockIdxBucket.Get(hash[:])
+		loc := deserializeBlockLoc(row)
+		if loc.blockFileNum&coldFlag == 0 {
+			t.Error("block index location is not cold")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("post-store view: %v", err)
+	}
+
+	hotAfter, err := filepath.Glob(filepath.Join(dbPath, "*.fdb"))
+	if err != nil {
+		t.Fatalf("glob hot after: %v", err)
+	}
+	if len(hotAfter) > len(hotBefore) {
+		t.Errorf("StoreBlockCold grew hot files: before %d after %d",
+			len(hotBefore), len(hotAfter))
+	}
+
+	// Rollback path: schedule then force failure.
+	dbPath2 := t.TempDir()
+	pdb2, err := database.Create("ffldb", dbPath2, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create rollback db: %v", err)
+	}
+	defer pdb2.Close()
+	block2, err := btcutil.NewBlockFromBytes(fixtures[1%len(fixtures)])
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes fixture1: %v", err)
+	}
+	hash2 := block2.Hash()
+	if err := pdb2.Update(func(tx database.Tx) error {
+		if err := tx.(database.ColdCompactor).StoreBlockCold(block2); err != nil {
+			return err
+		}
+		return errors.New("test: force rollback")
+	}); err == nil {
+		t.Fatal("expected rollback error")
+	}
+	if err := pdb2.View(func(tx database.Tx) error {
+		has, err := tx.HasBlock(hash2)
+		if err != nil {
+			return err
+		}
+		if has {
+			t.Error("block exists after StoreBlockCold rollback")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("rollback view: %v", err)
+	}
+}
+
 // TestCompactBlockToColdRollback verifies that rolling back a compaction
 // transaction leaves the block in the hot tier (no orphaned cold data, block
 // index unchanged).

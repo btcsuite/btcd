@@ -10,10 +10,12 @@ package indexers
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 var (
@@ -25,6 +27,37 @@ var (
 	// to a user-requested interrupt.
 	errInterruptRequested = errors.New("interrupt requested")
 )
+
+// blockTxLocs returns transaction locations for indexing. When the block is
+// already cold (StoreBlockCold or prior compaction), locations are relative to
+// the stripped serialization so FetchBlockRegion works without a later rewrite.
+func blockTxLocs(dbTx database.Tx, block *btcutil.Block) ([]wire.TxLoc, error) {
+	if cc, ok := dbTx.(database.ColdCompactor); ok {
+		cold, err := cc.IsColdBlock(block.Hash())
+		if err != nil {
+			return nil, err
+		}
+		if cold {
+			return strippedTxLocs(block)
+		}
+	}
+	return block.TxLoc()
+}
+
+// strippedTxLocs returns TxLoc relative to SerializeNoWitness bytes.
+func strippedTxLocs(block *btcutil.Block) ([]wire.TxLoc, error) {
+	strippedBytes, err := block.BytesNoWitness()
+	if err != nil {
+		return nil, fmt.Errorf("serialize stripped block %s: %w",
+			block.Hash(), err)
+	}
+	strippedBlock, err := btcutil.NewBlockFromBytes(strippedBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse stripped block %s: %w",
+			block.Hash(), err)
+	}
+	return strippedBlock.TxLoc()
+}
 
 // NeedsInputser provides a generic interface for an indexer to specify the it
 // requires the ability to look up inputs for a transaction.

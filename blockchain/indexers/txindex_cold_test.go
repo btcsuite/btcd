@@ -352,3 +352,60 @@ type errHashMismatch struct {
 func (e errHashMismatch) Error() string {
 	return "tx hash mismatch: expected " + e.expected.String() + ", got " + e.got.String()
 }
+
+// TestTxIndexColdDirectConnect verifies ConnectBlock writes stripped-relative
+// offsets when the block was stored via StoreBlockCold (no later rewrite).
+func TestTxIndexColdDirectConnect(t *testing.T) {
+	fixtures := loadColdFixturesForIndexer(t)
+	var raw []byte
+	for _, f := range fixtures {
+		if hasWitnessData(t, f) {
+			raw = f
+			break
+		}
+	}
+	if raw == nil {
+		t.Skip("no witness-containing fixture")
+	}
+
+	dbPath := t.TempDir()
+	db, err := database.Create("ffldb", dbPath, wire.MainNet)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer db.Close()
+
+	idx := NewTxIndex(db)
+	if err := db.Update(func(tx database.Tx) error {
+		meta := tx.Metadata()
+		if _, err := meta.CreateBucketIfNotExists(indexTipsBucketName); err != nil {
+			return err
+		}
+		if err := idx.Create(tx); err != nil {
+			return err
+		}
+		return dbPutIndexerTip(tx, idx.Key(), &chainhash.Hash{}, -1)
+	}); err != nil {
+		t.Fatalf("Create buckets: %v", err)
+	}
+	if err := idx.Init(); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	block, err := btcutil.NewBlockFromBytes(raw)
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes: %v", err)
+	}
+	block.SetHeight(0)
+
+	if err := db.Update(func(tx database.Tx) error {
+		if err := tx.(database.ColdCompactor).StoreBlockCold(block); err != nil {
+			return err
+		}
+		return idx.ConnectBlock(tx, block, nil)
+	}); err != nil {
+		t.Fatalf("StoreBlockCold+Connect: %v", err)
+	}
+
+	verifyAllTxViaIndex(t, db, block, "cold-direct connect")
+}

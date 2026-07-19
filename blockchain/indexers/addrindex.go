@@ -847,8 +847,8 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
 	// The offset and length of the transactions within the serialized
-	// block.
-	txLocs, err := block.TxLoc()
+	// block. Cold blocks use stripped-relative offsets.
+	txLocs, err := blockTxLocs(dbTx, block)
 	if err != nil {
 		return err
 	}

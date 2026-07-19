@@ -950,14 +950,14 @@ type pendingBlock struct {
 	bytes []byte
 }
 
-// pendingColdCompaction is a block scheduled to be moved from the hot tier to
-// the cold tier at commit time. The hot block bytes and its hash are captured
-// when CompactBlockToCold is called; the cold write and block-index update
-// happen in writePendingAndCommit so a rolled-back tx leaves no orphaned cold
-// data (matching how StoreBlock defers hot writes to commit).
+// pendingColdCompaction is a block scheduled to be written to the cold tier at
+// commit time. Used both by CompactBlockToCold (age-out from an existing hot
+// copy) and StoreBlockCold (IBD cold-direct, never writes hot). The full block
+// bytes (with witness) are captured up front; writeColdBlock strips and
+// compresses at commit so a rolled-back tx leaves no orphaned cold data.
 type pendingColdCompaction struct {
 	hash  *chainhash.Hash
-	bytes []byte // full hot block bytes, with witness
+	bytes []byte // full block bytes, with witness
 }
 
 // transaction represents a database transaction.  It can either be read-only or
@@ -1150,8 +1150,38 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 	if _, exists := tx.pendingBlocks[*hash]; exists {
 		return true
 	}
+	for _, pending := range tx.pendingColdCompactions {
+		if pending.hash.IsEqual(hash) {
+			return true
+		}
+	}
 
 	return tx.hasKey(bucketizedKey(blockIdxBucketID, hash[:]))
+}
+
+// pendingColdBytes returns the full (witness-included) bytes for a block that
+// is pending a cold write in this transaction, or nil if none.
+func (tx *transaction) pendingColdBytes(hash *chainhash.Hash) []byte {
+	for _, pending := range tx.pendingColdCompactions {
+		if pending.hash.IsEqual(hash) {
+			return pending.bytes
+		}
+	}
+	return nil
+}
+
+// strippedPendingColdBytes returns the stripped serialization for a pending
+// cold write so in-tx FetchBlock matches post-commit cold semantics.
+func strippedPendingColdBytes(full []byte) ([]byte, error) {
+	var blk wire.MsgBlock
+	if err := blk.Deserialize(bytes.NewReader(full)); err != nil {
+		return nil, err
+	}
+	var stripped bytes.Buffer
+	if err := blk.SerializeNoWitness(&stripped); err != nil {
+		return nil, err
+	}
+	return stripped.Bytes(), nil
 }
 
 // StoreBlock stores the provided block into the database.  There are no checks
@@ -1205,6 +1235,46 @@ func (tx *transaction) StoreBlock(block *btcutil.Block) error {
 	})
 	log.Tracef("Added block %s to pending blocks", blockHash)
 
+	return nil
+}
+
+// StoreBlockCold stores the provided block directly into the cold tier
+// (witness stripped, zstd-compressed) without writing a hot copy. The write is
+// deferred to commit, matching StoreBlock / CompactBlockToCold.
+//
+// This method is part of the database.ColdCompactor optional interface.
+func (tx *transaction) StoreBlockCold(block *btcutil.Block) error {
+	if err := tx.checkClosed(); err != nil {
+		return err
+	}
+	if !tx.writable {
+		str := "store block cold requires a writable database transaction"
+		return makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+	if tx.db.cold == nil {
+		str := "cold tier is not available"
+		return makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	blockHash := block.Hash()
+	if tx.hasBlock(blockHash) {
+		str := fmt.Sprintf("block %s already exists", blockHash)
+		return makeDbErr(database.ErrBlockExists, str, nil)
+	}
+
+	blockBytes, err := block.Bytes()
+	if err != nil {
+		str := fmt.Sprintf("failed to get serialized bytes for block %s",
+			blockHash)
+		return makeDbErr(database.ErrDriverSpecific, str, err)
+	}
+
+	hashCopy := *blockHash
+	tx.pendingColdCompactions = append(tx.pendingColdCompactions, pendingColdCompaction{
+		hash:  &hashCopy,
+		bytes: blockBytes,
+	})
+	log.Tracef("Added block %s to pending cold stores", blockHash)
 	return nil
 }
 
@@ -1285,6 +1355,12 @@ func (tx *transaction) CompactBlockToCold(hash *chainhash.Hash) error {
 	if _, exists := tx.pendingBlocks[*hash]; exists {
 		str := fmt.Sprintf("block %s is pending store; cannot compact", hash)
 		return makeDbErr(database.ErrDriverSpecific, str, nil)
+	}
+
+	// Already scheduled as a cold write (StoreBlockCold or prior compact).
+	if tx.pendingColdBytes(hash) != nil {
+		log.Tracef("CompactBlockToCold: block %s pending cold, no-op", hash)
+		return nil
 	}
 
 	// Look up the current location and verify the block is in the hot tier.
@@ -1557,6 +1633,14 @@ func (tx *transaction) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
 	// from there.
 	if idx, exists := tx.pendingBlocks[*hash]; exists {
 		return tx.pendingBlockData[idx].bytes, nil
+	}
+	if full := tx.pendingColdBytes(hash); full != nil {
+		stripped, err := strippedPendingColdBytes(full)
+		if err != nil {
+			str := fmt.Sprintf("failed to strip pending cold block %s", hash)
+			return nil, makeDbErr(database.ErrDriverSpecific, str, err)
+		}
+		return stripped, nil
 	}
 
 	// Lookup the location of the block in the files from the block index.
@@ -1954,11 +2038,12 @@ func (tx *transaction) writePendingAndCommit() error {
 		}
 	}
 
-	// Compact pending blocks from the hot tier to the cold tier: write the
-	// stripped+compressed record and update the block index to the new cold
-	// location. The hot-tier bytes remain on disk for a later reclaim sweep.
+	// Compact / cold-direct pending blocks: write the stripped+compressed
+	// record and put the block index at the cold location. For age-out
+	// compaction the hot-tier bytes remain on disk for a later reclaim sweep;
+	// for StoreBlockCold there was never a hot copy.
 	for _, comp := range tx.pendingColdCompactions {
-		log.Tracef("Compacting block %s to cold tier", comp.hash)
+		log.Tracef("Writing block %s to cold tier", comp.hash)
 		coldLoc, err := tx.db.cold.writeColdBlock(comp.bytes)
 		if err != nil {
 			rollback()

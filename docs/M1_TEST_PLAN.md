@@ -20,6 +20,7 @@ and the disk-reduction headline.
 | `TestColdCorruptionDetection` | `database/ffldb/coldblock_test.go` | CRC catches corrupted cold blocks |
 | `TestColdSavingsOnDisk` | `database/ffldb/coldblock_test.go` | Cold file is smaller than hot file on disk |
 | `TestCompactBlockToCold` | `database/ffldb/coldblock_test.go` | `CompactBlockToCold` through full `database.Tx`: store hot → compact → FetchBlock returns stripped, block index has cold flag |
+| `TestStoreBlockCold` | `database/ffldb/coldblock_test.go` | Cold-direct store: no hot write, FetchBlock stripped, cold flag set, rollback leaves no orphan |
 | `TestCompactBlockToColdRollback` | `database/ffldb/coldblock_test.go` | Rolled-back compaction leaves block in hot tier, no orphaned cold data |
 | `TestCompactAlreadyCold` | `database/ffldb/coldblock_test.go` | Compacting an already-cold block is an idempotent no-op (returns nil) |
 | `TestReclaimHotSpace` | `database/ffldb/coldblock_test.go` | Hot file deleted after reclaim, block still readable from cold |
@@ -28,6 +29,7 @@ and the disk-reduction headline.
 | `TestColdCacheRegion` | `database/ffldb/coldblock_test.go` | Region reads populate and hit the cache |
 | `TestColdCacheEviction` | `database/ffldb/coldblock_test.go` | Cache evicts oldest entries when full |
 | `TestTxIndexColdCompactionRewrite` | `blockchain/indexers/txindex_cold_test.go` | txindex offsets are rewritten to stripped-relative on compaction; every tx in a cold block round-trips through `dbFetchTxIndexEntry` → `FetchBlockRegion` with the correct txid |
+| `TestTxIndexColdDirectConnect` | `blockchain/indexers/txindex_cold_test.go` | `StoreBlockCold` + ConnectBlock indexes with stripped offsets; every tx round-trips without a later rewrite |
 | `TestTxIndexColdCompactionWithoutRewrite` | `blockchain/indexers/txindex_cold_test.go` | Proves the bug exists without the rewrite: witness-relative offsets from `ConnectBlock` point past the stripped block boundary, so `FetchBlockRegion` fails for segwit txs |
 | `FuzzColdCompactionOffsets` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the offset-rewrite core: for any deserializable block, the stripped serialization's TxLocs point at byte ranges that deserialize to txs with the correct txid (pure-data, ~40k execs/s) |
 | `FuzzColdCompactionTxIndex` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the integrated path: compact → rewrite → txindex → `FetchBlockRegion` → txid match, including the idempotent reorg model (compact-already-cold + double rewrite) |
@@ -35,6 +37,7 @@ and the disk-reduction headline.
 | `TestAddrIndexColdCompactionWithoutRewrite` | `blockchain/indexers/addrindex_cold_test.go` | Proves the addrindex bug exists without the rewrite: witness-relative offsets point past the stripped block, so `FetchBlockRegions` returns wrong bytes / EOF for addresses in segwit blocks |
 | `TestAddrIndexRewriteNilStxosRefused` | `blockchain/indexers/addrindex_cold_test.go` | Nil spend journal: rewrite refuses to leave stale input-address offsets; chain skips compaction when journal is missing |
 | `TestWitnessBufferAgeOut` | `blockchain/ageout_test.go` | Blockchain-layer age-out driver: blocks beyond buffer are compacted, cold files created on disk, all blocks remain readable |
+| `TestColdDirectStoreWhenHeadersAhead` | `blockchain/cold_direct_test.go` | Headers-first IBD: bodies past buffer are `IsColdBlock` immediately (StoreBlockCold), tip window stays hot |
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
 | `TestWitnessBufferConfig` | `blockchain/ageout_test.go` | `Config.WitnessBuffer` wires through to `BlockChain.witnessBuffer` |
 | `TestInvalidatePastWitnessBufferRefused` | `blockchain/witness_excision_ops_test.go` | Deep `InvalidateBlock` past the hot window is refused with `ErrWitnessExcised`; shallow invalidate still works |

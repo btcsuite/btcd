@@ -132,22 +132,22 @@ Earlier two-fixture measurement (post-segwit, 26% and 74% witness):
 The storage is split into two tiers by age:
 
 - **Hot tier (recent blocks, last 2016 ≈ 2 weeks): stored exactly as praxisd does
-  today (same hot path as upstream btcd).** Full block, with witness, uncompressed. The write/acceptance path is
-  *unchanged* — `writeBlock` appends the raw block as today. This keeps the IBD
-  hot path free of compression CPU and keeps `FetchBlock` returning a full
-  witness-included block (per the `database.Tx` contract) for everything live.
-  Storage cost of not compressing this window: 2016 blocks × ~2 MB ≈ 4 GB, vs
+  today (same hot path as upstream btcd).** Full block, with witness, uncompressed.
+  Near-tip acceptance still appends the raw block via `writeBlock`. During IBD,
+  when the **headers tip** already places a height past the witness buffer, the
+  body is written **cold-direct** (`StoreBlockCold`: strip+zstd in memory, one
+  NAND write) instead of hot-then-age-out. Tip-window blocks stay hot so
+  `FetchBlock` returns a full witness-included block for everything live.
+  Storage cost of not compressing the hot window: 2016 blocks × ~2 MB ≈ 4 GB, vs
   ~1.2 GB if compressed — a ~2.8 GB difference on a ~755 GB chain (0.4%).
 - **Cold tier (blocks older than 2016): witness stripped, non-witness
-  zstd-compressed, retained forever.** A background age-out job reads each block
-  as it falls out of the hot window, serializes it via `SerializeNoWitness`,
-  compresses the stripped bytes via `blockcompress`, writes the result to a cold
-  block file, updates the block index to point at the new location, and reclaims
-  the hot-tier space. The cold tier is what holds the vast majority of the chain
-  and is where the ~70% reduction comes from. Alternate forks (side chains) that
-  never become tip are not compacted: once they fall past the witness buffer their
-  **block bodies are dropped** (headers retained in the block index) — they are
-  dead for realistic reorgs, and deep cold attach is already refused.
+  zstd-compressed, retained forever.** Populated either by cold-direct IBD
+  writes or by rolling age-out: read hot → `SerializeNoWitness` → compress →
+  write cold → reclaim hot space. The cold tier holds the vast majority of the
+  chain. Alternate forks (side chains) that never become tip are not compacted:
+  once they fall past the witness buffer their **block bodies are dropped**
+  (headers retained in the block index) — they are dead for realistic reorgs,
+  and deep cold attach is already refused.
 
 Because recent blocks are stored whole and old blocks have no witness at all,
 there is never a case where a stripped block needs witness re-attached. The
@@ -236,9 +236,11 @@ standard objection that compression endangers deterministic results:
    decompressed block. A codec bug that altered bytes would fail the
    original-block CRC *and* consensus validation, the same two layers that guard
    the uncompressed path today.
-7. **The write path is unchanged for live blocks.** Block acceptance writes the
-   full raw block to the hot tier exactly as today; compression happens only in
-   the background age-out job, never on the acceptance critical path.
+7. **Near-tip writes stay uncompressed.** Block acceptance into the hot window
+   writes the full raw block exactly as upstream; compression is not on the
+   live tip critical path. During IBD, heights already past the buffer relative
+   to the headers tip use `StoreBlockCold` (strip+zstd once) so catch-up does
+   not double-write hot then cold.
 
 ### Why the target is realistic (measured, not estimated)
 
@@ -319,8 +321,10 @@ headline, all confined to blocks older than the 2016 hot window):
 5. **Hot-path neutral**: write throughput and `readBlock` latency for hot-tier
    blocks are within 10% of uncompressed (they *are* uncompressed — this verifies
    the hot path is genuinely untouched).
-6. **SSD-wear**: bytes-written to the underlying files during a replay benchmark
-   reduced by ≥ 40% vs uncompressed, dominated by the cold tier.
+6. **SSD-wear**: during headers-ahead IBD, cold-direct writes (`StoreBlockCold`)
+   program roughly the cold footprint once instead of hot+cold. Bytes written
+   on a full-chain catch-up should drop by ≥ 40% vs uncompressed hot-only
+   archival, dominated by the cold majority.
 7. **Race-clean**: `go test -race` passes across `blockcompress` and `ffldb`.
 
 ### Phasing
@@ -331,6 +335,7 @@ headline, all confined to blocks older than the 2016 hot window):
 | A-2 | Cold-tier file format: per-file header, `writeBlock`/`readBlock` paths that handle both headerless-uncompressed (hot/legacy) and compressed-stripped (cold) files via the header check, `readBlockRegion` decompress for cold files. Whitebox unit tests. No age-out job yet — blocks are written cold directly in tests. |
 | A-3 | Age-out compaction job: background read-hot → strip+compress → write-cold → update block index → reclaim hot space. 2016-block rolling window. LRU decompressed-block cache. Indexer catch-up benchmark. (Status: **done.** Compaction primitive `CompactBlockToCold` + `ColdCompactor` interface + LRU cache + blockchain-layer age-out driver + hot-tier space reclaim (`ReclaimHotSpace`) done and race-clean. `TestFullBlocks` consensus suite passes. **Critical fix:** offset-bearing index entries (txindex, addrindex) are rewritten to stripped-relative offsets at compaction time via `ColdCompactionIndexManager.RewriteTxOffsetsForColdCompaction` — without it, `getrawtransaction` / `searchrawtransactions` / wallet rescans would return garbled bytes for any compacted segwit block. `CompactBlockToCold` is idempotent (nil for already-cold) so the rewrite also fires after reorg reconnections. `FetchBlockRegion` bounds check fixed for cold blocks (compressed `blockLen` vs. uncompressed stripped length).) |
 | A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-excision verification, integration test on existing datadir. (Status: **done.** `--witness-buffer` config flag + `blockchain.Config.WitnessBuffer` + validation + service-bit handling (`NODE_WITNESS` retained for the hot window; cold `MSG_WITNESS_BLOCK` → `notfound`, `NODE_NETWORK` retained) all complete. Integration test on real mainnet datadir verified via measurement tooling — 52.5% blended reduction confirmed on 1005 GB chain.) |
+| A-5 | Cold-direct IBD writes: when headers tip − height ≥ witness buffer and the block is on the best header chain, `StoreBlockCold` writes strip+zstd once (no hot copy). ConnectBlock indexes with stripped `TxLoc` when already cold. (Status: **done.** `TestStoreBlockCold`, `TestColdDirectStoreWhenHeadersAhead`, `TestTxIndexColdDirectConnect`.) |
 
 **Test plan:** see `docs/M1_TEST_PLAN.md` for the full test matrix (26 tests across database, blockchain, and codec layers) and real-chain measurement instructions.
 
