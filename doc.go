@@ -140,6 +140,7 @@ Application Options:
 	    --sigcachemaxsize=      The maximum number of entries in the signature
 	                            verification cache (default: 100000)
 	    --simnet                Use the simulation test network
+	    --signet                Use the signet test network
 	    --testnet               Use the test network
 	    --torisolation          Enable Tor stream isolation by randomizing user
 	                            credentials for each connection.

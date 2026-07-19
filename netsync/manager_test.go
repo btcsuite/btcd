@@ -396,7 +396,7 @@ func TestBuildBlockRequestSkipsInflightBlocks(t *testing.T) {
 				syncPeerState.requestedBlocks[*hash] = struct{}{}
 			}
 
-			gdmsg := sm.buildBlockRequest(syncPeer)
+			gdmsg := sm.buildBlockRequest(syncPeer, maxInFlightPerPeer)
 
 			// Collect the hashes from the getdata message.
 			got := make(map[chainhash.Hash]struct{}, len(gdmsg.InvList))
@@ -946,9 +946,20 @@ func syncStalledPeerRecovery(t *testing.T, sm *SyncManager,
 	require.Equal(t, int32(stallAfter), best.Height)
 	require.True(t, sm.ibdMode)
 
-	// Trigger stall detection.
-	sm.lastProgressTime = time.Now().Add(
-		-(maxStallDuration + time.Minute))
+	// Snapshot outstanding requests before stall handling clears them
+	// (kick requeues by wiping the peer's local map immediately).
+	stalledState := sm.peerStates[stalledPeer]
+	stalledRequested := make([]chainhash.Hash, 0, len(stalledState.requestedBlocks))
+	for hash := range stalledState.requestedBlocks {
+		stalledRequested = append(stalledRequested, hash)
+	}
+	require.NotEmpty(t, stalledRequested,
+		"stalled peer should have outstanding requested blocks")
+
+	// Trigger stall detection (per-peer progress + global progress).
+	stallAt := time.Now().Add(-(maxStallDuration + time.Minute))
+	sm.lastProgressTime = stallAt
+	stalledState.lastBlockProgress = stallAt
 	sm.handleStallSample()
 
 	// Verify that handleStallSample called Disconnect() on the
@@ -965,22 +976,11 @@ func syncStalledPeerRecovery(t *testing.T, sm *SyncManager,
 		t.Fatal("Disconnect() was not called on stalled peer")
 	}
 
-	// Snapshot the stalled peer's outstanding requested blocks before
-	// disconnection so we can verify they are cleaned up.
-	stalledState := sm.peerStates[stalledPeer]
-	stalledRequested := make([]chainhash.Hash, 0, len(stalledState.requestedBlocks))
-	for hash := range stalledState.requestedBlocks {
-		stalledRequested = append(stalledRequested, hash)
-	}
-	require.NotEmpty(t, stalledRequested,
-		"stalled peer should have outstanding requested blocks")
-
 	// In production, Disconnect() triggers handleDonePeerMsg
 	// asynchronously via the peer goroutine.  Call it directly to
-	// complete the removal.  Note: handleDonePeerMsg first clears the
-	// stalled peer's requested blocks from the global map via
-	// clearRequestedState, then updateSyncPeer → startSync immediately
-	// re-requests them for the replacement peer.
+	// complete the removal.  Kick already requeued in-flight hashes
+	// into the global pending set and refill assigned them to the
+	// replacement peer.
 	sm.handleDonePeerMsg(stalledPeer)
 
 	_, stalledTracked := sm.peerStates[stalledPeer]
@@ -989,6 +989,8 @@ func syncStalledPeerRecovery(t *testing.T, sm *SyncManager,
 	require.True(t, sm.syncPeer == replacementPeer,
 		"replacement peer should take over as sync peer")
 	require.True(t, sm.ibdMode)
+	require.True(t, sm.isBlockDownloadPeer(replacementPeer),
+		"replacement peer should be in the block download pool")
 
 	// Verify that the replacement peer re-requested the exact same
 	// blocks that were outstanding from the stalled peer.

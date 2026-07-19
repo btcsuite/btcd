@@ -47,6 +47,9 @@ const (
 	stallSampleInterval = 30 * time.Second
 )
 
+// NOTE: Parallel IBD block-download knobs (pool size, per-peer in-flight cap,
+// slow-peer ratio) live in parallel_fetch.go.
+
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash chainhash.Hash
 
@@ -150,6 +153,22 @@ type peerSyncState struct {
 	requestQueue    []*wire.InvVect
 	requestedTxns   map[chainhash.Hash]struct{}
 	requestedBlocks map[chainhash.Hash]struct{}
+
+	// bytesFetched counts IBD block bytes delivered in the current
+	// parallel-fetch scoring window.
+	bytesFetched uint64
+
+	// blocksDelivered is the total IBD blocks this peer successfully
+	// contributed (connected, non-orphan). Used to prefer working peers.
+	blocksDelivered uint64
+
+	// notFoundBlocks counts IBD block notfounds from this peer. Too many
+	// means they cannot serve history and should leave the download pool.
+	notFoundBlocks uint32
+
+	// lastBlockProgress is updated whenever this peer delivers a connected
+	// IBD block. Used for per-peer stall detection.
+	lastBlockProgress time.Time
 }
 
 // limitAdd is a helper function for maps that require a maximum limit by
@@ -195,6 +214,18 @@ type SyncManager struct {
 	syncPeer         *peerpkg.Peer
 	peerStates       map[*peerpkg.Peer]*peerSyncState
 	lastProgressTime time.Time
+
+	// blockPeers are peers currently assigned partitioned IBD getdata work.
+	// Headers still sync from syncPeer alone; blocks fan out across this pool.
+	blockPeers map[*peerpkg.Peer]struct{}
+
+	// priorityBlocks are IBD block hashes that must be requested before
+	// scanning further ahead (typically requeued after a peer kick) so the
+	// orphan/lookahead buffer stays tight around tip+1.
+	priorityBlocks map[chainhash.Hash]struct{}
+
+	// lastScoreTime is the last parallel-fetch slow-peer ranking pass.
+	lastScoreTime time.Time
 
 	// The following fields are used for the initial block download mode.
 	ibdMode bool
@@ -323,38 +354,8 @@ func (sm *SyncManager) startSync() {
 	}
 
 	// We don't have any more headers to download at this
-	// point so start asking for blocks.
-	best := sm.chain.BestSnapshot()
-	higherPeers := sm.fetchHigherPeers(best.Height)
-
-	// Pick randomly from the set of peers greater than our
-	// block height, falling back to a random peer of the same
-	// height if none are greater.
-	//
-	// TODO(conner): Use a better algorithm to ranking peers based on
-	// observed metrics and/or sync in parallel.
-	var bestPeer *peerpkg.Peer
-	switch {
-	case len(higherPeers) > 0:
-		bestPeer = higherPeers[rand.Intn(len(higherPeers))]
-	}
-
-	if bestPeer == nil {
-		log.Warnf("No sync peer candidates available")
-		return
-	}
-
-	sm.syncPeer = bestPeer
-	sm.ibdMode = true
-
-	// Reset the last progress time now that we have a non-nil
-	// syncPeer to avoid instantly detecting it as stalled in the
-	// event the progress time hasn't been updated recently.
-	sm.lastProgressTime = time.Now()
-
-	log.Infof("Syncing to block height %d from peer %v",
-		sm.syncPeer.LastBlock(), sm.syncPeer.Addr())
-	sm.fetchHeaderBlocks(sm.syncPeer)
+	// point so start asking for blocks in parallel.
+	sm.startParallelBlockFetch()
 }
 
 // isSyncCandidate returns whether or not the peer is a candidate to consider
@@ -440,17 +441,32 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 	}
 
 	// Start syncing by choosing the best candidate if needed.
-	if isSyncCandidate && sm.syncPeer == nil {
+	if !isSyncCandidate {
+		return
+	}
+	if sm.syncPeer == nil {
 		sm.startSync()
+		return
+	}
+
+	// If headers are done and IBD block download is active, grow the
+	// parallel pool with newly connected candidates.
+	if sm.ibdMode && sm.headersCaughtUp() {
+		sm.ensureBlockPeers()
+		sm.fillAllBlockRequests()
 	}
 }
 
-// handleStallSample will switch to a new sync peer if the current one has
-// stalled. This is detected when by comparing the last progress timestamp with
-// the current time, and disconnecting the peer if we stalled before reaching
-// their highest advertised block.
+// handleStallSample will switch away from stalled sync/download peers if we
+// haven't made progress. Header download uses the single syncPeer path;
+// block download uses the parallel pool stall/score logic.
 func (sm *SyncManager) handleStallSample() {
 	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		return
+	}
+
+	if len(sm.blockPeers) > 0 {
+		sm.handleParallelStallSample()
 		return
 	}
 
@@ -511,10 +527,33 @@ func (sm *SyncManager) handleDonePeerMsg(peer *peerpkg.Peer) {
 
 	// Remove the peer from the list of candidate peers.
 	delete(sm.peerStates, peer)
+	wasBlockPeer := sm.isBlockDownloadPeer(peer)
+	delete(sm.blockPeers, peer)
 
 	log.Infof("Lost peer %s", peer)
 
-	sm.clearRequestedState(state)
+	// Requeue this peer's in-flight IBD blocks before dropping state so
+	// another peer can fetch them (avoid stranded hashes).
+	requeued := sm.requeuePeerBlockRequests(state)
+	if requeued > 0 {
+		log.Infof("Requeued %d in-flight block(s) from lost peer %s",
+			requeued, peer)
+	}
+	for txHash := range state.requestedTxns {
+		delete(sm.requestedTxns, txHash)
+	}
+
+	if wasBlockPeer {
+		sm.freeAheadSlotsForPriority()
+		sm.ensureBlockPeers()
+		sm.pickSyncPeerFromBlockPool()
+		sm.fillAllBlockRequests()
+		if len(sm.blockPeers) == 0 {
+			sm.syncPeer = nil
+			sm.startSync()
+		}
+		return
+	}
 
 	if peer == sm.syncPeer {
 		// Update the sync peer. The server has already disconnected the
@@ -524,7 +563,7 @@ func (sm *SyncManager) handleDonePeerMsg(peer *peerpkg.Peer) {
 }
 
 // clearRequestedState wipes all expected transactions and blocks from the sync
-// manager's requested maps that were requested under a peer's sync state, This
+// manager's requested maps that were requested under a peer's sync state. This
 // allows them to be rerequested by a subsequent sync peer.
 func (sm *SyncManager) clearRequestedState(state *peerSyncState) {
 	// Remove requested transactions from the global map so that they will
@@ -532,26 +571,21 @@ func (sm *SyncManager) clearRequestedState(state *peerSyncState) {
 	for txHash := range state.requestedTxns {
 		delete(sm.requestedTxns, txHash)
 	}
+	state.requestedTxns = make(map[chainhash.Hash]struct{})
 
-	// Remove requested blocks from the global map so that they will be
-	// fetched from elsewhere next time we get an inv.
-	// TODO: we could possibly here check which peers have these blocks
-	// and request them now to speed things up a little.
-	for blockHash := range state.requestedBlocks {
-		delete(sm.requestedBlocks, blockHash)
-	}
+	// Requeue in-flight blocks (clear global + peer maps) so another peer
+	// can fetch them. Leaving hashes only on a dead peer stalls IBD.
+	sm.requeuePeerBlockRequests(state)
 }
 
 // updateSyncPeer choose a new sync peer to replace the current one. If
 // dcSyncPeer is true, this method will also disconnect the current sync peer.
-// If we are in header first mode, any header state related to prefetching is
-// also reset in preparation for the next sync peer.
 func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 	log.Debugf("Updating sync peer, no progress for: %v",
 		time.Since(sm.lastProgressTime))
 
 	// First, disconnect the current sync peer if requested.
-	if dcSyncPeer {
+	if dcSyncPeer && sm.syncPeer != nil {
 		sm.syncPeer.Disconnect()
 	}
 
@@ -635,13 +669,17 @@ func (sm *SyncManager) current() bool {
 
 	// if blockChain thinks we are current and we have no syncPeer it
 	// is probably right.
-	if sm.syncPeer == nil {
+	if sm.syncPeer == nil && len(sm.blockPeers) == 0 {
 		return true
 	}
 
-	// No matter what chain thinks, if we are below the block we are syncing
-	// to we are not current.
-	if sm.chain.BestSnapshot().Height < sm.syncPeer.LastBlock() {
+	// No matter what chain thinks, if we are below a peer we are syncing
+	// from we are not current.
+	bestHeight := sm.chain.BestSnapshot().Height
+	if sm.syncPeer != nil && bestHeight < sm.syncPeer.LastBlock() {
+		return false
+	}
+	if bestHeight < sm.maxBlockPeerHeight() {
 		return false
 	}
 	return true
@@ -794,8 +832,9 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			peer.PushGetBlocksMsg(locator, orphanRoot)
 		}
 	} else {
-		if peer == sm.syncPeer {
-			sm.lastProgressTime = time.Now()
+		// Any parallel IBD download peer counts as progress.
+		if sm.isBlockDownloadPeer(peer) || peer == sm.syncPeer {
+			sm.noteBlockPeerProgress(peer, bmsg.block.MsgBlock().SerializeSize())
 		}
 
 		// When the block is not an orphan, log information about it and
@@ -846,12 +885,11 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
-	// Fetch more blocks if we're still not caught up to the best header and
-	// the number of in-flight blocks has dropped below the minimum threshold.
+	// Fetch more blocks if we're still not caught up to the best header.
+	// Refill the whole parallel pool (least-loaded assignment).
 	_, lastHeight := sm.chain.BestHeader()
-	if bmsg.block.Height() < lastHeight &&
-		len(state.requestedBlocks) < minInFlightBlocks {
-		sm.fetchHeaderBlocks(sm.syncPeer)
+	if bmsg.block.Height() < lastHeight {
+		sm.fillAllBlockRequests()
 		return
 	}
 
@@ -860,47 +898,84 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			"caught up to block %v(%v) -- now listening to blocks.",
 			bmsg.block.Hash(), bmsg.block.Height())
 		sm.ibdMode = false
+		sm.blockPeers = make(map[*peerpkg.Peer]struct{})
 	}
 }
 
 // fetchHeaderBlocks creates and sends a request to the given peer for the next
 // list of blocks to be downloaded based on the current list of headers.
 func (sm *SyncManager) fetchHeaderBlocks(peer *peerpkg.Peer) {
-	if peer == nil {
-		log.Warnf("fetchHeaderBlocks called with a nil peer")
-		return
-	}
-
-	gdmsg := sm.buildBlockRequest(peer)
-	if len(gdmsg.InvList) > 0 {
-		peer.QueueMessage(gdmsg, nil)
-	}
+	sm.fetchHeaderBlocksLimited(peer, maxInFlightPerPeer)
 }
 
-// buildBlockRequest builds a getdata message for blocks that need to be
-// downloaded based on the current list of headers.
+// buildBlockRequest builds a getdata message for up to maxNew blocks that need
+// to be downloaded based on the current list of headers.
 //
 // Start fetching from the fork point between the best chain and
 // the best header chain rather than from the best chain height.
 // When the best header chain has diverged (e.g. due to a reorg),
 // blocks between the fork point and the current height on the new
 // chain are different and must also be downloaded.
-func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
+func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer, maxNew int) *wire.MsgGetData {
 	// Return early if the peer is nil.
-	if peer == nil {
+	if peer == nil || maxNew <= 0 {
 		return wire.NewMsgGetDataSizeHint(0)
+	}
+
+	peerState := sm.peerStates[peer]
+	if peerState == nil {
+		return wire.NewMsgGetDataSizeHint(0)
+	}
+
+	gdmsg := wire.NewMsgGetDataSizeHint(uint(maxNew))
+	numRequested := 0
+
+	// Prefer requeued / tip-adjacent priority hashes before scanning further
+	// ahead so kicks don't leave a large orphan buffer.
+	for _, hash := range sm.priorityHashesByHeight() {
+		if numRequested >= maxNew {
+			break
+		}
+		if len(peerState.requestedBlocks) >= maxInFlightPerPeer {
+			break
+		}
+		if _, inflight := sm.requestedBlocks[hash]; inflight {
+			delete(sm.priorityBlocks, hash)
+			continue
+		}
+
+		iv := wire.NewInvVect(wire.InvTypeBlock, &hash)
+		haveInv, err := sm.haveInventory(iv)
+		if err != nil {
+			log.Warnf("Unexpected failure when checking for "+
+				"existing inventory during priority block "+
+				"fetch: %v", err)
+		}
+		delete(sm.priorityBlocks, hash)
+		if haveInv {
+			continue
+		}
+
+		sm.requestedBlocks[hash] = struct{}{}
+		peerState.requestedBlocks[hash] = struct{}{}
+		if peer.IsWitnessEnabled() {
+			iv.Type = wire.InvTypeWitnessBlock
+		}
+		gdmsg.AddInvVect(iv)
+		numRequested++
+	}
+
+	if numRequested >= maxNew ||
+		len(peerState.requestedBlocks) >= maxInFlightPerPeer {
+		return gdmsg
 	}
 
 	_, bestHeaderHeight := sm.chain.BestHeader()
 	forkHeight := sm.chain.BestChainHeaderForkHeight()
 	if bestHeaderHeight < forkHeight {
-		// Should never happen but we're guarding against the uint cast
-		// that happens below.
-		return wire.NewMsgGetDataSizeHint(0)
+		return gdmsg
 	}
-	length := bestHeaderHeight - forkHeight
-	gdmsg := wire.NewMsgGetDataSizeHint(uint(length))
-	numRequested := 0
+
 	for h := forkHeight + 1; h <= bestHeaderHeight; h++ {
 		hash, err := sm.chain.HeaderHashByHeight(h)
 		if err != nil {
@@ -927,10 +1002,15 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 				continue
 			}
 
-			peerState := sm.peerStates[peer]
+			// Cap per-peer in-flight so work stays partitioned
+			// across the parallel IBD pool.
+			if len(peerState.requestedBlocks) >= maxInFlightPerPeer {
+				break
+			}
 
 			sm.requestedBlocks[*hash] = struct{}{}
 			peerState.requestedBlocks[*hash] = struct{}{}
+			delete(sm.priorityBlocks, *hash)
 
 			// If we're fetching from a witness enabled peer
 			// post-fork, then ensure that we receive all the
@@ -943,7 +1023,10 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 			numRequested++
 		}
 
-		if numRequested >= wire.MaxInvPerMsg {
+		if numRequested >= maxNew || numRequested >= wire.MaxInvPerMsg {
+			break
+		}
+		if len(peerState.requestedBlocks) >= maxInFlightPerPeer {
 			break
 		}
 	}
@@ -1007,7 +1090,7 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	log.Infof("downloaded headers to %v(%v) from peer %v "+
 		"-- now fetching blocks",
 		bestHeaderHash, bestHeaderHeight, hmsg.peer.String())
-	sm.fetchHeaderBlocks(peer)
+	sm.startParallelBlockFetch()
 }
 
 // handleNotFoundMsg handles notfound messages from all peers.
@@ -1018,6 +1101,8 @@ func (sm *SyncManager) handleNotFoundMsg(nfmsg *notFoundMsg) {
 		log.Warnf("Received notfound message from unknown peer %s", peer)
 		return
 	}
+
+	requeued := 0
 	for _, inv := range nfmsg.notFound.InvList {
 		// verify the hash was actually announced by the peer
 		// before deleting from the global requested maps.
@@ -1028,6 +1113,16 @@ func (sm *SyncManager) handleNotFoundMsg(nfmsg *notFoundMsg) {
 			if _, exists := state.requestedBlocks[inv.Hash]; exists {
 				delete(state.requestedBlocks, inv.Hash)
 				delete(sm.requestedBlocks, inv.Hash)
+				// Immediately put tip-needed work back at the front of
+				// the line; otherwise IBD stalls until a stall timeout.
+				if sm.ibdMode {
+					if sm.priorityBlocks == nil {
+						sm.priorityBlocks = make(map[chainhash.Hash]struct{})
+					}
+					sm.priorityBlocks[inv.Hash] = struct{}{}
+					requeued++
+					state.notFoundBlocks++
+				}
 			}
 
 		case wire.InvTypeWitnessTx:
@@ -1039,6 +1134,24 @@ func (sm *SyncManager) handleNotFoundMsg(nfmsg *notFoundMsg) {
 			}
 		}
 	}
+
+	if requeued == 0 {
+		return
+	}
+
+	log.Infof("Peer %s notfound for %d IBD block(s); requeued to front of line",
+		peer.Addr(), requeued)
+
+	// Peers that repeatedly cannot serve historical blocks are useless for
+	// IBD — kick them so working archival peers get the slots.
+	const maxIBDNotFounds = 3
+	if sm.isBlockDownloadPeer(peer) && state.notFoundBlocks >= maxIBDNotFounds {
+		sm.kickBlockPeer(peer, false, "too many IBD notfounds")
+		return
+	}
+
+	sm.freeAheadSlotsForPriority()
+	sm.fillAllBlockRequests()
 }
 
 // haveInventory returns whether or not the inventory represented by the passed
@@ -1630,6 +1743,8 @@ func New(config *Config) (*SyncManager, error) {
 		requestedTxns:   make(map[chainhash.Hash]struct{}),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
 		peerStates:      make(map[*peerpkg.Peer]*peerSyncState),
+		blockPeers:      make(map[*peerpkg.Peer]struct{}),
+		priorityBlocks:  make(map[chainhash.Hash]struct{}),
 		progressLogger:  newBlockProgressLogger("Processed", log),
 		msgChan:         make(chan interface{}, config.MaxPeers*3),
 		quit:            make(chan struct{}),
