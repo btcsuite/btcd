@@ -15,8 +15,8 @@ func TestRpcChainRuleError(t *testing.T) {
 	}
 
 	rule := blockchain.RuleError{
-		ErrorCode:   blockchain.ErrWitnessPruned,
-		Description: "block is witness-pruned",
+		ErrorCode:   blockchain.ErrWitnessExcised,
+		Description: "block is witness-excised",
 	}
 	got := rpcChainRuleError(rule)
 	rpcErr, ok := got.(*btcjson.RPCError)

@@ -56,3 +56,4 @@ coverage.txt.bak
 
 .DS_Store
 .aider*
+ln-soak-cold/*

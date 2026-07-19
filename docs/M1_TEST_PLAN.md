@@ -11,8 +11,8 @@ and the disk-reduction headline.
 
 | Test | Location | What it verifies |
 |---|---|---|
-| `TestWitnessPruningEndToEnd` | `database/ffldb/witness_prune_test.go` | Full lifecycle: store hot → compact to cold → FetchBlock returns stripped → no witness on any tx → block hash unchanged → cold file smaller → reclaim hot space → block still readable |
-| `TestWitnessPruningMultipleBlocks` | `database/ffldb/witness_prune_test.go` | Multiple blocks compacted together, hot window preserved, all blocks readable after reclaim |
+| `TestWitnessExcisionEndToEnd` | `database/ffldb/witness_excision_test.go` | Full lifecycle: store hot → compact to cold → FetchBlock returns stripped → no witness on any tx → block hash unchanged → cold file smaller → reclaim hot space → block still readable |
+| `TestWitnessExcisionMultipleBlocks` | `database/ffldb/witness_excision_test.go` | Multiple blocks compacted together, hot window preserved, all blocks readable after reclaim |
 | `TestColdBlockRoundTrip` | `database/ffldb/coldblock_test.go` | Cold block reads back as stripped serialization, byte-identical, deserializes via `DeserializeNoWitness` |
 | `TestColdBlockRegion` | `database/ffldb/coldblock_test.go` | `readBlockRegion` on cold blocks (header reads from decompressed stripped block) |
 | `TestHotPathUnchanged` | `database/ffldb/coldblock_test.go` | Hot-tier write/read path untouched by cold-tier code |
@@ -37,11 +37,11 @@ and the disk-reduction headline.
 | `TestWitnessBufferAgeOut` | `blockchain/ageout_test.go` | Blockchain-layer age-out driver: blocks beyond buffer are compacted, cold files created on disk, all blocks remain readable |
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
 | `TestWitnessBufferConfig` | `blockchain/ageout_test.go` | `Config.WitnessBuffer` wires through to `BlockChain.witnessBuffer` |
-| `TestInvalidatePastWitnessBufferRefused` | `blockchain/witness_prune_ops_test.go` | Deep `InvalidateBlock` past the hot window is refused with `ErrWitnessPruned`; shallow invalidate still works |
-| `TestStaleSideChainBodyDropped` | `blockchain/witness_prune_ops_test.go` | Alternate forks past the witness buffer drop bodies (headers retained); recent side tips stay hot |
+| `TestInvalidatePastWitnessBufferRefused` | `blockchain/witness_excision_ops_test.go` | Deep `InvalidateBlock` past the hot window is refused with `ErrWitnessExcised`; shallow invalidate still works |
+| `TestStaleSideChainBodyDropped` | `blockchain/witness_excision_ops_test.go` | Alternate forks past the witness buffer drop bodies (headers retained); recent side tips stay hot |
 | `TestDeleteBlock` | `database/ffldb/deleteblock_test.go` | `DeleteBlock` removes body from index, is idempotent, leaves sibling blocks intact |
 | `TestColdCompactionSurvivesReopen` | `database/ffldb/cold_reopen_test.go` | After compact + close + reopen, block stays cold and FetchBlock matches stripped bytes (post-commit crash recovery) |
-| `TestCreateTxRawResultWitnessPruned` | `witness_pruned_rpc_test.go` | Verbose tx JSON sets `witness_pruned` for cold loads and does not invent a historical wtxid |
+| `TestCreateTxRawResultWitnessExcised` | `witness_excised_rpc_test.go` | Verbose tx JSON sets `witness_excised` for cold loads and does not invent a historical wtxid |
 | `TestFullBlocks` | `blockchain/fullblocktests` | Consensus suite passes with two-tier storage enabled (22s, race-clean) |
 | `TestRoundTrip` | `blockcompress/codec_test.go` | `decompress(compress(x)) == x` for representative inputs |
 | `TestDeterminismAcrossInstances` | `blockcompress/codec_test.go` | Two codecs on same version produce identical compressed output |
@@ -66,8 +66,8 @@ Results on a 1005 GB mainnet datadir (156K blocks sampled from 29 files):
 | Approach | Reduction | Est. full-chain size |
 |---|---|---|
 | Compress whole block (zstd only) | 23.9% | 765 GB |
-| Prune witness only (no zstd) | 35.8% | 645 GB |
-| **Prune witness + zstd stripped** | **52.5%** | **477 GB** |
+| Excise witness only (no zstd) | 35.8% | 645 GB |
+| **Excise witness + zstd stripped** | **52.5%** | **477 GB** |
 
 Dictionary training added <0.4 percentage points. FormatV1 ships dict-free.
 
@@ -101,7 +101,7 @@ go test -run='^$' -fuzz=FuzzColdCompactionTxIndex -fuzztime=30s ./blockchain/ind
 
 ## What the Tests Prove
 
-1. **Witness is actually pruned**: `FetchBlock` on a cold block returns bytes
+1. **Witness is actually excised**: `FetchBlock` on a cold block returns bytes
    that are shorter than the full block, no transaction has witness data, and
    the bytes match `SerializeNoWitness` output exactly.
 

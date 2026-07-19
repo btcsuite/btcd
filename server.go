@@ -834,11 +834,11 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 		return s.pushTxMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
 
 	case wire.InvTypeWitnessBlock:
-		if s.blockWitnessPruned(&iv.Hash) {
+		if s.blockWitnessExcised(&iv.Hash) {
 			if doneChan != nil {
 				doneChan <- struct{}{}
 			}
-			return errWitnessPrunedInv
+			return errWitnessExcisedInv
 		}
 		return s.pushBlockMsg(
 			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
@@ -848,11 +848,11 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 		return s.pushBlockMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
 
 	case wire.InvTypeFilteredWitnessBlock:
-		if s.blockWitnessPruned(&iv.Hash) {
+		if s.blockWitnessExcised(&iv.Hash) {
 			if doneChan != nil {
 				doneChan <- struct{}{}
 			}
-			return errWitnessPrunedInv
+			return errWitnessExcisedInv
 		}
 		return s.pushMerkleBlockMsg(
 			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
@@ -874,12 +874,12 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 	}
 }
 
-// errWitnessPrunedInv is returned from pushInventory when a peer requests
+// errWitnessExcisedInv is returned from pushInventory when a peer requests
 // witness inventory for a cold-tier block. OnGetData turns it into notfound.
-var errWitnessPrunedInv = errors.New("witness data pruned for inventory")
+var errWitnessExcisedInv = errors.New("witness data excised for inventory")
 
-// blockWitnessPruned reports whether the block is in the cold tier.
-func (s *server) blockWitnessPruned(hash *chainhash.Hash) bool {
+// blockWitnessExcised reports whether the block is in the cold tier.
+func (s *server) blockWitnessExcised(hash *chainhash.Hash) bool {
 	var cold bool
 	_ = s.db.View(func(dbTx database.Tx) error {
 		cc, ok := dbTx.(database.ColdCompactor)

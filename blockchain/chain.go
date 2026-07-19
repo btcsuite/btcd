@@ -2059,7 +2059,7 @@ func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
 				"(%d); cold tip lacks retained witness data. Use "+
 				"--witness-buffer=0 for archival invalidate/reconsider",
 				hash, node.height, newTipHeight, b.witnessBuffer)
-			return ruleError(ErrWitnessPruned, str)
+			return ruleError(ErrWitnessExcised, str)
 		}
 	}
 
@@ -2246,7 +2246,7 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 
 	// Cold (witness-stripped) blocks cannot be re-validated: the commitment
 	// check would fail with a misleading ErrInvalidWitnessCommitment. Refuse
-	// with ErrWitnessPruned instead. Natural reorgs still work via KnownValid.
+	// with ErrWitnessExcised instead. Natural reorgs still work via KnownValid.
 	if err := b.rejectColdAttachNodes(attachNodes); err != nil {
 		return err
 	}
@@ -2272,7 +2272,7 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 	return b.reorganizeChain(detachNodes, attachNodes)
 }
 
-// rejectColdAttachNodes returns ErrWitnessPruned if any block on the attach
+// rejectColdAttachNodes returns ErrWitnessExcised if any block on the attach
 // path is stored in the cold tier. Reconsider/re-validation needs witness.
 func (b *BlockChain) rejectColdAttachNodes(attachNodes *list.List) error {
 	if attachNodes == nil || attachNodes.Len() == 0 {
@@ -2307,7 +2307,7 @@ func (b *BlockChain) rejectColdAttachNodes(attachNodes *list.List) error {
 			"been pruned by cold-tier compaction; re-validation requires "+
 			"a full archival node (--witness-buffer=0) or a re-download "+
 			"of the block with witness", coldHash)
-		return ruleError(ErrWitnessPruned, str)
+		return ruleError(ErrWitnessExcised, str)
 	}
 	return nil
 }

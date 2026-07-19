@@ -104,8 +104,8 @@ full synced mainnet datadir (1406 files, blocks/mainnet/blocks_ffldb):
 | Approach | Reduction | Est. full-chain size |
 |---|---|---|
 | Compress whole block (zstd only) | 23.9% | 765 GB |
-| Prune witness only (no zstd) | 35.8% | 645 GB |
-| **Prune witness + zstd stripped** | **52.5%** | **477 GB** |
+| Excise witness only (no zstd) | 35.8% | 645 GB |
+| **Excise witness + zstd stripped** | **52.5%** | **477 GB** |
 
 The witness fraction grows over time: 0% pre-segwit, 2–23% by 2018–19,
 24–46% by 2020–22, 48–70% recently (2024–25). Since modern blocks dominate disk
@@ -124,8 +124,8 @@ Earlier two-fixture measurement (post-segwit, 26% and 74% witness):
 | Approach | Fixture 0 (26% witness) | Fixture 1 (74% witness) | Blended |
 |---|---|---|---|
 | Compress whole block (zstd) | 25.0% | 23.6% | 24.1% |
-| Prune witness only | 26.4% | 74.4% | 57.4% |
-| **Prune witness + zstd stripped** | **48.3%** | **82.0%** | **70.0%** |
+| Excise witness only | 26.4% | 74.4% | 57.4% |
+| **Excise witness + zstd stripped** | **48.3%** | **82.0%** | **70.0%** |
 
 ### Scope
 
@@ -191,8 +191,8 @@ witness re-attachment problem does not exist in this design.
   peers fetch `MSG_BLOCK` (stripped) instead.
 - Config flags: `--witness-buffer=N` (default `2016`; the number of recent blocks
   kept full and uncompressed before age-out to the cold tier). A future
-  `--no-witness-pruning` flag to keep the hot tier forever (full archival) is
-  deferred — the default design is the pruned one.
+  `--no-witness-excision` flag to keep the hot tier forever (full archival) is
+  deferred — the default design is the excised-witness one.
 - Dictionary training tool (`//go:build ignore` program) that samples real
   mainnet blocks and trains a zstd dictionary for the stripped-block stream.
 
@@ -251,8 +251,8 @@ block 0 to the current tip:
 | Approach | Reduction | Est. full-chain size |
 |---|---|---|
 | Compress whole block (zstd only) | 23.9% | 765 GB |
-| Prune witness only (no zstd) | 35.8% | 645 GB |
-| **Prune witness + zstd stripped** | **52.5%** | **477 GB** |
+| Excise witness only (no zstd) | 35.8% | 645 GB |
+| **Excise witness + zstd stripped** | **52.5%** | **477 GB** |
 
 Two structural facts make this hold chain-wide:
 
@@ -290,12 +290,12 @@ headline, all confined to blocks older than the 2016 hot window):
 - A full `reindex` from scratch requires re-downloading witness for the cold
   range (same tradeoff as block pruning today).
 - `getrawtransaction` / verbose `getblock` on a cold-height tx or block set
-  `witness_pruned: true`; size/vsize/weight describe the stripped serialization
+  `witness_excised: true`; size/vsize/weight describe the stripped serialization
   only, and `hash` equals `txid` (historical wtxid is unavailable). Bundled
   btcwallet must honor this flag — see M3 “btcwallet changes required for M1
-  witness pruning.”
+  witness excision.”
 - `invalidateblock` deeper than the witness buffer, and `reconsiderblock` of a
-  cold block, are refused with a clear `ErrWitnessPruned` error (full archival
+  cold block, are refused with a clear `ErrWitnessExcised` error (full archival
   requires `--witness-buffer=0`). Natural reorgs within/around the hot window
   continue to work via `KnownValid`.
 
@@ -310,11 +310,11 @@ headline, all confined to blocks older than the 2016 hot window):
    produces consensus results identical to the uncompressed baseline.
 3. **Reorg safety**: the node validates correctly through a simulated reorg up to
    2016 blocks deep (the hot window). Deeper operator invalidate/reconsider of
-   cold blocks is refused with `ErrWitnessPruned`; natural reorgs rely on
+   cold blocks is refused with `ErrWitnessExcised`; natural reorgs rely on
    `KnownValid` and do not re-download cold witness.
 4. **Index completeness**: `txindex`/`addrindex` return complete results for
    `txid`-keyed queries including Taproot script-path spends, because indexing
-   happens before age-out. A query for a cold-height tx sets `witness_pruned`
+   happens before age-out. A query for a cold-height tx sets `witness_excised`
    rather than inventing a false wtxid or silent empty witness.
 5. **Hot-path neutral**: write throughput and `readBlock` latency for hot-tier
    blocks are within 10% of uncompressed (they *are* uncompressed — this verifies
@@ -330,7 +330,7 @@ headline, all confined to blocks older than the 2016 hot window):
 | A-1 | `blockcompress` codec + witness-split measurement + dictionary training + unit tests. No ffldb changes. **This phase alone produces the go/no-go ratio number.** (Status: **done.** Codec, tests, witness-split measurement, and dictionary training all complete and race-clean. Real-chain measurement: 52.5% blended reduction. Dictionary benchmarked and found to add <0.4pp; FormatV1 ships dict-free.) |
 | A-2 | Cold-tier file format: per-file header, `writeBlock`/`readBlock` paths that handle both headerless-uncompressed (hot/legacy) and compressed-stripped (cold) files via the header check, `readBlockRegion` decompress for cold files. Whitebox unit tests. No age-out job yet — blocks are written cold directly in tests. |
 | A-3 | Age-out compaction job: background read-hot → strip+compress → write-cold → update block index → reclaim hot space. 2016-block rolling window. LRU decompressed-block cache. Indexer catch-up benchmark. (Status: **done.** Compaction primitive `CompactBlockToCold` + `ColdCompactor` interface + LRU cache + blockchain-layer age-out driver + hot-tier space reclaim (`ReclaimHotSpace`) done and race-clean. `TestFullBlocks` consensus suite passes. **Critical fix:** offset-bearing index entries (txindex, addrindex) are rewritten to stripped-relative offsets at compaction time via `ColdCompactionIndexManager.RewriteTxOffsetsForColdCompaction` — without it, `getrawtransaction` / `searchrawtransactions` / wallet rescans would return garbled bytes for any compacted segwit block. `CompactBlockToCold` is idempotent (nil for already-cold) so the rewrite also fires after reorg reconnections. `FetchBlockRegion` bounds check fixed for cold blocks (compressed `blockLen` vs. uncompressed stripped length).) |
-| A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-prune verification, integration test on existing datadir. (Status: **done.** `--witness-buffer` config flag + `blockchain.Config.WitnessBuffer` + validation + service-bit handling (`NODE_WITNESS` retained for the hot window; cold `MSG_WITNESS_BLOCK` → `notfound`, `NODE_NETWORK` retained) all complete. Integration test on real mainnet datadir verified via measurement tooling — 52.5% blended reduction confirmed on 1005 GB chain.) |
+| A-4 | Config flag (`--witness-buffer`), service-bit handling, index-before-excision verification, integration test on existing datadir. (Status: **done.** `--witness-buffer` config flag + `blockchain.Config.WitnessBuffer` + validation + service-bit handling (`NODE_WITNESS` retained for the hot window; cold `MSG_WITNESS_BLOCK` → `notfound`, `NODE_NETWORK` retained) all complete. Integration test on real mainnet datadir verified via measurement tooling — 52.5% blended reduction confirmed on 1005 GB chain.) |
 
 **Test plan:** see `docs/M1_TEST_PLAN.md` for the full test matrix (26 tests across database, blockchain, and codec layers) and real-chain measurement instructions.
 
@@ -426,7 +426,7 @@ PSBT multisig with air-gapped QR signing, and a node dashboard.
   subprocess. Air-gapped QR ships first and covers the multisig use case without
   any hardware dependency.
 
-### btcwallet changes required for M1 witness pruning
+### btcwallet changes required for M1 witness excision
 
 M1 cold-tier storage strips witness past `--witness-buffer`. Bundling btcwallet
 must not assume historical `getrawtransaction` / block-rescan bytes always carry
@@ -434,14 +434,14 @@ witness. **`--txindex` does not fix this** — it only locates the stripped byte
 
 Required modifications when embedding / forking btcwallet into `btcd/wallet/`:
 
-1. **Honor `witness_pruned`.** Any path that consumes verbose
+1. **Honor `witness_excised`.** Any path that consumes verbose
    `getrawtransaction`, `getblock` (verbosity ≥ 1), or `searchrawtransactions`
-   must read the `witness_pruned` flag. When true:
+   must read the `witness_excised` flag. When true:
    - do **not** treat empty `txinwitness` / `hash == txid` as “this tx was never
      segwit”;
    - do **not** treat size / vsize / weight as the historical full-witness
      metrics (they describe the stripped serialization only);
-   - surface “witness pruned” in UI/RPC where tx detail is shown.
+   - surface “witness excised” in UI/RPC where tx detail is shown.
 2. **Prefer wallet DB over re-fetch.** For txs the wallet already knows, use
    wtxmgr / in-process records. Do not re-fetch cold confirmed txs from the
    node just to refresh witness or weight.
@@ -473,19 +473,19 @@ Track these in C-1 (embed) and verify under C-1 acceptance with a tiny
    harness and displays expected state from the in-process wallet/chain.
 4. **No consensus surface**: wallet code adds no paths into `blockchain/validate.go`
    or consensus rules.
-5. **Witness-pruning compatibility**: with a small `--witness-buffer`, mine past
+5. **Witness-excision compatibility**: with a small `--witness-buffer`, mine past
    the window, compact, then restore/rescan a wallet whose birthday is in the
    cold range — balances and address history match the pre-compact baseline;
-   no path treats pruned txs as non-segwit; detail views show witness pruned
+   no path treats excised-witness txs as non-segwit; detail views show witness excised
    rather than inventing wtxid/size.
 
 ### Phasing
 
 | Phase | Scope |
 |---|---|
-| C-1 | Embed btcwallet in-process; `--enable-wallet`; basic wallet RPCs; **M1 witness-pruning compatibility** (`witness_pruned`, stripped rescan, no false non-segwit inference). |
+| C-1 | Embed btcwallet in-process; `--enable-wallet`; basic wallet RPCs; **M1 witness-excision compatibility** (`witness_excised`, stripped rescan, no false non-segwit inference). |
 | C-2 | PSBT multisig flows on existing `psbt` package; air-gapped QR. |
-| C-3 | GioUI MVP: balance, send/receive, transaction history (incl. pruned-witness labeling). |
+| C-3 | GioUI MVP: balance, send/receive, transaction history (incl. excised-witness labeling). |
 | C-4 | GioUI node dashboard. |
 | C-5 | Hardware wallet transport (optional stretch). |
 

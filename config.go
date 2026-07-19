@@ -190,7 +190,7 @@ type config struct {
 	Upnp                 bool          `long:"upnp" description:"Use UPnP to map our listening port outside of NAT"`
 	ShowVersion          bool          `short:"V" long:"version" description:"Display version information and exit"`
 	Whitelists           []string      `long:"whitelist" description:"Add an IP network or IP that will not be banned. (eg. 192.168.1.0/24 or ::1)"`
-	WitnessBuffer         int32         `long:"witness-buffer" description:"Number of recent blocks to keep with witness data before age-out compaction strips and compresses older blocks. Default 2016 (~2 weeks). 0 disables compaction (full archival node)."`
+	WitnessBuffer         int32         `long:"witness-buffer" description:"Number of recent blocks to keep with full witness data before age-out compaction excises witness and compresses older blocks. Default 2016 (~2 weeks). 0 disables compaction (full archival node). Distinct from --prune, which deletes old blocks entirely."`
 	lookup               func(string) ([]net.IP, error)
 	oniondial            func(string, string, time.Duration) (net.Conn, error)
 	dial                 func(string, string, time.Duration) (net.Conn, error)
@@ -1179,14 +1179,16 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// --prune and --witness-buffer are mutually exclusive: pruning deletes
-	// old blocks entirely (no historical data), while witness-buffer strips
-	// and compresses them (keeps the base ledger). Combining them would
-	// delete the cold-tier records that witness-buffer worked to create.
+	// --prune and --witness-buffer are mutually exclusive: Bitcoin Core-style
+	// pruning deletes old blocks entirely (no historical data), while
+	// witness-buffer excises witness data and compresses older blocks (keeps
+	// the base ledger on the cold tier). Combining them would delete the
+	// cold-tier records that witness-buffer worked to create.
 	if cfg.Prune != 0 && cfg.WitnessBuffer != 0 {
 		err := fmt.Errorf("%s: the --prune and --witness-buffer options "+
 			"may not be activated at the same time -- --prune deletes "+
-			"old blocks, --witness-buffer compresses them", funcName)
+			"old blocks, --witness-buffer excises witness and compresses them",
+			funcName)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

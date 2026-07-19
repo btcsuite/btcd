@@ -41,7 +41,7 @@ func realBlockPaths(tb testing.TB) []string {
 }
 
 // TestWitnessSeparatedSavings is the go/no-go measurement for the combined
-// design: compress the non-witness stream and optionally prune the witness
+// design: compress the non-witness stream and optionally excise the witness
 // stream. It uses btcd's own wire SerializeNoWitness to split blocks, then
 // reports three savings figures per fixture and blended:
 //

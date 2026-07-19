@@ -338,7 +338,7 @@ func rpcNoTxInfoError(txHash *chainhash.Hash) *btcjson.RPCError {
 			txHash))
 }
 
-// rpcChainRuleError maps blockchain rule failures (including ErrWitnessPruned)
+// rpcChainRuleError maps blockchain rule failures (including ErrWitnessExcised)
 // to a JSON-RPC error clients can display. Non-rule errors become internal.
 func rpcChainRuleError(err error) error {
 	if err == nil {
@@ -759,14 +759,14 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 }
 
 // createTxRawResult converts the passed transaction and associated parameters
-// to a raw transaction JSON object. When witnessPruned is true the tx was
+// to a raw transaction JSON object. When witnessExcised is true the tx was
 // loaded from a cold-tier (witness-stripped) block: Hash is set to the txid
 // (historical wtxid is unavailable), size metrics describe the stripped
-// serialization, and WitnessPruned is set so clients do not treat the result
+// serialization, and WitnessExcised is set so clients do not treat the result
 // as a full historical witness view.
 func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
-	blkHeight int32, chainHeight int32, witnessPruned bool) (*btcjson.TxRawResult, error) {
+	blkHeight int32, chainHeight int32, witnessExcised bool) (*btcjson.TxRawResult, error) {
 
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
@@ -774,7 +774,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	}
 
 	hashStr := mtx.WitnessHash().String()
-	if witnessPruned {
+	if witnessExcised {
 		// Without witness bytes WitnessHash equals TxHash; be explicit.
 		hashStr = txHash
 	}
@@ -790,7 +790,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		Vout:          createVoutList(mtx, chainParams, nil),
 		Version:       uint32(mtx.Version),
 		LockTime:      mtx.LockTime,
-		WitnessPruned: witnessPruned,
+		WitnessExcised: witnessExcised,
 	}
 
 	if blkHeader != nil {
@@ -1170,7 +1170,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
-	witnessPruned := dbBlockIsCold(s.cfg.DB, hash)
+	witnessExcised := dbBlockIsCold(s.cfg.DB, hash)
 	blockReply := btcjson.GetBlockVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
@@ -1187,7 +1187,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
 		NextHash:      nextHashString,
-		WitnessPruned: witnessPruned,
+		WitnessExcised: witnessExcised,
 	}
 
 	if *c.Verbosity == 1 {
@@ -1204,7 +1204,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		for i, tx := range txns {
 			rawTxn, err := createTxRawResult(params, tx.MsgTx(),
 				tx.Hash().String(), blockHeader, hash.String(),
-				blockHeight, best.Height, witnessPruned)
+				blockHeight, best.Height, witnessExcised)
 			if err != nil {
 				return nil, err
 			}
@@ -3463,7 +3463,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			blkHeight = height
 
 			if dbBlockIsCold(s.cfg.DB, blkHash) {
-				result.WitnessPruned = true
+				result.WitnessExcised = true
 				result.Hash = result.Txid
 			}
 		}

@@ -19,10 +19,10 @@ import (
 
 var errTxNotFound = errors.New("tx not found in cold block")
 
-// TestCreateTxRawResultWitnessPruned verifies that createTxRawResult marks cold
-// (witness-stripped) transactions with witness_pruned and does not invent a
+// TestCreateTxRawResultWitnessExcised verifies that createTxRawResult marks cold
+// (witness-stripped) transactions with witness_excised and does not invent a
 // distinct wtxid (hash == txid when pruned).
-func TestCreateTxRawResultWitnessPruned(t *testing.T) {
+func TestCreateTxRawResultWitnessExcised(t *testing.T) {
 	raw := loadWitnessBlockFixture(t)
 	block, err := btcutil.NewBlockFromBytes(raw)
 	if err != nil {
@@ -93,7 +93,7 @@ func TestCreateTxRawResultWitnessPruned(t *testing.T) {
 	txid := fullTx.Hash().String()
 	wantWtxid := fullTx.MsgTx().WitnessHash().String()
 	if wantWtxid == txid {
-		t.Fatal("fixture tx wtxid == txid before prune; need a real witness tx")
+		t.Fatal("fixture tx wtxid == txid before excision; need a real witness tx")
 	}
 
 	hotResult, err := createTxRawResult(&chaincfg.MainNetParams, fullTx.MsgTx(),
@@ -101,8 +101,8 @@ func TestCreateTxRawResultWitnessPruned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createTxRawResult hot: %v", err)
 	}
-	if hotResult.WitnessPruned {
-		t.Error("hot result unexpectedly witness_pruned")
+	if hotResult.WitnessExcised {
+		t.Error("hot result unexpectedly witness_excised")
 	}
 	if hotResult.Hash != wantWtxid {
 		t.Errorf("hot hash=%s, want wtxid %s", hotResult.Hash, wantWtxid)
@@ -113,8 +113,8 @@ func TestCreateTxRawResultWitnessPruned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createTxRawResult cold: %v", err)
 	}
-	if !coldResult.WitnessPruned {
-		t.Error("cold result missing witness_pruned")
+	if !coldResult.WitnessExcised {
+		t.Error("cold result missing witness_excised")
 	}
 	if coldResult.Hash != txid {
 		t.Errorf("cold hash=%s, want txid %s (must not invent wtxid)",

@@ -19,7 +19,7 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
-// TestWitnessPruningEndToEnd is the definitive end-to-end test for the
+// TestWitnessExcisionEndToEnd is the definitive end-to-end test for the
 // witness-separated storage design. It exercises the full lifecycle with real
 // post-SegWit mainnet blocks that contain witness data:
 //
@@ -35,7 +35,7 @@ import (
 //
 // 10. Verify the block is still readable from cold after reclaim
 // 11. Verify the block hash is unchanged (stripped block has same hash as full block)
-func TestWitnessPruningEndToEnd(t *testing.T) {
+func TestWitnessExcisionEndToEnd(t *testing.T) {
 	fixtures := loadColdFixtures(t)
 	if len(fixtures) == 0 {
 		t.Skip("no post-SegWit fixtures")
@@ -43,12 +43,12 @@ func TestWitnessPruningEndToEnd(t *testing.T) {
 
 	for fi, raw := range fixtures {
 		t.Run("fixture_"+itoa(fi), func(t *testing.T) {
-			testWitnessPruningLifecycle(t, raw)
+			testWitnessExcisionLifecycle(t, raw)
 		})
 	}
 }
 
-func testWitnessPruningLifecycle(t *testing.T, raw []byte) {
+func testWitnessExcisionLifecycle(t *testing.T, raw []byte) {
 	dbPath := t.TempDir()
 	pdb, err := database.Create("ffldb", dbPath, wire.MainNet)
 	if err != nil {
@@ -217,10 +217,10 @@ func testWitnessPruningLifecycle(t *testing.T, raw []byte) {
 	}
 }
 
-// TestWitnessPruningMultipleBlocks exercises the lifecycle with multiple blocks
+// TestWitnessExcisionMultipleBlocks exercises the lifecycle with multiple blocks
 // compacted and reclaimed together, verifying that the hot window is preserved
 // while older blocks are cold.
-func TestWitnessPruningMultipleBlocks(t *testing.T) {
+func TestWitnessExcisionMultipleBlocks(t *testing.T) {
 	fixtures := loadColdFixtures(t)
 	if len(fixtures) < 2 {
 		t.Skip("need >= 2 fixtures")

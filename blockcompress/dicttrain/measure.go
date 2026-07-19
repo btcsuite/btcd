@@ -135,10 +135,10 @@ func main() {
 	fmt.Printf("\ncompress-only (zstd whole block):   %.1f%% reduction -> %.1f GB\n",
 		100.0*(1-float64(totCompWhole)/float64(totRaw)),
 		float64(totCompWhole)/1e9)
-	fmt.Printf("prune-witness-only (no compress):   %.1f%% reduction -> %.1f GB\n",
+	fmt.Printf("excise-witness-only (no compress):   %.1f%% reduction -> %.1f GB\n",
 		100.0*(1-float64(totStripped)/float64(totRaw)),
 		float64(totStripped)/1e9)
-	fmt.Printf("combined (prune witness + zstd):    %.1f%% reduction -> %.1f GB\n",
+	fmt.Printf("combined (excise witness + zstd):    %.1f%% reduction -> %.1f GB\n",
 		100.0*(1-float64(totCompStripped)/float64(totRaw)),
 		float64(totCompStripped)/1e9)
 	if totCompStrippedDict > 0 {

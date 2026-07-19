@@ -59,7 +59,7 @@ func TestErrorCodeStringer(t *testing.T) {
 		{ErrInvalidAncestorBlock, "ErrInvalidAncestorBlock"},
 		{ErrPrevBlockNotBest, "ErrPrevBlockNotBest"},
 		{ErrKnownInvalidBlock, "ErrKnownInvalidBlock"},
-		{ErrWitnessPruned, "ErrWitnessPruned"},
+		{ErrWitnessExcised, "ErrWitnessExcised"},
 		{0xffff, "Unknown ErrorCode (65535)"},
 	}
 

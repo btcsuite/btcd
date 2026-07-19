@@ -29,7 +29,7 @@ func TestInvalidatePastWitnessBufferRefused(t *testing.T) {
 	}
 
 	// Tip is height 15. Invalidating height 5 would set tip to 4;
-	// 15-4=11 >= buffer → must refuse with ErrWitnessPruned.
+	// 15-4=11 >= buffer → must refuse with ErrWitnessExcised.
 	deep, err := chain.BlockByHeight(5)
 	if err != nil {
 		t.Fatalf("BlockByHeight(5): %v", err)
@@ -42,8 +42,8 @@ func TestInvalidatePastWitnessBufferRefused(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected RuleError, got %T: %v", err, err)
 	}
-	if rerr.ErrorCode != ErrWitnessPruned {
-		t.Fatalf("ErrorCode=%v, want ErrWitnessPruned", rerr.ErrorCode)
+	if rerr.ErrorCode != ErrWitnessExcised {
+		t.Fatalf("ErrorCode=%v, want ErrWitnessExcised", rerr.ErrorCode)
 	}
 
 	// Shallow invalidate (height 14 → tip 13): 15-13=2 < buffer → allowed.
