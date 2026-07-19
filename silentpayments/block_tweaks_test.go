@@ -1,9 +1,9 @@
 package silentpayments
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"maps"
 	"os"
 	"slices"
 	"testing"
@@ -34,7 +34,14 @@ func TestPrivKeyTweak(t *testing.T) {
 	}
 }
 
-// runReceivingPrivKeyTweakTest runs a single receiving private key tweak test.
+// runReceivingPrivKeyTweakTest runs a single receiving test vector through
+// the same flow a scanning client uses: derive the transaction tweak (the
+// value a tweak-data index server would serve), the ECDH shared secret and
+// the candidate output keys per output index k, pairing them against the
+// transaction's taproot outputs. All expected intermediate values of the
+// vector are asserted: the tweak, the shared secret, each found output's
+// private key tweak (which must complete the spend key to the output key)
+// and the found-output count, honoring the K_max scan limit.
 func runReceivingPrivKeyTweakTest(t *testing.T, r *Receiving) {
 	givenInputs := parseInputs(t, r.Given.Vin)
 	prevOutputs := make(map[wire.OutPoint][]byte)
@@ -61,6 +68,29 @@ func runReceivingPrivKeyTweakTest(t *testing.T, r *Receiving) {
 			Witness:          witness,
 		}
 	}
+
+	// The given outputs become the transaction's taproot outputs, which
+	// also makes the transaction pass the has-taproot-output eligibility
+	// check of TransactionTweakData.
+	candidates := make(map[[32]byte]struct{}, len(r.Given.Outputs))
+	for _, outputHex := range r.Given.Outputs {
+		outputBytes, err := hex.DecodeString(outputHex)
+		require.NoError(t, err)
+		require.Len(t, outputBytes, 32)
+
+		tx.TxOut = append(tx.TxOut, &wire.TxOut{
+			Value: 1000,
+			PkScript: append(
+				[]byte{txscript.OP_1, txscript.OP_DATA_32},
+				outputBytes...,
+			),
+		})
+
+		var xOnly [32]byte
+		copy(xOnly[:], outputBytes)
+		candidates[xOnly] = struct{}{}
+	}
+
 	prevOutFetcher := func(op wire.OutPoint) ([]byte, error) {
 		pkScript, ok := prevOutputs[op]
 		if !ok {
@@ -70,80 +100,231 @@ func runReceivingPrivKeyTweakTest(t *testing.T, r *Receiving) {
 		return pkScript, nil
 	}
 
+	// Derive the transaction tweak end to end, exactly like a tweak-data
+	// index server does.
 	logger := btclog.NewBackend(os.Stdout)
-	sumKey := SumInputPubKeys(tx, prevOutFetcher, logger.Logger("TEST"))
+	tweakData, err := TransactionTweakData(
+		tx, prevOutFetcher, logger.Logger("TEST"),
+	)
+	require.NoError(t, err)
 
-	if sumKey == nil || !sumKey.IsOnCurve() {
+	// A vector without an expected tweak describes a transaction that
+	// must be skipped (no eligible inputs, or an input key sum at the
+	// point at infinity).
+	if r.Expected.Tweak == "" {
+		require.Nil(t, tweakData)
 		require.Empty(t, r.Expected.Outputs)
 
 		return
 	}
-
-	inputHash, err := CalculateInputHashTweak(
-		slices.Collect(maps.Keys(prevOutputs)), sumKey,
+	require.NotNil(t, tweakData)
+	require.Equal(
+		t, r.Expected.Tweak,
+		hex.EncodeToString(tweakData.SerializeCompressed()),
 	)
-	require.NoError(t, err)
 
 	scanKey, spendKey, err := r.Given.KeyMaterial.Parse()
 	require.NoError(t, err)
-
-	shareSum := ScalarMult(scanKey.Key, sumKey)
 	spendPubKey := spendKey.PubKey()
 
-	outputsToCheck := make(map[int]struct{})
-	for idx := range r.Expected.Outputs {
-		outputsToCheck[idx] = struct{}{}
+	// The scanner multiplies the served tweak by its scan key to arrive
+	// at the full ECDH shared secret.
+	sharedSecret := ScalarMult(scanKey.Key, tweakData)
+	require.Equal(
+		t, r.Expected.SharedSecret,
+		hex.EncodeToString(sharedSecret.SerializeCompressed()),
+	)
+
+	// The label variants every scanner tracks: the plain spend key, the
+	// change label (m=0, always scanned per the BIP) and the wallet's
+	// published labels.
+	labelTweaks := []*btcec.ModNScalar{nil, LabelTweak(scanKey, 0)}
+	for _, m := range r.Given.Labels {
+		if m == 0 {
+			continue
+		}
+		labelTweaks = append(labelTweaks, LabelTweak(scanKey, m))
 	}
 
-	checkOutput := func(toCheck map[int]struct{}, k int,
-		spendPubKey btcec.PublicKey) bool {
+	expectedByKey := make(map[string]*Output, len(r.Expected.Outputs))
+	for _, output := range r.Expected.Outputs {
+		expectedByKey[output.PubKey] = output
+	}
 
-		for idx := range toCheck {
-			expectedOutput := r.Expected.Outputs[idx]
-			expectedKey, err := expectedOutput.ParsePubKey()
-			require.NoError(t, err)
+	// The served tweak already contains the input hash factor, so the
+	// scalar one keeps CreateOutputKey from applying it again.
+	var one btcec.ModNScalar
+	one.SetInt(1)
 
-			changeLabel := LabelTweak(scanKey, 0)
-			match, err := OutputMatches(
-				*expectedKey, spendPubKey, changeLabel,
-				*shareSum, uint32(k), *inputHash,
+	// Walk output index k per BIP-0352 continuation semantics: k only
+	// advances while the current k yields a match, and scanning stops at
+	// the K_max limit.
+	found := 0
+	for k := uint32(0); len(candidates) > 0; k++ {
+		// Spec: If k == K_max (=2323), stop scanning.
+		if k == MaxRecipientsPerGroup {
+			break
+		}
+
+		matchedAtK := false
+		for _, labelTweak := range labelTweaks {
+			spendVariant := LabelSpendKey(labelTweak, spendPubKey)
+			outputKey, err := CreateOutputKey(
+				*sharedSecret, *spendVariant, k, one,
 			)
 			require.NoError(t, err)
 
-			if match {
-				delete(toCheck, idx)
-
-				return true
+			var xOnly [32]byte
+			copy(xOnly[:], schnorr.SerializePubKey(outputKey))
+			if _, ok := candidates[xOnly]; !ok {
+				continue
 			}
 
-			// We now try with the actual labels.
-			for _, givenLabel := range r.Given.Labels {
-				label := LabelTweak(scanKey, givenLabel)
-				match, err = OutputMatches(
-					*expectedKey, spendPubKey, label,
-					*shareSum, uint32(k), *inputHash,
-				)
-				require.NoError(t, err)
+			delete(candidates, xOnly)
+			matchedAtK = true
+			found++
 
-				if match {
-					delete(toCheck, idx)
-
-					return true
-				}
+			// Vectors that list expected outputs pin the exact
+			// private key tweak of every found output.
+			if len(r.Expected.Outputs) == 0 {
+				continue
 			}
+			xOnlyHex := hex.EncodeToString(xOnly[:])
+			expected, ok := expectedByKey[xOnlyHex]
+			require.True(
+				t, ok, "found unexpected output %v", xOnlyHex,
+			)
+
+			// t_k = hash(ser(shared_secret) || ser32(k)), plus
+			// the label tweak for labeled matches.
+			payload := make([]byte, 33+4)
+			copy(payload, sharedSecret.SerializeCompressed())
+			binary.BigEndian.PutUint32(payload[33:], k)
+			tweakHash := chainhash.TaggedHash(
+				TagBIP0352SharedSecret, payload,
+			)
+			var privKeyTweak btcec.ModNScalar
+			privKeyTweak.SetBytes((*[32]byte)(tweakHash))
+			if labelTweak != nil {
+				privKeyTweak.Add(labelTweak)
+			}
+
+			tweakBytes := privKeyTweak.Bytes()
+			require.Equal(
+				t, expected.PrivKeyTweak,
+				hex.EncodeToString(tweakBytes[:]),
+			)
+
+			// The tweak must complete the spend private key to
+			// the found output key, otherwise the wallet could
+			// detect the payment but never spend it.
+			fullKey := spendKey.Key
+			fullKey.Add(&privKeyTweak)
+			require.Equal(
+				t, xOnly[:],
+				schnorr.SerializePubKey(ScalarBaseMult(fullKey)),
+			)
 		}
 
-		return false
-	}
-
-	for k := 0; k < len(r.Expected.Outputs); k++ {
-		found := checkOutput(outputsToCheck, k, *spendPubKey)
-		if !found || len(outputsToCheck) == 0 {
+		if !matchedAtK {
 			break
 		}
 	}
 
-	require.Empty(t, outputsToCheck)
+	if r.Expected.NumOutputs > 0 {
+		require.EqualValues(t, r.Expected.NumOutputs, found)
+	} else {
+		require.Equal(t, len(r.Expected.Outputs), found)
+	}
+}
+
+// TestOutputMatches tests the library's single-output convenience matcher
+// against a base payment and a change-labeled payment from the official
+// vectors.
+func TestOutputMatches(t *testing.T) {
+	vectors, err := ReadTestVectors()
+	require.NoError(t, err)
+
+	runMatch := func(t *testing.T, comment string) {
+		var r *Receiving
+		for _, vector := range vectors {
+			if vector.Comment == comment {
+				r = vector.Receiving[0]
+			}
+		}
+		require.NotNil(t, r, "vector not found: %v", comment)
+
+		givenInputs := parseInputs(t, r.Given.Vin)
+		outpoints := make([]wire.OutPoint, len(givenInputs))
+		pubKeys := make([]*btcec.PublicKey, 0, len(givenInputs))
+		prevOutputs := make(map[wire.OutPoint][]byte)
+		for idx, input := range givenInputs {
+			outpoints[idx] = input.OutPoint
+			prevOutputs[input.OutPoint] = input.Utxo.PkScript
+		}
+		for idx := range givenInputs {
+			sigScript, err := hex.DecodeString(
+				r.Given.Vin[idx].ScriptSig,
+			)
+			require.NoError(t, err)
+			witnessBytes, err := hex.DecodeString(
+				r.Given.Vin[idx].TxInWitness,
+			)
+			require.NoError(t, err)
+			witness, err := parseWitness(witnessBytes)
+			require.NoError(t, err)
+
+			pubKey, err := PublicKeyFromInput(&wire.TxIn{
+				PreviousOutPoint: outpoints[idx],
+				SignatureScript:  sigScript,
+				Witness:          witness,
+			}, func(op wire.OutPoint) ([]byte, error) {
+				return prevOutputs[op], nil
+			})
+			require.NoError(t, err)
+			pubKeys = append(pubKeys, pubKey)
+		}
+
+		sumKey := sumPubKeys(pubKeys)
+		require.NotNil(t, sumKey)
+		inputHash, err := CalculateInputHashTweak(outpoints, sumKey)
+		require.NoError(t, err)
+
+		scanKey, spendKey, err := r.Given.KeyMaterial.Parse()
+		require.NoError(t, err)
+		shareSum := ScalarMult(scanKey.Key, sumKey)
+		changeLabel := LabelTweak(scanKey, 0)
+
+		expectedKey, err := r.Expected.Outputs[0].ParsePubKey()
+		require.NoError(t, err)
+
+		match, err := OutputMatches(
+			*expectedKey, *spendKey.PubKey(), changeLabel,
+			*shareSum, 0, *inputHash,
+		)
+		require.NoError(t, err)
+		require.True(t, match)
+
+		// A random unrelated output must not match.
+		otherKey, err := btcec.NewPrivateKey()
+		require.NoError(t, err)
+		match, err = OutputMatches(
+			*otherKey.PubKey(), *spendKey.PubKey(), changeLabel,
+			*shareSum, 0, *inputHash,
+		)
+		require.NoError(t, err)
+		require.False(t, match)
+	}
+
+	t.Run("base payment", func(t *testing.T) {
+		runMatch(t, "Simple send: two inputs")
+	})
+	t.Run("change label", func(t *testing.T) {
+		runMatch(
+			t, "Single recipient: use silent payments for "+
+				"sender change",
+		)
+	})
 }
 
 // TestSumInputPubKeysInfinity tests that an input public key sum at the

@@ -108,9 +108,24 @@ func (k *KeyMaterial) Parse() (*btcec.PrivateKey, *btcec.PrivateKey, error) {
 }
 
 type ReceivingExpected struct {
-	Addresses  []string  `json:"addresses"`
-	Outputs    []*Output `json:"outputs"`
-	NumOutputs uint32    `json:"n_outputs"`
+	Addresses []string `json:"addresses"`
+
+	// Tweak is the compressed transaction tweak point (input_hash * A,
+	// the value a tweak-data index server serves), or empty for
+	// transactions that must be skipped.
+	Tweak string `json:"tweak"`
+
+	// SharedSecret is the compressed full ECDH shared secret
+	// (input_hash * b_scan * A), or empty for transactions that must be
+	// skipped.
+	SharedSecret string `json:"shared_secret"`
+
+	Outputs []*Output `json:"outputs"`
+
+	// NumOutputs is the expected number of found outputs, used instead
+	// of Outputs by vectors with output counts too large to list (the
+	// K_max limit vector).
+	NumOutputs uint32 `json:"n_outputs"`
 }
 
 type Output struct {
