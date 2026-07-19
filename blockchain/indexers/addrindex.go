@@ -907,10 +907,15 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 // relative to the stripped (non-witness) serialization.
 //
 // The address index stores <blockID><txStart><txLen> per (address, tx) entry,
-// where txStart/txLen come from block.TxLoc() (witness-relative offsets). After
-// compaction the block is stored stripped, so those offsets are wrong for any
-// block containing a segwit transaction — searchrawtransactions would return
-// garbled transaction bytes.
+// where txStart/txLen come from block.TxLoc() on the FULL (hot) block
+// (witness-relative offsets). After compaction the block is stored stripped,
+// so those offsets are wrong for any block containing a segwit transaction —
+// searchrawtransactions would return garbled transaction bytes.
+//
+// The caller MUST pass the full hot block (or an equivalent in-memory block
+// whose TxLoc is still witness-relative). Passing a block parsed from
+// stripped FetchBlock bytes makes oldToNew an identity map and leaves
+// entries stale — that was a production age-out bug.
 //
 // The rewrite re-derives TxLoc from the stripped serialization and, for each
 // address that appears in the block, scans the level data for entries matching

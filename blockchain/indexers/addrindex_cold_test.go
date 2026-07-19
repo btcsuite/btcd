@@ -290,6 +290,148 @@ func TestAddrIndexColdCompactionRewrite(t *testing.T) {
 	compareAddrTxns(t, expected, got)
 }
 
+// TestAddrIndexRewriteWithStrippedRefetchLeavesStaleOffsets is the regression
+// for the production age-out bug: after CompactBlockToCold, FetchBlock returns
+// stripped bytes (pending cold). Passing that re-parsed block to
+// RewriteTxOffsetsForColdCompaction makes oldToNew an identity map keyed by
+// stripped offsets, so witness-relative stored entries are not updated.
+// searchrawtransactions then reads stale offsets into the cold block.
+func TestAddrIndexRewriteWithStrippedRefetchLeavesStaleOffsets(t *testing.T) {
+	fixtures := loadColdFixturesForIndexer(t)
+	var raw []byte
+	for _, f := range fixtures {
+		if hasWitnessData(t, f) {
+			raw = f
+			break
+		}
+	}
+	if raw == nil {
+		t.Skip("no witness-containing fixture")
+	}
+
+	params := &chaincfg.MainNetParams
+	db, blocks, idx := setupAddrIndexDB(t, [][]byte{raw})
+	defer db.Close()
+	block := blocks[0]
+	addrs := blockOutputAddresses(t, block, params)
+	if len(addrs) == 0 {
+		t.Skip("no parseable output addresses")
+	}
+
+	hash := block.Hash()
+	if err := db.Update(func(tx database.Tx) error {
+		cc := tx.(database.ColdCompactor)
+		if err := cc.CompactBlockToCold(hash); err != nil {
+			return err
+		}
+		// Simulate the buggy chain.go re-fetch after scheduling compaction.
+		strippedBytes, err := tx.FetchBlock(hash)
+		if err != nil {
+			return err
+		}
+		strippedBlock, err := btcutil.NewBlockFromBytes(strippedBytes)
+		if err != nil {
+			return err
+		}
+		return idx.RewriteTxOffsetsForColdCompaction(tx, strippedBlock,
+			dummyStxosForBlock(block))
+	}); err != nil {
+		t.Fatalf("compact+stripped-rewrite: %v", err)
+	}
+
+	atLeastOneFailed := false
+	for key, entry := range addrs {
+		var regionsFailed bool
+		err := db.View(func(dbTx database.Tx) error {
+			regions, _, err := idx.TxRegionsForAddress(dbTx, entry.addr, 0, 1<<20, false)
+			if err != nil {
+				return err
+			}
+			if len(regions) == 0 {
+				regionsFailed = true
+				return nil
+			}
+			serialized, err := dbTx.FetchBlockRegions(regions)
+			if err != nil {
+				regionsFailed = true
+				return nil
+			}
+			wantSet := make(map[chainhash.Hash]struct{}, len(entry.txIdxs))
+			for _, txIdx := range entry.txIdxs {
+				wantSet[*block.Transactions()[txIdx].Hash()] = struct{}{}
+			}
+			if len(serialized) != len(wantSet) {
+				regionsFailed = true
+				return nil
+			}
+			for _, raw := range serialized {
+				var msgTx wire.MsgTx
+				if err := msgTx.Deserialize(bytes.NewReader(raw)); err != nil {
+					regionsFailed = true
+					return nil
+				}
+				h := msgTx.TxHash()
+				if _, ok := wantSet[h]; !ok {
+					regionsFailed = true
+					return nil
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("view %s: %v", key, err)
+		}
+		if regionsFailed {
+			atLeastOneFailed = true
+			t.Logf("addr %s: stale offsets after stripped-refetch rewrite", key)
+		}
+	}
+	if !atLeastOneFailed {
+		t.Fatal("expected stripped-refetch rewrite to leave stale offsets " +
+			"for at least one address; bug may not be exercisable")
+	}
+}
+
+// TestAddrIndexRewriteFullBlockSameTxAsCompact is the corrected production
+// path: CompactBlockToCold then Rewrite with the ORIGINAL full in-memory
+// block (never re-fetch). Offsets must round-trip after commit.
+func TestAddrIndexRewriteFullBlockSameTxAsCompact(t *testing.T) {
+	fixtures := loadColdFixturesForIndexer(t)
+	var raw []byte
+	for _, f := range fixtures {
+		if hasWitnessData(t, f) {
+			raw = f
+			break
+		}
+	}
+	if raw == nil {
+		t.Skip("no witness-containing fixture")
+	}
+
+	params := &chaincfg.MainNetParams
+	db, blocks, idx := setupAddrIndexDB(t, [][]byte{raw})
+	defer db.Close()
+	block := blocks[0]
+	addrs := blockOutputAddresses(t, block, params)
+	if len(addrs) == 0 {
+		t.Skip("no parseable output addresses")
+	}
+
+	expected := collectExpectedAddrTxns(t, db, idx, addrs, block, params, "hot")
+	hash := block.Hash()
+	if err := db.Update(func(tx database.Tx) error {
+		if err := tx.(database.ColdCompactor).CompactBlockToCold(hash); err != nil {
+			return err
+		}
+		return idx.RewriteTxOffsetsForColdCompaction(tx, block,
+			dummyStxosForBlock(block))
+	}); err != nil {
+		t.Fatalf("compact+full-rewrite: %v", err)
+	}
+	got := collectExpectedAddrTxns(t, db, idx, addrs, block, params, "cold")
+	compareAddrTxns(t, expected, got)
+}
+
 // TestAddrIndexColdCompactionWithoutRewrite demonstrates the addrindex bug:
 // after compaction but WITHOUT the offset rewrite, at least one address's tx
 // region resolves to wrong bytes (a tx hash that is not in the block, or a

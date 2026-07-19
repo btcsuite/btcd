@@ -466,6 +466,12 @@ type ColdCompactor interface {
 	// commit, so a rolled-back transaction leaves no orphaned cold data.
 	CompactBlockToCold(hash *chainhash.Hash) error
 
+	// CancelPendingColdCompaction drops a cold write scheduled in this
+	// transaction (StoreBlockCold or CompactBlockToCold) so commit leaves
+	// the prior on-disk state. Used when post-compaction index rewrite
+	// fails and the block must stay hot with witness-relative indexes.
+	CancelPendingColdCompaction(hash *chainhash.Hash) error
+
 	// IsColdBlock reports whether the block identified by hash is stored in
 	// the cold tier (witness stripped). It returns false when the block is
 	// unknown or still hot. Pending cold writes in this transaction are

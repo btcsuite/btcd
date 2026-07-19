@@ -725,41 +725,38 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 							"compact without safe addrindex rewrite",
 							ageOutNode.hash, ageOutHeight, stxoErr)
 					} else {
-						compacted := false
 						err := cc.CompactBlockToCold(&ageOutNode.hash)
 						if err != nil {
 							log.Debugf("Age-out compaction of "+
 								"block %s (height %d) failed: %v",
 								ageOutNode.hash, ageOutHeight, err)
-						} else {
-							compacted = true
-						}
-
-						// Rewrite block-relative byte offsets in offset-bearing
-						// indexes (txindex, addrindex) to be relative to the
-						// stripped serialization. Fatal on failure: cold block
-						// with stale offsets would corrupt RPC / rescans.
-						if compacted && b.indexManager != nil {
+						} else if b.indexManager != nil {
+							// Rewrite offset-bearing indexes using the FULL
+							// hot block fetched above. Do NOT re-fetch after
+							// CompactBlockToCold: pending cold makes
+							// FetchBlock return stripped bytes, and
+							// AddrIndex.RewriteTxOffsetsForColdCompaction
+							// needs witness-relative TxLoc keys to find the
+							// stored entries (searchrawtransactions /
+							// wallet rescan path).
 							if cm, ok := b.indexManager.(ColdCompactionIndexManager); ok {
-								// Re-fetch after scheduling compaction: first
-								// compaction still returns hot bytes in-tx.
-								ageOutBlockBytes, err = dbTx.FetchBlock(&ageOutNode.hash)
-								if err != nil {
-									return fmt.Errorf("cold compaction index "+
-										"rewrite: fetch block %s: %v",
-										ageOutNode.hash, err)
-								}
-								ageOutBlock, err = btcutil.NewBlockFromBytes(ageOutBlockBytes)
-								if err != nil {
-									return fmt.Errorf("cold compaction index "+
-										"rewrite: parse block %s: %v",
-										ageOutNode.hash, err)
-								}
 								if err := cm.RewriteTxOffsetsForColdCompaction(
 									dbTx, ageOutBlock, ageOutStxos); err != nil {
-									return fmt.Errorf("cold compaction index "+
-										"rewrite for block %s: %v",
-										ageOutNode.hash, err)
+									// Drop the pending cold write so commit
+									// leaves the block hot with intact
+									// witness-relative indexes. Do not fail
+									// tip connect over optional index health.
+									if cerr := cc.CancelPendingColdCompaction(
+										&ageOutNode.hash); cerr != nil {
+										return fmt.Errorf("cold compaction "+
+											"index rewrite for block %s: %v "+
+											"(also cancel pending: %v)",
+											ageOutNode.hash, err, cerr)
+									}
+									log.Warnf("Skipping age-out of block %s "+
+										"(height %d): index rewrite failed "+
+										"(%v); left hot",
+										ageOutNode.hash, ageOutHeight, err)
 								}
 							}
 						}

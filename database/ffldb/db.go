@@ -1398,6 +1398,30 @@ func (tx *transaction) CompactBlockToCold(hash *chainhash.Hash) error {
 	return nil
 }
 
+// CancelPendingColdCompaction drops a pending cold write for hash so commit
+// does not move the block to the cold tier. No-op if nothing was pending.
+//
+// This method is part of the database.ColdCompactor optional interface.
+func (tx *transaction) CancelPendingColdCompaction(hash *chainhash.Hash) error {
+	if err := tx.checkClosed(); err != nil {
+		return err
+	}
+	if !tx.writable {
+		str := "cancel pending cold requires a writable database transaction"
+		return makeDbErr(database.ErrTxNotWritable, str, nil)
+	}
+	if n := len(tx.pendingColdCompactions); n > 0 {
+		kept := tx.pendingColdCompactions[:0]
+		for _, pending := range tx.pendingColdCompactions {
+			if pending.hash == nil || !pending.hash.IsEqual(hash) {
+				kept = append(kept, pending)
+			}
+		}
+		tx.pendingColdCompactions = kept
+	}
+	return nil
+}
+
 // IsColdBlock reports whether the block is stored in the cold tier (or is
 // pending cold compaction in this transaction). Unknown hashes return false.
 //
