@@ -327,6 +327,30 @@ func TestPublicKeyFromInputRejects(t *testing.T) {
 	}
 }
 
+// TestPublicKeyFromInputShortControlBlock tests that a taproot witness that
+// looks like a script path spend but carries a control block shorter than
+// the mandatory 33 bytes yields an error instead of a panic. Such witnesses
+// cannot appear in valid blocks, but the function is also fed unconfirmed
+// transactions.
+func TestPublicKeyFromInputShortControlBlock(t *testing.T) {
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	p2trScript := append(
+		[]byte{txscript.OP_1, txscript.OP_DATA_32},
+		schnorr.SerializePubKey(privKey.PubKey())...,
+	)
+	prevOutFetcher := func(wire.OutPoint) ([]byte, error) {
+		return p2trScript, nil
+	}
+
+	require.NotPanics(t, func() {
+		_, err := PublicKeyFromInput(&wire.TxIn{
+			Witness: wire.TxWitness{{0x01}, {0x02}},
+		}, prevOutFetcher)
+		require.ErrorIs(t, err, ErrInvalidTaprootWitness)
+	})
+}
+
 // TestPublicKeyFromInput tests the extraction of public keys from transaction
 // inputs. It uses a selection of real mainnet transactions (from the first
 // couple of blocks after Taproot activation) that contain the various supported
