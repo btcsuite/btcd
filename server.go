@@ -834,6 +834,12 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 		return s.pushTxMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
 
 	case wire.InvTypeWitnessBlock:
+		if s.blockWitnessPruned(&iv.Hash) {
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return errWitnessPrunedInv
+		}
 		return s.pushBlockMsg(
 			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
 		)
@@ -842,6 +848,12 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 		return s.pushBlockMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
 
 	case wire.InvTypeFilteredWitnessBlock:
+		if s.blockWitnessPruned(&iv.Hash) {
+			if doneChan != nil {
+				doneChan <- struct{}{}
+			}
+			return errWitnessPrunedInv
+		}
 		return s.pushMerkleBlockMsg(
 			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
 		)
@@ -860,6 +872,25 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 
 		return errors.New("unknown inventory type")
 	}
+}
+
+// errWitnessPrunedInv is returned from pushInventory when a peer requests
+// witness inventory for a cold-tier block. OnGetData turns it into notfound.
+var errWitnessPrunedInv = errors.New("witness data pruned for inventory")
+
+// blockWitnessPruned reports whether the block is in the cold tier.
+func (s *server) blockWitnessPruned(hash *chainhash.Hash) bool {
+	var cold bool
+	_ = s.db.View(func(dbTx database.Tx) error {
+		cc, ok := dbTx.(database.ColdCompactor)
+		if !ok {
+			return nil
+		}
+		var err error
+		cold, err = cc.IsColdBlock(hash)
+		return err
+	})
+	return cold
 }
 
 // OnGetBlocks is invoked when a peer receives a getblocks bitcoin
@@ -2876,14 +2907,10 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if cfg.Prune != 0 {
 		services &^= wire.SFNodeNetwork
 	}
-	// When witness-buffer compaction is active, the node does not retain
-	// witness data for blocks older than the hot window. It cannot serve
-	// MSG_WITNESS_BLOCK for those heights, so it must not advertise
-	// NODE_WITNESS. It still advertises NODE_NETWORK (the base ledger is
-	// complete) and serves MSG_BLOCK for all heights. See docs/ROADMAP.md, M1.
-	if cfg.WitnessBuffer > 0 {
-		services &^= wire.SFNodeWitness
-	}
+	// Witness-buffer compaction keeps full witness for the hot window and
+	// strips it for cold heights. The node still advertises NODE_WITNESS so
+	// peers can fetch recent (hot) witness blocks. Cold MSG_WITNESS_BLOCK
+	// requests are answered with notfound (see pushInventory).
 	if !cfg.V2Transport {
 		services &^= wire.SFNodeP2PV2
 	}

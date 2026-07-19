@@ -277,7 +277,7 @@ func TestAddrIndexColdCompactionRewrite(t *testing.T) {
 
 	// Step 4: rewrite addrindex offsets to stripped-relative.
 	if err := db.Update(func(tx database.Tx) error {
-		return idx.RewriteTxOffsetsForColdCompaction(tx, block, nil)
+		return idx.RewriteTxOffsetsForColdCompaction(tx, block, dummyStxosForBlock(block))
 	}); err != nil {
 		t.Fatalf("RewriteTxOffsetsForColdCompaction: %v", err)
 	}
@@ -473,20 +473,12 @@ func compareAddrTxns(t *testing.T, hot, cold map[string]map[chainhash.Hash]struc
 // RewriteTxOffsetsForColdCompaction signature in the parent package.
 var _ = blockchain.SpentTxOut{}
 
-// TestAddrIndexRewriteNilStxosNoPanic is the regression test for a crash bug
-// found while building the addrindex cold-compaction coverage: when the spend
-// journal for an aging-out block has been pruned (the normal state for old
-// blocks once pruning is enabled), chain.go's call site sets stxos to nil and
-// passes it to RewriteTxOffsetsForColdCompaction. The rewrite called indexBlock,
-// which unconditionally indexed stxos[stxoIndex] for every non-coinbase input —
-// a nil stxos slice with any non-coinbase input panicked and crashed the node
-// during connectBlock.
-//
-// This test reproduces the exact condition: a block with non-coinbase inputs,
-// nil stxos, and asserts the rewrite returns cleanly (no panic) and that the
-// output-address entries it does rewrite remain correct. It is the guard that
-// the nil-stxos path (pruned spend journal) can never crash production.
-func TestAddrIndexRewriteNilStxosNoPanic(t *testing.T) {
+// TestAddrIndexRewriteNilStxosRefused verifies that cold-compaction rewrite
+// refuses a nil spend journal when the block has non-coinbase inputs. Leaving
+// stale input-address offsets would make searchrawtransactions return garbage;
+// the chain layer skips compaction when the journal is missing, and this method
+// also hard-errors if called directly with nil stxos.
+func TestAddrIndexRewriteNilStxosRefused(t *testing.T) {
 	fixtures := loadColdFixturesForIndexer(t)
 	if len(fixtures) == 0 {
 		t.Skip("no fixtures")
@@ -506,10 +498,6 @@ func TestAddrIndexRewriteNilStxosNoPanic(t *testing.T) {
 	defer db.Close()
 	block := blocks[0]
 
-	// The fixture block must have non-coinbase transactions with inputs —
-	// otherwise the nil-stxos path is not exercised (indexBlock only touches
-	// stxos for non-coinbase inputs). If a future fixture lacks them, skip
-	// rather than pass vacuously.
 	hasNonCoinbaseInputs := false
 	for i, tx := range block.Transactions() {
 		if i != 0 && len(tx.MsgTx().TxIn) > 0 {
@@ -521,7 +509,6 @@ func TestAddrIndexRewriteNilStxosNoPanic(t *testing.T) {
 		t.Skip("fixture has no non-coinbase inputs; nil-stxos path not exercised")
 	}
 
-	// Compact to cold.
 	hash := block.Hash()
 	if err := db.Update(func(tx database.Tx) error {
 		return tx.(database.ColdCompactor).CompactBlockToCold(hash)
@@ -529,41 +516,10 @@ func TestAddrIndexRewriteNilStxosNoPanic(t *testing.T) {
 		t.Fatalf("CompactBlockToCold: %v", err)
 	}
 
-	// Rewrite with NIL stxos — the pruned-spend-journal condition. Before the
-	// fix this panicked with an index-out-of-range inside indexBlock. The test
-	// reaching the error check below (rather than crashing the test binary) is
-	// the assertion.
 	err := db.Update(func(tx database.Tx) error {
 		return idx.RewriteTxOffsetsForColdCompaction(tx, block, nil)
 	})
-	if err != nil {
-		t.Fatalf("RewriteTxOffsetsForColdCompaction with nil stxos failed: %v", err)
-	}
-
-	// The output-address entries must still be correct: verify a sample of
-	// addresses round-trip through the addrindex after the nil-stxos rewrite.
-	params := &chaincfg.MainNetParams
-	addrs := blockOutputAddresses(t, block, params)
-	if len(addrs) == 0 {
-		t.Skip("no parseable output addresses to verify")
-	}
-	blockTxIDs := make(map[chainhash.Hash]struct{}, len(block.Transactions()))
-	for _, tx := range block.Transactions() {
-		blockTxIDs[*tx.Hash()] = struct{}{}
-	}
-	checked := 0
-	for _, info := range addrs {
-		entries := addrTxRegionsAndBytes(t, db, idx, info.addr)
-		for _, e := range entries {
-			if _, ok := blockTxIDs[*e.hash]; !ok {
-				t.Errorf("nil-stxos rewrite: address %s resolved to tx %s "+
-					"not in the block", info.addr, e.hash)
-			}
-		}
-		checked++
-		if checked >= 100 {
-			break // a sample is enough; the full sweep is covered by the
-			// main rewrite test
-		}
+	if err == nil {
+		t.Fatal("expected RewriteTxOffsetsForColdCompaction to refuse nil stxos")
 	}
 }

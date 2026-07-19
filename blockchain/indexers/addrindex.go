@@ -826,6 +826,18 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block *btcutil.Block,
 	}
 }
 
+// blockHasNonCoinbaseInputs reports whether any non-coinbase transaction in
+// the block spends an input.
+func blockHasNonCoinbaseInputs(block *btcutil.Block) bool {
+	txs := block.Transactions()
+	for i := 1; i < len(txs); i++ {
+		if len(txs[i].MsgTx().TxIn) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain.  This indexer adds a mapping for each address
 // the transactions in the block involve.
@@ -906,15 +918,20 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 // count, and level structure are unchanged.
 //
 // If stxos is nil the input-address entries cannot be located (indexBlock needs
-// spent output scripts to extract input addresses) and are skipped; in that
-// case only output-address entries are rewritten. This only happens when the
-// spend journal entry for the block has been pruned, which implies the block
-// data itself is also gone, so the stale input-address entries are not
-// reachable via FetchBlockRegion anyway.
+// spent output scripts to extract input addresses). Compaction is skipped at
+// the chain layer when the spend journal is missing; this method also returns
+// an error for nil stxos when the block has non-coinbase inputs so a direct
+// caller cannot leave stale input-address offsets in place.
 //
 // This is part of the OffsetRewriter optional interface.
 func (idx *AddrIndex) RewriteTxOffsetsForColdCompaction(dbTx database.Tx,
 	block *btcutil.Block, stxos []blockchain.SpentTxOut) error {
+
+	if stxos == nil && blockHasNonCoinbaseInputs(block) {
+		return fmt.Errorf("cold compaction addrindex rewrite: spend journal "+
+			"required for block %s (non-coinbase inputs); refusing to leave "+
+			"stale input-address offsets", block.Hash())
+	}
 
 	// Re-serialize the block without witness and compute stripped TxLocs.
 	strippedBytes, err := block.BytesNoWitness()

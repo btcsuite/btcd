@@ -1278,6 +1278,31 @@ func (tx *transaction) CompactBlockToCold(hash *chainhash.Hash) error {
 	return nil
 }
 
+// IsColdBlock reports whether the block is stored in the cold tier (or is
+// pending cold compaction in this transaction). Unknown hashes return false.
+//
+// This method is part of the database.ColdCompactor optional interface.
+func (tx *transaction) IsColdBlock(hash *chainhash.Hash) (bool, error) {
+	if err := tx.checkClosed(); err != nil {
+		return false, err
+	}
+	for _, pending := range tx.pendingColdCompactions {
+		if pending.hash.IsEqual(hash) {
+			return true, nil
+		}
+	}
+	blockRow, err := tx.fetchBlockRow(hash)
+	if err != nil {
+		if dbErr, ok := err.(database.Error); ok &&
+			dbErr.ErrorCode == database.ErrBlockNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	loc := deserializeBlockLoc(blockRow)
+	return loc.blockFileNum&coldFlag != 0, nil
+}
+
 // ReclaimHotSpace deletes hot-tier block files whose blocks have all been
 // compacted to the cold tier. It finds the lowest hot file number still
 // referenced by the block index and deletes all hot files below it. Block

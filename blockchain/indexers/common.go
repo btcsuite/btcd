@@ -44,10 +44,9 @@ type NeedsInputser interface {
 // The block is still readable as its full (hot) serialization during the
 // transaction; the implementation re-derives TxLoc from the stripped
 // serialization and overwrites the existing entries. stxos is nil when the
-// spend journal entry is unavailable (e.g. the block has been pruned);
-// implementations that require it to locate entries (e.g. the address index,
-// which keys entries by address and needs input addresses) should skip their
-// rewrite in that case.
+// spend journal entry is unavailable; implementations that require it
+// (e.g. the address index) must refuse rather than leave stale offsets.
+// The chain layer skips compaction when the journal is missing.
 type OffsetRewriter interface {
 	RewriteTxOffsetsForColdCompaction(dbTx database.Tx, block *btcutil.Block,
 		stxos []blockchain.SpentTxOut) error

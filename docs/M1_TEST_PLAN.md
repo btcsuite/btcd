@@ -33,7 +33,7 @@ and the disk-reduction headline.
 | `FuzzColdCompactionTxIndex` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the integrated path: compact → rewrite → txindex → `FetchBlockRegion` → txid match, including the idempotent reorg model (compact-already-cold + double rewrite) |
 | `TestAddrIndexColdCompactionRewrite` | `blockchain/indexers/addrindex_cold_test.go` | addrindex offsets are rewritten to stripped-relative on compaction; every address's tx regions round-trip through `TxRegionsForAddress` → `FetchBlockRegions` with correct txids (the `searchrawtransactions` RPC path) |
 | `TestAddrIndexColdCompactionWithoutRewrite` | `blockchain/indexers/addrindex_cold_test.go` | Proves the addrindex bug exists without the rewrite: witness-relative offsets point past the stripped block, so `FetchBlockRegions` returns wrong bytes / EOF for addresses in segwit blocks |
-| `TestAddrIndexRewriteNilStxosNoPanic` | `blockchain/indexers/addrindex_cold_test.go` | Regression for a crash bug: `RewriteTxOffsetsForColdCompaction` with nil stxos (pruned spend journal) must not panic on blocks with non-coinbase inputs; output-address entries remain correct |
+| `TestAddrIndexRewriteNilStxosRefused` | `blockchain/indexers/addrindex_cold_test.go` | Nil spend journal: rewrite refuses to leave stale input-address offsets; chain skips compaction when journal is missing |
 | `TestWitnessBufferAgeOut` | `blockchain/ageout_test.go` | Blockchain-layer age-out driver: blocks beyond buffer are compacted, cold files created on disk, all blocks remain readable |
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
 | `TestWitnessBufferConfig` | `blockchain/ageout_test.go` | `Config.WitnessBuffer` wires through to `BlockChain.witnessBuffer` |
@@ -162,13 +162,7 @@ go test -run='^$' -fuzz=FuzzColdCompactionTxIndex -fuzztime=30s ./blockchain/ind
     test shows `FetchBlockRegions` returning wrong bytes / EOF. This is the
     btcwallet address-history rescan path.
 
-13. **Pruned spend journal cannot crash the node**: `RewriteTxOffsetsForColdCompaction`
-    with nil stxos (the state when the spend journal for an old block has been
-    pruned, which is the normal case for blocks aging out past the witness
-    buffer) previously panicked inside `indexBlock` on any block with
-    non-coinbase inputs — crashing the node during `connectBlock`.
-    `TestAddrIndexRewriteNilStxosNoPanic` is the regression guard. The fix
-    makes `indexBlock` skip input-address indexing when stxos is nil, so only
-    output-address entries are rewritten (input-address entries are left
-    stale, which is acceptable because pruned blocks' input addresses are not
-    reachable via `FetchBlockRegion` anyway).
+13. **Missing spend journal disables unsafe compaction**: when the spend journal
+    for an aging-out block is unavailable, age-out skips compaction (block stays
+    hot) rather than leaving stale addrindex input offsets.
+    `TestAddrIndexRewriteNilStxosRefused` guards the direct-call refuse path.

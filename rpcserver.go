@@ -744,27 +744,38 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 }
 
 // createTxRawResult converts the passed transaction and associated parameters
-// to a raw transaction JSON object.
+// to a raw transaction JSON object. When witnessPruned is true the tx was
+// loaded from a cold-tier (witness-stripped) block: Hash is set to the txid
+// (historical wtxid is unavailable), size metrics describe the stripped
+// serialization, and WitnessPruned is set so clients do not treat the result
+// as a full historical witness view.
 func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	txHash string, blkHeader *wire.BlockHeader, blkHash string,
-	blkHeight int32, chainHeight int32) (*btcjson.TxRawResult, error) {
+	blkHeight int32, chainHeight int32, witnessPruned bool) (*btcjson.TxRawResult, error) {
 
 	mtxHex, err := messageToHex(mtx)
 	if err != nil {
 		return nil, err
 	}
 
+	hashStr := mtx.WitnessHash().String()
+	if witnessPruned {
+		// Without witness bytes WitnessHash equals TxHash; be explicit.
+		hashStr = txHash
+	}
+
 	txReply := &btcjson.TxRawResult{
-		Hex:      mtxHex,
-		Txid:     txHash,
-		Hash:     mtx.WitnessHash().String(),
-		Size:     int32(mtx.SerializeSize()),
-		Vsize:    int32(mempool.GetTxVirtualSize(btcutil.NewTx(mtx))),
-		Weight:   int32(blockchain.GetTransactionWeight(btcutil.NewTx(mtx))),
-		Vin:      createVinList(mtx),
-		Vout:     createVoutList(mtx, chainParams, nil),
-		Version:  uint32(mtx.Version),
-		LockTime: mtx.LockTime,
+		Hex:           mtxHex,
+		Txid:          txHash,
+		Hash:          hashStr,
+		Size:          int32(mtx.SerializeSize()),
+		Vsize:         int32(mempool.GetTxVirtualSize(btcutil.NewTx(mtx))),
+		Weight:        int32(blockchain.GetTransactionWeight(btcutil.NewTx(mtx))),
+		Vin:           createVinList(mtx),
+		Vout:          createVoutList(mtx, chainParams, nil),
+		Version:       uint32(mtx.Version),
+		LockTime:      mtx.LockTime,
+		WitnessPruned: witnessPruned,
 	}
 
 	if blkHeader != nil {
@@ -776,6 +787,22 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	}
 
 	return txReply, nil
+}
+
+// dbBlockIsCold reports whether hash is stored in the cold (witness-stripped)
+// tier. Backends without cold support return false.
+func dbBlockIsCold(db database.DB, hash *chainhash.Hash) bool {
+	var cold bool
+	_ = db.View(func(dbTx database.Tx) error {
+		cc, ok := dbTx.(database.ColdCompactor)
+		if !ok {
+			return nil
+		}
+		var err error
+		cold, err = cc.IsColdBlock(hash)
+		return err
+	})
+	return cold
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
@@ -1128,6 +1155,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
+	witnessPruned := dbBlockIsCold(s.cfg.DB, hash)
 	blockReply := btcjson.GetBlockVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
@@ -1144,6 +1172,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		Bits:          strconv.FormatInt(int64(blockHeader.Bits), 16),
 		Difficulty:    getDifficultyRatio(blockHeader.Bits, params),
 		NextHash:      nextHashString,
+		WitnessPruned: witnessPruned,
 	}
 
 	if *c.Verbosity == 1 {
@@ -1160,7 +1189,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		for i, tx := range txns {
 			rawTxn, err := createTxRawResult(params, tx.MsgTx(),
 				tx.Hash().String(), blockHeader, hash.String(),
-				blockHeight, best.Height)
+				blockHeight, best.Height, witnessPruned)
 			if err != nil {
 				return nil, err
 			}
@@ -2732,7 +2761,8 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 	}
 
 	rawTxn, err := createTxRawResult(s.cfg.ChainParams, mtx, txHash.String(),
-		blkHeader, blkHashStr, blkHeight, chainHeight)
+		blkHeader, blkHashStr, blkHeight, chainHeight,
+		blkHash != nil && dbBlockIsCold(s.cfg.DB, blkHash))
 	if err != nil {
 		return nil, err
 	}
@@ -3376,6 +3406,10 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 		result := &srtList[i]
 		result.Hex = hexTxns[i]
 		result.Txid = mtx.TxHash().String()
+		result.Hash = mtx.WitnessHash().String()
+		result.Size = strconv.Itoa(mtx.SerializeSize())
+		result.Vsize = strconv.Itoa(int(mempool.GetTxVirtualSize(btcutil.NewTx(mtx))))
+		result.Weight = strconv.Itoa(int(blockchain.GetTransactionWeight(btcutil.NewTx(mtx))))
 		result.Vin, err = createVinListPrevOut(s, mtx, params, vinExtra,
 			filterAddrMap)
 		if err != nil {
@@ -3412,6 +3446,11 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			blkHeader = &header
 			blkHashStr = blkHash.String()
 			blkHeight = height
+
+			if dbBlockIsCold(s.cfg.DB, blkHash) {
+				result.WitnessPruned = true
+				result.Hash = result.Txid
+			}
 		}
 
 		// Add the block information to the result if there is any.

@@ -446,6 +446,12 @@ type ColdCompactor interface {
 	// commit, so a rolled-back transaction leaves no orphaned cold data.
 	CompactBlockToCold(hash *chainhash.Hash) error
 
+	// IsColdBlock reports whether the block identified by hash is stored in
+	// the cold tier (witness stripped). It returns false when the block is
+	// unknown or still hot. Pending cold compactions in this transaction are
+	// treated as cold so callers see the post-commit state.
+	IsColdBlock(hash *chainhash.Hash) (bool, error)
+
 	// ReclaimHotSpace deletes hot-tier block files whose blocks have all been
 	// compacted to the cold tier. It scans the block index for the lowest hot
 	// file number still in use and deletes all hot files below it. Block index

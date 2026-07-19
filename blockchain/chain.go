@@ -703,84 +703,75 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			ageOutNode := b.bestChain.NodeByHeight(ageOutHeight)
 			if ageOutNode != nil {
 				if cc, ok := dbTx.(database.ColdCompactor); ok {
-					compacted := false
-					err := cc.CompactBlockToCold(&ageOutNode.hash)
+					// Fetch spend journal first. When it is missing, skip
+					// compaction entirely: the address index cannot safely
+					// rewrite input-address offsets without stxos, and
+					// leaving the block hot is better than serving garbage
+					// from searchrawtransactions.
+					ageOutBlockBytes, err := dbTx.FetchBlock(&ageOutNode.hash)
 					if err != nil {
-						// An error here is not fatal: the block
-						// just stays hot and will be retried on
-						// the next connection. Log and continue.
-						log.Debugf("Age-out compaction of "+
-							"block %s (height %d) failed: %v",
-							ageOutNode.hash, ageOutHeight, err)
-					} else {
-						compacted = true
+						return fmt.Errorf("age-out: fetch block %s: %v",
+							ageOutNode.hash, err)
 					}
+					ageOutBlock, err := btcutil.NewBlockFromBytes(ageOutBlockBytes)
+					if err != nil {
+						return fmt.Errorf("age-out: parse block %s: %v",
+							ageOutNode.hash, err)
+					}
+					ageOutStxos, stxoErr := dbFetchSpendJournalEntry(dbTx, ageOutBlock)
+					if stxoErr != nil {
+						log.Debugf("Skipping age-out of block %s (height %d): "+
+							"spend journal unavailable (%v); refusing to "+
+							"compact without safe addrindex rewrite",
+							ageOutNode.hash, ageOutHeight, stxoErr)
+					} else {
+						compacted := false
+						err := cc.CompactBlockToCold(&ageOutNode.hash)
+						if err != nil {
+							log.Debugf("Age-out compaction of "+
+								"block %s (height %d) failed: %v",
+								ageOutNode.hash, ageOutHeight, err)
+						} else {
+							compacted = true
+						}
 
-					// Rewrite block-relative byte offsets in offset-bearing
-					// indexes (txindex, addrindex) to be relative to the
-					// stripped serialization. This MUST happen whenever the
-					// block is cold (either just compacted above or already
-					// cold from a prior compaction that survived a reorg).
-					// Without it, FetchBlockRegion reads wrong bytes from
-					// the stripped cold block using the witness-relative
-					// offsets the index was originally built with.
-					//
-					// The rewrite is fatal on failure: if it fails the
-					// block is cold but the index has witness-relative
-					// offsets, so getrawtransaction / wallet rescans would
-					// return garbage. Aborting the whole connectBlock is
-					// preferable to silently corrupting the index.
-					if compacted && b.indexManager != nil {
-						if cm, ok := b.indexManager.(ColdCompactionIndexManager); ok {
-							ageOutBlockBytes, err := dbTx.FetchBlock(&ageOutNode.hash)
-							if err != nil {
-								return fmt.Errorf("cold compaction index "+
-									"rewrite: fetch block %s: %v",
-									ageOutNode.hash, err)
-							}
-							ageOutBlock, err := btcutil.NewBlockFromBytes(ageOutBlockBytes)
-							if err != nil {
-								return fmt.Errorf("cold compaction index "+
-									"rewrite: parse block %s: %v",
-									ageOutNode.hash, err)
-							}
-
-							// The address index needs the spent outputs
-							// (stxos) to locate entries by input address.
-							// Fetch them from the spend journal; pass nil
-							// if unavailable (e.g. pruned) so addrindex
-							// can skip its input-address rewrite.
-							var ageOutStxos []SpentTxOut
-							ageOutStxos, err = dbFetchSpendJournalEntry(dbTx, ageOutBlock)
-							if err != nil {
-								log.Debugf("Cold compaction index rewrite: "+
-									"spend journal for block %s "+
-									"unavailable, skipping addrindex "+
-									"input rewrite: %v",
-									ageOutNode.hash, err)
-								ageOutStxos = nil
-							}
-
-							if err := cm.RewriteTxOffsetsForColdCompaction(
-								dbTx, ageOutBlock, ageOutStxos); err != nil {
-								return fmt.Errorf("cold compaction index "+
-									"rewrite for block %s: %v",
-									ageOutNode.hash, err)
+						// Rewrite block-relative byte offsets in offset-bearing
+						// indexes (txindex, addrindex) to be relative to the
+						// stripped serialization. Fatal on failure: cold block
+						// with stale offsets would corrupt RPC / rescans.
+						if compacted && b.indexManager != nil {
+							if cm, ok := b.indexManager.(ColdCompactionIndexManager); ok {
+								// Re-fetch after scheduling compaction: first
+								// compaction still returns hot bytes in-tx.
+								ageOutBlockBytes, err = dbTx.FetchBlock(&ageOutNode.hash)
+								if err != nil {
+									return fmt.Errorf("cold compaction index "+
+										"rewrite: fetch block %s: %v",
+										ageOutNode.hash, err)
+								}
+								ageOutBlock, err = btcutil.NewBlockFromBytes(ageOutBlockBytes)
+								if err != nil {
+									return fmt.Errorf("cold compaction index "+
+										"rewrite: parse block %s: %v",
+										ageOutNode.hash, err)
+								}
+								if err := cm.RewriteTxOffsetsForColdCompaction(
+									dbTx, ageOutBlock, ageOutStxos); err != nil {
+									return fmt.Errorf("cold compaction index "+
+										"rewrite for block %s: %v",
+										ageOutNode.hash, err)
+								}
 							}
 						}
-					}
 
-					// Reclaim hot-tier files once per difficulty period
-					// (2016 blocks). This deletes hot files whose blocks
-					// have all been compacted to cold. The O(n) block index
-					// scan is amortized over 2016 blocks, so the per-block
-					// cost is negligible.
-					if node.height%b.blocksPerRetarget == 0 {
-						if reclaimed, err := cc.ReclaimHotSpace(); err != nil {
-							log.Debugf("Hot-tier reclaim failed: %v", err)
-						} else if reclaimed > 0 {
-							log.Debugf("Reclaimed %d bytes of hot-tier "+
-								"space", reclaimed)
+						// Reclaim hot-tier files once per difficulty period.
+						if node.height%b.blocksPerRetarget == 0 {
+							if reclaimed, err := cc.ReclaimHotSpace(); err != nil {
+								log.Debugf("Hot-tier reclaim failed: %v", err)
+							} else if reclaimed > 0 {
+								log.Debugf("Reclaimed %d bytes of hot-tier "+
+									"space", reclaimed)
+							}
 						}
 					}
 				}
@@ -1994,6 +1985,12 @@ func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Has
 // in the best chain is invalidated, the active chain tip will be the parent of the
 // invalidated block.
 //
+// When witness-buffer compaction is enabled, invalidating a block at or below
+// tip−witnessBuffer is refused: the resulting tip would be cold (witness
+// stripped), so tip size/weight and any later reconsider path would be wrong or
+// fail. Deep invalidates are rare; operators who need them should run with
+// --witness-buffer=0 (full archival).
+//
 // This function is safe for concurrent access.
 func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
 	b.chainLock.Lock()
@@ -2014,6 +2011,21 @@ func (b *BlockChain) InvalidateBlock(hash *chainhash.Hash) error {
 	// Nothing to do if the given block is already invalid.
 	if node.status.KnownInvalid() {
 		return nil
+	}
+
+	// Refuse invalidates that would leave a cold tip when witness buffering
+	// is active. Parent of the invalidated best-chain block becomes tip.
+	if b.witnessBuffer > 0 && b.bestChain.Contains(node) {
+		newTipHeight := node.height - 1
+		tipHeight := b.bestChain.Tip().height
+		if tipHeight-newTipHeight >= b.witnessBuffer {
+			str := fmt.Sprintf("cannot invalidate block %s at height %d: "+
+				"resulting tip height %d is outside the witness buffer "+
+				"(%d); cold tip lacks retained witness data. Use "+
+				"--witness-buffer=0 for archival invalidate/reconsider",
+				hash, node.height, newTipHeight, b.witnessBuffer)
+			return ruleError(ErrWitnessPruned, str)
+		}
 	}
 
 	// Set the status of the block being invalidated.
@@ -2197,6 +2209,13 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 	// to it after checking the validity of the nodes.
 	detachNodes, attachNodes := b.getReorganizeNodes(reconsiderTip)
 
+	// Cold (witness-stripped) blocks cannot be re-validated: the commitment
+	// check would fail with a misleading ErrInvalidWitnessCommitment. Refuse
+	// with ErrWitnessPruned instead. Natural reorgs still work via KnownValid.
+	if err := b.rejectColdAttachNodes(attachNodes); err != nil {
+		return err
+	}
+
 	// We're checking if the reorganization that'll happen is actually valid.
 	// While this is called in reorganizeChain, we call it beforehand as the error
 	// returned from reorganizeChain doesn't differentiate between actual disconnect/
@@ -2216,6 +2235,45 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 	}
 
 	return b.reorganizeChain(detachNodes, attachNodes)
+}
+
+// rejectColdAttachNodes returns ErrWitnessPruned if any block on the attach
+// path is stored in the cold tier. Reconsider/re-validation needs witness.
+func (b *BlockChain) rejectColdAttachNodes(attachNodes *list.List) error {
+	if attachNodes == nil || attachNodes.Len() == 0 {
+		return nil
+	}
+	var coldHash *chainhash.Hash
+	err := b.db.View(func(dbTx database.Tx) error {
+		cc, ok := dbTx.(database.ColdCompactor)
+		if !ok {
+			return nil
+		}
+		for e := attachNodes.Front(); e != nil; e = e.Next() {
+			n := e.Value.(*blockNode)
+			cold, err := cc.IsColdBlock(&n.hash)
+			if err != nil {
+				return err
+			}
+			if cold {
+				h := n.hash
+				coldHash = &h
+				return nil
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if coldHash != nil {
+		str := fmt.Sprintf("cannot reconsider block %s: witness data has "+
+			"been pruned by cold-tier compaction; re-validation requires "+
+			"a full archival node (--witness-buffer=0) or a re-download "+
+			"of the block with witness", coldHash)
+		return ruleError(ErrWitnessPruned, str)
+	}
+	return nil
 }
 
 // IndexManager provides a generic interface that the is called when blocks are
@@ -2262,9 +2320,8 @@ type IndexManager interface {
 //
 // The stxos parameter is the spent transaction outputs for the block (from the
 // spend journal); indexers that need to locate entries by input address (e.g.
-// the address index) require it. Callers should pass nil when the spend journal
-// entry is unavailable (e.g. the block has been pruned); in that case
-// indexers that require stxos will skip their rewrite for this block.
+// the address index) require it. The chain layer skips age-out compaction when
+// the spend journal entry is unavailable rather than passing nil.
 type ColdCompactionIndexManager interface {
 	RewriteTxOffsetsForColdCompaction(dbTx database.Tx, block *btcutil.Block,
 		stxos []SpentTxOut) error
