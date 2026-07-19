@@ -1,6 +1,7 @@
 package silentpayments
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/btclog"
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // TransactionTweakData computes the Silent Payment tweak data for the given
@@ -138,6 +140,169 @@ func TransactionOutputKeysForFilter(txTweak btcec.PublicKey,
 		}
 
 		result = append(result, outputKey)
+	}
+
+	return result, nil
+}
+
+// batchToAffine converts a slice of Jacobian points to affine coordinates
+// (with normalized values, exactly like JacobianPoint.ToAffine) using a
+// single modular inversion for the whole slice via Montgomery's trick,
+// instead of one expensive inversion per point. A point at infinity yields
+// an error, since no honestly derived scan value can be at infinity.
+func batchToAffine(points []btcec.JacobianPoint) error {
+	// prefix[i] holds z_0 * ... * z_(i-1), so that the single inverted
+	// accumulator can be unrolled back into the individual 1/z_i values.
+	prefix := make([]secp.FieldVal, len(points))
+
+	var acc secp.FieldVal
+	acc.SetInt(1)
+	for i := range points {
+		if points[i].Z.Normalize().IsZero() {
+			return fmt.Errorf("point %d is at infinity", i)
+		}
+
+		prefix[i].Set(&acc)
+		acc.Mul(&points[i].Z)
+	}
+
+	// One inversion for the whole batch: acc = 1 / (z_0 * ... * z_(n-1)).
+	acc.Normalize().Inverse()
+
+	for i := len(points) - 1; i >= 0; i-- {
+		// 1/z_i = prefix_i * 1/(z_0*...*z_i); then strip z_i off the
+		// accumulator for the next round: acc *= z_i.
+		var zInv secp.FieldVal
+		zInv.Mul2(&acc, &prefix[i]).Normalize()
+		acc.Mul(&points[i].Z).Normalize()
+
+		// Mirror ToAffine: X = X/z^2, Y = Y/z^3, Z = 1, normalized.
+		var zInv2, zInv3 secp.FieldVal
+		zInv2.SquareVal(&zInv)
+		zInv3.Mul2(&zInv2, &zInv).Normalize()
+		points[i].X.Mul(&zInv2).Normalize()
+		points[i].Y.Mul(&zInv3).Normalize()
+		points[i].Z.SetInt(1)
+	}
+
+	return nil
+}
+
+// TransactionOutputKeysForFilterBatch is the batch variant of
+// TransactionOutputKeysForFilter: it derives the k = 0 candidate output
+// keys of many transaction tweaks in one call, for a set of scan addresses
+// that must all share the same scan private key. The result is a flat
+// slice of len(txTweaks) * len(addresses) keys, grouped by tweak (all
+// addresses of the first tweak first).
+//
+// Deriving candidates in batches is significantly cheaper than per tweak:
+// the output tweak t_0 only depends on the shared secret, so its point is
+// computed once per transaction and the per-address candidates become
+// point additions; and all per-point modular inversions (the affine
+// conversions of the shared secrets and of the candidate keys) collapse
+// into two batched inversions for the entire call.
+func TransactionOutputKeysForFilterBatch(addresses []ScanAddress,
+	txTweaks []*btcec.PublicKey) ([]*btcec.PublicKey, error) {
+
+	if len(txTweaks) == 0 {
+		return nil, nil
+	}
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("no scan addresses provided")
+	}
+
+	// The whole point of batching is a single ECDH secret per tweak, so
+	// all addresses must share the scan key it is derived from.
+	scanKey := addresses[0].ScanPrivateKey.Key
+	for _, recipient := range addresses[1:] {
+		if !scanKey.Equals(&recipient.ScanPrivateKey.Key) {
+			return nil, fmt.Errorf("all addresses must share " +
+				"the same scan private key")
+		}
+	}
+
+	// Spec: Let ecdh_shared_secret = input_hash·A·b_scan.
+	//
+	// The affine conversion of the results is deferred to a single
+	// batched inversion below.
+	sharedSecrets := make([]btcec.JacobianPoint, len(txTweaks))
+	for i, txTweak := range txTweaks {
+		var tweakJ btcec.JacobianPoint
+		txTweak.AsJacobian(&tweakJ)
+		btcec.ScalarMultNonConst(&scanKey, &tweakJ, &sharedSecrets[i])
+	}
+	if err := batchToAffine(sharedSecrets); err != nil {
+		return nil, fmt.Errorf("shared secret: %w", err)
+	}
+
+	spendKeys := make([]btcec.JacobianPoint, len(addresses))
+	for i, recipient := range addresses {
+		recipient.LabelTweakedSpendKey.AsJacobian(&spendKeys[i])
+	}
+
+	const k = 0
+	outputPayload := make([]byte, pubKeyLength+4)
+	binary.BigEndian.PutUint32(outputPayload[pubKeyLength:], k)
+
+	candidates := make(
+		[]btcec.JacobianPoint, 0, len(txTweaks)*len(addresses),
+	)
+	for i := range sharedSecrets {
+		// Serialize the (now affine) shared secret in compressed form
+		// for the tagged hash.
+		//
+		// Spec: Let t_k = hashBIP0352/SharedSecret(
+		//    serP(ecdh_shared_secret) || ser32(k)
+		// )
+		outputPayload[0] = secp.PubKeyFormatCompressedEven
+		if sharedSecrets[i].Y.IsOdd() {
+			outputPayload[0] = secp.PubKeyFormatCompressedOdd
+		}
+		sharedSecrets[i].X.PutBytesUnchecked(outputPayload[1:33])
+
+		t := chainhash.TaggedHash(
+			TagBIP0352SharedSecret, outputPayload,
+		)
+
+		var tScalar btcec.ModNScalar
+		overflow := tScalar.SetBytes((*[32]byte)(t))
+
+		// Spec: If t_k is not a valid tweak, i.e., if t_k = 0 or t_k
+		// is larger or equal to the secp256k1 group order, fail.
+		if overflow == 1 {
+			return nil, fmt.Errorf("tagged hash overflow")
+		}
+		if tScalar.IsZero() {
+			return nil, fmt.Errorf("tagged hash is zero")
+		}
+
+		// The tweak point t_0*G doesn't depend on the spend key, so
+		// one base multiplication serves all addresses.
+		var tweakPoint btcec.JacobianPoint
+		btcec.ScalarBaseMultNonConst(&tScalar, &tweakPoint)
+
+		// Spec: Let P_mn = B_m + t_k·G
+		for j := range spendKeys {
+			var candidate btcec.JacobianPoint
+			btcec.AddNonConst(
+				&tweakPoint, &spendKeys[j], &candidate,
+			)
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	// A candidate at infinity (spend key equal to the negated tweak
+	// point, impossible for honestly derived keys) surfaces as an error
+	// here, matching the per-tweak variant.
+	if err := batchToAffine(candidates); err != nil {
+		return nil, fmt.Errorf("output key: %w", err)
+	}
+
+	result := make([]*btcec.PublicKey, len(candidates))
+	for i := range candidates {
+		result[i] = btcec.NewPublicKey(
+			&candidates[i].X, &candidates[i].Y,
+		)
 	}
 
 	return result, nil
