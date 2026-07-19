@@ -8,8 +8,12 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/btclog"
 	"github.com/stretchr/testify/require"
@@ -140,6 +144,129 @@ func runReceivingPrivKeyTweakTest(t *testing.T, r *Receiving) {
 	}
 
 	require.Empty(t, outputsToCheck)
+}
+
+// TestPublicKeyFromInputRejects tests that inputs BIP-0352 excludes from
+// shared secret derivation do not yield a public key: uncompressed and
+// hybrid keys, and script shapes that merely look like one of the supported
+// types.
+func TestPublicKeyFromInputRejects(t *testing.T) {
+	// A valid DER signature and key material to build realistic witness
+	// stacks and scriptSigs from.
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	sig := ecdsa.Sign(privKey, chainhash.HashB([]byte("test")))
+	sigBytes := append(
+		sig.Serialize(), byte(txscript.SigHashAll),
+	)
+
+	compressed := privKey.PubKey().SerializeCompressed()
+	uncompressed := privKey.PubKey().SerializeUncompressed()
+
+	// A hybrid key is an uncompressed key whose format byte also encodes
+	// the parity of Y (0x06 for even, 0x07 for odd), a long-deprecated
+	// format that ParsePubKey still accepts.
+	hybrid := slices.Clone(uncompressed)
+	hybrid[0] = 0x06 + (compressed[0] - 0x02)
+
+	pushData := func(items ...[]byte) []byte {
+		builder := txscript.NewScriptBuilder()
+		for _, item := range items {
+			builder.AddData(item)
+		}
+		script, err := builder.Script()
+		require.NoError(t, err)
+
+		return script
+	}
+
+	p2pkhScript := func(pubKey []byte) []byte {
+		script, err := txscript.NewScriptBuilder().
+			AddOp(txscript.OP_DUP).
+			AddOp(txscript.OP_HASH160).
+			AddData(address.Hash160(pubKey)).
+			AddOp(txscript.OP_EQUALVERIFY).
+			AddOp(txscript.OP_CHECKSIG).
+			Script()
+		require.NoError(t, err)
+
+		return script
+	}
+	p2wpkhScript := func(pubKey []byte) []byte {
+		script, err := txscript.NewScriptBuilder().
+			AddOp(txscript.OP_0).
+			AddData(address.Hash160(pubKey)).
+			Script()
+		require.NoError(t, err)
+
+		return script
+	}
+	p2shScript := func(redeem []byte) []byte {
+		script, err := txscript.NewScriptBuilder().
+			AddOp(txscript.OP_HASH160).
+			AddData(address.Hash160(redeem)).
+			AddOp(txscript.OP_EQUAL).
+			Script()
+		require.NoError(t, err)
+
+		return script
+	}
+
+	testCases := []struct {
+		name      string
+		sigScript []byte
+		witness   wire.TxWitness
+		prevOut   []byte
+	}{{
+		// BIP-0352: "only X-only and compressed public keys are
+		// permitted".
+		name:    "P2WPKH with uncompressed key",
+		witness: wire.TxWitness{sigBytes, uncompressed},
+		prevOut: p2wpkhScript(uncompressed),
+	}, {
+		name:    "P2WPKH with hybrid key",
+		witness: wire.TxWitness{sigBytes, hybrid},
+		prevOut: p2wpkhScript(hybrid),
+	}, {
+		name:      "P2PKH with uncompressed key",
+		sigScript: pushData(sigBytes, uncompressed),
+		prevOut:   p2pkhScript(uncompressed),
+	}, {
+		name:      "P2SH-P2WPKH with uncompressed key",
+		sigScript: pushData(p2wpkhScript(uncompressed)),
+		witness:   wire.TxWitness{sigBytes, uncompressed},
+		prevOut:   p2shScript(p2wpkhScript(uncompressed)),
+	}, {
+		// A P2SH-P2WSH spend whose witness script is exactly a
+		// parseable 33-byte public key must not be mistaken for a
+		// nested P2WPKH spend — its scriptSig pushes a witness
+		// program of a different version/length than the canonical
+		// P2WPKH redeem script.
+		name: "P2SH-P2WSH witness-script lookalike",
+		sigScript: pushData(append(
+			[]byte{txscript.OP_0, txscript.OP_DATA_32},
+			chainhash.HashB(compressed)...,
+		)),
+		witness: wire.TxWitness{sigBytes, compressed},
+		prevOut: p2shScript(append(
+			[]byte{txscript.OP_0, txscript.OP_DATA_32},
+			chainhash.HashB(compressed)...,
+		)),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(tt *testing.T) {
+			prevOutFetcher := func(wire.OutPoint) ([]byte, error) {
+				return tc.prevOut, nil
+			}
+
+			_, err := PublicKeyFromInput(&wire.TxIn{
+				SignatureScript: tc.sigScript,
+				Witness:         tc.witness,
+			}, prevOutFetcher)
+			require.Error(tt, err)
+		})
+	}
 }
 
 // TestPublicKeyFromInput tests the extraction of public keys from transaction

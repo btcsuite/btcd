@@ -112,7 +112,17 @@ func PublicKeyFromInput(txIn *wire.TxIn,
 	//                  (0x160014{20-byte-key-hash})
 	//    scriptPubKey: HASH160 <20-byte-script-hash> EQUAL
 	//                  (0xA914{20-byte-script-hash}87)
-	if sigScriptLen > 0 && witnessLen == 2 {
+	//
+	// The scriptSig must be exactly the canonical push of the P2WPKH
+	// witness program. A looser check (any non-empty scriptSig with a
+	// two-item witness) would also match P2SH-P2WSH spends, and an
+	// attacker-crafted witness script that happens to parse as a public
+	// key would contribute a bogus key to the input sum.
+	isNestedP2WPKH := sigScriptLen == 23 &&
+		txIn.SignatureScript[0] == txscript.OP_DATA_22 &&
+		txIn.SignatureScript[1] == txscript.OP_0 &&
+		txIn.SignatureScript[2] == txscript.OP_DATA_20
+	if isNestedP2WPKH && witnessLen == 2 {
 		pubKeyBytes := txIn.Witness[1]
 		if len(pubKeyBytes) != 33 {
 			return nil, ErrNonStandardScript
@@ -322,7 +332,13 @@ func isPayToWitnessPubKeyHashWitness(witness wire.TxWitness) bool {
 		return false
 	}
 
-	// Second item must be a 33-byte compressed public key.
+	// Second item must be a 33-byte compressed public key. The length
+	// must be checked explicitly, since ParsePubKey also accepts 65-byte
+	// uncompressed and hybrid keys, which BIP-0352 excludes from shared
+	// secret derivation.
+	if len(witness[1]) != 33 {
+		return false
+	}
 	if _, err := btcec.ParsePubKey(witness[1]); err != nil {
 		return false
 	}
