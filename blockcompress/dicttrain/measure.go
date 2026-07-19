@@ -11,7 +11,7 @@
 //
 // Usage:
 //
-//	go run blockcompress/dicttrain/measure.go -datadir /path/to/btcd/blocks_ffldb
+//	go run blockcompress/dicttrain/measure.go -datadir /path/to/praxisd/blocks_ffldb
 package main
 
 import (

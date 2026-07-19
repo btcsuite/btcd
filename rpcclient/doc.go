@@ -166,8 +166,8 @@ The following full-blown client examples are in the examples directory:
   - bitcoincorehttp
     Connects to a bitcoin core RPC server using HTTP POST mode with TLS disabled
     and gets the current block count
-  - btcdwebsockets
-    Connects to a btcd RPC server using TLS-secured websockets, registers for
+  - praxisdwebsockets
+    Connects to a praxisd RPC server using TLS-secured websockets, registers for
     block connected and block disconnected notifications, and gets the current
     block count
   - btcwalletwebsockets

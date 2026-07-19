@@ -49,7 +49,6 @@ coverage.txt.bak
 
 # Binaries produced by "make build"
 /addblock
-/btcctl
 /praxctl
 /praxisd
 /findcheckpoint

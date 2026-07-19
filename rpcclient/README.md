@@ -19,8 +19,8 @@ implement and the API is not stable yet.
 ## Documentation
 
 * [API Reference](https://pkg.go.dev/github.com/btcsuite/btcd/rpcclient)
-* [btcd Websockets Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/btcdwebsockets)
-  Connects to a btcd RPC server using TLS-secured websockets, registers for
+* [praxisd Websockets Example](https://github.com/bitcoin-praxis/bitcoin-praxis/tree/master/rpcclient/examples/praxisdwebsockets)
+  Connects to a praxisd RPC server using TLS-secured websockets, registers for
   block connected and block disconnected notifications, and gets the current
   block count
 * [btcwallet Websockets Example](https://github.com/btcsuite/btcd/tree/master/rpcclient/examples/btcwalletwebsockets)

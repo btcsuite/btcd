@@ -13,7 +13,7 @@
 //
 // Usage:
 //
-//	go run blockcompress/dicttrain/main.go -datadir /path/to/btcd/blocks_ffldb \
+//	go run blockcompress/dicttrain/main.go -datadir /path/to/praxisd/blocks_ffldb \
 //		-maxblocks 5000 -out blockcompress/v1.dict
 //
 // The datadir must contain ffldb-format block files (*.fdb). The tool streams
