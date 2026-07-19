@@ -115,3 +115,30 @@ func BenchmarkScanFilterKeys(b *testing.B) {
 		)
 	}
 }
+
+// BenchmarkScanFilterKeysBatch measures the batched filter candidate
+// derivation, normalized per tweak for comparison with
+// BenchmarkScanFilterKeys.
+func BenchmarkScanFilterKeysBatch(b *testing.B) {
+	_, addresses, tweak := benchmarkKeys(b)
+
+	// One batch roughly the size of a spam block's tweak list.
+	const batchSize = 256
+	tweaks := make([]*btcec.PublicKey, batchSize)
+	for i := range tweaks {
+		tweaks[i] = tweak
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchmarkSink, _ = TransactionOutputKeysForFilterBatch(
+			addresses, tweaks,
+		)
+	}
+	b.StopTimer()
+	b.ReportMetric(
+		float64(b.Elapsed().Nanoseconds())/float64(b.N*batchSize),
+		"ns/tweak",
+	)
+}
