@@ -146,6 +146,64 @@ func runReceivingPrivKeyTweakTest(t *testing.T, r *Receiving) {
 	require.Empty(t, outputsToCheck)
 }
 
+// TestSumInputPubKeysInfinity tests that an input public key sum at the
+// point at infinity skips the transaction instead of producing a bogus
+// all-zero tweak point. This happened in the wild (signet block 198023
+// spends two outputs whose public keys share the same x coordinate with
+// opposite parity), and the resulting 0x02||0x00...00 "tweak" was served to
+// light clients before this check existed.
+func TestSumInputPubKeysInfinity(t *testing.T) {
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	pubKey := privKey.PubKey()
+	negKey := Negate(pubKey)
+
+	otherPriv, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	otherKey := otherPriv.PubKey()
+
+	// P + (-P) sums to the point at infinity: no valid key.
+	require.Nil(t, sumPubKeys([]*btcec.PublicKey{pubKey, negKey}))
+
+	// Only the final sum matters: an intermediate sum at infinity must
+	// not abort the summation (official vector "Input keys intermediate
+	// sum is zero but final sum is non-zero").
+	sum := sumPubKeys([]*btcec.PublicKey{pubKey, negKey, otherKey})
+	require.NotNil(t, sum)
+	require.True(t, sum.IsEqual(otherKey))
+
+	// End to end: a transaction whose eligible inputs sum to infinity
+	// yields no tweak data at all.
+	sig := ecdsa.Sign(privKey, chainhash.HashB([]byte("test")))
+	sigBytes := append(sig.Serialize(), byte(txscript.SigHashAll))
+	tx := &wire.MsgTx{
+		TxIn: []*wire.TxIn{
+			{Witness: wire.TxWitness{
+				sigBytes, pubKey.SerializeCompressed(),
+			}},
+			{Witness: wire.TxWitness{
+				sigBytes, negKey.SerializeCompressed(),
+			}},
+		},
+		TxOut: []*wire.TxOut{{
+			Value: 1000,
+			PkScript: append(
+				[]byte{txscript.OP_1, txscript.OP_DATA_32},
+				schnorr.SerializePubKey(otherKey)...,
+			),
+		}},
+	}
+	prevOutFetcher := func(wire.OutPoint) ([]byte, error) {
+		return nil, fmt.Errorf("no prev out needed")
+	}
+
+	require.Nil(t, SumInputPubKeys(tx, prevOutFetcher, nil))
+
+	tweak, err := TransactionTweakData(tx, prevOutFetcher, nil)
+	require.NoError(t, err)
+	require.Nil(t, tweak)
+}
+
 // TestPublicKeyFromInputRejects tests that inputs BIP-0352 excludes from
 // shared secret derivation do not yield a public key: uncompressed and
 // hybrid keys, and script shapes that merely look like one of the supported

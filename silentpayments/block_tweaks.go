@@ -43,8 +43,9 @@ type PrevOutFetcher func(wire.OutPoint) ([]byte, error)
 // SumInputPubKeys extracts and sums the public keys from the given transaction
 // inputs. It supports P2PKH, P2WPKH, P2SH-P2WPKH, and P2TR input types,
 // according to the BIP-0352 specification for allowed input types for Silent
-// Payments. If no public keys could be extracted, nil is returned. This also
-// means the transaction does not meet the Silent Payments criteria.
+// Payments. If no public keys could be extracted, or the keys sum to the
+// point at infinity, nil is returned. This also means the transaction does
+// not meet the Silent Payments criteria.
 func SumInputPubKeys(tx *wire.MsgTx, getPrevOut PrevOutFetcher,
 	logger btclog.Logger) *btcec.PublicKey {
 
@@ -70,7 +71,7 @@ func SumInputPubKeys(tx *wire.MsgTx, getPrevOut PrevOutFetcher,
 }
 
 // sumPubKeys takes a slice of public keys and returns their sum as a single
-// public key.
+// public key. If the keys sum to the point at infinity, nil is returned.
 func sumPubKeys(publicKeys []*btcec.PublicKey) *btcec.PublicKey {
 	if len(publicKeys) == 0 {
 		return nil
@@ -90,6 +91,19 @@ func sumPubKeys(publicKeys []*btcec.PublicKey) *btcec.PublicKey {
 	}
 
 	keyJ.ToAffine()
+
+	// The keys may sum to the point at infinity (for example a key and
+	// its negation, which has occurred in the wild), which converts to
+	// the affine coordinates (0, 0) — not a valid public key, and one
+	// that would serialize as a bogus all-zero compressed point. Only the
+	// final sum matters: an intermediate sum at infinity is fine, since
+	// the Jacobian addition above handles it.
+	//
+	// Spec: If A is the point at infinity, skip the transaction.
+	if keyJ.X.IsZero() && keyJ.Y.IsZero() {
+		return nil
+	}
+
 	return btcec.NewPublicKey(&keyJ.X, &keyJ.Y)
 }
 
