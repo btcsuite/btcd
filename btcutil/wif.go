@@ -118,6 +118,22 @@ func DecodeWIF(wif string) (*WIF, error) {
 
 	netID := decoded[0]
 	privKeyBytes := decoded[1 : 1+btcec.PrivKeyBytesLen]
+
+	// Ensure the private key is within the valid range for a secp256k1
+	// private key, that is [1, N-1].  Without this check, a WIF encoding a
+	// key of zero or one greater than or equal to the group order N is
+	// silently accepted: btcec.PrivKeyFromBytes reduces the scalar modulo
+	// N, so DecodeWIF would otherwise return a private key that differs from
+	// the one actually encoded in the WIF (or the all-zero key) without
+	// reporting an error.
+	var keyScalar btcec.ModNScalar
+	defer keyScalar.Zero()
+	if overflow := keyScalar.SetByteSlice(privKeyBytes); overflow ||
+		keyScalar.IsZero() {
+
+		return nil, ErrMalformedPrivateKey
+	}
+
 	privKey, _ := btcec.PrivKeyFromBytes(privKeyBytes)
 	return &WIF{privKey, compress, netID}, nil
 }
