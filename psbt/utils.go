@@ -464,7 +464,16 @@ func NewFromSignedTx(tx *wire.MsgTx) (*Packet, [][]byte,
 func FindLeafScript(pInput *PInput,
 	targetLeafHash []byte) (*TaprootTapLeafScript, error) {
 
-	for _, leaf := range pInput.TaprootLeafScript {
+	if pInput == nil {
+		return nil, fmt.Errorf("nil PSBT input: %w", ErrInvalidPsbtFormat)
+	}
+
+	for idx, leaf := range pInput.TaprootLeafScript {
+		if leaf == nil {
+			return nil, fmt.Errorf("nil taproot leaf script at index "+
+				"%d: %w", idx, ErrInvalidPsbtFormat)
+		}
+
 		leafHash := txscript.TapLeaf{
 			LeafVersion: leaf.LeafVersion,
 			Script:      leaf.Script,
