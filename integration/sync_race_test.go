@@ -4,23 +4,28 @@
 package integration
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	syncRaceIterations  = 1000
-	syncRaceConcurrency = 300
-	syncRaceRunDuration = 90 * time.Second
-	syncRaceProofBlocks = 5
-	syncRaceProofWait   = 8 * time.Second
+	syncRaceIterations           = 1000
+	syncRaceConcurrency          = 300
+	syncRaceHandshakeConcurrency = 8
+	syncRaceRegistrationWait     = 15 * time.Second
+	syncRaceRunDuration          = 90 * time.Second
+	syncRaceProofBlocks          = 5
+	syncRaceProofWait            = 8 * time.Second
 )
 
 // fakePeerConn connects to the node at nodeAddr, performs the
@@ -29,7 +34,35 @@ const (
 // simulates attacker traffic: many connections that complete the
 // handshake then drop, stressing the sync manager's ordering of
 // NewPeer/DonePeer.
-func fakePeerConn(nodeAddr string) error {
+func fakePeerConn(
+	nodeAddr string, handshakeSlots chan struct{}, ready chan<- struct{},
+	disconnect <-chan struct{},
+) error {
+
+	select {
+	case <-disconnect:
+		return nil
+	default:
+	}
+
+	select {
+	case handshakeSlots <- struct{}{}:
+	case <-disconnect:
+		return nil
+	}
+	handshakeSlotHeld := true
+	defer func() {
+		if handshakeSlotHeld {
+			<-handshakeSlots
+		}
+	}()
+
+	select {
+	case <-disconnect:
+		return nil
+	default:
+	}
+
 	conn, err := net.DialTimeout("tcp", nodeAddr, 5*time.Second)
 	if err != nil {
 		return err
@@ -63,12 +96,14 @@ func fakePeerConn(nodeAddr string) error {
 		return err
 	}
 
+	var pingNonce uint64
+	var awaitingPong bool
 	for {
 		msg, _, err := wire.ReadMessage(conn, wire.ProtocolVersion, wire.SimNet)
 		if err != nil {
 			return err
 		}
-		switch msg.(type) {
+		switch msg := msg.(type) {
 		case *wire.MsgVersion:
 			// Node's version; send verack.
 			err := wire.WriteMessage(
@@ -83,13 +118,175 @@ func fakePeerConn(nodeAddr string) error {
 			// Optional; keep reading.
 
 		case *wire.MsgVerAck:
-			// Handshake complete; close to trigger DonePeer.
+			// A pong proves the server processed our verack and
+			// released its incomplete-handshake source slot.
+			pingNonce = uint64(rand.Int63())
+			awaitingPong = true
+			err := wire.WriteMessage(
+				conn, wire.NewMsgPing(pingNonce),
+				wire.ProtocolVersion, wire.SimNet,
+			)
+			if err != nil {
+				return err
+			}
+
+		case *wire.MsgPong:
+			if !awaitingPong || msg.Nonce != pingNonce {
+				continue
+			}
+
+			// Keep the registered peer open until all peers are
+			// ready to disconnect together.
+			<-handshakeSlots
+			handshakeSlotHeld = false
+			ready <- struct{}{}
+			<-disconnect
+
 			return nil
 
 		default:
 			// Ignore other messages (e.g. wtxidrelay) and keep reading.
 		}
 	}
+}
+
+// waitForConnectionCount waits for the server's registered peer count to
+// reach the expected value.
+func waitForConnectionCount(
+	getConnectionCount func() rpcclient.FutureGetConnectionCountResult,
+	want int64,
+) error {
+
+	deadline := time.NewTimer(syncRaceRegistrationWait)
+	defer deadline.Stop()
+
+	var got int64 = -1
+	for {
+		future := getConnectionCount()
+		select {
+		case response := <-future:
+			// Put the response back into the buffered future so its
+			// public Receive method retains the standard decoding and
+			// error handling.
+			future <- response
+
+			var err error
+			got, err = future.Receive()
+			if err != nil {
+				return err
+			}
+
+		case <-deadline.C:
+			return fmt.Errorf(
+				"timed out waiting for %d registered peers, "+
+					"last count %d", want, got,
+			)
+		}
+
+		if got == want {
+			return nil
+		}
+
+		poll := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-poll.C:
+
+		case <-deadline.C:
+			if !poll.Stop() {
+				<-poll.C
+			}
+			return fmt.Errorf(
+				"timed out waiting for %d registered peers, "+
+					"last count %d", want, got,
+			)
+		}
+	}
+}
+
+// runFakePeerBatch registers one full wave of peers, disconnects them
+// together, and waits for every worker and server-side peer removal.
+func runFakePeerBatch(
+	nodeAddr string,
+	getConnectionCount func() rpcclient.FutureGetConnectionCountResult,
+) error {
+
+	handshakeSlots := make(
+		chan struct{}, syncRaceHandshakeConcurrency,
+	)
+	ready := make(chan struct{}, syncRaceConcurrency)
+	disconnect := make(chan struct{})
+	errCh := make(chan error, syncRaceConcurrency)
+
+	var disconnectOnce sync.Once
+	disconnectAll := func() {
+		disconnectOnce.Do(func() {
+			close(disconnect)
+		})
+	}
+	defer disconnectAll()
+
+	for i := 0; i < syncRaceConcurrency; i++ {
+		go func() {
+			errCh <- fakePeerConn(
+				nodeAddr, handshakeSlots, ready, disconnect,
+			)
+		}()
+	}
+
+	var firstErr error
+	var results int
+	for readyPeers := 0; readyPeers < syncRaceConcurrency &&
+		firstErr == nil; {
+
+		select {
+		case <-ready:
+			readyPeers++
+
+		case err := <-errCh:
+			results++
+			if err == nil {
+				firstErr = fmt.Errorf(
+					"fake peer exited before disconnect barrier",
+				)
+				break
+			}
+
+			firstErr = fmt.Errorf(
+				"fake peer failed before disconnect barrier: %w",
+				err,
+			)
+		}
+	}
+
+	if firstErr == nil {
+		err := waitForConnectionCount(
+			getConnectionCount, syncRaceConcurrency,
+		)
+		if err != nil {
+			firstErr = fmt.Errorf(
+				"peer registration barrier: %w", err,
+			)
+		}
+	}
+
+	disconnectAll()
+	for results < syncRaceConcurrency {
+		err := <-errCh
+		results++
+		if firstErr == nil && err != nil {
+			firstErr = err
+		}
+	}
+	if firstErr != nil {
+		return firstErr
+	}
+
+	err := waitForConnectionCount(getConnectionCount, 0)
+	if err != nil {
+		return fmt.Errorf("peer removal barrier: %w", err)
+	}
+
+	return nil
 }
 
 // TestSyncManagerRaceCorruption stresses a single simnet node
@@ -115,18 +312,14 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 	deadline := time.Now().Add(syncRaceRunDuration)
 	iter := 0
 	var done int
-	errCh := make(chan error, syncRaceConcurrency*2)
 
 	for time.Now().Before(deadline) && iter < syncRaceIterations {
-		for i := 0; i < syncRaceConcurrency; i++ {
-			go func() {
-				errCh <- fakePeerConn(nodeAddr)
-			}()
-		}
-		for i := 0; i < syncRaceConcurrency; i++ {
-			require.NoError(t, <-errCh)
-			done++
-		}
+		err := runFakePeerBatch(
+			nodeAddr, stressedHarness.Client.GetConnectionCountAsync,
+		)
+		require.NoError(t, err)
+
+		done += syncRaceConcurrency
 		iter += syncRaceConcurrency
 	}
 

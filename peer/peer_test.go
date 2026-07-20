@@ -96,8 +96,12 @@ func (c conn) SetWriteDeadline(t time.Time) error { return nil }
 // already-disconnected peer is closed instead of being published and leaked.
 func TestDisconnectBeforeAssociateConnection(t *testing.T) {
 	local, remote := net.Pipe()
-	defer local.Close()
-	defer remote.Close()
+	defer func() {
+		_ = local.Close()
+	}()
+	defer func() {
+		_ = remote.Close()
+	}()
 
 	trackedConn := &countingConn{Conn: local}
 	p := peer.NewInboundPeer(&peer.Config{})
