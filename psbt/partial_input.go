@@ -3,6 +3,7 @@ package psbt
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"sort"
 
@@ -492,6 +493,13 @@ func (pi *PInput) serialize(w io.Writer) error {
 			}
 		}
 
+		for idx, scriptSpend := range pi.TaprootScriptSpendSig {
+			if scriptSpend == nil {
+				return fmt.Errorf("nil taproot script spend "+
+					"signature at index %d: %w", idx,
+					ErrInvalidPsbtFormat)
+			}
+		}
 		sort.Slice(pi.TaprootScriptSpendSig, func(i, j int) bool {
 			return pi.TaprootScriptSpendSig[i].SortBefore(
 				pi.TaprootScriptSpendSig[j],
@@ -513,6 +521,12 @@ func (pi *PInput) serialize(w io.Writer) error {
 			}
 		}
 
+		for idx, leafScript := range pi.TaprootLeafScript {
+			if leafScript == nil {
+				return fmt.Errorf("nil taproot leaf script at "+
+					"index %d: %w", idx, ErrInvalidPsbtFormat)
+			}
+		}
 		sort.Slice(pi.TaprootLeafScript, func(i, j int) bool {
 			return pi.TaprootLeafScript[i].SortBefore(
 				pi.TaprootLeafScript[j],
@@ -530,6 +544,12 @@ func (pi *PInput) serialize(w io.Writer) error {
 			}
 		}
 
+		for idx, derivation := range pi.TaprootBip32Derivation {
+			if derivation == nil {
+				return fmt.Errorf("nil taproot BIP32 derivation at "+
+					"index %d: %w", idx, ErrInvalidPsbtFormat)
+			}
+		}
 		sort.Slice(pi.TaprootBip32Derivation, func(i, j int) bool {
 			return pi.TaprootBip32Derivation[i].SortBefore(
 				pi.TaprootBip32Derivation[j],

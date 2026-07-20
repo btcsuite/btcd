@@ -2,6 +2,7 @@ package psbt
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"sort"
 
@@ -225,6 +226,12 @@ func (po *POutput) serialize(w io.Writer) error {
 		}
 	}
 
+	for idx, derivation := range po.TaprootBip32Derivation {
+		if derivation == nil {
+			return fmt.Errorf("nil taproot BIP32 derivation at "+
+				"index %d: %w", idx, ErrInvalidPsbtFormat)
+		}
+	}
 	sort.Slice(po.TaprootBip32Derivation, func(i, j int) bool {
 		return po.TaprootBip32Derivation[i].SortBefore(
 			po.TaprootBip32Derivation[j],

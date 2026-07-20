@@ -1364,6 +1364,138 @@ func TestFromUnsigned(t *testing.T) {
 	}
 }
 
+func TestB64EncodeRejectsNilTaprootFields(t *testing.T) {
+	testCases := []struct {
+		name        string
+		expectedErr string
+		setNil      func(*Packet)
+	}{
+		{
+			name:        "input script spend signature",
+			expectedErr: "nil taproot script spend signature at index 0",
+			setNil: func(packet *Packet) {
+				packet.Inputs[0].TaprootScriptSpendSig =
+					[]*TaprootScriptSpendSig{nil}
+			},
+		},
+		{
+			name:        "input leaf script",
+			expectedErr: "nil taproot leaf script at index 0",
+			setNil: func(packet *Packet) {
+				packet.Inputs[0].TaprootLeafScript =
+					[]*TaprootTapLeafScript{nil}
+			},
+		},
+		{
+			name:        "input BIP32 derivation",
+			expectedErr: "nil taproot BIP32 derivation at index 0",
+			setNil: func(packet *Packet) {
+				packet.Inputs[0].TaprootBip32Derivation =
+					[]*TaprootBip32Derivation{nil}
+			},
+		},
+		{
+			name:        "output BIP32 derivation",
+			expectedErr: "nil taproot BIP32 derivation at index 0",
+			setNil: func(packet *Packet) {
+				packet.Outputs[0].TaprootBip32Derivation =
+					[]*TaprootBip32Derivation{nil}
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			tx := wire.NewMsgTx(2)
+			tx.AddTxIn(&wire.TxIn{
+				PreviousOutPoint: wire.OutPoint{},
+			})
+			tx.AddTxOut(wire.NewTxOut(
+				1, []byte{txscript.OP_TRUE},
+			))
+
+			packet, err := NewFromUnsignedTx(tx)
+			require.NoError(t, err)
+			testCase.setNil(packet)
+
+			_, err = packet.B64Encode()
+			require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+			require.ErrorContains(t, err, testCase.expectedErr)
+		})
+	}
+}
+
+func TestFindLeafScriptRejectsNilLeaf(t *testing.T) {
+	_, err := FindLeafScript(nil, make([]byte, chainhash.HashSize))
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+	require.ErrorContains(t, err, "nil PSBT input")
+
+	input := &PInput{
+		TaprootLeafScript: []*TaprootTapLeafScript{nil},
+	}
+
+	_, err = FindLeafScript(input, make([]byte, chainhash.HashSize))
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+	require.ErrorContains(t, err, "nil taproot leaf script at index 0")
+}
+
+func TestFinalizeRejectsNilTaprootFields(t *testing.T) {
+	newPacket := func() *Packet {
+		tx := wire.NewMsgTx(2)
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{},
+		})
+		tx.AddTxOut(wire.NewTxOut(
+			1, []byte{txscript.OP_TRUE},
+		))
+
+		packet, err := NewFromUnsignedTx(tx)
+		require.NoError(t, err)
+		packet.Inputs[0].WitnessUtxo = wire.NewTxOut(
+			1, append(
+				[]byte{txscript.OP_1, txscript.OP_DATA_32},
+				make([]byte, 32)...,
+			),
+		)
+
+		return packet
+	}
+
+	t.Run("script spend signature", func(t *testing.T) {
+		packet := newPacket()
+		packet.Inputs[0].TaprootScriptSpendSig =
+			[]*TaprootScriptSpendSig{nil}
+
+		finalized, err := MaybeFinalize(packet, 0)
+		require.False(t, finalized)
+		require.ErrorIs(t, err, ErrNotFinalizable)
+
+		err = Finalize(packet, 0)
+		require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+		require.ErrorContains(
+			t, err, "nil taproot script spend signature at index 0",
+		)
+	})
+
+	t.Run("leaf script", func(t *testing.T) {
+		packet := newPacket()
+		packet.Inputs[0].TaprootScriptSpendSig =
+			[]*TaprootScriptSpendSig{{
+				LeafHash: make([]byte, chainhash.HashSize),
+			}}
+		packet.Inputs[0].TaprootLeafScript =
+			[]*TaprootTapLeafScript{nil}
+
+		finalized, err := MaybeFinalize(packet, 0)
+		require.False(t, finalized)
+		require.ErrorIs(t, err, ErrNotFinalizable)
+
+		err = Finalize(packet, 0)
+		require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+		require.ErrorContains(t, err, "nil taproot leaf script at index 0")
+	})
+}
+
 func TestNonWitnessToWitness(t *testing.T) {
 	// We'll start with a PSBT produced by Core for which
 	// the first input is signed and we'll provided the signatures for

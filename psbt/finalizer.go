@@ -55,6 +55,10 @@ func isFinalizableWitnessInput(pInput *PInput) bool {
 			// For each of the script spend signatures we need a
 			// corresponding tap script leaf with the control block.
 			for _, sig := range pInput.TaprootScriptSpendSig {
+				if sig == nil {
+					return false
+				}
+
 				_, err := FindLeafScript(pInput, sig.LeafHash)
 				if err != nil {
 					return false
@@ -516,6 +520,13 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 		pInput            = &p.Inputs[inIndex]
 	)
 
+	for idx, scriptSpendSig := range pInput.TaprootScriptSpendSig {
+		if scriptSpendSig == nil {
+			return fmt.Errorf("nil taproot script spend signature "+
+				"at index %d: %w", idx, ErrInvalidPsbtFormat)
+		}
+	}
+
 	// What spend path did we take?
 	switch {
 	// Key spend path.
@@ -547,8 +558,8 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 		targetLeafHash := pInput.TaprootScriptSpendSig[0].LeafHash
 		leafScript, err := FindLeafScript(pInput, targetLeafHash)
 		if err != nil {
-			return fmt.Errorf("control block for script spend " +
-				"signature not found")
+			return fmt.Errorf("control block for script spend "+
+				"signature not found: %w", err)
 		}
 
 		// The witness stack will contain all signatures, followed by
