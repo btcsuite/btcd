@@ -619,7 +619,7 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 		return subBucketClosure(dbTx, idxKey, nil)
 	})
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// Iterate through each sub-bucket in reverse, deepest-first, deleting
@@ -668,6 +668,9 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 			}
 			return bucket.DeleteBucket(bucketName[len(bucketName)-1])
 		})
+		if err != nil {
+			return err
+		}
 	}
 
 	// Call extra index specific deinitialization for the transaction index.
