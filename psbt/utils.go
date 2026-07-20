@@ -315,6 +315,13 @@ func readTxOut(txout []byte) (*wire.TxOut, error) {
 		return nil, err
 	}
 
+	// wire.ReadTxOut stores PkScript in an internal 4 MiB script slab.
+	// Compact it before storing the TxOut in the PSBT so tiny witness
+	// scripts do not retain the full slab.
+	script := make([]byte, len(txOut.PkScript))
+	copy(script, txOut.PkScript)
+	txOut.PkScript = script
+
 	return txOut, nil
 }
 
