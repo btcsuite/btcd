@@ -739,6 +739,23 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 							// needs witness-relative TxLoc keys to find the
 							// stored entries (searchrawtransactions /
 							// wallet rescan path).
+							//
+							// CancelPendingColdCompaction only undoes a
+							// pending hot→cold write. If the block was
+							// already cold (CompactBlockToCold no-op after a
+							// reorg reconnect), a rewrite failure cannot be
+							// rolled back that way — the block stays cold.
+							// That path needs a >witnessBuffer reorg plus a
+							// db failure at the same moment (operator
+							// reconsider of cold tips is refused); ConnectBlock
+							// for already-cold blocks also writes stripped
+							// TxLocs up front. Asymmetry is intentional.
+							//
+							// A rewrite failure on the hot→cold path cancels
+							// the pending cold write and leaves the block hot
+							// permanently for that height (the rolling age-out
+							// advances; it does not retry). Safe: correct
+							// indexes, small disk-savings miss.
 							if cm, ok := b.indexManager.(ColdCompactionIndexManager); ok {
 								if err := cm.RewriteTxOffsetsForColdCompaction(
 									dbTx, ageOutBlock, ageOutStxos); err != nil {
