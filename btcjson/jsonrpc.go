@@ -97,7 +97,7 @@ type Request struct {
 	Jsonrpc RPCVersion        `json:"jsonrpc"`
 	Method  string            `json:"method"`
 	Params  []json.RawMessage `json:"params"`
-	ID      interface{}       `json:"id"`
+	ID      interface{}       `json:"id,omitempty"`
 }
 
 // UnmarshalJSON is a custom unmarshal func for the Request struct. The param
@@ -195,7 +195,7 @@ func NewRequest(rpcVersion RPCVersion, id interface{}, method string, params []i
 type Response struct {
 	Jsonrpc RPCVersion      `json:"jsonrpc"`
 	Result  json.RawMessage `json:"result"`
-	Error   *RPCError       `json:"error"`
+	Error   *RPCError       `json:"error,omitempty"`
 	ID      *interface{}    `json:"id"`
 }
 
