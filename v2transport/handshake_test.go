@@ -3,8 +3,8 @@ package v2transport
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
+	"net"
 	"testing"
 	"time"
 )
@@ -40,6 +40,13 @@ func (rw *splitReadWriter) Write(p []byte) (int, error) {
 	}
 
 	return rw.writes.Write(p)
+}
+
+// prefixedReadWriter reads already-read bytes before reading from its
+// underlying connection.
+type prefixedReadWriter struct {
+	io.Reader
+	io.Writer
 }
 
 // bufferedReadWriter is one endpoint of a buffered in-memory duplex pipe.
@@ -105,55 +112,116 @@ func TestResponderV1Fallback(t *testing.T) {
 	}
 }
 
-// TestResponderIncompleteCandidate verifies incomplete v2 candidates do not
-// consume CPU admission or generate responder key material.
-func TestResponderIncompleteCandidate(t *testing.T) {
-	for _, length := range []int{1, 15, 16, 63} {
-		t.Run(fmt.Sprintf("length_%d", length), func(t *testing.T) {
-			var admissions int
-			peer := NewPeerWithOptions(WithResponderHandshakeAdmission(
-				testHandshakeAdmission(func() (func(), error) {
-					admissions++
-					return func() {}, nil
-				}),
-			))
-			candidate := make([]byte, length)
-			candidate[0] = 1
-			rw := newSplitReadWriter(candidate)
-			peer.UseReadWriter(rw)
+// TestResponderHandshakeProgress verifies the responder sends after the first
+// v1-prefix mismatch instead of waiting for the complete initiator key. The
+// peers then complete key agreement and exchange an encrypted packet.
+func TestResponderHandshakeProgress(t *testing.T) {
+	const testNet = BitcoinNet(0xd9b4bef9)
 
-			err := peer.RespondV2Handshake(0, BitcoinNet(0xd9b4bef9))
-			if err == nil {
-				t.Fatal("incomplete candidate unexpectedly succeeded")
-			}
-			if admissions != 0 {
-				t.Fatalf("incomplete candidate consumed %d admissions",
-					admissions)
-			}
-			if peer.privkeyOurs != nil {
-				t.Fatal("incomplete candidate generated responder key")
-			}
-			if rw.writes.Len() != 0 {
-				t.Fatalf("incomplete candidate wrote %d bytes",
-					rw.writes.Len())
-			}
-		})
+	initiator := NewPeer()
+	capture := newSplitReadWriter(nil)
+	initiator.UseReadWriter(capture)
+	if err := initiator.InitiateV2Handshake(0); err != nil {
+		t.Fatalf("initiator key generation failed: %v", err)
+	}
+	initiatorKey := append([]byte(nil), capture.writes.Bytes()...)
+	v1Prefix := createV1Prefix(testNet)
+	mismatchLen := 0
+	for mismatchLen < len(v1Prefix) &&
+		initiatorKey[mismatchLen] == v1Prefix[mismatchLen] {
+
+		mismatchLen++
+	}
+	if mismatchLen == len(v1Prefix) {
+		t.Fatal("initiator key matched the complete v1 prefix")
+	}
+	mismatchLen++
+
+	initiatorConn, responderConn := net.Pipe()
+	defer initiatorConn.Close()
+	defer responderConn.Close()
+
+	deadline := time.Now().Add(5 * time.Second)
+	if err := initiatorConn.SetDeadline(deadline); err != nil {
+		t.Fatalf("initiator deadline failed: %v", err)
+	}
+	if err := responderConn.SetDeadline(deadline); err != nil {
+		t.Fatalf("responder deadline failed: %v", err)
+	}
+
+	responder := NewPeer()
+	responder.UseReadWriter(responderConn)
+	responderErr := make(chan error, 1)
+	go func() {
+		responderErr <- responder.RespondV2Handshake(0, testNet)
+	}()
+
+	if _, err := initiatorConn.Write(initiatorKey[:mismatchLen]); err != nil {
+		t.Fatalf("initiator mismatch prefix failed: %v", err)
+	}
+
+	var responderPrefix [1]byte
+	if _, err := io.ReadFull(initiatorConn, responderPrefix[:]); err != nil {
+		t.Fatalf("responder made no progress after mismatch: %v", err)
+	}
+
+	initiatorWriteErr := make(chan error, 1)
+	go func() {
+		_, err := initiatorConn.Write(initiatorKey[mismatchLen:])
+		initiatorWriteErr <- err
+	}()
+
+	initiator.UseReadWriter(&prefixedReadWriter{
+		Reader: io.MultiReader(
+			bytes.NewReader(responderPrefix[:]), initiatorConn,
+		),
+		Writer: initiatorConn,
+	})
+	if err := initiator.completeKeyExchange(true, testNet); err != nil {
+		t.Fatalf("initiator key exchange failed: %v", err)
+	}
+	if err := <-initiatorWriteErr; err != nil {
+		t.Fatalf("remaining initiator key failed: %v", err)
+	}
+	if err := <-responderErr; err != nil {
+		t.Fatalf("responder handshake failed: %v", err)
+	}
+
+	payload := []byte("post-handshake payload")
+	sendErr := make(chan error, 1)
+	go func() {
+		_, _, err := initiator.V2EncPacket(payload, nil, false)
+		sendErr <- err
+	}()
+
+	got, err := responder.V2ReceivePacket(nil)
+	if err != nil {
+		t.Fatalf("packet receive failed: %v", err)
+	}
+	if err := <-sendErr; err != nil {
+		t.Fatalf("packet send failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("packet mismatch: got %x, want %x", got, payload)
 	}
 }
 
-// TestResponderWrongNetworkV1 verifies wrong-network v1 is rejected before
-// CPU admission and key generation.
+// TestResponderWrongNetworkV1 verifies wrong-network v1 is rejected after the
+// responder sends at the first prefix mismatch but before key agreement.
 func TestResponderWrongNetworkV1(t *testing.T) {
 	const expectedNet = BitcoinNet(0xd9b4bef9)
 
 	candidate := make([]byte, 64)
 	copy(candidate, createV1Prefix(BitcoinNet(0x0709110b)))
 
-	var admissions int
+	var (
+		admissions int
+		releases   int
+	)
 	peer := NewPeerWithOptions(WithResponderHandshakeAdmission(
 		testHandshakeAdmission(func() (func(), error) {
 			admissions++
-			return func() {}, nil
+			return func() { releases++ }, nil
 		}),
 	))
 	rw := newSplitReadWriter(candidate)
@@ -163,11 +231,15 @@ func TestResponderWrongNetworkV1(t *testing.T) {
 	if !errors.Is(err, errWrongNetV1Peer) {
 		t.Fatalf("unexpected wrong-network error: %v", err)
 	}
-	if admissions != 0 {
-		t.Fatalf("wrong-network v1 consumed %d admissions", admissions)
+	if admissions != 1 || releases != 1 {
+		t.Fatalf("unexpected lease counts: admissions=%d releases=%d",
+			admissions, releases)
 	}
-	if peer.privkeyOurs != nil {
-		t.Fatal("wrong-network v1 generated responder key")
+	if peer.privkeyOurs == nil {
+		t.Fatal("wrong-network v1 did not generate responder key")
+	}
+	if rw.writes.Len() != 64 {
+		t.Fatalf("responder wrote %d bytes, want 64", rw.writes.Len())
 	}
 }
 
@@ -205,8 +277,8 @@ func TestResponderAdmissionRejected(t *testing.T) {
 	}
 }
 
-// TestResponderAdmissionLease verifies the admission lease covers responder
-// cryptography and is released before the response is written.
+// TestResponderAdmissionLease verifies separate admission leases cover key
+// generation and key agreement without spanning network I/O.
 func TestResponderAdmissionLease(t *testing.T) {
 	candidate := make([]byte, 64)
 	for i := range candidate {
@@ -234,12 +306,57 @@ func TestResponderAdmissionLease(t *testing.T) {
 	if err := peer.RespondV2Handshake(0, BitcoinNet(0xd9b4bef9)); err != nil {
 		t.Fatalf("responder handshake failed: %v", err)
 	}
-	if admissions != 1 || releases != 1 {
+	if admissions != 2 || releases != 2 {
 		t.Fatalf("unexpected lease counts: admissions=%d releases=%d",
 			admissions, releases)
 	}
 	if peer.privkeyOurs == nil || !peer.responderReady {
 		t.Fatal("accepted responder did not initialize key material")
+	}
+	if rw.writes.Len() != 64 {
+		t.Fatalf("responder wrote %d bytes, want 64", rw.writes.Len())
+	}
+}
+
+// TestResponderSecondAdmissionRejected verifies a rejection after the
+// responder write does not start key agreement or leak the first lease.
+func TestResponderSecondAdmissionRejected(t *testing.T) {
+	errRejected := errors.New("rejected")
+	candidate := make([]byte, 64)
+	for i := range candidate {
+		candidate[i] = byte(i)
+	}
+
+	var (
+		admissions int
+		releases   int
+	)
+	peer := NewPeerWithOptions(WithResponderHandshakeAdmission(
+		testHandshakeAdmission(func() (func(), error) {
+			admissions++
+			if admissions == 2 {
+				return nil, errRejected
+			}
+
+			return func() { releases++ }, nil
+		}),
+	))
+	rw := newSplitReadWriter(candidate)
+	peer.UseReadWriter(rw)
+
+	err := peer.RespondV2Handshake(0, BitcoinNet(0xd9b4bef9))
+	if !errors.Is(err, errRejected) {
+		t.Fatalf("unexpected admission error: %v", err)
+	}
+	if admissions != 2 || releases != 1 {
+		t.Fatalf("unexpected lease counts: admissions=%d releases=%d",
+			admissions, releases)
+	}
+	if peer.privkeyOurs == nil {
+		t.Fatal("first responder phase did not generate key material")
+	}
+	if peer.responderReady {
+		t.Fatal("rejected second phase initialized responder ciphers")
 	}
 	if rw.writes.Len() != 64 {
 		t.Fatalf("responder wrote %d bytes, want 64", rw.writes.Len())

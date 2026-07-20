@@ -106,12 +106,12 @@ var (
 	ErrShouldDowngradeToV1 = fmt.Errorf("should downgrade to v1")
 )
 
-// HandshakeAdmission controls access to the CPU-bound portion of an inbound
-// v2 handshake.
+// HandshakeAdmission controls access to the CPU-bound phases of an inbound v2
+// handshake.
 type HandshakeAdmission interface {
-	// Acquire reserves the resources needed to generate the responder key
-	// and perform key agreement. The returned function releases the
-	// reservation once those operations are complete.
+	// Acquire reserves the resources needed for one CPU-bound responder
+	// phase. Responders acquire once for key generation and again for key
+	// agreement. The returned function releases the phase reservation.
 	Acquire() (release func(), err error)
 }
 
@@ -119,8 +119,7 @@ type HandshakeAdmission interface {
 type PeerOption func(*Peer)
 
 // WithResponderHandshakeAdmission installs an admission policy that runs
-// after a responder has received a complete v2 key candidate and before it
-// performs key generation or key agreement.
+// before each CPU-bound responder phase.
 func WithResponderHandshakeAdmission(
 	admission HandshakeAdmission,
 ) PeerOption {
@@ -193,7 +192,7 @@ type Peer struct {
 	rw io.ReadWriter
 
 	// responderAdmission optionally reserves resources for the CPU-bound
-	// portion of an inbound handshake.
+	// phases of an inbound handshake.
 	responderAdmission HandshakeAdmission
 
 	// responderReady is set after the responder has completed key agreement
@@ -421,10 +420,12 @@ func (p *Peer) InitiateV2Handshake(garbageLen int) error {
 }
 
 // RespondV2Handshake determines whether the initiator wants to use the v2
-// protocol.  For a v2 initiator, it receives the complete key candidate before
-// reserving CPU resources, initializes the responder ciphers, and sends the
-// responder's ElligatorSwift-encoded public key followed by garbage.  For a v1
-// initiator, it returns ErrUseV1Protocol without performing v2 cryptography.
+// protocol. For a v2 initiator, it sends the responder's ElligatorSwift key
+// after the first v1-prefix mismatch, receives the rest of the initiator key,
+// and initializes the responder ciphers. Key generation and key agreement use
+// separate CPU admissions, and neither admission is held during network I/O.
+// For a v1 initiator, it returns ErrUseV1Protocol without performing v2
+// cryptography.
 func (p *Peer) RespondV2Handshake(garbageLen int, net BitcoinNet) error {
 	v1Prefix := createV1Prefix(net)
 
@@ -470,10 +471,27 @@ func (p *Peer) RespondV2Handshake(garbageLen int, net BitcoinNet) error {
 	return ErrUseV1Protocol
 }
 
-// prepareResponderHandshake receives the rest of the initiator's key and
-// performs all CPU-bound responder setup without holding a resource admission
-// across a network read or write.
+// prepareResponderHandshake generates and sends the responder key, receives
+// the rest of the initiator key, then initializes the responder ciphers. The
+// two CPU-bound phases use separate admissions so neither lease spans network
+// I/O.
 func (p *Peer) prepareResponderHandshake(garbageLen int, net BitcoinNet) error {
+	release, err := p.acquireResponderAdmission()
+	if err != nil {
+		return err
+	}
+
+	data, err := p.generateResponderKey(garbageLen, release)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("Sending ellswift pubkey and garbage (total_len=%d)",
+		len(data))
+	if _, err := p.Send(data); err != nil {
+		return err
+	}
+
 	remaining := 64 - len(p.receivedPrefix)
 	recvData, _, err := p.Receive(remaining)
 	if err != nil {
@@ -492,48 +510,57 @@ func (p *Peer) prepareResponderHandshake(garbageLen int, net BitcoinNet) error {
 		return errWrongNetV1Peer
 	}
 
-	release := func() {}
-	if p.responderAdmission != nil {
-		release, err = p.responderAdmission.Acquire()
-		if err != nil {
-			return err
-		}
-		if release == nil {
-			release = func() {}
-		}
-	}
-
-	err = p.initializeResponder(net, release)
+	release, err = p.acquireResponderAdmission()
 	if err != nil {
 		return err
 	}
 
-	data, err := p.generateKeyAndGarbage(garbageLen)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("Sending ellswift pubkey and garbage (total_len=%d)",
-		len(data))
-	_, err = p.Send(data)
-
-	return err
+	return p.initializeResponder(net, release)
 }
 
-// initializeResponder performs the responder's CPU-bound key generation, key
-// agreement, and cipher setup.  The admission is released before this method
-// returns so callers never hold it across a network write.
-func (p *Peer) initializeResponder(net BitcoinNet, release func()) error {
+// acquireResponderAdmission reserves one CPU-bound responder phase.
+func (p *Peer) acquireResponderAdmission() (func(), error) {
+	if p.responderAdmission == nil {
+		return func() {}, nil
+	}
+
+	release, err := p.responderAdmission.Acquire()
+	if err != nil {
+		return nil, err
+	}
+	if release == nil {
+		release = func() {}
+	}
+
+	return release, nil
+}
+
+// generateResponderKey performs the responder's CPU-bound key generation. The
+// admission is released before this method returns so callers never hold it
+// across a network write.
+func (p *Peer) generateResponderKey(
+	garbageLen int, release func(),
+) ([]byte, error) {
+
 	defer release()
 
 	var err error
 	p.privkeyOurs, p.ellswiftOurs, err = ellswift.EllswiftCreate()
 	if err != nil {
 		log.Errorf("Failed to create ellswift keypair: %v", err)
-		return err
+		return nil, err
 	}
 
 	log.Tracef("Created ellswift keypair, pubkey=%x", p.ellswiftOurs)
+
+	return p.generateKeyAndGarbage(garbageLen)
+}
+
+// initializeResponder performs the responder's CPU-bound key agreement and
+// cipher setup. The admission is released before this method returns so
+// callers never hold it across further network I/O.
+func (p *Peer) initializeResponder(net BitcoinNet, release func()) error {
+	defer release()
 
 	var ellswiftTheirs [64]byte
 	copy(ellswiftTheirs[:], p.receivedPrefix)
@@ -603,8 +630,9 @@ func createV1Prefix(net BitcoinNet) []byte {
 }
 
 // completeKeyExchange receives the remote key and initializes the packet
-// ciphers.  RespondV2Handshake performs this phase early for responders so its
-// CPU admission can be released before any response is written.
+// ciphers. RespondV2Handshake performs this phase early for responders so its
+// CPU admission is released before CompleteHandshake writes the garbage
+// terminator and encrypted version packet.
 func (p *Peer) completeKeyExchange(initiating bool, net BitcoinNet) error {
 	if p.responderReady {
 		return nil
