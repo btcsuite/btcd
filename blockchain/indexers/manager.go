@@ -619,7 +619,7 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 		return subBucketClosure(dbTx, idxKey, nil)
 	})
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// Iterate through each sub-bucket in reverse, deepest-first, deleting
