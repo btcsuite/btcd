@@ -100,17 +100,37 @@ type Admission struct {
 }
 
 // V2Admission binds the server-wide v2 admission policy to a single remote
-// address. The transport uses this value after it has classified the
-// connection as v2, but before it performs key generation or key agreement.
+// address. Its first successful acquisition consumes the handshake's rate
+// budgets. Each acquisition reserves a fresh concurrency slot for one
+// CPU-bound responder phase.
 type V2Admission struct {
 	admission          *Admission
 	remote             net.Addr
 	bypassSourceLimits bool
+
+	mu           sync.Mutex
+	rateAdmitted bool
 }
 
-// Acquire reserves the v2 rate and concurrency budgets for the bound remote.
+// Acquire reserves one v2 concurrency slot for the bound remote. The first
+// successful call also consumes the global and per-source rate budgets.
 func (a *V2Admission) Acquire() (func(), error) {
-	return a.admission.admitV2(a.remote, a.bypassSourceLimits)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.rateAdmitted {
+		return a.admission.acquireV2Slot(a.remote)
+	}
+
+	release, err := a.admission.admitV2(
+		a.remote, a.bypassSourceLimits,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	a.rateAdmitted = true
+	return release, nil
 }
 
 // BindV2 binds the v2 admission policy to a remote address.
@@ -279,8 +299,8 @@ func (a *Admission) AcquireSource(
 	return release, nil
 }
 
-// admitV2 reserves the rate and concurrency budgets for the CPU-bound portion
-// of an inbound v2 handshake.  The returned release function only releases the
+// admitV2 reserves the one-time rate budgets and the first concurrency slot
+// for an inbound v2 handshake. The returned release function only releases the
 // concurrency slot; consumed rate tokens are not returned.
 func (a *Admission) admitV2(
 	addr net.Addr, bypassSourceLimits bool,
@@ -311,6 +331,22 @@ func (a *Admission) admitV2(
 		return nil, errV2HandshakeRateLimit
 	}
 
+	release, err := a.acquireV2Slot(addr)
+	if err != nil {
+		globalReservation.CancelAt(now)
+		if sourceReservation != nil {
+			sourceReservation.CancelAt(now)
+		}
+
+		return nil, err
+	}
+
+	return release, nil
+}
+
+// acquireV2Slot reserves one concurrency slot for a CPU-bound responder
+// phase. It does not consume a handshake rate token.
+func (a *Admission) acquireV2Slot(addr net.Addr) (func(), error) {
 	select {
 	case a.v2Slots <- struct{}{}:
 		var once sync.Once
@@ -321,10 +357,6 @@ func (a *Admission) admitV2(
 		}, nil
 
 	default:
-		globalReservation.CancelAt(now)
-		if sourceReservation != nil {
-			sourceReservation.CancelAt(now)
-		}
 		a.logV2Rejection(addr, "concurrency")
 		return nil, errV2HandshakeConcurrency
 	}

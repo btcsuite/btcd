@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -107,29 +109,161 @@ func TestHandshakeReleaseOnDisconnect(t *testing.T) {
 	require.Equal(t, uint32(1), releases.Load())
 }
 
-// TestMaxInboundPeers verifies that automatic outbound capacity is reserved
-// without underflow at small peer limits.
-func TestMaxInboundPeers(t *testing.T) {
+// TestInboundPeerReservation verifies that listener capacity is derived from
+// the configured peer mode while connmgr retains its automatic target.
+func TestInboundPeerReservation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name           string
 		maxPeers       int
 		targetOutbound int
-		want           uint32
+		permanentPeers int
+		automatic      bool
+		wantReserved   int
+		wantInbound    uint32
 	}{
-		{name: "zero", maxPeers: 0, targetOutbound: 0, want: 0},
-		{name: "all outbound", maxPeers: 8, targetOutbound: 8, want: 0},
-		{name: "below outbound", maxPeers: 7, targetOutbound: 8, want: 0},
-		{name: "one inbound", maxPeers: 9, targetOutbound: 8, want: 1},
-		{name: "default", maxPeers: 125, targetOutbound: 8, want: 117},
+		{
+			name: "connect only", maxPeers: 8, targetOutbound: 8,
+			permanentPeers: 1, wantReserved: 1, wantInbound: 7,
+		},
+		{
+			name: "connect only capped", maxPeers: 8,
+			targetOutbound: 8, permanentPeers: 10,
+			wantReserved: 8, wantInbound: 0,
+		},
+		{
+			name: "simnet without peers", maxPeers: 8,
+			targetOutbound: 8, wantReserved: 0, wantInbound: 8,
+		},
+		{
+			name: "simnet with peers", maxPeers: 8,
+			targetOutbound: 8, permanentPeers: 3,
+			wantReserved: 3, wantInbound: 5,
+		},
+		{
+			name: "automatic without add peers", maxPeers: 125,
+			targetOutbound: 8, automatic: true,
+			wantReserved: 8, wantInbound: 117,
+		},
+		{
+			name: "add peers below target", maxPeers: 125,
+			targetOutbound: 8, permanentPeers: 3, automatic: true,
+			wantReserved: 11, wantInbound: 114,
+		},
+		{
+			name: "add peers above target", maxPeers: 10,
+			targetOutbound: 8, permanentPeers: 9, automatic: true,
+			wantReserved: 10, wantInbound: 0,
+		},
+		{
+			name: "add peers at max peers", maxPeers: 10,
+			targetOutbound: 8, permanentPeers: 10, automatic: true,
+			wantReserved: 10, wantInbound: 0,
+		},
+		{
+			name: "add peers above max peers", maxPeers: 10,
+			targetOutbound: 8, permanentPeers: 12, automatic: true,
+			wantReserved: 10, wantInbound: 0,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.want, maxInboundPeers(
+			reserved := reservedOutboundPeers(
 				test.maxPeers, test.targetOutbound,
+				test.permanentPeers, test.automatic,
+			)
+			require.Equal(t, test.wantReserved, reserved)
+			require.Equal(t, test.wantInbound, maxInboundPeers(
+				test.maxPeers, reserved,
 			))
+		})
+	}
+}
+
+// TestInboundPeerAdmissionSourceLimits verifies that loopback and whitelisted
+// peers retain the ordinary pending-handshake and V2 source limits.
+func TestInboundPeerAdmissionSourceLimits(t *testing.T) {
+	_, whitelist, err := net.ParseCIDR("192.0.2.0/24")
+	require.NoError(t, err)
+
+	originalCfg := cfg
+	t.Cleanup(func() {
+		cfg = originalCfg
+	})
+
+	tests := []struct {
+		name            string
+		addr            net.Addr
+		whitelists      []*net.IPNet
+		wantWhitelisted bool
+	}{
+		{
+			name: "loopback",
+			addr: &net.TCPAddr{
+				IP: net.ParseIP("127.0.0.2"), Port: 8333,
+			},
+		},
+		{
+			name: "whitelisted",
+			addr: &net.TCPAddr{
+				IP: net.ParseIP("192.0.2.1"), Port: 8333,
+			},
+			whitelists:      []*net.IPNet{whitelist},
+			wantWhitelisted: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg = &config{whitelists: test.whitelists}
+			s := &server{inboundAdmission: inbound.New()}
+
+			var releases []func()
+			for i := 0; i < 20; i++ {
+				whitelisted, release, _, err :=
+					s.acquireInboundPeerAdmission(test.addr)
+				if err != nil {
+					break
+				}
+
+				require.Equal(
+					t, test.wantWhitelisted, whitelisted,
+				)
+				releases = append(releases, release)
+			}
+			require.Less(t, len(releases), 20,
+				"the source pending limit must reject a peer")
+			for _, release := range releases {
+				release()
+			}
+
+			var v2Rejections int
+			for i := 0; i < 20; i++ {
+				whitelisted, releaseSource, v2Admission, err :=
+					s.acquireInboundPeerAdmission(test.addr)
+				require.NoError(t, err)
+				require.Equal(
+					t, test.wantWhitelisted, whitelisted,
+				)
+				releaseSource()
+
+				releaseV2, err := v2Admission.Acquire()
+				if err != nil {
+					v2Rejections++
+					break
+				}
+				releaseV2()
+
+				releaseV2, err = v2Admission.Acquire()
+				require.NoError(t, err,
+					"the second CPU phase must not consume "+
+						"another rate token")
+				releaseV2()
+			}
+			require.Equal(t, 1, v2Rejections,
+				"the V2 source rate must reject a peer")
 		})
 	}
 }

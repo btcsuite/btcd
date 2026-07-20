@@ -299,6 +299,87 @@ func TestV2HandshakeConcurrency(t *testing.T) {
 	replacement()
 }
 
+// TestV2HandshakePhases verifies a bound handshake consumes its rate budgets
+// once while each CPU phase reacquires the concurrency slot.
+func TestV2HandshakePhases(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1000, 0)
+	remote := &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 8333}
+	other := &net.TCPAddr{IP: net.ParseIP("192.0.3.1"), Port: 8333}
+	admission := newAdmission(admissionConfig{
+		maxPendingPerSource: 1,
+		v2Rate:              0,
+		v2Burst:             1,
+		v2SourceRate:        0,
+		v2SourceBurst:       1,
+		v2SourceCacheSize:   16,
+		v2Concurrency:       1,
+		now:                 func() time.Time { return now },
+	})
+
+	bound := admission.BindV2(remote, false)
+	releaseFirst, err := bound.Acquire()
+	require.NoError(t, err)
+
+	_, err = bound.Acquire()
+	require.ErrorIs(t, err, errV2HandshakeConcurrency,
+		"each phase must reserve a fresh concurrency slot")
+
+	releaseFirst()
+	releaseFirst()
+
+	releaseSecond, err := bound.Acquire()
+	require.NoError(t, err,
+		"the second phase must not consume another rate token")
+	releaseSecond()
+	releaseSecond()
+
+	_, err = admission.BindV2(other, false).Acquire()
+	require.ErrorIs(t, err, errV2HandshakeRateLimit,
+		"a new handshake must consume a new global rate token")
+
+	_, err = admission.BindV2(remote, false).Acquire()
+	require.ErrorIs(t, err, errV2HandshakeSourceRateLimit,
+		"a new handshake must consume a new source rate token")
+}
+
+// TestV2HandshakeFirstAcquireRetry verifies a concurrency rejection leaves a
+// bound admission in its first-acquire state.
+func TestV2HandshakeFirstAcquireRetry(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1000, 0)
+	sourceA := &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 1}
+	sourceB := &net.TCPAddr{IP: net.ParseIP("192.0.3.1"), Port: 2}
+	admission := newAdmission(admissionConfig{
+		maxPendingPerSource: 1,
+		v2Rate:              rate.Inf,
+		v2SourceRate:        0,
+		v2SourceBurst:       1,
+		v2SourceCacheSize:   16,
+		v2Concurrency:       1,
+		now:                 func() time.Time { return now },
+	})
+
+	releaseA, err := admission.BindV2(sourceA, false).Acquire()
+	require.NoError(t, err)
+
+	boundB := admission.BindV2(sourceB, false)
+	_, err = boundB.Acquire()
+	require.ErrorIs(t, err, errV2HandshakeConcurrency)
+	releaseA()
+
+	releaseB, err := admission.BindV2(sourceB, false).Acquire()
+	require.NoError(t, err,
+		"a concurrency rejection must return the source rate token")
+	releaseB()
+
+	_, err = boundB.Acquire()
+	require.ErrorIs(t, err, errV2HandshakeSourceRateLimit,
+		"a rejected first acquisition must retry rate admission")
+}
+
 // TestV2HandshakeGlobalRateRollback verifies a global rejection does not
 // consume the rejected source's independent token.
 func TestV2HandshakeGlobalRateRollback(t *testing.T) {

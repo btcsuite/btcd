@@ -74,14 +74,32 @@ var (
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash chainhash.Hash
 
+// reservedOutboundPeers returns the outbound connection reservation for the
+// configured peer mode, capped at the total peer limit.
+func reservedOutboundPeers(
+	maxPeers, targetOutbound, permanentPeers int, automaticOutbound bool,
+) int {
+
+	reserved := permanentPeers
+	if automaticOutbound {
+		reserved += targetOutbound
+	}
+
+	if reserved > maxPeers {
+		return maxPeers
+	}
+
+	return reserved
+}
+
 // maxInboundPeers returns the accepted inbound connection budget after
-// reserving capacity for automatic outbound peers.
-func maxInboundPeers(maxPeers, targetOutbound int) uint32 {
-	if maxPeers <= targetOutbound {
+// reserving capacity for outbound peers.
+func maxInboundPeers(maxPeers, reservedOutbound int) uint32 {
+	if maxPeers <= reservedOutbound {
 		return 0
 	}
 
-	return uint32(maxPeers - targetOutbound)
+	return uint32(maxPeers - reservedOutbound)
 }
 
 // onionAddr implements the net.Addr interface and represents a tor address.
@@ -2306,29 +2324,39 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 	}
 }
 
+// acquireInboundPeerAdmission reserves the source budgets for an inbound peer
+// and reports whether the peer retains the existing no-ban permission.
+func (s *server) acquireInboundPeerAdmission(
+	remoteAddr net.Addr,
+) (bool, func(), *inbound.V2Admission, error) {
+
+	whitelisted := isWhitelisted(remoteAddr)
+	if s.inboundAdmission == nil {
+		return whitelisted, nil, nil, nil
+	}
+
+	releaseHandshake, err := s.inboundAdmission.AcquireSource(
+		remoteAddr, false,
+	)
+	if err != nil {
+		return whitelisted, nil, nil, err
+	}
+
+	v2Admission := s.inboundAdmission.BindV2(remoteAddr, false)
+	return whitelisted, releaseHandshake, v2Admission, nil
+}
+
 // inboundPeerConnected is invoked by the connection manager when a new inbound
 // connection is established.  It initializes a new inbound server peer
 // instance, associates it with the connection, and starts a goroutine to wait
 // for disconnection.
 func (s *server) inboundPeerConnected(conn net.Conn) {
 	remoteAddr := conn.RemoteAddr()
-	whitelisted := isWhitelisted(remoteAddr)
-
-	// Loopback includes onion peers forwarded into the listener. Bypass the
-	// per-source limits for these and configured whitelisted peers, while the
-	// global socket, v2 rate, and v2 concurrency limits remain active.
-	bypassSourceLimits := whitelisted || inbound.IsLoopback(remoteAddr)
-
-	var releaseHandshake func()
-	if s.inboundAdmission != nil {
-		var err error
-		releaseHandshake, err = s.inboundAdmission.AcquireSource(
-			remoteAddr, bypassSourceLimits,
-		)
-		if err != nil {
-			_ = conn.Close()
-			return
-		}
+	whitelisted, releaseHandshake, v2Admission, err :=
+		s.acquireInboundPeerAdmission(remoteAddr)
+	if err != nil {
+		_ = conn.Close()
+		return
 	}
 
 	sp := newServerPeer(s, false)
@@ -2336,11 +2364,7 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 	sp.releaseInboundHandshake = releaseHandshake
 
 	peerCfg := newPeerConfig(sp)
-	if s.inboundAdmission != nil {
-		peerCfg.V2HandshakeAdmission = s.inboundAdmission.BindV2(
-			remoteAddr, bypassSourceLimits,
-		)
-	}
+	peerCfg.V2HandshakeAdmission = v2Admission
 
 	sp.Peer = peer.NewInboundPeer(peerCfg)
 	sp.AssociateConnection(conn)
@@ -3205,10 +3229,18 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	if cfg.MaxPeers < targetOutbound {
 		targetOutbound = cfg.MaxPeers
 	}
-	maxInbound := maxInboundPeers(cfg.MaxPeers, targetOutbound)
+	permanentPeerCount := len(cfg.ConnectPeers)
+	if permanentPeerCount == 0 {
+		permanentPeerCount = len(cfg.AddPeers)
+	}
+	reservedOutbound := reservedOutboundPeers(
+		cfg.MaxPeers, targetOutbound, permanentPeerCount,
+		newAddressFunc != nil,
+	)
+	maxInbound := maxInboundPeers(cfg.MaxPeers, reservedOutbound)
 	if maxInbound == 0 && len(listeners) > 0 {
 		srvrLog.Infof("Inbound connections disabled: maxpeers=%d, "+
-			"reserved-outbound=%d", cfg.MaxPeers, targetOutbound)
+			"reserved-outbound=%d", cfg.MaxPeers, reservedOutbound)
 	}
 	cmgr, err := connmgr.New(&connmgr.Config{
 		Listeners:      listeners,

@@ -1301,8 +1301,8 @@ func TestSendAddrV2Handshake(t *testing.T) {
 	}
 }
 
-// TestV2HandshakeAdmission verifies the responder admission hook is invoked
-// exactly once for an inbound v2 handshake and never for the initiator.
+// TestV2HandshakeAdmission verifies the responder admission hook bounds both
+// inbound CPU phases and is never invoked for the initiator.
 func TestV2HandshakeAdmission(t *testing.T) {
 	verack := make(chan struct{}, 2)
 	var (
@@ -1355,10 +1355,10 @@ func TestV2HandshakeAdmission(t *testing.T) {
 		}
 	}
 
-	if got := admissions.Load(); got != 1 {
-		t.Fatalf("admission invoked %d times, want 1", got)
+	if got := admissions.Load(); got != 2 {
+		t.Fatalf("admission invoked %d times, want 2", got)
 	}
-	if got := releases.Load(); got != 1 {
-		t.Fatalf("admission released %d times, want 1", got)
+	if got := releases.Load(); got != 2 {
+		t.Fatalf("admission released %d times, want 2", got)
 	}
 }
