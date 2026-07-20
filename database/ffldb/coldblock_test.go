@@ -832,3 +832,95 @@ func TestColdCacheEviction(t *testing.T) {
 		t.Errorf("second-to-last loc should still be cached")
 	}
 }
+
+// TestColdWriteCursorResumesAfterReopen verifies that newColdStore scans existing
+// cold files and resumes the write cursor at the end of the latest file. Without
+// that scan, a post-restart write reopens file 0 at offset 0, appends into an
+// already-full file, and can bypass maxBlockFileSize.
+func TestColdWriteCursorResumesAfterReopen(t *testing.T) {
+	ct, cleanup := newColdTestStore(t)
+	defer cleanup()
+
+	fixtures := loadColdFixtures(t)
+	if len(fixtures) == 0 {
+		t.Skip("no fixtures")
+	}
+
+	// Size the cap from a real record so file 0 fills and rotates, rather than
+	// skipping file 0 because a single fixture exceeds a tiny artificial max.
+	if _, err := ct.cold.writeColdBlock(fixtures[0]); err != nil {
+		t.Fatalf("probe write: %v", err)
+	}
+	oneRecordEnd := ct.cold.writeCursor.curOffset
+	if oneRecordEnd == 0 {
+		t.Fatal("probe write left cursor at 0")
+	}
+	// Fit roughly two records per file, then rotate on the third.
+	maxSize := oneRecordEnd*2 + coldHeaderLen
+	ct.cold.maxBlockFileSize = maxSize
+
+	var lastFileNum uint32
+	advanced := false
+	for i := 0; i < 20; i++ {
+		raw := fixtures[i%len(fixtures)]
+		loc, err := ct.cold.writeColdBlock(raw)
+		if err != nil {
+			t.Fatalf("writeColdBlock %d: %v", i, err)
+		}
+		lastFileNum = loc.blockFileNum &^ coldFlag
+		if lastFileNum > 0 {
+			advanced = true
+			break
+		}
+	}
+	if !advanced {
+		t.Fatal("expected cold writes to advance past file 0")
+	}
+	if _, err := os.Stat(coldBlockFilePath(ct.dir, 0)); err != nil {
+		t.Fatalf("expected cold file 0 to exist after rotation: %v", err)
+	}
+
+	offsetBefore := ct.cold.writeCursor.curOffset
+	ct.cold.Close()
+
+	reopened, err := newColdStore(ct.dir, wire.MainNet, blockcompress.FormatV1)
+	if err != nil {
+		t.Fatalf("newColdStore reopen: %v", err)
+	}
+	defer reopened.Close()
+	reopened.maxBlockFileSize = maxSize
+
+	if reopened.writeCursor.curFileNum != lastFileNum {
+		t.Fatalf("resumed file num=%d, want %d",
+			reopened.writeCursor.curFileNum, lastFileNum)
+	}
+	if reopened.writeCursor.curOffset != offsetBefore {
+		t.Fatalf("resumed offset=%d, want %d",
+			reopened.writeCursor.curOffset, offsetBefore)
+	}
+
+	loc, err := reopened.writeColdBlock(fixtures[0])
+	if err != nil {
+		t.Fatalf("write after reopen: %v", err)
+	}
+	gotFile := loc.blockFileNum &^ coldFlag
+	if gotFile < lastFileNum {
+		t.Fatalf("post-reopen write went to file %d, want >= %d",
+			gotFile, lastFileNum)
+	}
+
+	for n := uint32(0); n <= gotFile; n++ {
+		st, err := os.Stat(coldBlockFilePath(ct.dir, n))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("stat cold file %d: %v", n, err)
+		}
+		if st.Size() > int64(maxSize) {
+			t.Fatalf("cold file %d size %d exceeds maxBlockFileSize %d",
+				n, st.Size(), maxSize)
+		}
+	}
+}
+

@@ -49,6 +49,9 @@ import (
 	"hash/crc32"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/btcsuite/btcd/blockcompress"
 	"github.com/btcsuite/btcd/database"
@@ -105,17 +108,61 @@ type coldStore struct {
 	openWriteFileFunc func(fileNum uint32) (filer, uint32, error)
 }
 
+// scanColdBlockFiles searches the cold subdirectory for flat cold block files
+// and returns the first file number, last file number, and length of the last
+// file. The last-file end position is the cold write cursor after restart,
+// matching scanBlockFiles for the hot tier. Missing cold/ is treated as empty.
+func scanColdBlockFiles(basePath string) (int, int, uint32, error) {
+	firstFile, lastFile, lastFileLen := -1, -1, uint32(0)
+
+	files, err := filepath.Glob(filepath.Join(basePath, coldFileSubdir,
+		"*"+blockFileExtension))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	sort.Strings(files)
+	if len(files) == 0 {
+		return firstFile, lastFile, lastFileLen, nil
+	}
+
+	firstFile, err = strconv.Atoi(strings.TrimSuffix(filepath.Base(files[0]),
+		blockFileExtension))
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("scanColdBlockFiles: %w", err)
+	}
+	lastFile, err = strconv.Atoi(strings.TrimSuffix(
+		filepath.Base(files[len(files)-1]), blockFileExtension))
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("scanColdBlockFiles: %w", err)
+	}
+
+	st, err := os.Stat(coldBlockFilePath(basePath, uint32(lastFile)))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	lastFileLen = uint32(st.Size())
+	return firstFile, lastFile, lastFileLen, nil
+}
+
 // newColdStore returns a cold store backed by the given base path's cold
-// subdirectory, using codec version v for compression. It does not scan for
-// existing cold files; the write cursor starts at file 0 offset coldHeaderLen
-// (a fresh cold file with its header) and is advanced as blocks are written.
-// A-3 (age-out compaction) wires up scan/resume of existing cold files.
+// subdirectory, using codec version v for compression. Existing cold files are
+// scanned so the write cursor resumes at the end of the latest file — same
+// pattern as newBlockStore — otherwise a post-restart write would reopen file 0
+// and bypass the size cap.
 func newColdStore(basePath string, network wire.BitcoinNet,
 	v blockcompress.FormatVersion) (*coldStore, error) {
 
 	codec, err := blockcompress.NewCodec(v)
 	if err != nil {
 		return nil, err
+	}
+	_, fileNum, fileOff, err := scanColdBlockFiles(basePath)
+	if err != nil {
+		return nil, err
+	}
+	if fileNum == -1 {
+		fileNum = 0
+		fileOff = 0
 	}
 	cs := &coldStore{
 		basePath:         basePath,
@@ -124,8 +171,8 @@ func newColdStore(basePath string, network wire.BitcoinNet,
 		codec:            codec,
 		writeCursor: &writeCursor{
 			curFile:    &lockableFile{},
-			curFileNum: 0,
-			curOffset:  0, // advanced to coldHeaderLen on first write
+			curFileNum: uint32(fileNum),
+			curOffset:  fileOff,
 		},
 	}
 	cs.openWriteFileFunc = cs.openWriteFile

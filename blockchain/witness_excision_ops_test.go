@@ -183,4 +183,68 @@ func TestStaleSideChainBodyDropped(t *testing.T) {
 	}
 }
 
+// TestReconsiderColdAttachPreservesInvalidStatus verifies that ReconsiderBlock
+// refuses a cold attach path with ErrWitnessExcised WITHOUT clearing
+// statusValidateFailed. Clearing first made a refused reconsider look like a
+// successful status reset in memory.
+func TestReconsiderColdAttachPreservesInvalidStatus(t *testing.T) {
+	chain, params, tearDown := utxoCacheTestChain("TestReconsiderColdAttach")
+	defer tearDown()
+
+	tip := btcutil.NewBlock(params.GenesisBlock)
+	tip.SetHeight(0)
+	_, spendableOuts, err := addBlocks(6, chain, tip, []*testhelper.SpendableOut{})
+	if err != nil {
+		t.Fatalf("addBlocks: %v", err)
+	}
+
+	nextSpends, _ := randomSelect(spendableOuts[len(spendableOuts)-1])
+	nextSpends[0].Amount += testhelper.LowFee
+
+	bestBlock, err := chain.BlockByHash(&chain.BestSnapshot().Hash)
+	if err != nil {
+		t.Fatalf("BlockByHash: %v", err)
+	}
+	invalidBlock, _, err := newBlock(chain, bestBlock, nextSpends)
+	if err != nil {
+		t.Fatalf("newBlock: %v", err)
+	}
+	invalidHash := invalidBlock.Hash()
+
+	if _, _, err := chain.ProcessBlock(invalidBlock, BFNone); err == nil {
+		t.Fatal("expected ProcessBlock of invalid block to fail")
+	}
+
+	node := chain.index.LookupNode(invalidHash)
+	if node == nil || !node.status.KnownInvalid() {
+		t.Fatal("expected invalid block to be KnownInvalid after ProcessBlock")
+	}
+
+	err = chain.db.Update(func(dbTx database.Tx) error {
+		return dbTx.(database.ColdCompactor).CompactBlockToCold(invalidHash)
+	})
+	if err != nil {
+		t.Fatalf("CompactBlockToCold: %v", err)
+	}
+
+	err = chain.ReconsiderBlock(invalidHash)
+	if err == nil {
+		t.Fatal("expected ReconsiderBlock of cold invalid tip to fail")
+	}
+	rerr, ok := err.(RuleError)
+	if !ok {
+		t.Fatalf("expected RuleError, got %T: %v", err, err)
+	}
+	if rerr.ErrorCode != ErrWitnessExcised {
+		t.Fatalf("ErrorCode=%v, want ErrWitnessExcised", rerr.ErrorCode)
+	}
+
+	node = chain.index.LookupNode(invalidHash)
+	if node == nil || !node.status.KnownInvalid() {
+		t.Fatal("KnownInvalid cleared despite cold-attach refusal; " +
+			"status must be preserved until reconsider can proceed")
+	}
+}
+
+
 

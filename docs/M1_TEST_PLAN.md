@@ -28,6 +28,7 @@ and the disk-reduction headline.
 | `TestColdCacheHit` | `database/ffldb/coldblock_test.go` | LRU cache returns cached decompressed block without file I/O |
 | `TestColdCacheRegion` | `database/ffldb/coldblock_test.go` | Region reads populate and hit the cache |
 | `TestColdCacheEviction` | `database/ffldb/coldblock_test.go` | Cache evicts oldest entries when full |
+| `TestColdWriteCursorResumesAfterReopen` | `database/ffldb/coldblock_test.go` | After close/reopen, cold write cursor resumes at latest cold file end; post-restart write does not append to file 0 or exceed `maxBlockFileSize` |
 | `TestTxIndexColdCompactionRewrite` | `blockchain/indexers/txindex_cold_test.go` | txindex offsets are rewritten to stripped-relative on compaction; every tx in a cold block round-trips through `dbFetchTxIndexEntry` → `FetchBlockRegion` with the correct txid |
 | `TestTxIndexColdDirectConnect` | `blockchain/indexers/txindex_cold_test.go` | `StoreBlockCold` + ConnectBlock indexes with stripped offsets; every tx round-trips without a later rewrite |
 | `TestTxIndexColdCompactionWithoutRewrite` | `blockchain/indexers/txindex_cold_test.go` | Proves the bug exists without the rewrite: witness-relative offsets from `ConnectBlock` point past the stripped block boundary, so `FetchBlockRegion` fails for segwit txs |
@@ -44,6 +45,7 @@ and the disk-reduction headline.
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
 | `TestWitnessBufferConfig` | `blockchain/ageout_test.go` | `Config.WitnessBuffer` wires through to `BlockChain.witnessBuffer` |
 | `TestInvalidatePastWitnessBufferRefused` | `blockchain/witness_excision_ops_test.go` | Deep `InvalidateBlock` past the hot window is refused with `ErrWitnessExcised`; shallow invalidate still works |
+| `TestReconsiderColdAttachPreservesInvalidStatus` | `blockchain/witness_excision_ops_test.go` | `ReconsiderBlock` of a cold attach path returns `ErrWitnessExcised` and restores `KnownInvalid` (does not leave cleared invalid flags in memory) |
 | `TestStaleSideChainBodyDropped` | `blockchain/witness_excision_ops_test.go` | Alternate forks past the witness buffer drop bodies (headers retained); recent side tips stay hot |
 | `TestDeleteBlock` | `database/ffldb/deleteblock_test.go` | `DeleteBlock` removes body from index, is idempotent, leaves sibling blocks intact |
 | `TestColdCompactionSurvivesReopen` | `database/ffldb/cold_reopen_test.go` | After compact + close + reopen, block stays cold and FetchBlock matches stripped bytes (post-commit crash recovery) |

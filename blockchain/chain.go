@@ -2211,22 +2211,34 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 		return nil
 	}
 
-	// Clear the status of the block being reconsidered.
-	b.index.UnsetStatusFlags(reconsiderNode, statusInvalidAncestor)
-	b.index.UnsetStatusFlags(reconsiderNode, statusValidateFailed)
-
 	// Grab all the tips.
 	tips := b.index.InactiveTips(b.bestChain)
 	tips = append(tips, b.bestChain.Tip())
 
 	log.Debugf("Examining %v inactive chain tips for reconsideration")
 
-	// Go through all the tips and unset the status for all the descendents of the
-	// block being reconsidered.
+	// Find the tip of the branch being reconsidered and snapshot invalid
+	// flags before clearing them. getReorganizeNodes skips KnownInvalid
+	// nodes, so status must be cleared to build the attach list — but a
+	// subsequent cold-attach refusal must restore KnownInvalid so a refused
+	// reconsider does not look like a successful status reset.
+	type invalidSnap struct {
+		node  *blockNode
+		flags blockStatus
+	}
+	var snaps []invalidSnap
+	saveInvalid := func(n *blockNode) {
+		flags := n.status & (statusInvalidAncestor | statusValidateFailed)
+		if flags != 0 {
+			snaps = append(snaps, invalidSnap{node: n, flags: flags})
+		}
+	}
+
 	var reconsiderTip *blockNode
+	saveInvalid(reconsiderNode)
 	for _, tip := range tips {
 		// Continue if the given inactive tip is not a descendant of the block
-		// being invalidated.
+		// being reconsidered.
 		if !tip.IsAncestor(reconsiderNode) {
 			// Set as the reconsider tip if the block node being reconsidered
 			// is a tip.
@@ -2239,8 +2251,30 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 		// Mark the current tip as the tip being reconsidered.
 		reconsiderTip = tip
 
-		// Unset the status of all the parents up until it reaches the block
+		// Snapshot invalid-ancestor flags on the path down to the block
 		// being reconsidered.
+		for n := tip; n != nil && n != reconsiderNode; n = n.parent {
+			saveInvalid(n)
+		}
+	}
+	if reconsiderTip == nil {
+		return fmt.Errorf("requested block hash of %s has no tip to reconsider",
+			hash)
+	}
+
+	restoreInvalid := func() {
+		for _, s := range snaps {
+			b.index.SetStatusFlags(s.node, s.flags)
+		}
+	}
+
+	// Clear the status of the block being reconsidered and its descendants.
+	b.index.UnsetStatusFlags(reconsiderNode, statusInvalidAncestor)
+	b.index.UnsetStatusFlags(reconsiderNode, statusValidateFailed)
+	for _, tip := range tips {
+		if !tip.IsAncestor(reconsiderNode) {
+			continue
+		}
 		for n := tip; n != nil && n != reconsiderNode; n = n.parent {
 			b.index.UnsetStatusFlags(n, statusInvalidAncestor)
 		}
@@ -2260,8 +2294,9 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 
 	// Cold (witness-stripped) blocks cannot be re-validated: the commitment
 	// check would fail with a misleading ErrInvalidWitnessCommitment. Refuse
-	// with ErrWitnessExcised instead. Natural reorgs still work via KnownValid.
+	// with ErrWitnessExcised and restore the prior invalid status.
 	if err := b.rejectColdAttachNodes(attachNodes); err != nil {
+		restoreInvalid()
 		return err
 	}
 
