@@ -6,6 +6,8 @@ package indexers
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/address/v2"
@@ -288,15 +290,81 @@ func TestAddrIndexColdCompactionRewrite(t *testing.T) {
 
 	// The set of (address -> tx hashes) must be identical before and after.
 	compareAddrTxns(t, expected, got)
+
+	// Completeness: every stored entry for this blockID must use a stripped
+	// TxStart — not merely "some addresses round-trip".
+	assertAllAddrEntriesUseStrippedOffsets(t, db, block)
 }
 
-// TestAddrIndexRewriteWithStrippedRefetchLeavesStaleOffsets is the regression
-// for the production age-out bug: after CompactBlockToCold, FetchBlock returns
+// assertAllAddrEntriesUseStrippedOffsets scans every addrindex level and
+// asserts that every entry for the block's ID has a txStart present in the
+// stripped TxLoc set. Catches silent partial rewrites that leave a subset of
+// witness-relative offsets behind while happy-path address samples still pass.
+func assertAllAddrEntriesUseStrippedOffsets(t *testing.T, db database.DB,
+	block *btcutil.Block) {
+
+	t.Helper()
+	strippedBytes, err := block.BytesNoWitness()
+	if err != nil {
+		t.Fatalf("BytesNoWitness: %v", err)
+	}
+	strippedBlock, err := btcutil.NewBlockFromBytes(strippedBytes)
+	if err != nil {
+		t.Fatalf("NewBlockFromBytes stripped: %v", err)
+	}
+	strippedLocs, err := strippedBlock.TxLoc()
+	if err != nil {
+		t.Fatalf("stripped TxLoc: %v", err)
+	}
+	allowed := make(map[uint32]struct{}, len(strippedLocs))
+	for _, loc := range strippedLocs {
+		allowed[uint32(loc.TxStart)] = struct{}{}
+	}
+
+	var checked int
+	err = db.View(func(tx database.Tx) error {
+		blockID, err := dbFetchBlockIDByHash(tx, block.Hash())
+		if err != nil {
+			return err
+		}
+		bucket := tx.Metadata().Bucket(addrIndexKey)
+		return bucket.ForEach(func(k, v []byte) error {
+			if len(k) != levelKeySize || len(v) == 0 {
+				return nil
+			}
+			for offset := 0; offset+txEntrySize <= len(v); offset += txEntrySize {
+				entryBlockID := byteOrder.Uint32(v[offset : offset+4])
+				if entryBlockID != blockID {
+					continue
+				}
+				txStart := byteOrder.Uint32(v[offset+4 : offset+8])
+				if _, ok := allowed[txStart]; !ok {
+					return fmt.Errorf("block %d entry at key %x offset %d "+
+						"has txStart %d not in stripped TxLoc set "+
+						"(partial/silent rewrite miss)",
+						blockID, k, offset, txStart)
+				}
+				checked++
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		t.Fatalf("assert stripped offsets: %v", err)
+	}
+	if checked == 0 {
+		t.Fatal("no addrindex entries found for block; completeness check vacuous")
+	}
+}
+
+// TestAddrIndexRewriteWithStrippedRefetchFails is the regression for the
+// production age-out bug: after CompactBlockToCold, FetchBlock returns
 // stripped bytes (pending cold). Passing that re-parsed block to
 // RewriteTxOffsetsForColdCompaction makes oldToNew an identity map keyed by
-// stripped offsets, so witness-relative stored entries are not updated.
-// searchrawtransactions then reads stale offsets into the cold block.
-func TestAddrIndexRewriteWithStrippedRefetchLeavesStaleOffsets(t *testing.T) {
+// stripped offsets, so witness-relative stored entries are not found in the
+// map. The rewrite must fail (so connectBlock can cancel pending cold) rather
+// than silently leave stale offsets for searchrawtransactions.
+func TestAddrIndexRewriteWithStrippedRefetchFails(t *testing.T) {
 	fixtures := loadColdFixturesForIndexer(t)
 	var raw []byte
 	for _, f := range fixtures {
@@ -309,87 +377,58 @@ func TestAddrIndexRewriteWithStrippedRefetchLeavesStaleOffsets(t *testing.T) {
 		t.Skip("no witness-containing fixture")
 	}
 
-	params := &chaincfg.MainNetParams
 	db, blocks, idx := setupAddrIndexDB(t, [][]byte{raw})
 	defer db.Close()
 	block := blocks[0]
-	addrs := blockOutputAddresses(t, block, params)
-	if len(addrs) == 0 {
-		t.Skip("no parseable output addresses")
+
+	fullLocs, err := block.TxLoc()
+	if err != nil {
+		t.Fatalf("TxLoc: %v", err)
+	}
+	strippedBytes, err := block.BytesNoWitness()
+	if err != nil {
+		t.Fatalf("BytesNoWitness: %v", err)
+	}
+	if len(strippedBytes) >= len(mustBlockBytes(t, block)) &&
+		len(fullLocs) > 0 {
+		// Need a real witness delta so stripped TxStarts differ from full.
+		t.Skip("fixture has no witness size delta")
 	}
 
 	hash := block.Hash()
-	if err := db.Update(func(tx database.Tx) error {
+	err = db.Update(func(tx database.Tx) error {
 		cc := tx.(database.ColdCompactor)
 		if err := cc.CompactBlockToCold(hash); err != nil {
 			return err
 		}
 		// Simulate the buggy chain.go re-fetch after scheduling compaction.
-		strippedBytes, err := tx.FetchBlock(hash)
+		got, err := tx.FetchBlock(hash)
 		if err != nil {
 			return err
 		}
-		strippedBlock, err := btcutil.NewBlockFromBytes(strippedBytes)
+		strippedBlock, err := btcutil.NewBlockFromBytes(got)
 		if err != nil {
 			return err
 		}
 		return idx.RewriteTxOffsetsForColdCompaction(tx, strippedBlock,
 			dummyStxosForBlock(block))
-	}); err != nil {
-		t.Fatalf("compact+stripped-rewrite: %v", err)
+	})
+	if err == nil {
+		t.Fatal("expected stripped-refetch rewrite to fail on unknown " +
+			"witness-relative offsets")
 	}
+	if !strings.Contains(err.Error(), "not found in rewrite map") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-	atLeastOneFailed := false
-	for key, entry := range addrs {
-		var regionsFailed bool
-		err := db.View(func(dbTx database.Tx) error {
-			regions, _, err := idx.TxRegionsForAddress(dbTx, entry.addr, 0, 1<<20, false)
-			if err != nil {
-				return err
-			}
-			if len(regions) == 0 {
-				regionsFailed = true
-				return nil
-			}
-			serialized, err := dbTx.FetchBlockRegions(regions)
-			if err != nil {
-				regionsFailed = true
-				return nil
-			}
-			wantSet := make(map[chainhash.Hash]struct{}, len(entry.txIdxs))
-			for _, txIdx := range entry.txIdxs {
-				wantSet[*block.Transactions()[txIdx].Hash()] = struct{}{}
-			}
-			if len(serialized) != len(wantSet) {
-				regionsFailed = true
-				return nil
-			}
-			for _, raw := range serialized {
-				var msgTx wire.MsgTx
-				if err := msgTx.Deserialize(bytes.NewReader(raw)); err != nil {
-					regionsFailed = true
-					return nil
-				}
-				h := msgTx.TxHash()
-				if _, ok := wantSet[h]; !ok {
-					regionsFailed = true
-					return nil
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("view %s: %v", key, err)
-		}
-		if regionsFailed {
-			atLeastOneFailed = true
-			t.Logf("addr %s: stale offsets after stripped-refetch rewrite", key)
-		}
+func mustBlockBytes(t *testing.T, block *btcutil.Block) []byte {
+	t.Helper()
+	b, err := block.Bytes()
+	if err != nil {
+		t.Fatalf("block.Bytes: %v", err)
 	}
-	if !atLeastOneFailed {
-		t.Fatal("expected stripped-refetch rewrite to leave stale offsets " +
-			"for at least one address; bug may not be exercisable")
-	}
+	return b
 }
 
 // TestAddrIndexRewriteFullBlockSameTxAsCompact is the corrected production
@@ -430,6 +469,7 @@ func TestAddrIndexRewriteFullBlockSameTxAsCompact(t *testing.T) {
 	}
 	got := collectExpectedAddrTxns(t, db, idx, addrs, block, params, "cold")
 	compareAddrTxns(t, expected, got)
+	assertAllAddrEntriesUseStrippedOffsets(t, db, block)
 }
 
 // TestAddrIndexColdCompactionWithoutRewrite demonstrates the addrindex bug:
@@ -665,3 +705,79 @@ func TestAddrIndexRewriteNilStxosRefused(t *testing.T) {
 		t.Fatal("expected RewriteTxOffsetsForColdCompaction to refuse nil stxos")
 	}
 }
+
+// TestAddrIndexRewriteUnknownOffsetFails verifies that a matched blockID with
+// a stored txStart missing from oldToNew fails the rewrite instead of
+// silently leaving a stale witness-relative offset that would break
+// searchrawtransactions after cold commit.
+func TestAddrIndexRewriteUnknownOffsetFails(t *testing.T) {
+	fixtures := loadColdFixturesForIndexer(t)
+	var raw []byte
+	for _, f := range fixtures {
+		if hasWitnessData(t, f) {
+			raw = f
+			break
+		}
+	}
+	if raw == nil {
+		t.Skip("no witness-containing fixture")
+	}
+
+	params := &chaincfg.MainNetParams
+	db, blocks, idx := setupAddrIndexDB(t, [][]byte{raw})
+	defer db.Close()
+	block := blocks[0]
+	addrs := blockOutputAddresses(t, block, params)
+	if len(addrs) == 0 {
+		t.Skip("no parseable output addresses")
+	}
+
+	var addrKey [addrKeySize]byte
+	for _, entry := range addrs {
+		var err error
+		addrKey, err = addrToKey(entry.addr)
+		if err != nil {
+			t.Fatalf("addrToKey: %v", err)
+		}
+		break
+	}
+
+	err := db.Update(func(tx database.Tx) error {
+		blockID, err := dbFetchBlockIDByHash(tx, block.Hash())
+		if err != nil {
+			return err
+		}
+		bucket := tx.Metadata().Bucket(addrIndexKey)
+		levelKey := keyForLevel(addrKey, 0)
+		levelData := append([]byte(nil), bucket.Get(levelKey[:])...)
+		if len(levelData) < txEntrySize {
+			return fmt.Errorf("no addrindex level-0 data for test address")
+		}
+		corrupted := false
+		for offset := 0; offset+txEntrySize <= len(levelData); offset += txEntrySize {
+			entryBlockID := byteOrder.Uint32(levelData[offset : offset+4])
+			if entryBlockID != blockID {
+				continue
+			}
+			oldStart := byteOrder.Uint32(levelData[offset+4 : offset+8])
+			byteOrder.PutUint32(levelData[offset+4:offset+8], oldStart+1)
+			corrupted = true
+			break
+		}
+		if !corrupted {
+			return fmt.Errorf("no addrindex entry for block %d to corrupt", blockID)
+		}
+		if err := bucket.Put(levelKey[:], levelData); err != nil {
+			return err
+		}
+		return idx.RewriteTxOffsetsForColdCompaction(tx, block,
+			dummyStxosForBlock(block))
+	})
+	if err == nil {
+		t.Fatal("expected rewrite to fail on unknown stored tx offset")
+	}
+	if !strings.Contains(err.Error(), "not found in rewrite map") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+

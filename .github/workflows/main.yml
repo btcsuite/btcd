@@ -35,6 +35,23 @@ jobs:
       - name: Test
         run: make unit
 
+  unit-m1:
+    name: Unit M1 cold / index rewrite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      # Focused M1 job: cold-tier, age-out, addrindex/txindex rewrite completeness,
+      # and FuzzColdCompaction seed-corpus replay (not covered by plain go test ./...).
+      - name: Test M1 regressions
+        run: make unit-m1
+
   unit-race:
     name: Unit race
     runs-on: ubuntu-latest

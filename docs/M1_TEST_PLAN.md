@@ -34,12 +34,13 @@ and the disk-reduction headline.
 | `TestTxIndexColdCompactionWithoutRewrite` | `blockchain/indexers/txindex_cold_test.go` | Proves the bug exists without the rewrite: witness-relative offsets from `ConnectBlock` point past the stripped block boundary, so `FetchBlockRegion` fails for segwit txs |
 | `FuzzColdCompactionOffsets` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the offset-rewrite core: for any deserializable block, the stripped serialization's TxLocs point at byte ranges that deserialize to txs with the correct txid (pure-data, ~40k execs/s) |
 | `FuzzColdCompactionTxIndex` | `blockchain/indexers/coldcompaction_fuzz_test.go` | Coverage-guided fuzz of the integrated path: compact → rewrite → txindex → `FetchBlockRegion` → txid match, including the idempotent reorg model (compact-already-cold + double rewrite) |
-| `TestAddrIndexColdCompactionRewrite` | `blockchain/indexers/addrindex_cold_test.go` | addrindex offsets are rewritten to stripped-relative on compaction; every address's tx regions round-trip through `TxRegionsForAddress` → `FetchBlockRegions` with correct txids (the `searchrawtransactions` RPC path) |
-| `TestAddrIndexRewriteWithStrippedRefetchLeavesStaleOffsets` | `blockchain/indexers/addrindex_cold_test.go` | Regression: rewrite after pending-cold FetchBlock (stripped) leaves witness-relative offsets stale |
+| `TestAddrIndexColdCompactionRewrite` | `blockchain/indexers/addrindex_cold_test.go` | addrindex offsets rewritten to stripped-relative; every address round-trips; **all** stored entries for the blockID use stripped TxStarts (completeness, not sampled) |
+| `TestAddrIndexRewriteWithStrippedRefetchFails` | `blockchain/indexers/addrindex_cold_test.go` | Regression: rewrite after pending-cold FetchBlock (stripped) fails on unknown witness-relative offsets instead of silently leaving stale entries |
 | `TestAddrIndexRewriteFullBlockSameTxAsCompact` | `blockchain/indexers/addrindex_cold_test.go` | Correct age-out path: CompactBlockToCold then rewrite with the original full block in the same tx |
 | `TestAgeOutProcessBlockPassesFullBlockToAddrindexRewrite` | `blockchain/indexers/ageout_addrindex_e2e_test.go` | End-to-end: ProcessBlock + txindex/addrindex + segwit past `--witness-buffer`; rewrite sees full hot block (not stripped re-fetch); `TxRegionsForAddress` → `FetchBlockRegions` round-trips post-compaction |
 | `TestAddrIndexColdCompactionWithoutRewrite` | `blockchain/indexers/addrindex_cold_test.go` | Proves the addrindex bug exists without the rewrite: witness-relative offsets point past the stripped block, so `FetchBlockRegions` returns wrong bytes / EOF for addresses in segwit blocks |
 | `TestAddrIndexRewriteNilStxosRefused` | `blockchain/indexers/addrindex_cold_test.go` | Nil spend journal: rewrite refuses to leave stale input-address offsets; chain skips compaction when journal is missing |
+| `TestAddrIndexRewriteUnknownOffsetFails` | `blockchain/indexers/addrindex_cold_test.go` | Matched blockID with stored txStart missing from oldToNew fails the rewrite (no silent stale offsets after cold commit) |
 | `TestWitnessBufferAgeOut` | `blockchain/ageout_test.go` | Blockchain-layer age-out driver: blocks beyond buffer are compacted, cold files created on disk, all blocks remain readable |
 | `TestColdDirectStoreWhenHeadersAhead` | `blockchain/cold_direct_test.go` | Headers-first IBD: bodies past buffer are `IsColdBlock` immediately (StoreBlockCold), tip window stays hot |
 | `TestWitnessBufferDisabled` | `blockchain/ageout_test.go` | With `witnessBuffer=0`, no compaction occurs, no cold directory created |
@@ -49,8 +50,8 @@ and the disk-reduction headline.
 | `TestStaleSideChainBodyDropped` | `blockchain/witness_excision_ops_test.go` | Alternate forks past the witness buffer drop bodies (headers retained); recent side tips stay hot |
 | `TestDeleteBlock` | `database/ffldb/deleteblock_test.go` | `DeleteBlock` removes body from index, is idempotent, leaves sibling blocks intact |
 | `TestColdCompactionSurvivesReopen` | `database/ffldb/cold_reopen_test.go` | After compact + close + reopen, block stays cold and FetchBlock matches stripped bytes (post-commit crash recovery) |
-| `TestCreateTxRawResultWitnessExcised` | `witness_excised_rpc_test.go` | Verbose tx JSON sets `witness_excised` for cold loads and does not invent a historical wtxid |
-| `TestFullBlocks` | `blockchain/fullblocktests` | Consensus suite passes with two-tier storage enabled (22s, race-clean) |
+| `TestCreateTxRawResultWitnessExcised` | `witness_excised_rpc_test.go` | Verbose tx JSON sets `witness_excised` for cold loads and does not invent a historical wtxid; `getblock` verbosity 0 refuses cold hex (no flag carrier) |
+| `TestFullBlocks` | `blockchain/fullblocks_test.go` | Consensus suite passes with two-tier storage enabled (`WitnessBuffer=8` so age-out runs during acceptance) |
 | `TestRoundTrip` | `blockcompress/codec_test.go` | `decompress(compress(x)) == x` for representative inputs |
 | `TestDeterminismAcrossInstances` | `blockcompress/codec_test.go` | Two codecs on same version produce identical compressed output |
 | `TestDeterminismAcrossRuns` | `blockcompress/codec_test.go` | Repeated compression with same codec is identical |
@@ -84,6 +85,15 @@ revisit this.
 ## Running the Tests
 
 ```bash
+# Full unit suite (what GitHub Actions `unit` / `unit-race` run)
+make unit
+make unit-race
+
+# M1-focused regressions (GitHub Actions `unit-m1` job): cold-tier, age-out,
+# addrindex/txindex rewrite + completeness, and FuzzColdCompaction seed replay.
+# Plain `go test ./...` does NOT execute FuzzXxx seed corpora — this target does.
+make unit-m1
+
 # Database-level tests (whitebox, ~23s with -race)
 go test -race -timeout 120s ./database/ffldb/
 
@@ -102,11 +112,11 @@ go run blockcompress/dicttrain/measure.go -datadir /path/to/blocks_ffldb
 # Cold-compaction fuzz targets (seed-corpus regression run, ~3s)
 go test -race -timeout 120s -run='FuzzColdCompaction' ./blockchain/indexers/
 
-# Cold-compaction fuzz exploration (run in CI or locally for a fixed budget):
+# Cold-compaction fuzz exploration (optional local / longer CI budget):
 go test -run='^$' -fuzz=FuzzColdCompactionOffsets -fuzztime=30s ./blockchain/indexers/
 go test -run='^$' -fuzz=FuzzColdCompactionTxIndex -fuzztime=30s ./blockchain/indexers/
-# Failing inputs are persisted to blockchain/indexers/testdata/fuzz/ and
-# replayed automatically on subsequent normal test runs as regression cases.
+# Failing inputs are persisted under blockchain/indexers/testdata/fuzz/ and
+# replayed by `make unit-m1` / `-run=FuzzColdCompaction` (not by plain ./...).
 ```
 
 ## Tests we ran
@@ -140,8 +150,9 @@ soak matrix; M3 Bitcoin-Praxis Wallet / GUI acceptance tests (see ROADMAP).
    `HasWitness() == true`. This means `pushBlockMsg` in `server.go` serves cold
    blocks correctly as legacy (non-witness) blocks to peers.
 
-4. **Consensus is not affected**: `TestFullBlocks` passes, meaning all consensus
-   checks operate on the decompressed block and produce correct results.
+4. **Consensus is not affected**: `TestFullBlocks` passes with `WitnessBuffer`
+   enabled (two-tier age-out during acceptance), meaning all consensus checks
+   operate correctly whether blocks are hot or cold.
 
 5. **Disk savings are real**: The cold file on disk is smaller than the hot file.
    On real mainnet data, the blended reduction is 52.5% (1005 GB → 477 GB).
@@ -191,9 +202,21 @@ soak matrix; M3 Bitcoin-Praxis Wallet / GUI acceptance tests (see ROADMAP).
     after compaction + rewrite, every output address's tx regions resolve to
     the same tx hashes as before compaction. Without the rewrite the negative
     test shows `FetchBlockRegions` returning wrong bytes / EOF. This is the
-    btcwallet address-history rescan path.
+    btcwallet address-history rescan path. Happy-path tests also assert
+    **every** stored entry for the compacted blockID uses a stripped TxStart
+    (`assertAllAddrEntriesUseStrippedOffsets`) — not merely that sampled
+    addresses round-trip.
 
 13. **Missing spend journal disables unsafe compaction**: when the spend journal
     for an aging-out block is unavailable, age-out skips compaction (block stays
     hot) rather than leaving stale addrindex input offsets.
     `TestAddrIndexRewriteNilStxosRefused` guards the direct-call refuse path.
+
+14. **Index rewrite is fail-closed**: if an addrindex entry matches the block
+    ID but its stored `txStart` is not in the old→new map, rewrite returns an
+    error (`TestAddrIndexRewriteUnknownOffsetFails`,
+    `TestAddrIndexRewriteWithStrippedRefetchFails`). Age-out then cancels the
+    pending cold write and leaves the block hot. Do **not** treat “rewrite
+    succeeds but reads are stale” as an acceptable negative test — that encodes
+    the silent-`continue` bug. Negative cases must assert the rewrite **fails**
+    (or cold is cancelled), never that corruption is merely observable later.

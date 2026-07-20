@@ -805,10 +805,12 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 }
 
 // dbBlockIsCold reports whether hash is stored in the cold (witness-stripped)
-// tier. Backends without cold support return false.
-func dbBlockIsCold(db database.DB, hash *chainhash.Hash) bool {
+// tier. Backends without ColdCompactor return false, nil. Database errors are
+// returned to the caller — do not treat them as "not cold" (that would omit
+// witness_excised and can mis-serve stripped data).
+func dbBlockIsCold(db database.DB, hash *chainhash.Hash) (bool, error) {
 	var cold bool
-	_ = db.View(func(dbTx database.Tx) error {
+	err := db.View(func(dbTx database.Tx) error {
 		cc, ok := dbTx.(database.ColdCompactor)
 		if !ok {
 			return nil
@@ -817,7 +819,7 @@ func dbBlockIsCold(db database.DB, hash *chainhash.Hash) bool {
 		cold, err = cc.IsColdBlock(hash)
 		return err
 	})
-	return cold
+	return cold, err
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
@@ -1135,7 +1137,24 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 		}
 	}
 	// If verbosity is 0, return the serialized block as a hex encoded string.
+	// Cold (witness-stripped) blocks cannot safely use this path: callers would
+	// receive stripped hex with no witness_excised signal. Refuse and point
+	// them at verbosity >= 1 (JSON includes the flag) or --witness-buffer=0.
 	if c.Verbosity != nil && *c.Verbosity == 0 {
+		cold, err := dbBlockIsCold(s.cfg.DB, hash)
+		if err != nil {
+			context := "Failed to check cold-tier status"
+			return nil, internalRPCError(err.Error(), context)
+		}
+		if cold {
+			return nil, &btcjson.RPCError{
+				Code: btcjson.ErrRPCMisc,
+				Message: "Block witness data has been excised by cold-tier " +
+					"compaction; use verbosity >= 1 (includes " +
+					"witness_excised) or run with --witness-buffer=0 " +
+					"for archival hex",
+			}
+		}
 		return hex.EncodeToString(blkBytes), nil
 	}
 
@@ -1170,7 +1189,11 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
-	witnessExcised := dbBlockIsCold(s.cfg.DB, hash)
+	witnessExcised, err := dbBlockIsCold(s.cfg.DB, hash)
+	if err != nil {
+		context := "Failed to check cold-tier status"
+		return nil, internalRPCError(err.Error(), context)
+	}
 	blockReply := btcjson.GetBlockVerboseResult{
 		Hash:          c.Hash,
 		Version:       blockHeader.Version,
@@ -2775,9 +2798,17 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		chainHeight = s.cfg.Chain.BestSnapshot().Height
 	}
 
+	var witnessExcised bool
+	if blkHash != nil {
+		var err error
+		witnessExcised, err = dbBlockIsCold(s.cfg.DB, blkHash)
+		if err != nil {
+			context := "Failed to check cold-tier status"
+			return nil, internalRPCError(err.Error(), context)
+		}
+	}
 	rawTxn, err := createTxRawResult(s.cfg.ChainParams, mtx, txHash.String(),
-		blkHeader, blkHashStr, blkHeight, chainHeight,
-		blkHash != nil && dbBlockIsCold(s.cfg.DB, blkHash))
+		blkHeader, blkHashStr, blkHeight, chainHeight, witnessExcised)
 	if err != nil {
 		return nil, err
 	}
@@ -3462,7 +3493,10 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 			blkHashStr = blkHash.String()
 			blkHeight = height
 
-			if dbBlockIsCold(s.cfg.DB, blkHash) {
+			if cold, err := dbBlockIsCold(s.cfg.DB, blkHash); err != nil {
+				context := "Failed to check cold-tier status"
+				return nil, internalRPCError(err.Error(), context)
+			} else if cold {
 				result.WitnessExcised = true
 				result.Hash = result.Txid
 			}

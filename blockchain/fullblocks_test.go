@@ -113,13 +113,15 @@ func chainSetup(dbName string, params *chaincfg.Params) (*blockchain.BlockChain,
 	// the chain parameters do not affect the global instance.
 	paramsCopy := *params
 
-	// Create the main chain instance.
+	// Create the main chain instance with a small witness buffer so age-out
+	// compaction exercises the cold tier during acceptance (ROADMAP M1).
 	chain, err := blockchain.New(&blockchain.Config{
-		DB:          db,
-		ChainParams: &paramsCopy,
-		Checkpoints: nil,
-		TimeSource:  blockchain.NewMedianTime(),
-		SigCache:    txscript.NewSigCache(1000),
+		DB:            db,
+		ChainParams:   &paramsCopy,
+		Checkpoints:   nil,
+		TimeSource:    blockchain.NewMedianTime(),
+		SigCache:      txscript.NewSigCache(1000),
+		WitnessBuffer: 8,
 	})
 	if err != nil {
 		teardown()
@@ -138,6 +140,7 @@ func TestFullBlocks(t *testing.T) {
 	}
 
 	// Create a new database and chain instance to run tests against.
+	// chainSetup enables WitnessBuffer so two-tier storage is exercised.
 	chain, teardownFunc, err := chainSetup("fullblocktest",
 		&chaincfg.RegressionNetParams)
 	if err != nil {

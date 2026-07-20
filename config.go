@@ -74,8 +74,9 @@ const (
 	// defaultWitnessBuffer is the default number of recent blocks kept in the
 	// hot tier (full, with witness, uncompressed) before age-out compaction
 	// moves them to the cold tier (witness-stripped, zstd-compressed). 2016
-	// blocks is roughly two weeks and covers any realistic reorg depth plus
-	// Lightning channel CSV windows. See docs/ROADMAP.md, M1.
+	// blocks is roughly two weeks and covers common reorg assumptions and
+	// typical LN delays; use a larger buffer or --witness-buffer=0 if you
+	// require longer witness retention. See docs/ROADMAP.md, M1.
 	defaultWitnessBuffer          = 2016
 )
 

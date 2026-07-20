@@ -62,7 +62,7 @@ flowchart TD
 | # | Milestone | Headline Claim |
 |---|---|---|
 | M1 | Witness-Separated Storage | **52.5% smaller** (measured on 1005 GB mainnet chain → ~477 GB), Lightning-compatible |
-| M2 | Parallel Validation Pipeline | 2–3× faster IBD via cross-platform parallel script validation |
+| M2 | Parallel Validation Pipeline | 2–3× faster IBD (target) via cross-platform parallel script validation |
 | M3 | Bundled Wallet + Native GUI | Full Core-QT replacement for non-mining users |
 | M4 | Cross-Platform Async I/O | io_uring on Linux; macOS/Windows I/O backends |
 | M5 | DATUM / Stratum-v2 Mining | First major node with decentralized pool job negotiation |
@@ -89,8 +89,8 @@ already has the split primitive (`SerializeNoWitness` /
 Witness is required for initial validation and for serving full blocks to
 modern peers, but **not** for the UTXO set, new-block validation, Lightning
 historical monitoring, or Neutrino serving. The high-entropy witness bytes
-that don't compress are simply discarded once a block is old enough that no
-realistic reorg or protocol needs them. The structural non-witness bytes that
+that don't compress are simply discarded once a block is old enough that common
+reorgs or typical protocols no longer need them. The structural non-witness bytes that
 *do* compress (~30%) are what gets kept, compressed, forever.
 
 **Headline claim (measured on real mainnet chain):** **52.5% blended disk reduction**
@@ -146,7 +146,7 @@ The storage is split into two tiers by age:
   write cold → reclaim hot space. The cold tier holds the vast majority of the
   chain. Alternate forks (side chains) that never become tip are not compacted:
   once they fall past the witness buffer their **block bodies are dropped**
-  (headers retained in the block index) — they are dead for realistic reorgs,
+  (headers retained in the block index) — they are dead for common reorgs,
   and deep cold attach is already refused.
 
 Because recent blocks are stored whole and old blocks have no witness at all,
@@ -351,7 +351,7 @@ This milestone requires no OS-specific code — parallel script validation runs 
 Linux, macOS, and Windows unchanged — so the IBD speedup lands on every platform
 on day one, while the OS-specific async I/O work follows in M4.
 
-**Headline claim:** 2–3× faster initial block download via parallel script
+**Headline claim:** 2–3× faster initial block download (target) via parallel script
 validation with ordered block connection; cross-platform, no OS-specific
 dependencies.
 

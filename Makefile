@@ -134,6 +134,18 @@ unit-race:
 	cd psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd wire && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 
+#? unit-m1: Run M1 witness-buffer / cold-tier / index-rewrite regressions (incl. fuzz seed corpus)
+# FuzzXxx seed corpora are NOT executed by plain `go test ./...`; they need -run=Fuzz.
+unit-m1:
+	@$(call print, "Running M1 cold-tier and index-rewrite regressions.")
+	$(GOTEST) -race -timeout=10m \
+		./database/ffldb/ \
+		./blockcompress/ \
+		./blockchain/ \
+		./blockchain/indexers/
+	@$(call print, "Replaying cold-compaction fuzz seed corpora.")
+	$(GOTEST) -race -timeout=5m -run='FuzzColdCompaction' ./blockchain/indexers/
+
 # =========
 # UTILITIES
 # =========

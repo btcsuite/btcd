@@ -149,6 +149,7 @@ func TestAgeOutProcessBlockPassesFullBlockToAddrindexRewrite(t *testing.T) {
 	}
 
 	assertAddrIndexRoundTrip(t, db, spy.AddrIndex, &params, []*btcutil.Block{b1, b2})
+	assertAllAddrEntriesUseStrippedOffsets(t, db, b2)
 }
 
 func assertAddrIndexRoundTrip(t *testing.T, db database.DB, idx *AddrIndex,

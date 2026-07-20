@@ -725,7 +725,16 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 							"compact without safe addrindex rewrite",
 							ageOutNode.hash, ageOutHeight, stxoErr)
 					} else {
-						err := cc.CompactBlockToCold(&ageOutNode.hash)
+						// Snapshot tier before CompactBlockToCold: after a
+						// successful schedule IsColdBlock is also true
+						// (pending counts as cold), so we must know whether
+						// cancel can actually leave the block hot.
+						alreadyCold, err := cc.IsColdBlock(&ageOutNode.hash)
+						if err != nil {
+							return fmt.Errorf("age-out: IsColdBlock %s: %v",
+								ageOutNode.hash, err)
+						}
+						err = cc.CompactBlockToCold(&ageOutNode.hash)
 						if err != nil {
 							log.Debugf("Age-out compaction of "+
 								"block %s (height %d) failed: %v",
@@ -759,21 +768,31 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 							if cm, ok := b.indexManager.(ColdCompactionIndexManager); ok {
 								if err := cm.RewriteTxOffsetsForColdCompaction(
 									dbTx, ageOutBlock, ageOutStxos); err != nil {
-									// Drop the pending cold write so commit
-									// leaves the block hot with intact
-									// witness-relative indexes. Do not fail
-									// tip connect over optional index health.
-									if cerr := cc.CancelPendingColdCompaction(
-										&ageOutNode.hash); cerr != nil {
-										return fmt.Errorf("cold compaction "+
-											"index rewrite for block %s: %v "+
-											"(also cancel pending: %v)",
-											ageOutNode.hash, err, cerr)
+									if alreadyCold {
+										// Nothing pending to cancel; block
+										// remains cold. Do not claim "left hot".
+										log.Warnf("Age-out index rewrite for "+
+											"already-cold block %s (height %d) "+
+											"failed (%v); block remains cold "+
+											"(cancel pending is a no-op)",
+											ageOutNode.hash, ageOutHeight, err)
+									} else {
+										// Drop the pending cold write so commit
+										// leaves the block hot with intact
+										// witness-relative indexes. Do not fail
+										// tip connect over optional index health.
+										if cerr := cc.CancelPendingColdCompaction(
+											&ageOutNode.hash); cerr != nil {
+											return fmt.Errorf("cold compaction "+
+												"index rewrite for block %s: %v "+
+												"(also cancel pending: %v)",
+												ageOutNode.hash, err, cerr)
+										}
+										log.Warnf("Skipping age-out of block %s "+
+											"(height %d): index rewrite failed "+
+											"(%v); left hot",
+											ageOutNode.hash, ageOutHeight, err)
 									}
-									log.Warnf("Skipping age-out of block %s "+
-										"(height %d): index rewrite failed "+
-										"(%v); left hot",
-										ageOutNode.hash, ageOutHeight, err)
 								}
 							}
 						}
@@ -2490,8 +2509,9 @@ type Config struct {
 	// moves them to the cold tier (witness-stripped, zstd-compressed).
 	// A value of 0 disables cold-tier compaction entirely (full archival
 	// node, same as upstream btcd). The default is 2016 (roughly two weeks
-	// of blocks), which covers any realistic reorg depth and Lightning
-	// channel CSV windows. See docs/ROADMAP.md, M1.
+	// of blocks), which covers common reorg assumptions and typical LN
+	// delays; use a larger buffer or --witness-buffer=0 if you require
+	// longer witness retention. See docs/ROADMAP.md, M1.
 	WitnessBuffer int32
 }
 

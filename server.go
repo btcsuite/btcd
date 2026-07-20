@@ -878,10 +878,12 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 // witness inventory for a cold-tier block. OnGetData turns it into notfound.
 var errWitnessExcisedInv = errors.New("witness data excised for inventory")
 
-// blockWitnessExcised reports whether the block is in the cold tier.
+// blockWitnessExcised reports whether the block is in the cold tier. On
+// database error it returns true so callers fail closed (notfound) instead of
+// serving stripped bytes on a witness encoding path.
 func (s *server) blockWitnessExcised(hash *chainhash.Hash) bool {
 	var cold bool
-	_ = s.db.View(func(dbTx database.Tx) error {
+	err := s.db.View(func(dbTx database.Tx) error {
 		cc, ok := dbTx.(database.ColdCompactor)
 		if !ok {
 			return nil
@@ -890,6 +892,11 @@ func (s *server) blockWitnessExcised(hash *chainhash.Hash) bool {
 		cold, err = cc.IsColdBlock(hash)
 		return err
 	})
+	if err != nil {
+		srvrLog.Errorf("IsColdBlock %s failed: %v; treating as excised",
+			hash, err)
+		return true
+	}
 	return cold
 }
 

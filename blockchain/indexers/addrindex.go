@@ -558,7 +558,7 @@ func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte,
 // ordering are unchanged, so the level invariants (each level is empty, half
 // full, or completely full) still hold.
 func dbUpdateAddrIndexOffsetsForBlock(bucket internalBucket, addrKey [addrKeySize]byte,
-	blockID uint32, oldToNew map[uint32]wire.TxLoc) error {
+	blockID uint32, blockHash *chainhash.Hash, oldToNew map[uint32]wire.TxLoc) error {
 
 	for level := uint8(0); ; level++ {
 		levelKey := keyForLevel(addrKey, level)
@@ -581,13 +581,15 @@ func dbUpdateAddrIndexOffsetsForBlock(bucket internalBucket, addrKey [addrKeySiz
 			oldTxStart := byteOrder.Uint32(levelData[offset+4 : offset+8])
 			newLoc, ok := oldToNew[oldTxStart]
 			if !ok {
-				// blockID matched but the old txStart is not in the
-				// map. This should not happen for a main-chain block
-				// whose entries were written by ConnectBlock; if it
-				// does, leave the entry alone rather than corrupting
-				// it, so the caller can detect the mismatch via a
-				// follow-up read.
-				continue
+				// Matched this block but the stored offset is not in the
+				// rewrite map. Failing here lets connectBlock cancel the
+				// pending cold write and leave the block hot with intact
+				// witness-relative indexes. Silently continuing would
+				// commit cold with stale offsets for searchrawtransactions.
+				return fmt.Errorf("addrindex cold rewrite: block %d (%s) "+
+					"addr entry has tx offset %d not found in rewrite map "+
+					"(level %d, entry offset %d)",
+					blockID, blockHash, oldTxStart, level, offset)
 			}
 			// Copy the level data before mutating if this is the first
 			// modification in this level: bucket.Get may return a
@@ -985,7 +987,7 @@ func (idx *AddrIndex) RewriteTxOffsetsForColdCompaction(dbTx database.Tx,
 	bucket := dbTx.Metadata().Bucket(addrIndexKey)
 	for addrKey := range addrsToTxns {
 		if err := dbUpdateAddrIndexOffsetsForBlock(bucket, addrKey, blockID,
-			oldToNew); err != nil {
+			block.Hash(), oldToNew); err != nil {
 			return err
 		}
 	}

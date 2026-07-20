@@ -63,7 +63,9 @@ func TestCreateTxRawResultWitnessExcised(t *testing.T) {
 		t.Fatalf("CompactBlockToCold: %v", err)
 	}
 
-	if !dbBlockIsCold(db, hash) {
+	if cold, err := dbBlockIsCold(db, hash); err != nil {
+		t.Fatalf("dbBlockIsCold: %v", err)
+	} else if !cold {
 		t.Fatal("expected block to be cold after compaction")
 	}
 
