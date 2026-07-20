@@ -24,23 +24,22 @@ func TestPayToAnchorSimple(t *testing.T) {
 		t.Skip("Skipping P2A integration test in short mode")
 	}
 
-	// Create a btcd instance for testing P2A functionality in a controlled
-	// environment. The simnet harness accepts non-standard transactions by
-	// default, but the sub-dust and non-empty-witness cases below rely on
-	// standardness checks running, so we start the node with
-	// --rejectnonstd.
-	btcdCfg := []string{"--rejectnonstd"}
-	harness, err := rpctest.New(
-		&chaincfg.SimNetParams, nil, btcdCfg, "",
-	)
+	h, err := rpctest.New()
 	if err != nil {
 		t.Fatalf("unable to create test harness: %v", err)
 	}
-	defer harness.TearDown()
+	defer h.TearDown()
 
-	// Initialize the test harness with mining enabled to confirm
+	// Start a btcd instance for testing P2A functionality in a controlled
+	// environment. The simnet harness accepts non-standard transactions by
+	// default, but the sub-dust and non-empty-witness cases below rely on
+	// standardness checks running, so we start the node with
+	// --rejectnonstd. The test harness has mining enabled to confirm
 	// transactions.
-	err = harness.SetUp(true, 25)
+	err = h.SetUp(rpctest.SOpts{
+		Args:      []string{"--rejectnonstd"},
+		UTXOCount: 25,
+	})
 	if err != nil {
 		t.Fatalf("unable to setup test harness: %v", err)
 	}
@@ -59,7 +58,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 	// Use the harness to create a transaction that sends to the P2A
 	// address. This handles all the UTXO selection and signing for us.
 	amount := btcutil.Amount(10_000)
-	createP2ATxHash, err := harness.SendOutputs([]*wire.TxOut{
+	createP2ATxHash, err := h.SendOutputs([]*wire.TxOut{
 		wire.NewTxOut(int64(amount), p2aPkScript),
 	}, 10)
 	if err != nil {
@@ -67,7 +66,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 	}
 
 	// Mine a block to confirm the P2A creation.
-	blockHashes, err := harness.Client.Generate(1)
+	blockHashes, err := h.Client.Generate(1)
 	if err != nil {
 		t.Fatalf("unable to generate block: %v", err)
 	}
@@ -88,7 +87,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 	spendP2ATx.AddTxIn(p2aInput)
 
 	// Send the P2A funds to a regular address.
-	spendAddr, err := harness.NewAddress()
+	spendAddr, err := h.NewAddress()
 	if err != nil {
 		t.Fatalf("unable to get spend address: %v", err)
 	}
@@ -104,13 +103,13 @@ func TestPayToAnchorSimple(t *testing.T) {
 	// Broadcast the spend transaction to verify network acceptance. P2A
 	// outputs are witness programs and are validated through the normal
 	// transaction validation path in the mempool and consensus.
-	spendTxHash, err := harness.Client.SendRawTransaction(spendP2ATx, true)
+	spendTxHash, err := h.Client.SendRawTransaction(spendP2ATx, true)
 	if err != nil {
 		t.Fatalf("unable to send P2A spend transaction: %v", err)
 	}
 
 	// Mine a block to confirm the spend.
-	blockHashes, err = harness.Client.Generate(1)
+	blockHashes, err = h.Client.Generate(1)
 	if err != nil {
 		t.Fatalf("unable to generate block after spend: %v", err)
 	}
@@ -118,7 +117,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 	// Ensure the spend transaction was actually mined to prove full P2A
 	// support.
 	//
-	block, err := harness.Client.GetBlock(blockHashes[0])
+	block, err := h.Client.GetBlock(blockHashes[0])
 	if err != nil {
 		t.Fatalf("unable to get block: %v", err)
 	}
@@ -144,13 +143,13 @@ func TestPayToAnchorSimple(t *testing.T) {
 	// sub-dust P2A funding transaction is rejected as non-standard.
 	t.Run("non-empty witness rejected", func(t *testing.T) {
 		// Fund a fresh P2A output we can attempt to spend.
-		fundTxHash, err := harness.SendOutputs([]*wire.TxOut{
+		fundTxHash, err := h.SendOutputs([]*wire.TxOut{
 			wire.NewTxOut(int64(amount), p2aPkScript),
 		}, 10)
 		if err != nil {
 			t.Fatalf("unable to fund second P2A output: %v", err)
 		}
-		if _, err := harness.Client.Generate(1); err != nil {
+		if _, err := h.Client.Generate(1); err != nil {
 			t.Fatalf("unable to mine block: %v", err)
 		}
 
@@ -164,7 +163,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 		badTx.AddTxIn(input)
 		badTx.AddTxOut(wire.NewTxOut(int64(amount-100), spendScript))
 
-		if _, err := harness.Client.SendRawTransaction(
+		if _, err := h.Client.SendRawTransaction(
 			badTx, true,
 		); err == nil {
 
@@ -180,7 +179,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 		// Build a transaction paying sub-dust to P2A from a new
 		// harness-funded input. CreateTransaction performs the
 		// signing for us; the dust gate fires when we try to relay it.
-		dustTx, err := harness.CreateTransaction(
+		dustTx, err := h.CreateTransaction(
 			[]*wire.TxOut{wire.NewTxOut(subDust, p2aPkScript)},
 			10, true,
 		)
@@ -188,7 +187,7 @@ func TestPayToAnchorSimple(t *testing.T) {
 			t.Fatalf("unable to build sub-dust funding tx: %v", err)
 		}
 
-		if _, err := harness.Client.SendRawTransaction(
+		if _, err := h.Client.SendRawTransaction(
 			dustTx, true,
 		); err == nil {
 
@@ -197,4 +196,3 @@ func TestPayToAnchorSimple(t *testing.T) {
 		}
 	})
 }
-

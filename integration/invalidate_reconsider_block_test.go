@@ -9,12 +9,12 @@ import (
 
 func TestInvalidateAndReconsiderBlock(t *testing.T) {
 	// Set up regtest chain.
-	r, err := rpctest.New(&chaincfg.RegressionNetParams, nil, nil, "")
+	r, err := rpctest.New(rpctest.Opts{Net: &chaincfg.RegressionNetParams})
 	if err != nil {
 		t.Fatalf("TestInvalidateAndReconsiderBlock fail."+
 			"Unable to create primary harness: %v", err)
 	}
-	if err := r.SetUp(true, 0); err != nil {
+	if err := r.SetUp(); err != nil {
 		t.Fatalf("TestInvalidateAndReconsiderBlock fail. "+
 			"Unable to setup test chain: %v", err)
 	}
@@ -57,6 +57,9 @@ func TestInvalidateAndReconsiderBlock(t *testing.T) {
 
 	// Assert that block 1 is the active chaintip.
 	bestHash, err := r.Client.GetBestBlockHash()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if *bestHash != *block1Hash {
 		t.Fatalf("TestInvalidateAndReconsiderBlock fail. Expected the "+
 			"best block hash to be block 1 with hash %s but got %s",

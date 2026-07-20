@@ -11,14 +11,15 @@ package rpctest
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 )
 
 func testSendOutputs(r *Harness, t *testing.T) {
@@ -106,11 +107,11 @@ func assertConnectedTo(t *testing.T, nodeA *Harness, nodeB *Harness) {
 
 func testConnectNode(r *Harness, t *testing.T) {
 	// Create a fresh test harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(false, 0); err != nil {
+	if err := harness.SetUp(); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -154,7 +155,7 @@ func testActiveHarnesses(r *Harness, t *testing.T) {
 	numInitialHarnesses := len(ActiveHarnesses())
 
 	// Create a single test harness.
-	harness1, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness1, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,11 +183,11 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	// Create a local test harness with only the genesis block.  The nodes
 	// will be synced below so the same transaction can be sent to both
 	// nodes without it being an orphan.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(false, 0); err != nil {
+	if err := harness.SetUp(); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -282,11 +283,11 @@ func testJoinMempools(r *Harness, t *testing.T) {
 func testJoinBlocks(r *Harness, t *testing.T) {
 	// Create a second harness with only the genesis block so it is behind
 	// the main harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(false, 0); err != nil {
+	if err := harness.SetUp(); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -470,11 +471,11 @@ func testGenerateAndSubmitBlockWithCustomCoinbaseOutputs(r *Harness,
 func testMemWalletReorg(r *Harness, t *testing.T) {
 	// Create a fresh harness, we'll be using the main harness to force a
 	// re-org on this local harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(true, 5); err != nil {
+	if err := harness.SetUp(SOpts{UTXOCount: 5}); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -547,6 +548,77 @@ func testMemWalletLockedOutputs(r *Harness, t *testing.T) {
 	}
 }
 
+func testSkipCleanup(_ *Harness, t *testing.T) {
+	h, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.SetUp(SOpts{UTXOCount: 1}); err != nil {
+		t.Fatal(err)
+	}
+	defer h.TearDown()
+	count, err := h.Client.GetBlockCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 101 {
+		t.Fatalf("unexpected blockcount %d", count)
+	}
+
+	// Verify that the state is kept between restarts.
+	for range 3 {
+		if err := h.TearDown(TOpts{NoNodeCleanup: true}); err != nil {
+
+			t.Fatal(err)
+		}
+		if err := h.SetUp(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count, err = h.Client.GetBlockCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 101 {
+		t.Fatalf("unexpected blockcount %d", count)
+	}
+}
+
+func testTearDownReturnsErrorWhenExitCodeIsNotZero(_ *Harness, t *testing.T) {
+	h, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The invalid flag should make the startup of the node fail, the
+	// failure is asserted on teardown.
+	err = h.SetUp(SOpts{
+		Args:           []string{"--invalidflag=0"},
+		NoRPCAndWallet: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We expect the process to exit with non zero status code.
+	if err := h.TearDown(); err == nil {
+		t.Fatal(err)
+	}
+}
+
+func testNoGoroutineLeak(_ *Harness, t *testing.T) {
+	gStart := runtime.NumGoroutine()
+	defer func() {
+		time.Sleep(time.Millisecond * 50)
+		require.Equal(t, int(0), runtime.NumGoroutine()-gStart)
+	}()
+
+	h, err := New()
+	require.NoError(t, err)
+	require.NoError(t, h.SetUp(SOpts{UTXOCount: 1}))
+	require.NoError(t, h.TearDown())
+}
+
 var harnessTestCases = []HarnessTestCase{
 	testSendOutputs,
 	testConnectNode,
@@ -557,6 +629,9 @@ var harnessTestCases = []HarnessTestCase{
 	testGenerateAndSubmitBlockWithCustomCoinbaseOutputs,
 	testMemWalletReorg,
 	testMemWalletLockedOutputs,
+	testSkipCleanup,
+	testTearDownReturnsErrorWhenExitCodeIsNotZero,
+	testNoGoroutineLeak,
 }
 
 var mainHarness *Harness
@@ -567,7 +642,7 @@ const (
 
 func TestMain(m *testing.M) {
 	var err error
-	mainHarness, err = New(&chaincfg.SimNetParams, nil, nil, "")
+	mainHarness, err = New()
 	if err != nil {
 		fmt.Println("unable to create main harness: ", err)
 		os.Exit(1)
@@ -576,7 +651,8 @@ func TestMain(m *testing.M) {
 	// Initialize the main mining node with a chain of length 125,
 	// providing 25 mature coinbases to allow spending from for testing
 	// purposes.
-	if err = mainHarness.SetUp(true, numMatureOutputs); err != nil {
+	err = mainHarness.SetUp(SOpts{UTXOCount: numMatureOutputs})
+	if err != nil {
 		fmt.Println("unable to setup test chain: ", err)
 
 		// Even though the harness was not fully setup, it still needs

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/rpcclient"
@@ -304,13 +303,7 @@ var primaryHarness *rpctest.Harness
 func TestMain(m *testing.M) {
 	var err error
 
-	// In order to properly test scenarios on as if we were on mainnet,
-	// ensure that non-standard transactions aren't accepted into the
-	// mempool or relayed.
-	btcdCfg := []string{"--rejectnonstd"}
-	primaryHarness, err = rpctest.New(
-		&chaincfg.SimNetParams, nil, btcdCfg, "",
-	)
+	primaryHarness, err = rpctest.New()
 	if err != nil {
 		fmt.Println("unable to create primary harness: ", err)
 		os.Exit(1)
@@ -319,7 +312,15 @@ func TestMain(m *testing.M) {
 	// Initialize the primary mining node with a chain of length 125,
 	// providing 25 mature coinbases to allow spending from for testing
 	// purposes.
-	if err := primaryHarness.SetUp(true, 25); err != nil {
+	//
+	// In order to properly test scenarios on as if we were on mainnet,
+	// ensure that non-standard transactions aren't accepted into the
+	// mempool or relayed.
+	err = primaryHarness.SetUp(rpctest.SOpts{
+		Args:      []string{"--rejectnonstd"},
+		UTXOCount: 25,
+	})
+	if err != nil {
 		fmt.Println("unable to setup test chain: ", err)
 
 		// Even though the harness was not fully setup, it still needs

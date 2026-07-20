@@ -108,6 +108,9 @@ type memWallet struct {
 	rpc *rpcclient.Client
 
 	sync.RWMutex
+
+	stop chan struct{}
+	done chan struct{}
 }
 
 // newMemWallet creates and returns a fully initialized instance of the
@@ -146,6 +149,11 @@ func newMemWallet(net *chaincfg.Params, harnessID uint32) (*memWallet, error) {
 	addrs := make(map[uint32]address.Address)
 	addrs[0] = coinbaseAddr
 
+	stop := make(chan struct{})
+	close(stop)
+	done := make(chan struct{})
+	close(done)
+
 	return &memWallet{
 		net:               net,
 		coinbaseKey:       coinbaseKey,
@@ -154,14 +162,41 @@ func newMemWallet(net *chaincfg.Params, harnessID uint32) (*memWallet, error) {
 		hdRoot:            hdRoot,
 		addrs:             addrs,
 		utxos:             make(map[wire.OutPoint]*utxo),
-		chainUpdateSignal: make(chan struct{}),
+		chainUpdateSignal: make(chan struct{}, 1),
 		reorgJournal:      make(map[int32]*undoEntry),
+		stop:              stop,
+		done:              done,
 	}, nil
 }
 
 // Start launches all goroutines required for the wallet to function properly.
 func (m *memWallet) Start() {
-	go m.chainSyncer()
+	select {
+	case <-m.done:
+		m.done = make(chan struct{})
+	default:
+		return
+	}
+
+	m.stop = make(chan struct{})
+	go func() {
+		m.chainSyncer()
+		close(m.done)
+	}()
+}
+
+// Stop sends a stop request to the wallet and wait until shutdown.
+func (m *memWallet) Stop() {
+	select {
+	case <-m.stop:
+		return
+	default:
+	}
+
+	close(m.stop)
+	<-m.done
+
+	m.chainUpdates = nil
 }
 
 // SyncedHeight returns the height the wallet is known to be synced to.
@@ -182,7 +217,15 @@ func (m *memWallet) SetRPCClient(rpcClient *rpcclient.Client) {
 // IngestBlock is a call-back which is to be triggered each time a new block is
 // connected to the main chain. It queues the update for the chain syncer,
 // calling the private version in sequential order.
-func (m *memWallet) IngestBlock(height int32, header *wire.BlockHeader, filteredTxns []*btcutil.Tx) {
+func (m *memWallet) IngestBlock(height int32, header *wire.BlockHeader,
+	filteredTxns []*btcutil.Tx) {
+
+	select {
+	case <-m.stop:
+		return
+	default:
+	}
+
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	m.chainMtx.Lock()
@@ -222,29 +265,72 @@ func (m *memWallet) ingestBlock(update *chainUpdate) {
 	m.reorgJournal[update.blockHeight] = undo
 }
 
+func (m *memWallet) processChainUpdate() {
+	// A new update is available, so pop the new chain
+	// update from the front of the update queue.
+	m.chainMtx.Lock()
+	update := m.chainUpdates[0]
+	// Set to nil to prevent GC leak.
+	m.chainUpdates[0] = nil
+	m.chainUpdates = m.chainUpdates[1:]
+	m.chainMtx.Unlock()
+
+	m.Lock()
+	if update.isConnect {
+		m.ingestBlock(update)
+	} else {
+		m.unwindBlock(update)
+	}
+	m.Unlock()
+}
+
+func (m *memWallet) processChainUpdates() {
+	m.chainMtx.Lock()
+	updatesAvailable := len(m.chainUpdates)
+	m.chainMtx.Unlock()
+
+	// If we have multiple updates coming at the same time, the
+	// chainUpdateSignal may drop some signals, so every time a signal is
+	// received we iterate over all the chainUpdates received since the last
+	// signal.
+	//
+	// There's some possibilities here.
+	//
+	// 1. Received a single signal and a single chain update, in this
+	// case, the loop will be iterated once.
+	//
+	// 2. Lost some signals in a race and multiple updates will be processed
+	// now.
+	//
+	// 3. Processed all the updates but there was a signal left in the
+	// buffered channel that came from an update which was already
+	// processed, so no update will be processed.
+	//
+	// 4. While executing the loop below, new updates came, so there's a
+	// signal in the buffered channel and this procedure will be called
+	// again.
+	//
+	// In any case, there's no risk of not processing updates, nor
+	// panicking by trying to acess an update from a zero length
+	// chainUpdates slice.
+	for range updatesAvailable {
+		m.processChainUpdate()
+	}
+}
+
 // chainSyncer is a goroutine dedicated to processing new blocks in order to
 // keep the wallet's utxo state up to date.
 //
 // NOTE: This MUST be run as a goroutine.
 func (m *memWallet) chainSyncer() {
-	var update *chainUpdate
+	for {
+		select {
+		case <-m.chainUpdateSignal:
+			m.processChainUpdates()
 
-	for range m.chainUpdateSignal {
-		// A new update is available, so pop the new chain update from
-		// the front of the update queue.
-		m.chainMtx.Lock()
-		update = m.chainUpdates[0]
-		m.chainUpdates[0] = nil // Set to nil to prevent GC leak.
-		m.chainUpdates = m.chainUpdates[1:]
-		m.chainMtx.Unlock()
-
-		m.Lock()
-		if update.isConnect {
-			m.ingestBlock(update)
-		} else {
-			m.unwindBlock(update)
+		case <-m.stop:
+			return
 		}
-		m.Unlock()
 	}
 }
 
@@ -303,6 +389,12 @@ func (m *memWallet) evalInputs(inputs []*wire.TxIn, undo *undoEntry) {
 // disconnected from the main chain. It queues the update for the chain syncer,
 // calling the private version in sequential order.
 func (m *memWallet) UnwindBlock(height int32, header *wire.BlockHeader) {
+	select {
+	case <-m.stop:
+		return
+	default:
+	}
+
 	// Append this new chain update to the end of the queue of new chain
 	// updates.
 	m.chainMtx.Lock()
@@ -310,12 +402,13 @@ func (m *memWallet) UnwindBlock(height int32, header *wire.BlockHeader) {
 		nil, false})
 	m.chainMtx.Unlock()
 
-	// Launch a goroutine to signal the chainSyncer that a new update is
-	// available. We do this in a new goroutine in order to avoid blocking
-	// the main loop of the rpc client.
-	go func() {
-		m.chainUpdateSignal <- struct{}{}
-	}()
+	// Signal the chainSyncer that a new update is available. We use select
+	// with a buffered channel to avoid blocking the main loop of the rpc
+	// client.
+	select {
+	case m.chainUpdateSignal <- struct{}{}:
+	default:
+	}
 }
 
 // unwindBlock undoes the effect that a particular block had on the wallet's
