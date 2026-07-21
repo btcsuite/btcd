@@ -74,6 +74,24 @@ var (
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash chainhash.Hash
 
+// targetOutboundPeers returns the automatic outbound target for the configured
+// peer mode after permanent peers reserve their portion of the total budget.
+func targetOutboundPeers(
+	maxPeers, permanentPeers int, automaticOutbound bool,
+) int {
+
+	if !automaticOutbound || permanentPeers >= maxPeers {
+		return 0
+	}
+
+	available := maxPeers - permanentPeers
+	if available < defaultTargetOutbound {
+		return available
+	}
+
+	return defaultTargetOutbound
+}
+
 // reservedOutboundPeers returns the outbound connection reservation for the
 // configured peer mode, capped at the total peer limit.
 func reservedOutboundPeers(
@@ -3225,17 +3243,20 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	// Create a connection manager.
-	targetOutbound := defaultTargetOutbound
-	if cfg.MaxPeers < targetOutbound {
-		targetOutbound = cfg.MaxPeers
-	}
 	permanentPeerCount := len(cfg.ConnectPeers)
 	if permanentPeerCount == 0 {
 		permanentPeerCount = len(cfg.AddPeers)
 	}
+	automaticOutbound := newAddressFunc != nil
+	targetOutbound := targetOutboundPeers(
+		cfg.MaxPeers, permanentPeerCount, automaticOutbound,
+	)
+	if targetOutbound == 0 {
+		newAddressFunc = nil
+	}
 	reservedOutbound := reservedOutboundPeers(
 		cfg.MaxPeers, targetOutbound, permanentPeerCount,
-		newAddressFunc != nil,
+		automaticOutbound,
 	)
 	maxInbound := maxInboundPeers(cfg.MaxPeers, reservedOutbound)
 	if maxInbound == 0 && len(listeners) > 0 {

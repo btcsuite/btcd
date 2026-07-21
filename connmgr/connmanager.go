@@ -127,8 +127,9 @@ type Config struct {
 	// behavior, while a pointer to zero disables inbound connections.
 	MaxInbound *uint32
 
-	// TargetOutbound is the number of outbound network connections to
-	// maintain. Defaults to 8.
+	// TargetOutbound is the number of automatic outbound network connections
+	// to maintain. Connections made through Connect are additional. Defaults
+	// to 8.
 	TargetOutbound uint32
 
 	// RetryDuration is the duration to wait before retrying connection
@@ -616,7 +617,7 @@ func (cm *ConnManager) Start() {
 		}
 	}
 
-	for i := atomic.LoadUint64(&cm.connReqCount); i < uint64(cm.cfg.TargetOutbound); i++ {
+	for i := uint32(0); i < cm.cfg.TargetOutbound; i++ {
 		go cm.NewConnReq()
 	}
 }

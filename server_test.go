@@ -117,61 +117,66 @@ func TestInboundPeerReservation(t *testing.T) {
 	tests := []struct {
 		name           string
 		maxPeers       int
-		targetOutbound int
 		permanentPeers int
 		automatic      bool
+		wantTarget     int
 		wantReserved   int
 		wantInbound    uint32
 	}{
 		{
-			name: "connect only", maxPeers: 8, targetOutbound: 8,
+			name: "connect only", maxPeers: 8,
 			permanentPeers: 1, wantReserved: 1, wantInbound: 7,
 		},
 		{
 			name: "connect only capped", maxPeers: 8,
-			targetOutbound: 8, permanentPeers: 10,
-			wantReserved: 8, wantInbound: 0,
+			permanentPeers: 10,
+			wantReserved:   8, wantInbound: 0,
 		},
 		{
-			name: "simnet without peers", maxPeers: 8,
-			targetOutbound: 8, wantReserved: 0, wantInbound: 8,
+			name: "simnet without peers", maxPeers: 8, wantReserved: 0,
+			wantInbound: 8,
 		},
 		{
-			name: "simnet with peers", maxPeers: 8,
-			targetOutbound: 8, permanentPeers: 3,
+			name: "simnet with peers", maxPeers: 8, permanentPeers: 3,
 			wantReserved: 3, wantInbound: 5,
 		},
 		{
 			name: "automatic without add peers", maxPeers: 125,
-			targetOutbound: 8, automatic: true,
+			automatic: true, wantTarget: 8,
 			wantReserved: 8, wantInbound: 117,
 		},
 		{
 			name: "add peers below target", maxPeers: 125,
-			targetOutbound: 8, permanentPeers: 3, automatic: true,
+			permanentPeers: 3, automatic: true, wantTarget: 8,
 			wantReserved: 11, wantInbound: 114,
 		},
 		{
 			name: "add peers above target", maxPeers: 10,
-			targetOutbound: 8, permanentPeers: 9, automatic: true,
+			permanentPeers: 9, automatic: true, wantTarget: 1,
 			wantReserved: 10, wantInbound: 0,
 		},
 		{
 			name: "add peers at max peers", maxPeers: 10,
-			targetOutbound: 8, permanentPeers: 10, automatic: true,
+			permanentPeers: 10, automatic: true,
 			wantReserved: 10, wantInbound: 0,
 		},
 		{
 			name: "add peers above max peers", maxPeers: 10,
-			targetOutbound: 8, permanentPeers: 12, automatic: true,
+			permanentPeers: 12, automatic: true,
 			wantReserved: 10, wantInbound: 0,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			targetOutbound := targetOutboundPeers(
+				test.maxPeers, test.permanentPeers,
+				test.automatic,
+			)
+			require.Equal(t, test.wantTarget, targetOutbound)
+
 			reserved := reservedOutboundPeers(
-				test.maxPeers, test.targetOutbound,
+				test.maxPeers, targetOutbound,
 				test.permanentPeers, test.automatic,
 			)
 			require.Equal(t, test.wantReserved, reserved)

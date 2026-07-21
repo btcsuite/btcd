@@ -371,6 +371,114 @@ func TestTargetOutbound(t *testing.T) {
 	cmgr.Stop()
 }
 
+// TestTargetOutboundComposition verifies that explicit permanent connections
+// are additional to the automatic outbound target regardless of whether they
+// receive connection request IDs before or after the manager starts.
+func TestTargetOutboundComposition(t *testing.T) {
+	const (
+		targetOutbound = uint32(3)
+		permanentPeers = uint64(2)
+	)
+
+	tests := []struct {
+		name                 string
+		permanentBeforeStart bool
+	}{
+		{name: "permanent before start", permanentBeforeStart: true},
+		{name: "permanent after start"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			connected := make(chan *ConnReq,
+				int(targetOutbound)+int(permanentPeers))
+			cmgr, err := New(&Config{
+				TargetOutbound: targetOutbound,
+				Dial:           mockDialer,
+				GetNewAddress: func() (net.Addr, error) {
+					return &net.TCPAddr{
+						IP:   net.ParseIP("127.0.0.1"),
+						Port: 18555,
+					}, nil
+				},
+				OnConnection: func(c *ConnReq, _ net.Conn) {
+					connected <- c
+				},
+			})
+			if err != nil {
+				t.Fatalf("New error: %v", err)
+			}
+
+			connectPermanent := func() {
+				for i := uint64(0); i < permanentPeers; i++ {
+					go cmgr.Connect(&ConnReq{
+						Addr: &net.TCPAddr{
+							IP:   net.ParseIP("127.0.0.1"),
+							Port: 18556 + int(i),
+						},
+						Permanent: true,
+					})
+				}
+			}
+
+			if test.permanentBeforeStart {
+				connectPermanent()
+
+				deadline := time.After(time.Second)
+				for atomic.LoadUint64(&cmgr.connReqCount) <
+					permanentPeers {
+
+					select {
+					case <-deadline:
+						t.Fatal("permanent requests did not receive IDs")
+					case <-time.After(time.Millisecond):
+					}
+				}
+			}
+
+			cmgr.Start()
+			if !test.permanentBeforeStart {
+				connectPermanent()
+			}
+
+			var (
+				automaticCount int
+				permanentCount int
+			)
+			for i := 0; i < int(targetOutbound)+int(permanentPeers); i++ {
+				select {
+				case connReq := <-connected:
+					if connReq.Permanent {
+						permanentCount++
+					} else {
+						automaticCount++
+					}
+
+				case <-time.After(time.Second):
+					t.Fatal("timed out waiting for outbound connections")
+				}
+			}
+
+			if automaticCount != int(targetOutbound) {
+				t.Fatalf("unexpected automatic count: got %d, want %d",
+					automaticCount, targetOutbound)
+			}
+			if permanentCount != int(permanentPeers) {
+				t.Fatalf("unexpected permanent count: got %d, want %d",
+					permanentCount, permanentPeers)
+			}
+
+			select {
+			case connReq := <-connected:
+				t.Fatalf("unexpected extra connection: %v", connReq)
+			case <-time.After(10 * time.Millisecond):
+			}
+
+			cmgr.Stop()
+		})
+	}
+}
+
 // TestRetryPermanent tests that permanent connection requests are retried.
 //
 // We make a permanent connection request using Connect, disconnect it using
