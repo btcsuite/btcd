@@ -357,22 +357,27 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 		done, heightBefore, heightAfter)
 }
 
-// dialAndSendVersion connects to nodeAddr and sends a version
-// message, returning the open connection. The caller is
-// responsible for closing it.
-func dialAndSendVersion(
-	t *testing.T, nodeAddr string,
-) net.Conn {
-
-	t.Helper()
-
+// dialPreVerackPeer connects to nodeAddr and exchanges version messages without
+// sending verack. The caller is responsible for closing the returned
+// connection.
+func dialPreVerackPeer(nodeAddr string) (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", nodeAddr, 5*time.Second)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
+	connected := false
+	defer func() {
+		if !connected {
+			_ = conn.Close()
+		}
+	}()
 
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	nodeTCP, err := net.ResolveTCPAddr("tcp", nodeAddr)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	you := wire.NewNetAddress(
 		nodeTCP, wire.SFNodeNetwork|wire.SFNodeWitness,
@@ -391,9 +396,22 @@ func dialAndSendVersion(
 	err = wire.WriteMessage(
 		conn, msgVersion, wire.ProtocolVersion, wire.SimNet,
 	)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
-	return conn
+	msg, _, err := wire.ReadMessage(
+		conn, wire.ProtocolVersion, wire.SimNet,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := msg.(*wire.MsgVersion); !ok {
+		return nil, fmt.Errorf("expected version message, got %T", msg)
+	}
+
+	connected = true
+	return conn, nil
 }
 
 // TestPreVerackDisconnect verifies that a peer disconnecting
@@ -409,15 +427,36 @@ func TestPreVerackDisconnect(t *testing.T) {
 
 	nodeAddr := harness.P2PAddress()
 
-	// Connect and send version, then disconnect before receiving or
-	// sending verack. This is expected to produce a peerDone without
-	// a preceding peerAdd in the lifecycle channel.
-	const preVerackAttempts = 50
+	// Connect and exchange version messages, then disconnect without sending
+	// verack. This is expected to produce a peerDone without a preceding
+	// peerAdd in the lifecycle channel.
+	const (
+		preVerackAttempts     = 50
+		preVerackRetryTimeout = 5 * time.Second
+		preVerackRetryDelay   = 10 * time.Millisecond
+	)
 
+	retries := 0
 	for i := 0; i < preVerackAttempts; i++ {
-		conn := dialAndSendVersion(t, nodeAddr)
-		conn.Close()
+		deadline := time.Now().Add(preVerackRetryTimeout)
+		for {
+			conn, err := dialPreVerackPeer(nodeAddr)
+			if err == nil {
+				require.NoError(t, conn.Close())
+				break
+			}
+
+			if time.Now().After(deadline) {
+				t.Fatalf("pre-verack attempt %d did not complete: %v",
+					i+1, err)
+			}
+
+			retries++
+			time.Sleep(preVerackRetryDelay)
+		}
 	}
+	t.Logf("completed %d pre-verack disconnects with %d retries",
+		preVerackAttempts, retries)
 
 	// Allow the node time to process all the disconnects.
 	time.Sleep(2 * time.Second)
