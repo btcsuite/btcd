@@ -95,6 +95,15 @@ func minUint32(a, b uint32) uint32 {
 	return b
 }
 
+// validateMaxPeers ensures btcd has a positive total peer budget.
+func validateMaxPeers(maxPeers int) error {
+	if maxPeers <= 0 {
+		return fmt.Errorf("maxpeers must be greater than zero: %d", maxPeers)
+	}
+
+	return nil
+}
+
 // config defines the configuration options for btcd.
 //
 // See loadConfig for details on the configuration load process.
@@ -129,7 +138,7 @@ type config struct {
 	Listeners            []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
-	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers. Outbound slots for the configured peer mode are reserved before inbound capacity is calculated"`
+	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers. Must be greater than zero. Outbound slots for the configured peer mode are reserved before inbound capacity is calculated"`
 	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
 	MinRelayTxFee        float64       `long:"minrelaytxfee" description:"The minimum transaction fee in BTC/kB to be considered a non-zero fee."`
 	DisableBanning       bool          `long:"nobanning" description:"Disable banning of misbehaving peers"`
@@ -610,6 +619,13 @@ func loadConfig() (*config, []string, error) {
 			"params can't be used together -- choose one of the " +
 			"five"
 		err := fmt.Errorf(str, funcName)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	if err := validateMaxPeers(cfg.MaxPeers); err != nil {
+		err := fmt.Errorf("%s: %w", funcName, err)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

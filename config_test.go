@@ -8,6 +8,30 @@ import (
 	"testing"
 )
 
+func TestValidateMaxPeers(t *testing.T) {
+	tests := []struct {
+		name     string
+		maxPeers int
+		wantErr  bool
+	}{
+		{name: "negative", maxPeers: -1, wantErr: true},
+		{name: "zero", wantErr: true},
+		{name: "positive", maxPeers: 1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateMaxPeers(test.maxPeers)
+			if test.wantErr && err == nil {
+				t.Fatal("expected validation error")
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("unexpected validation error: %v", err)
+			}
+		})
+	}
+}
+
 var (
 	rpcuserRegexp = regexp.MustCompile("(?m)^rpcuser=.+$")
 	rpcpassRegexp = regexp.MustCompile("(?m)^rpcpass=.+$")
