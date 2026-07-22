@@ -275,16 +275,19 @@ func decodeSegWitAddress(address string) (byte, []byte, error) {
 			"version 0: %v", len(regrouped))
 	}
 
-	// For witness version 0, the bech32 encoding must be used.
+	// Per BIP-350, witness version 0 must use the bech32 encoding, while
+	// witness versions 1 through 16 must use the bech32m encoding. Previously
+	// only versions 0 and 1 were checked, which let a v2-v16 program encoded
+	// with the legacy bech32 checksum decode successfully in violation of the
+	// spec.
 	if version == 0 && bech32version != bech32.Version0 {
 		return 0, nil, fmt.Errorf("invalid checksum expected bech32 " +
 			"encoding for address with witness version 0")
 	}
 
-	// For witness version 1, the bech32m encoding must be used.
-	if version == 1 && bech32version != bech32.VersionM {
-		return 0, nil, fmt.Errorf("invalid checksum expected bech32m " +
-			"encoding for address with witness version 1")
+	if version >= 1 && bech32version != bech32.VersionM {
+		return 0, nil, fmt.Errorf("invalid checksum expected bech32m "+
+			"encoding for address with witness version %d", version)
 	}
 
 	return version, regrouped, nil
