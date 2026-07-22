@@ -3,6 +3,7 @@ package psbt
 import (
 	"bytes"
 	"encoding/base64"
+	"io"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire/v2"
@@ -170,6 +171,86 @@ func TestRejectsTrailingDataAfterPacket(t *testing.T) {
 		bytes.NewReader(append(rawPacket, 0x00)), false,
 	)
 	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}
+
+// TestStreamReaderNotProbedPastPacket verifies that a reader that cannot
+// report its remaining length is not read past the end of the packet: the
+// packet parses successfully and any subsequent data remains unread, so
+// parsing never blocks on an open stream.
+func TestStreamReaderNotProbedPastPacket(t *testing.T) {
+	unsignedTx, prevTx := strictnessTxPair(t)
+	rawPacket := strictnessPSBT(
+		t,
+		serializeTxForStrictness(t, unsignedTx, true),
+		serializeTxForStrictness(t, prevTx, false),
+	)
+
+	// io.MultiReader hides the Len method of the underlying bytes.Reader,
+	// mimicking a plain stream.
+	stream := io.MultiReader(bytes.NewReader(
+		append(append([]byte{}, rawPacket...), 0xde, 0xad),
+	))
+
+	_, err := NewFromRawBytes(stream, false)
+	require.NoError(t, err)
+
+	// The bytes following the packet must still be readable from the
+	// stream.
+	trailing, err := io.ReadAll(stream)
+	require.NoError(t, err)
+	require.Equal(t, []byte{0xde, 0xad}, trailing)
+}
+
+// TestAcceptsBase64PacketAboveWirePayloadLimit verifies that base64 parsing
+// accepts valid PSBT packets larger than the peer-to-peer wire message payload
+// limit.
+func TestAcceptsBase64PacketAboveWirePayloadLimit(t *testing.T) {
+	unsignedTx, _ := strictnessTxPair(t)
+	packet, err := NewFromUnsignedTx(unsignedTx)
+	require.NoError(t, err)
+
+	value := bytes.Repeat([]byte{0x01}, MaxPsbtValueLength)
+	for i := range 9 {
+		packet.Unknowns = append(packet.Unknowns, &Unknown{
+			Key:   []byte{0xfc, byte(i)},
+			Value: value,
+		})
+	}
+
+	var rawPacket bytes.Buffer
+	require.NoError(t, packet.Serialize(&rawPacket))
+	require.Greater(t, rawPacket.Len(), wire.MaxMessagePayload)
+
+	rawParsed, err := NewFromRawBytes(
+		bytes.NewReader(rawPacket.Bytes()), false,
+	)
+	require.NoError(t, err)
+	require.Len(t, rawParsed.Unknowns, 9)
+
+	encodedReader, encodedWriter := io.Pipe()
+	encodeDone := make(chan error, 1)
+	go func() {
+		encoder := base64.NewEncoder(
+			base64.StdEncoding, encodedWriter,
+		)
+		_, encodeErr := io.Copy(encoder, bytes.NewReader(
+			rawPacket.Bytes(),
+		))
+		if closeErr := encoder.Close(); encodeErr == nil {
+			encodeErr = closeErr
+		}
+		_ = encodedWriter.CloseWithError(encodeErr)
+		encodeDone <- encodeErr
+	}()
+
+	parsedPacket, parseErr := NewFromRawBytes(encodedReader, true)
+	_ = encodedReader.Close()
+	encodeErr := <-encodeDone
+	if parseErr == nil {
+		require.NoError(t, encodeErr)
+	}
+	require.NoError(t, parseErr)
+	require.Len(t, parsedPacket.Unknowns, 9)
 }
 
 // TestRejectsNonCanonicalBase64Packet verifies that base64 PSBT input rejects

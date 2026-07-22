@@ -185,15 +185,19 @@ func NewFromUnsignedTx(tx *wire.MsgTx) (*Packet, error) {
 // argument b64 is true, the passed byte slice is decoded from base64 encoding
 // before processing.
 //
+// The parsing is strict: base64 input must not contain whitespace or any
+// characters outside the RFC4648 standard alphabet, and any data after the
+// packet results in ErrInvalidPsbtFormat. For raw input, trailing data is only
+// detected when the reader can report its remaining length without blocking
+// (such as bytes.Reader); a plain raw stream is not probed past the packet, so
+// the reader is left positioned directly after it. Base64 input is decoded
+// incrementally and read through its canonical end.
+//
 // NOTE: To create a Packet from one's own data, rather than reading in a
 // serialization from a counterparty, one should use a psbt.New.
 func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	if b64 {
-		decoded, err := decodeBase64Strict(r)
-		if err != nil {
-			return nil, err
-		}
-		r = bytes.NewReader(decoded)
+		r = newStrictBase64Decoder(r)
 	}
 
 	// The Packet struct does not store the fixed magic bytes, but they
@@ -324,34 +328,91 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 		return nil, err
 	}
 
-	if err := assertFullyConsumed(r); err != nil {
-		return nil, err
+	if b64 {
+		if err := assertBase64FullyConsumed(r); err != nil {
+			return nil, err
+		}
+	} else {
+		// Reject any trailing data after the packet when a raw reader can
+		// report it without an additional read. Plain raw streams are not
+		// probed, as a read for EOF could block forever on an open
+		// connection that has already delivered a complete packet.
+		if lr, ok := r.(interface{ Len() int }); ok && lr.Len() > 0 {
+			return nil, ErrInvalidPsbtFormat
+		}
 	}
 
 	return &newPsbt, nil
 }
 
-// decodeBase64Strict decodes an RFC4648 base64 stream without permitting
-// whitespace and with '=' allowed only as final padding.
-func decodeBase64Strict(r io.Reader) ([]byte, error) {
-	encoded, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
+// canonicalBase64Reader rejects the CR and LF bytes that encoding/base64
+// otherwise ignores while decoding.
+type canonicalBase64Reader struct {
+	io.Reader
+}
+
+// Read returns encoded bytes only when they use the canonical RFC4648
+// alphabet.
+func (r *canonicalBase64Reader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if bytes.ContainsAny(p[:n], "\r\n") {
+		return 0, ErrInvalidPsbtFormat
 	}
 
-	// Go's strict base64 decoder still ignores CR/LF. Reject them before
-	// decoding so base64 PSBT parsing matches the RFC4648 alphabet exactly.
-	if bytes.ContainsAny(encoded, "\r\n") {
-		return nil, ErrInvalidPsbtFormat
+	return n, err
+}
+
+// strictBase64Decoder maps base64 syntax and truncation errors to
+// ErrInvalidPsbtFormat while preserving other errors returned by the
+// caller-supplied reader.
+type strictBase64Decoder struct {
+	io.Reader
+}
+
+// Read returns incrementally decoded bytes.
+func (d *strictBase64Decoder) Read(p []byte) (int, error) {
+	n, err := d.Reader.Read(p)
+	if err == nil || errors.Is(err, io.EOF) {
+		return n, err
 	}
 
-	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(encoded)))
-	n, err := base64.StdEncoding.Strict().Decode(decoded, encoded)
-	if err != nil {
-		return nil, ErrInvalidPsbtFormat
+	var corruptInput base64.CorruptInputError
+	if errors.As(err, &corruptInput) ||
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, ErrInvalidPsbtFormat) {
+
+		return n, ErrInvalidPsbtFormat
 	}
 
-	return decoded[:n], nil
+	return n, err
+}
+
+// newStrictBase64Decoder returns a streaming RFC4648 base64 decoder that
+// rejects whitespace and only accepts '=' as final padding.
+func newStrictBase64Decoder(r io.Reader) io.Reader {
+	canonicalReader := &canonicalBase64Reader{Reader: r}
+	decoder := base64.NewDecoder(
+		base64.StdEncoding.Strict(), canonicalReader,
+	)
+
+	return &strictBase64Decoder{Reader: decoder}
+}
+
+// assertBase64FullyConsumed verifies the end of the base64 envelope and
+// rejects decoded data after the PSBT packet.
+func assertBase64FullyConsumed(r io.Reader) error {
+	var trailing [1]byte
+	_, err := io.ReadFull(r, trailing[:])
+	switch {
+	case err == nil:
+		return ErrInvalidPsbtFormat
+
+	case errors.Is(err, io.EOF):
+		return nil
+
+	default:
+		return err
+	}
 }
 
 // Serialize creates a binary serialization of the referenced Packet struct

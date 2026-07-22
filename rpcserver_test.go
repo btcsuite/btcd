@@ -10,6 +10,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/mock"
@@ -109,6 +110,60 @@ func blockHexWithTrailingByte(t *testing.T) string {
 	require.NoError(t, err)
 
 	return hex.EncodeToString(append(block.Bytes(), 0x00))
+}
+
+// invalidatingBlockDB clears fetched block bytes as soon as its managed view
+// ends. This models database backends whose zero-copy buffers are only valid
+// for the lifetime of a transaction.
+type invalidatingBlockDB struct {
+	database.DB
+	blockBytes []byte
+}
+
+// View runs the callback with a transaction backed by the configured block
+// bytes, then invalidates those bytes before returning.
+func (d *invalidatingBlockDB) View(fn func(database.Tx) error) error {
+	err := fn(&invalidatingBlockTx{blockBytes: d.blockBytes})
+	clear(d.blockBytes)
+
+	return err
+}
+
+// invalidatingBlockTx returns the parent database's transaction-scoped block
+// bytes.
+type invalidatingBlockTx struct {
+	database.Tx
+	blockBytes []byte
+}
+
+// FetchBlock returns bytes that are invalidated when the enclosing view ends.
+func (t *invalidatingBlockTx) FetchBlock(*chainhash.Hash) ([]byte, error) {
+	return t.blockBytes, nil
+}
+
+// TestHandleGetBlockCopiesTransactionBytes verifies getblock does not retain
+// transaction-scoped database memory after its managed view ends.
+func TestHandleGetBlockCopiesTransactionBytes(t *testing.T) {
+	t.Parallel()
+
+	var serializedBlock bytes.Buffer
+	err := chaincfg.MainNetParams.GenesisBlock.Serialize(&serializedBlock)
+	require.NoError(t, err)
+
+	wantBytes := serializedBlock.Bytes()
+	dbBytes := append([]byte(nil), wantBytes...)
+	dbBytes = append(dbBytes, 0x00)
+	db := &invalidatingBlockDB{blockBytes: dbBytes}
+
+	verbosity := 0
+	cmd := btcjson.NewGetBlockCmd(
+		chaincfg.MainNetParams.GenesisHash.String(), &verbosity,
+	)
+	result, err := handleGetBlock(
+		&rpcServer{cfg: rpcserverConfig{DB: db}}, cmd, make(chan struct{}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, hex.EncodeToString(wantBytes), result)
 }
 
 // TestHandleSendRawTransactionRejectsTrailingBytes ensures sendrawtransaction
