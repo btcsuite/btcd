@@ -21,9 +21,9 @@ var (
 	// fields for storage in the database.
 	byteOrder = binary.LittleEndian
 
-	// errInterruptRequested indicates that an operation was cancelled due
+	// ErrInterruptRequested indicates that an operation was cancelled due
 	// to a user-requested interrupt.
-	errInterruptRequested = errors.New("interrupt requested")
+	ErrInterruptRequested = errors.New("interrupt requested")
 )
 
 // NeedsInputser provides a generic interface for an indexer to specify the it

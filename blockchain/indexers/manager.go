@@ -176,7 +176,7 @@ func (m *Manager) maybeFinishDrops(interrupt <-chan struct{}) error {
 	}
 
 	if interruptRequested(interrupt) {
-		return errInterruptRequested
+		return ErrInterruptRequested
 	}
 
 	// Finish dropping any of the enabled indexes that are already in the
@@ -240,7 +240,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	}
 
 	if interruptRequested(interrupt) {
-		return errInterruptRequested
+		return ErrInterruptRequested
 	}
 
 	// Finish and drops that were previously interrupted.
@@ -352,7 +352,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			}
 
 			if interruptRequested(interrupt) {
-				return errInterruptRequested
+				return ErrInterruptRequested
 			}
 		}
 
@@ -413,7 +413,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		}
 
 		if interruptRequested(interrupt) {
-			return errInterruptRequested
+			return ErrInterruptRequested
 		}
 
 		// Connect the block for all indexes that need it.
@@ -450,7 +450,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		progressLogger.LogBlockHeight(block)
 
 		if interruptRequested(interrupt) {
-			return errInterruptRequested
+			return ErrInterruptRequested
 		}
 	}
 
@@ -659,7 +659,7 @@ func dropIndex(db database.DB, idxKey []byte, idxName string, interrupt <-chan s
 		}
 
 		if interruptRequested(interrupt) {
-			return errInterruptRequested
+			return ErrInterruptRequested
 		}
 
 		// Drop the bucket itself.
