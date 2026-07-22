@@ -5,12 +5,12 @@ go 1.25.0
 require (
 	github.com/btcsuite/btcd/address/v2 v2.0.0
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0
-	github.com/btcsuite/btcd/btcutil/v2 v2.0.0
+	github.com/btcsuite/btcd/btcutil/v2 v2.0.1
 	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0
 	github.com/btcsuite/btcd/txscript/v2 v2.0.0
-	github.com/btcsuite/btcd/v2transport v1.0.1
-	github.com/btcsuite/btcd/wire/v2 v2.0.0
+	github.com/btcsuite/btcd/v2transport v1.1.0
+	github.com/btcsuite/btcd/wire/v2 v2.0.1
 	github.com/btcsuite/btclog v1.0.0
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
@@ -38,12 +38,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-replace (
-	github.com/btcsuite/btcd/btcutil/v2 => ./btcutil
-	github.com/btcsuite/btcd/v2transport => ./v2transport
-	github.com/btcsuite/btcd/wire/v2 => ./wire
 )
 
 // The retract statements below fixes an accidental push of the tags of a btcd
