@@ -1,140 +1,202 @@
 package rpcclient
 
 import (
+	"context"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 )
 
-// TestDisableAuth verifies that the DisableAuth field correctly controls
-// whether the Authorization header is sent on RPC requests.
-func TestDisableAuth(t *testing.T) {
-	t.Parallel()
+const (
+	testRPCUser     = "testuser"
+	testRPCPass     = "testpass"
+	testCallerAuth  = "Bearer test-api-key"
+	testExtraHeader = "X-Test-API-Key"
+	testExtraValue  = "test-api-key"
+)
 
-	t.Run("DisableAuth true omits Authorization header", func(t *testing.T) {
-		t.Parallel()
+// disableAuthTestCase describes one authentication header configuration that
+// must behave the same for HTTP POST and WebSocket transports.
+type disableAuthTestCase struct {
+	name              string
+	configure         func(*ConnConfig)
+	wantAuthorization string
+}
 
-		var gotAuth string
-		handler := http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				gotAuth = r.Header.Get("Authorization")
+// disableAuthTestCases returns the shared transport authentication cases.
+func disableAuthTestCases(missingCookie string) []disableAuthTestCase {
+	basicAuth := "Basic " + base64.StdEncoding.EncodeToString(
+		[]byte(testRPCUser+":"+testRPCPass),
+	)
 
-				// Return a valid JSON-RPC response so the client
-				// doesn't retry.
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(
-					`{"result":null,"error":null,"id":1}`,
-				))
+	return []disableAuthTestCase{
+		{
+			name: "disabled omits generated authorization",
+			configure: func(config *ConnConfig) {
+				config.User = ""
+				config.Pass = ""
+				config.CookiePath = missingCookie
+				config.DisableAuth = true
 			},
-		)
-		srv := httptest.NewServer(handler)
-		defer srv.Close()
-
-		addr := strings.TrimPrefix(srv.URL, "http://")
-		client, err := New(&ConnConfig{
-			Host:         addr,
-			HTTPPostMode: true,
-			DisableAuth:  true,
-			DisableTLS:   true,
-		}, nil)
-		require.NoError(t, err)
-		defer client.Shutdown()
-
-		// The client is now connected; issue a simple request to trigger
-		// handleSendPostMessage.
-		_, err = client.RawRequest("getblockchaininfo", nil)
-		// We don't care if the RPC itself errors. We only care about
-		// the Authorization header.
-		_ = err
-
-		require.Empty(
-			t, gotAuth,
-			"Authorization header should be empty when DisableAuth is true",
-		)
-	})
-
-	t.Run("DisableAuth false includes Authorization header", func(t *testing.T) {
-		t.Parallel()
-
-		var gotAuth string
-		handler := http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				gotAuth = r.Header.Get("Authorization")
-				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte(
-					`{"result":null,"error":null,"id":1}`,
-				))
+		},
+		{
+			name: "disabled preserves caller authorization",
+			configure: func(config *ConnConfig) {
+				config.User = ""
+				config.Pass = ""
+				config.CookiePath = missingCookie
+				config.DisableAuth = true
+				config.ExtraHeaders["Authorization"] =
+					testCallerAuth
 			},
-		)
-		srv := httptest.NewServer(handler)
-		defer srv.Close()
+			wantAuthorization: testCallerAuth,
+		},
+		{
+			name: "explicit false includes basic authorization",
+			configure: func(config *ConnConfig) {
+				config.DisableAuth = false
+			},
+			wantAuthorization: basicAuth,
+		},
+		{
+			name: "zero value includes basic authorization",
+			configure: func(*ConnConfig) {
+				// Leave DisableAuth at its zero value.
+			},
+			wantAuthorization: basicAuth,
+		},
+	}
+}
 
-		addr := strings.TrimPrefix(srv.URL, "http://")
-		client, err := New(&ConnConfig{
-			Host:         addr,
-			HTTPPostMode: true,
-			DisableAuth:  false,
-			DisableTLS:   true,
-			User:         "testuser",
-			Pass:         "testpass",
-		}, nil)
-		require.NoError(t, err)
-		defer client.Shutdown()
+// newDisableAuthConfig creates the common configuration for the transport
+// authentication cases.
+func newDisableAuthConfig() *ConnConfig {
+	return &ConnConfig{
+		User: testRPCUser,
+		Pass: testRPCPass,
+		ExtraHeaders: map[string]string{
+			testExtraHeader: testExtraValue,
+		},
+	}
+}
 
-		_, err = client.RawRequest("getblockchaininfo", nil)
-		_ = err
+// assertAuthHeaders verifies both generated or caller-supplied authorization
+// and the independent extra header.
+func assertAuthHeaders(t *testing.T, header http.Header,
+	wantAuthorization string) {
 
-		login := []byte("testuser:testpass")
-		expected := "Basic " + base64.StdEncoding.EncodeToString(login)
-		require.Equal(
-			t, expected, gotAuth,
-			"Authorization header should be set when DisableAuth is false",
-		)
-	})
+	t.Helper()
 
-	t.Run(
-		"DisableAuth default (zero value) includes Authorization header",
-		func(t *testing.T) {
-			t.Parallel()
+	require.Equal(t, wantAuthorization, header.Get("Authorization"))
+	require.Equal(t, testExtraValue, header.Get(testExtraHeader))
+}
 
-			var gotAuth string
-			handler := http.HandlerFunc(
-				func(w http.ResponseWriter, r *http.Request) {
-					gotAuth = r.Header.Get("Authorization")
-					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte(
-						`{"result":null,"error":null,"id":1}`,
-					))
+// TestDisableAuthHTTPPost verifies that DisableAuth controls generated Basic
+// Auth headers on HTTP POST requests without suppressing caller headers.
+func TestDisableAuthHTTPPost(t *testing.T) {
+	missingCookie := filepath.Join(t.TempDir(), "missing-cookie")
+
+	for _, tc := range disableAuthTestCases(missingCookie) {
+		t.Run(tc.name, func(t *testing.T) {
+			requestHeader := make(chan http.Header, 1)
+			client := newPostModeTestClient(postRoundTripFunc(
+				func(req *http.Request) (*http.Response, error) {
+					requestHeader <- req.Header.Clone()
+
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     make(http.Header),
+						Body: io.NopCloser(strings.NewReader(
+							`{"result":1,"error":null,"id":1}`,
+						)),
+					}, nil
 				},
-			)
-			srv := httptest.NewServer(handler)
-			defer srv.Close()
+			))
+			client.config = newDisableAuthConfig()
+			client.config.Host = "127.0.0.1:8332"
+			client.config.DisableTLS = true
+			client.config.HTTPPostMode = true
+			tc.configure(client.config)
 
-			addr := strings.TrimPrefix(srv.URL, "http://")
-			client, err := New(&ConnConfig{
-				Host:         addr,
-				HTTPPostMode: true,
-				DisableTLS:   true,
-				User:         "myuser",
-				Pass:         "mypass",
-			}, nil)
+			result, err := sendPostRequestWithRetry(
+				context.Background(), newPostTestRequest(), 1,
+				client.httpClient, client.config, client.httpURL,
+				false,
+			)
 			require.NoError(t, err)
-			defer client.Shutdown()
+			require.Equal(t, []byte("1"), result)
 
-			_, err = client.RawRequest("getblockchaininfo", nil)
-			_ = err
+			select {
+			case header := <-requestHeader:
+				assertAuthHeaders(t, header, tc.wantAuthorization)
 
-			login := []byte("myuser:mypass")
-			expected := "Basic " +
-				base64.StdEncoding.EncodeToString(login)
-			require.Equal(
-				t, expected, gotAuth,
-				"Authorization header should be set by default",
-			)
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for HTTP POST request")
+			}
+		})
+	}
+}
+
+// newWebsocketAuthServer creates a server that records the WebSocket handshake
+// headers before upgrading the connection.
+func newWebsocketAuthServer(t *testing.T) (string, <-chan http.Header) {
+	t.Helper()
+
+	requestHeader := make(chan http.Header, 1)
+	upgrader := websocket.Upgrader{}
+	handler := http.HandlerFunc(
+		func(w http.ResponseWriter, req *http.Request) {
+			requestHeader <- req.Header.Clone()
+
+			conn, err := upgrader.Upgrade(w, req, nil)
+			if err != nil {
+				return
+			}
+			defer func() {
+				_ = conn.Close()
+			}()
 		},
 	)
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	return strings.TrimPrefix(server.URL, "http://"), requestHeader
+}
+
+// TestDisableAuthWebsocket verifies that DisableAuth controls generated Basic
+// Auth headers on WebSocket handshakes without suppressing caller headers.
+func TestDisableAuthWebsocket(t *testing.T) {
+	missingCookie := filepath.Join(t.TempDir(), "missing-cookie")
+
+	for _, tc := range disableAuthTestCases(missingCookie) {
+		t.Run(tc.name, func(t *testing.T) {
+			host, requestHeader := newWebsocketAuthServer(t)
+			config := newDisableAuthConfig()
+			config.Host = host
+			config.DisableTLS = true
+			tc.configure(config)
+
+			conn, err := dial(config)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				require.NoError(t, conn.Close())
+			})
+
+			select {
+			case header := <-requestHeader:
+				assertAuthHeaders(t, header, tc.wantAuthorization)
+
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for WebSocket handshake")
+			}
+		})
+	}
 }

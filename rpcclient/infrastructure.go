@@ -810,7 +810,7 @@ retryloop:
 			httpReq.Header.Set(key, value)
 		}
 
-		// Configure basic access authorization.
+		// Configure generated basic access authorization.
 		if !config.DisableAuth {
 			user, pass, authErr := config.getAuth()
 			if authErr != nil {
@@ -1333,10 +1333,9 @@ type ConnConfig struct {
 	// when connecting to blockchain.info RPC server
 	EnableBCInfoHacks bool
 
-	// DisableAuth instructs the client to skip setting the Authorization
-	// header on RPC requests. This is useful when connecting to third-party
-	// RPC providers that authenticate via API key in the URL path and
-	// reject requests containing an Authorization header with 401 errors.
+	// DisableAuth instructs the client to skip generating a Basic
+	// Authorization header for RPC requests. Caller-provided Authorization
+	// values in ExtraHeaders are still sent.
 	DisableAuth bool
 }
 
@@ -1477,10 +1476,8 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 		dialer.NetDial = proxy.Dial
 	}
 
-	// Configure basic access authorization. When DisableAuth is set, skip
-	// setting the Authorization header entirely. This is useful for
-	// third-party RPC providers that authenticate via API key in the URL
-	// path and reject requests containing an Authorization header.
+	// Configure generated basic access authorization. Caller-provided
+	// headers are added independently below.
 	requestHeader := make(http.Header)
 	if !config.DisableAuth {
 		user, pass, err := config.getAuth()
