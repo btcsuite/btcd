@@ -1,6 +1,6 @@
 module github.com/btcsuite/btcd
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/btcsuite/btcd/address/v2 v2.0.0
@@ -24,6 +24,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	golang.org/x/crypto v0.40.0
 	golang.org/x/sys v0.35.0
+	golang.org/x/time v0.15.0
 	pgregory.net/rapid v1.2.0
 )
 
@@ -41,6 +42,7 @@ require (
 
 replace (
 	github.com/btcsuite/btcd/btcutil/v2 => ./btcutil
+	github.com/btcsuite/btcd/v2transport => ./v2transport
 	github.com/btcsuite/btcd/wire/v2 => ./wire
 )
 

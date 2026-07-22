@@ -31,6 +31,7 @@ import (
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/mining/cpuminer"
@@ -72,6 +73,52 @@ var (
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash chainhash.Hash
+
+// targetOutboundPeers returns the automatic outbound target for the configured
+// peer mode after permanent peers reserve their portion of the total budget.
+func targetOutboundPeers(
+	maxPeers, permanentPeers int, automaticOutbound bool,
+) int {
+
+	if !automaticOutbound || permanentPeers >= maxPeers {
+		return 0
+	}
+
+	available := maxPeers - permanentPeers
+	if available < defaultTargetOutbound {
+		return available
+	}
+
+	return defaultTargetOutbound
+}
+
+// reservedOutboundPeers returns the outbound connection reservation for the
+// configured peer mode, capped at the total peer limit.
+func reservedOutboundPeers(
+	maxPeers, targetOutbound, permanentPeers int, automaticOutbound bool,
+) int {
+
+	reserved := permanentPeers
+	if automaticOutbound {
+		reserved += targetOutbound
+	}
+
+	if reserved > maxPeers {
+		return maxPeers
+	}
+
+	return reserved
+}
+
+// maxInboundPeers returns the accepted inbound connection budget after
+// reserving capacity for outbound peers.
+func maxInboundPeers(maxPeers, reservedOutbound int) uint32 {
+	if maxPeers <= reservedOutbound {
+		return 0
+	}
+
+	return uint32(maxPeers - reservedOutbound)
+}
 
 // onionAddr implements the net.Addr interface and represents a tor address.
 type onionAddr struct {
@@ -237,6 +284,7 @@ type server struct {
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	p2pDowngrader        *peer.P2PDowngrader
+	inboundAdmission     *inbound.Admission
 	peerLifecycle        chan peerLifecycleEvent
 	banPeers             chan *serverPeer
 	query                chan interface{}
@@ -296,11 +344,16 @@ type serverPeer struct {
 	addressesMtx   sync.RWMutex
 	knownAddresses lru.Cache
 	banScore       connmgr.DynamicBanScore
-	quit chan struct{}
+	quit           chan struct{}
 
 	// Closed by verAckOnce when OnVerAck fires.
 	verAckCh   chan struct{}
 	verAckOnce sync.Once
+
+	// releaseInboundHandshake releases the source-prefix slot held while an
+	// inbound handshake is incomplete.
+	releaseInboundHandshake     func()
+	releaseInboundHandshakeOnce sync.Once
 
 	// peerAdded is set by peerLifecycleHandler after a peerAdd event
 	// has been enqueued on s.peerLifecycle. handleDonePeerMsg reads
@@ -329,6 +382,15 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		txProcessed:    make(chan struct{}, 1),
 		blockProcessed: make(chan struct{}, 1),
 	}
+}
+
+// releaseHandshake releases the source-prefix slot for an inbound handshake.
+func (sp *serverPeer) releaseHandshake() {
+	sp.releaseInboundHandshakeOnce.Do(func() {
+		if sp.releaseInboundHandshake != nil {
+			sp.releaseInboundHandshake()
+		}
+	})
 }
 
 // newestBlock returns the current best block hash and height using the format
@@ -574,7 +636,10 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 // sync.Once guard ensures verAckCh is closed at most once even if
 // OnVerAck is ever invoked more than once for a given peer.
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
-	sp.verAckOnce.Do(func() { close(sp.verAckCh) })
+	sp.verAckOnce.Do(func() {
+		sp.releaseHandshake()
+		close(sp.verAckCh)
+	})
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
@@ -2277,14 +2342,49 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 	}
 }
 
+// acquireInboundPeerAdmission reserves the source budgets for an inbound peer
+// and reports whether the peer retains the existing no-ban permission.
+func (s *server) acquireInboundPeerAdmission(
+	remoteAddr net.Addr,
+) (bool, func(), *inbound.V2Admission, error) {
+
+	whitelisted := isWhitelisted(remoteAddr)
+	if s.inboundAdmission == nil {
+		return whitelisted, nil, nil, nil
+	}
+
+	releaseHandshake, err := s.inboundAdmission.AcquireSource(
+		remoteAddr, false,
+	)
+	if err != nil {
+		return whitelisted, nil, nil, err
+	}
+
+	v2Admission := s.inboundAdmission.BindV2(remoteAddr, false)
+	return whitelisted, releaseHandshake, v2Admission, nil
+}
+
 // inboundPeerConnected is invoked by the connection manager when a new inbound
 // connection is established.  It initializes a new inbound server peer
 // instance, associates it with the connection, and starts a goroutine to wait
 // for disconnection.
 func (s *server) inboundPeerConnected(conn net.Conn) {
+	remoteAddr := conn.RemoteAddr()
+	whitelisted, releaseHandshake, v2Admission, err :=
+		s.acquireInboundPeerAdmission(remoteAddr)
+	if err != nil {
+		_ = conn.Close()
+		return
+	}
+
 	sp := newServerPeer(s, false)
-	sp.isWhitelisted = isWhitelisted(conn.RemoteAddr())
-	sp.Peer = peer.NewInboundPeer(newPeerConfig(sp))
+	sp.isWhitelisted = whitelisted
+	sp.releaseInboundHandshake = releaseHandshake
+
+	peerCfg := newPeerConfig(sp)
+	peerCfg.V2HandshakeAdmission = v2Admission
+
+	sp.Peer = peer.NewInboundPeer(peerCfg)
 	sp.AssociateConnection(conn)
 	go s.peerLifecycleHandler(sp)
 }
@@ -2347,9 +2447,10 @@ func (s *server) peerLifecycleHandler(sp *serverPeer) {
 		}
 		sp.peerAdded.Store(true)
 
-	case <-sp.Peer.Done():
+	case <-sp.Done():
 		// Disconnected before verack; no peerAdd needed.
 	}
+	sp.releaseHandshake()
 
 	// Wait for full disconnect (may already be done).
 	sp.WaitForDisconnect()
@@ -2903,8 +3004,9 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	s := server{
-		chainParams: chainParams,
-		addrManager: amgr,
+		chainParams:      chainParams,
+		addrManager:      amgr,
+		inboundAdmission: inbound.New(),
 
 		// peerLifecycle is buffered for up to two events per peer
 		// (peerAdd followed by peerDone) so peerLifecycleHandler
@@ -3141,13 +3243,30 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 	}
 
 	// Create a connection manager.
-	targetOutbound := defaultTargetOutbound
-	if cfg.MaxPeers < targetOutbound {
-		targetOutbound = cfg.MaxPeers
+	permanentPeerCount := len(cfg.ConnectPeers)
+	if permanentPeerCount == 0 {
+		permanentPeerCount = len(cfg.AddPeers)
+	}
+	automaticOutbound := newAddressFunc != nil
+	targetOutbound := targetOutboundPeers(
+		cfg.MaxPeers, permanentPeerCount, automaticOutbound,
+	)
+	if targetOutbound == 0 {
+		newAddressFunc = nil
+	}
+	reservedOutbound := reservedOutboundPeers(
+		cfg.MaxPeers, targetOutbound, permanentPeerCount,
+		automaticOutbound,
+	)
+	maxInbound := maxInboundPeers(cfg.MaxPeers, reservedOutbound)
+	if maxInbound == 0 && len(listeners) > 0 {
+		srvrLog.Infof("Inbound connections disabled: maxpeers=%d, "+
+			"reserved-outbound=%d", cfg.MaxPeers, reservedOutbound)
 	}
 	cmgr, err := connmgr.New(&connmgr.Config{
 		Listeners:      listeners,
 		OnAccept:       s.inboundPeerConnected,
+		MaxInbound:     &maxInbound,
 		RetryDuration:  connectionRetryInterval,
 		TargetOutbound: uint32(targetOutbound),
 		Dial:           btcdDial,
