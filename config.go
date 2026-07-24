@@ -70,6 +70,7 @@ const (
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
 	pruneMinSize                 = 1536
+	spendJournalPruneMinDepth    = 288
 )
 
 var (
@@ -168,6 +169,7 @@ type config struct {
 	ProxyPass            string        `long:"proxypass" default-mask:"-" description:"Password for proxy server"`
 	ProxyUser            string        `long:"proxyuser" description:"Username for proxy server"`
 	Prune                uint64        `long:"prune" description:"Prune already validated blocks from the database. Must specify a target size in MiB (minimum value of 1536, default value of 0 will disable pruning)"`
+	PruneSpendJournal    int32         `long:"prunespendjournal" description:"When different than zero, prunespendjournal keeps only the last N blocks of spend journal entries, which also requires disabled and non initialized cfindex, txindex and addrindex. As cfindex is enabled by default, when this config option is used, cfindex is also automatically disabled. Spend journal pruning is useful to keep all the blocks but at the same time significantly reduce storage usage. The minimum value is 288, as a chain reorg of 288 blocks is unlikely to happen."`
 	RegressionTest       bool          `long:"regtest" description:"Use the regression test network"`
 	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
 	RejectReplacement    bool          `long:"rejectreplacement" description:"Reject transactions that attempt to replace existing transactions within the mempool through the Replace-By-Fee (RBF) signaling policy."`
