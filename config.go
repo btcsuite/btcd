@@ -181,6 +181,7 @@ type config struct {
 	SigNet               bool          `long:"signet" description:"Use the signet test network"`
 	SigNetChallenge      string        `long:"signetchallenge" description:"Connect to a custom signet network defined by this challenge instead of using the global default signet test network -- Can be specified multiple times"`
 	SigNetSeedNode       []string      `long:"signetseednode" description:"Specify a seed node for the signet network instead of using the global default signet network seed nodes"`
+	StopAtHeight         int           `long:"stopatheight" hidden:"true" description:"Stop running after the block at the given height in the main chain is processed. Blocks after the target height may be processed during shutdown. For testing only (default: 0, disabled)"`
 	TestNet3             bool          `long:"testnet" description:"Use the test network (version 3)"`
 	TestNet4             bool          `long:"testnet4" description:"Use the test network (version 4)"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
