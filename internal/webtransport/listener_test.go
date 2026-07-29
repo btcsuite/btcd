@@ -114,6 +114,12 @@ func TestListenerCarriesRawBytes(t *testing.T) {
 	t.Parallel()
 
 	endpoint := newTestEndpoint(t, Config{})
+	// Negotiate per-session flow control so the raw byte test catches a zero
+	// server receive window.  Other tests leave this disabled where they need
+	// to exercise the listener's application-level stream rejection.
+	endpoint.transport.Config = &wt.Config{
+		MaxIncomingData: defaultSessionReceiveWindow,
+	}
 	accepted := make(chan net.Conn, 1)
 	acceptErrors := make(chan error, 1)
 	go func() {
@@ -658,6 +664,24 @@ type fakeStream struct {
 	cancelReadCount  int
 	cancelWriteCount int
 	deadlines        []time.Time
+	readErr          error
+	writeErr         error
+}
+
+func (s *fakeStream) Read(buffer []byte) (int, error) {
+	if s.readErr != nil {
+		return 0, s.readErr
+	}
+
+	return s.Buffer.Read(buffer)
+}
+
+func (s *fakeStream) Write(buffer []byte) (int, error) {
+	if s.writeErr != nil {
+		return 0, s.writeErr
+	}
+
+	return s.Buffer.Write(buffer)
 }
 
 func (s *fakeStream) CancelRead(wt.StreamErrorCode) {
@@ -737,6 +761,31 @@ func TestStreamConnFullClose(t *testing.T) {
 	require.Equal(t, 1, stream.cancelWriteCount)
 	require.Equal(t, 1, session.closeCount)
 	require.Equal(t, 1, connectionCloseCount)
+}
+
+func TestStreamConnNormalRemoteClose(t *testing.T) {
+	t.Parallel()
+
+	remoteClose := &wt.SessionError{Remote: true, ErrorCode: 0}
+	stream := &fakeStream{
+		readErr:  remoteClose,
+		writeErr: remoteClose,
+	}
+	conn := newStreamConn(stream, &fakeSession{}, nil)
+
+	_, err := conn.Read(make([]byte, 1))
+	require.ErrorIs(t, err, io.EOF)
+	_, err = conn.Write([]byte{1})
+	require.ErrorIs(t, err, net.ErrClosed)
+
+	abnormalClose := &wt.SessionError{
+		Remote:    true,
+		ErrorCode: 1,
+		Message:   "abnormal close",
+	}
+	stream.readErr = abnormalClose
+	_, err = conn.Read(make([]byte, 1))
+	require.ErrorIs(t, err, abnormalClose)
 }
 
 func testTLSConfigs(t *testing.T) (*tls.Config, *tls.Config) {

@@ -37,6 +37,11 @@ const (
 	DefaultMaxIdleTimeout        = 5 * time.Minute
 	DefaultKeepAlivePeriod       = 15 * time.Second
 
+	// defaultSessionReceiveWindow is a sliding per-session flow-control
+	// window.  It must be non-zero whenever the stream limits below enable
+	// WebTransport session flow control.
+	defaultSessionReceiveWindow = 1 << 20
+
 	maxHeaderBytes = 8 << 10
 )
 
@@ -227,6 +232,7 @@ func NewListener(packetConn net.PacketConn, config Config) (*Listener, error) {
 		Config: &wt.Config{
 			MaxIncomingStreams:    1,
 			MaxIncomingUniStreams: -1,
+			MaxIncomingData:       defaultSessionReceiveWindow,
 		},
 		CheckOrigin: listener.checkOrigin,
 	}

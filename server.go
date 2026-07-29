@@ -2985,18 +2985,24 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 
 	var listeners []net.Listener
 	var nat NAT
+	closeListenersOnError := false
+	defer func() {
+		if closeListenersOnError {
+			closeListeners(listeners)
+		}
+	}()
 	if !cfg.DisableListen {
 		var err error
 		listeners, nat, err = initListeners(amgr, listenAddrs, services)
 		if err != nil {
 			return nil, err
 		}
+		closeListenersOnError = true
 
 		webTransportListeners, err := initWebTransportListeners(
 			cfg.WebTransportListen,
 		)
 		if err != nil {
-			closeListeners(listeners)
 			return nil, err
 		}
 		listeners = append(listeners, webTransportListeners...)
@@ -3346,6 +3352,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		}()
 	}
 
+	closeListenersOnError = false
 	return &s, nil
 }
 

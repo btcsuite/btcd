@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>btcd WebTransport WASM integration test</title>
+</head>
+<body>
+  <pre id="status">starting</pre>
+  <script src="/wasm_exec.js"></script>
+  <script>
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("/client.wasm"), go.importObject)
+      .then(({instance}) => go.run(instance))
+      .catch(async error => {
+        const result = {status: "error", error: String(error)};
+        document.getElementById("status").textContent =
+          JSON.stringify(result);
+        await fetch("/result", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(result),
+        });
+      });
+  </script>
+</body>
+</html>

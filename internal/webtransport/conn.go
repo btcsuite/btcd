@@ -52,11 +52,31 @@ func newStreamConn(stream stream, session session,
 }
 
 func (c *streamConn) Read(buffer []byte) (int, error) {
-	return c.stream.Read(buffer)
+	n, err := c.stream.Read(buffer)
+	if isNormalRemoteClose(err) {
+		return n, io.EOF
+	}
+
+	return n, err
 }
 
 func (c *streamConn) Write(buffer []byte) (int, error) {
-	return c.stream.Write(buffer)
+	n, err := c.stream.Write(buffer)
+	if isNormalRemoteClose(err) {
+		return n, net.ErrClosed
+	}
+
+	return n, err
+}
+
+// isNormalRemoteClose gives a peer's normal WebTransport session close the
+// same net.Conn semantics as a clean TCP shutdown.  Without this conversion,
+// btcd treats the empty SessionError as a malformed Bitcoin message and tries
+// to send a reject message to a peer that has already gone away.
+func isNormalRemoteClose(err error) bool {
+	var sessionErr *wt.SessionError
+	return errors.As(err, &sessionErr) && sessionErr.Remote &&
+		sessionErr.ErrorCode == 0
 }
 
 func (c *streamConn) Close() error {
