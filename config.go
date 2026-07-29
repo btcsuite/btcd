@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,6 +70,7 @@ const (
 	sampleConfigFilename         = "sample-btcd.conf"
 	defaultTxIndex               = false
 	defaultAddrIndex             = false
+	defaultWebTransportPath      = "/v1/btc-p2p"
 	pruneMinSize                 = 1536
 )
 
@@ -136,6 +138,12 @@ type config struct {
 	Generate             bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
 	FreeTxRelayLimit     float64       `long:"limitfreerelay" description:"Limit relay of transactions with no transaction fee to the given amount in thousands of bytes per minute"`
 	Listeners            []string      `long:"listen" description:"Add an interface/port to listen for connections (default all interfaces port: 8333, testnet: 18333)"`
+	DisableTCPListen     bool          `long:"notcplisten" description:"Disable Bitcoin P2P TCP listeners while allowing configured WebTransport listeners"`
+	WebTransportListen   []string      `long:"webtransportlisten" description:"Add a UDP interface/port to listen for Bitcoin P2P connections over WebTransport"`
+	WebTransportCert     string        `long:"webtransportcert" description:"Certificate file for the WebTransport HTTP/3 server"`
+	WebTransportKey      string        `long:"webtransportkey" description:"Certificate key file for the WebTransport HTTP/3 server"`
+	WebTransportPath     string        `long:"webtransportpath" description:"Exact HTTPS path for WebTransport Bitcoin P2P sessions"`
+	WebTransportOrigins  []string      `long:"webtransportorigin" description:"Allow a browser Origin to open WebTransport sessions (repeatable; default same-origin)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers. Must be greater than zero. Outbound slots for the configured peer mode are reserved before inbound capacity is calculated"`
@@ -145,7 +153,7 @@ type config struct {
 	NoCFilters           bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
 	DisableCheckpoints   bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DisableDNSSeed       bool          `long:"nodnsseed" description:"Disable DNS seeding for peers"`
-	DisableListen        bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen"`
+	DisableListen        bool          `long:"nolisten" description:"Disable listening for incoming connections -- NOTE: Listening is automatically disabled if the --connect or --proxy options are used without also specifying listen interfaces via --listen or --webtransportlisten"`
 	NoOnion              bool          `long:"noonion" description:"Disable connecting to tor hidden services"`
 	NoPeerBloomFilters   bool          `long:"nopeerbloomfilters" description:"Disable bloom filtering support"`
 	NoRelayPriority      bool          `long:"norelaypriority" description:"Do not require free or low-fee transactions to have high priority for relaying"`
@@ -344,6 +352,83 @@ func normalizeAddresses(addrs []string, defaultPort string) []string {
 	return removeDuplicateAddresses(addrs)
 }
 
+// normalizeWebTransportAddresses validates WebTransport UDP bind addresses.
+// Unlike Bitcoin P2P listeners, WebTransport has no network-specific default
+// port, so every address must include an explicit numeric port.
+func normalizeWebTransportAddresses(addrs []string) ([]string, error) {
+	result := make([]string, 0, len(addrs))
+	seen := make(map[string]struct{}, len(addrs))
+
+	for _, addr := range addrs {
+		addr = strings.TrimSpace(addr)
+		host, portString, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid WebTransport listen address %q: %w",
+				addr, err)
+		}
+
+		port, err := strconv.ParseUint(portString, 10, 16)
+		if err != nil || port == 0 {
+			return nil, fmt.Errorf("WebTransport listen address %q must include a port from 1 to 65535", addr)
+		}
+
+		normalized := net.JoinHostPort(host, strconv.FormatUint(port, 10))
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+
+	return result, nil
+}
+
+func validateWebTransportPath(path string) error {
+	if path == "" || !strings.HasPrefix(path, "/") ||
+		strings.HasPrefix(path, "//") || strings.ContainsAny(path, "?#") {
+
+		return fmt.Errorf("WebTransport path must be an absolute HTTP path")
+	}
+
+	u, err := url.ParseRequestURI(path)
+	if err != nil || u.IsAbs() || u.Host != "" || u.RawQuery != "" ||
+		u.ForceQuery || u.Fragment != "" {
+
+		return fmt.Errorf("invalid WebTransport path %q", path)
+	}
+
+	return nil
+}
+
+// configureP2PListeners applies the default TCP listener while preserving an
+// explicit WebTransport-only mode. DisableListen continues to override every
+// inbound transport.
+func configureP2PListeners(cfg *config, defaultPort string) error {
+	if cfg.DisableListen {
+		return nil
+	}
+
+	if cfg.DisableTCPListen {
+		if len(cfg.Listeners) > 0 {
+			return fmt.Errorf("--listen and --notcplisten can not be mixed")
+		}
+		if len(cfg.WebTransportListen) == 0 {
+			return fmt.Errorf(
+				"--notcplisten requires --webtransportlisten",
+			)
+		}
+
+		return nil
+	}
+
+	if len(cfg.Listeners) == 0 {
+		cfg.Listeners = []string{net.JoinHostPort("", defaultPort)}
+	}
+
+	return nil
+}
+
 // newCheckpointFromStr parses checkpoints in the '<height>:<hash>' format.
 func newCheckpointFromStr(checkpoint string) (chaincfg.Checkpoint, error) {
 	parts := strings.Split(checkpoint, ":")
@@ -454,6 +539,7 @@ func loadConfig() (*config, []string, error) {
 		TxIndex:              defaultTxIndex,
 		AddrIndex:            defaultAddrIndex,
 		V2Transport:          false,
+		WebTransportPath:     defaultWebTransportPath,
 	}
 
 	// Service options which are only added on Windows.
@@ -766,9 +852,9 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// --proxy or --connect without --listen disables listening.
+	// --proxy or --connect without any explicit listener disables listening.
 	if (cfg.Proxy != "" || len(cfg.ConnectPeers) > 0) &&
-		len(cfg.Listeners) == 0 {
+		len(cfg.Listeners) == 0 && len(cfg.WebTransportListen) == 0 {
 		cfg.DisableListen = true
 	}
 
@@ -777,13 +863,14 @@ func loadConfig() (*config, []string, error) {
 		cfg.DisableDNSSeed = true
 	}
 
-	// Add the default listener if none were specified. The default
-	// listener is all addresses on the listen port for the network
-	// we are to connect to.
-	if len(cfg.Listeners) == 0 {
-		cfg.Listeners = []string{
-			net.JoinHostPort("", activeNetParams.DefaultPort),
-		}
+	// Add the default TCP listener unless TCP was explicitly disabled.
+	if err := configureP2PListeners(
+		&cfg, activeNetParams.DefaultPort,
+	); err != nil {
+		err = fmt.Errorf("%s: %w", funcName, err)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
 	}
 
 	// Check to make sure limited and admin users don't have the same username
@@ -986,6 +1073,36 @@ func loadConfig() (*config, []string, error) {
 	// duplicate addresses.
 	cfg.Listeners = normalizeAddresses(cfg.Listeners,
 		activeNetParams.DefaultPort)
+
+	if !cfg.DisableListen && len(cfg.WebTransportListen) > 0 {
+		if cfg.WebTransportCert == "" || cfg.WebTransportKey == "" {
+			str := "%s: --webtransportcert and --webtransportkey are " +
+				"required with --webtransportlisten"
+			err := fmt.Errorf(str, funcName)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		cfg.WebTransportListen, err =
+			normalizeWebTransportAddresses(cfg.WebTransportListen)
+		if err != nil {
+			err = fmt.Errorf("%s: %w", funcName, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		if err := validateWebTransportPath(cfg.WebTransportPath); err != nil {
+			err = fmt.Errorf("%s: %w", funcName, err)
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, usageMessage)
+			return nil, nil, err
+		}
+
+		cfg.WebTransportCert = cleanAndExpandPath(cfg.WebTransportCert)
+		cfg.WebTransportKey = cleanAndExpandPath(cfg.WebTransportKey)
+	}
 
 	// Add default port to all rpc listener addresses if needed and remove
 	// duplicate addresses.

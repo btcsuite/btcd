@@ -6,7 +6,104 @@ import (
 	"regexp"
 	"runtime"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestNormalizeWebTransportAddresses(t *testing.T) {
+	t.Parallel()
+
+	addresses, err := normalizeWebTransportAddresses([]string{
+		"127.0.0.1:4433", "[::1]:4433", "127.0.0.1:4433",
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"127.0.0.1:4433", "[::1]:4433"}, addresses)
+
+	for _, address := range []string{"127.0.0.1", "127.0.0.1:0", ":https"} {
+		_, err := normalizeWebTransportAddresses([]string{address})
+		require.Error(t, err)
+	}
+}
+
+func TestValidateWebTransportPath(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, validateWebTransportPath("/v1/btc-p2p"))
+	for _, path := range []string{"", "v1/p2p", "//host/p2p", "/p2p?x=1", "/p2p#x"} {
+		require.Error(t, validateWebTransportPath(path), path)
+	}
+}
+
+func TestConfigureP2PListeners(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		cfg           config
+		wantListeners []string
+		wantErr       string
+	}{
+		{
+			name:          "ordinary default TCP listener",
+			wantListeners: []string{":8333"},
+		},
+		{
+			name: "WebTransport adds to default TCP",
+			cfg: config{
+				WebTransportListen: []string{"127.0.0.1:4433"},
+			},
+			wantListeners: []string{":8333"},
+		},
+		{
+			name: "explicit WebTransport only",
+			cfg: config{
+				DisableTCPListen:   true,
+				WebTransportListen: []string{"127.0.0.1:4433"},
+			},
+		},
+		{
+			name: "nolisten overrides WebTransport",
+			cfg: config{
+				DisableListen:      true,
+				WebTransportListen: []string{"127.0.0.1:4433"},
+			},
+		},
+		{
+			name: "TCP disabled without WebTransport",
+			cfg: config{
+				DisableTCPListen: true,
+			},
+			wantErr: "requires --webtransportlisten",
+		},
+		{
+			name: "TCP listener conflicts with disabled TCP",
+			cfg: config{
+				DisableTCPListen: true,
+				Listeners:        []string{"127.0.0.1:8333"},
+				WebTransportListen: []string{
+					"127.0.0.1:4433",
+				},
+			},
+			wantErr: "can not be mixed",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := configureP2PListeners(&test.cfg, "8333")
+			if test.wantErr != "" {
+				require.ErrorContains(t, err, test.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.wantListeners, test.cfg.Listeners)
+		})
+	}
+}
 
 func TestValidateMaxPeers(t *testing.T) {
 	tests := []struct {

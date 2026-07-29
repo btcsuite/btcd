@@ -2991,6 +2991,16 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		if err != nil {
 			return nil, err
 		}
+
+		webTransportListeners, err := initWebTransportListeners(
+			cfg.WebTransportListen,
+		)
+		if err != nil {
+			closeListeners(listeners)
+			return nil, err
+		}
+		listeners = append(listeners, webTransportListeners...)
+
 		if len(listeners) == 0 {
 			return nil, errors.New("no valid listen address")
 		}
@@ -3357,6 +3367,12 @@ func initListeners(amgr *addrmgr.AddrManager, listenAddrs []string, services wir
 			continue
 		}
 		listeners = append(listeners, listener)
+	}
+	if len(listeners) == 0 {
+		// External IP advertisement and UPnP describe ordinary Bitcoin TCP
+		// listeners. A WebTransport-only server must not publish or map a
+		// phantom TCP endpoint.
+		return listeners, nil, nil
 	}
 
 	var nat NAT

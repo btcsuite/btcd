@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/peer"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +22,31 @@ func TestMain(m *testing.M) {
 	// OnVerAck's double-call guard) panics via logWriter.Write.
 	initLogRotator(filepath.Join(os.TempDir(), "btcd-server-test.log"))
 	os.Exit(m.Run())
+}
+
+func TestInitListenersWithoutTCPDoesNotAdvertiseTCP(t *testing.T) {
+	originalCfg := cfg
+	t.Cleanup(func() {
+		cfg = originalCfg
+	})
+	cfg = &config{
+		ExternalIPs: []string{"203.0.113.7:8333"},
+	}
+
+	addrManager := addrmgr.New(t.TempDir(), net.LookupIP)
+	listeners, nat, err := initListeners(
+		addrManager, nil, defaultServices,
+	)
+	require.NoError(t, err)
+	require.Empty(t, listeners)
+	require.Nil(t, nat)
+
+	remote := wire.NetAddressV2FromBytes(
+		time.Now(), 0, net.ParseIP("198.51.100.1"), 8333,
+	)
+	local := addrManager.GetBestLocalAddress(remote)
+	require.Equal(t, "0.0.0.0", local.Addr.String())
+	require.Zero(t, local.Port)
 }
 
 // newTestServerPeer creates a minimal serverPeer suitable for unit
