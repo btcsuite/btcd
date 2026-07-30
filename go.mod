@@ -20,10 +20,12 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jrick/logrotate v1.1.2
-	github.com/stretchr/testify v1.10.0
+	github.com/quic-go/quic-go v0.61.0
+	github.com/quic-go/webtransport-go v0.12.0
+	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	golang.org/x/crypto v0.40.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/crypto v0.54.0
+	golang.org/x/sys v0.47.0
 	golang.org/x/time v0.15.0
 	pgregory.net/rapid v1.2.0
 )
@@ -32,11 +34,15 @@ require (
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/kcalvinalvin/anet v0.0.0-20251112173137-d8ddc1f6dbee // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
