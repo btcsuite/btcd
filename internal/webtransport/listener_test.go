@@ -247,6 +247,47 @@ func TestListenerOriginAndPathPolicy(t *testing.T) {
 	}
 }
 
+func TestListenerAllowsAnyOrigin(t *testing.T) {
+	t.Parallel()
+
+	endpoint := newTestEndpoint(t, Config{
+		AllowedOrigins: []string{"*"},
+	})
+
+	for _, origin := range []string{
+		"https://wallet.example",
+		"https://other.example:8443",
+	} {
+		response, session, err := endpoint.dial(
+			t, DefaultPath, origin,
+		)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, response.StatusCode)
+		require.NotNil(t, session)
+		require.NoError(t, session.CloseWithError(0, ""))
+	}
+
+	for _, origin := range []string{"null", "not-an-origin"} {
+		response, session, err := endpoint.dial(
+			t, DefaultPath, origin,
+		)
+		require.Error(t, err)
+		require.Equal(t, http.StatusForbidden, response.StatusCode)
+		require.Nil(t, session)
+	}
+
+	request := &http.Request{
+		Host: endpoint.listener.Addr().String(),
+		Header: http.Header{
+			"Origin": {
+				"https://wallet.example",
+				"https://other.example",
+			},
+		},
+	}
+	require.False(t, endpoint.listener.checkOrigin(request))
+}
+
 func TestListenerBoundsPendingSessions(t *testing.T) {
 	t.Parallel()
 
@@ -574,6 +615,7 @@ func TestNormalizeConfig(t *testing.T) {
 	normalized, err := normalizeConfig(Config{TLSConfig: tlsConfig})
 	require.NoError(t, err)
 	require.Equal(t, DefaultPath, normalized.path)
+	require.False(t, normalized.allowAnyOrigin)
 	require.Equal(t, DefaultMaxPendingConnections,
 		normalized.maxPendingConnections)
 	require.Equal(t, DefaultMaxPendingSessions, normalized.maxPendingSessions)
@@ -583,6 +625,13 @@ func TestNormalizeConfig(t *testing.T) {
 	require.Equal(t, DefaultMaxIdleTimeout, normalized.maxIdleTimeout)
 	require.Equal(t, DefaultKeepAlivePeriod, normalized.keepAlivePeriod)
 	require.NotSame(t, tlsConfig, normalized.tlsConfig)
+
+	normalized, err = normalizeConfig(Config{
+		TLSConfig:      tlsConfig,
+		AllowedOrigins: []string{"*"},
+	})
+	require.NoError(t, err)
+	require.True(t, normalized.allowAnyOrigin)
 
 	for _, test := range []struct {
 		name   string
@@ -603,10 +652,19 @@ func TestNormalizeConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "origin wildcard",
+			name: "partial origin wildcard",
 			config: Config{
 				TLSConfig:      tlsConfig,
 				AllowedOrigins: []string{"https://*.example.com"},
+			},
+		},
+		{
+			name: "allow any does not mask invalid origin",
+			config: Config{
+				TLSConfig: tlsConfig,
+				AllowedOrigins: []string{
+					"*", "https://*.example.com",
+				},
 			},
 		},
 		{

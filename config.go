@@ -143,7 +143,7 @@ type config struct {
 	WebTransportCert     string        `long:"webtransportcert" description:"Certificate file for the WebTransport HTTP/3 server"`
 	WebTransportKey      string        `long:"webtransportkey" description:"Certificate key file for the WebTransport HTTP/3 server"`
 	WebTransportPath     string        `long:"webtransportpath" description:"Exact HTTPS path for WebTransport Bitcoin P2P sessions"`
-	WebTransportOrigins  []string      `long:"webtransportorigin" description:"Allow a browser Origin to open WebTransport sessions (repeatable; default same-origin)"`
+	WebTransportOrigins  []string      `long:"webtransportorigin" description:"Allow a browser Origin to open WebTransport sessions (repeatable; use * for any HTTP(S) origin; default same-origin)"`
 	LogDir               string        `long:"logdir" description:"Directory to log output."`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	MaxPeers             int           `long:"maxpeers" description:"Max number of inbound and outbound peers. Must be greater than zero. Outbound slots for the configured peer mode are reserved before inbound capacity is calculated"`

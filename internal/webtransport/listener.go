@@ -59,8 +59,9 @@ type Config struct {
 	Path string
 
 	// AllowedOrigins contains additional browser origins accepted alongside
-	// the safe same-origin default.  Entries are exact origins; wildcards and
-	// URL paths are rejected.
+	// the safe same-origin default.  Entries are exact origins; the exact value
+	// "*" allows any HTTP(S) origin.  Partial wildcards and URL paths are
+	// rejected.
 	AllowedOrigins []string
 
 	// MaxPendingConnections bounds QUIC connections that have not sent a
@@ -89,6 +90,7 @@ type listenerConfig struct {
 	tlsConfig             *tls.Config
 	path                  string
 	allowedOrigins        map[string]struct{}
+	allowAnyOrigin        bool
 	maxPendingConnections int
 	maxPendingSessions    int
 	firstRequestTimeout   time.Duration
@@ -528,6 +530,9 @@ func (l *Listener) checkOrigin(request *http.Request) bool {
 	if err != nil {
 		return false
 	}
+	if l.config.allowAnyOrigin {
+		return true
+	}
 	if origin == requestOrigin {
 		return true
 	}
@@ -562,7 +567,13 @@ func normalizeConfig(config Config) (listenerConfig, error) {
 	path = parsedPath.EscapedPath()
 
 	allowedOrigins := make(map[string]struct{}, len(config.AllowedOrigins))
+	allowAnyOrigin := false
 	for _, rawOrigin := range config.AllowedOrigins {
+		if rawOrigin == "*" {
+			allowAnyOrigin = true
+			continue
+		}
+
 		if strings.Contains(rawOrigin, "*") {
 			return listenerConfig{}, fmt.Errorf(
 				"WebTransport origin %q contains a wildcard", rawOrigin,
@@ -638,6 +649,7 @@ func normalizeConfig(config Config) (listenerConfig, error) {
 		tlsConfig:             config.TLSConfig.Clone(),
 		path:                  path,
 		allowedOrigins:        allowedOrigins,
+		allowAnyOrigin:        allowAnyOrigin,
 		maxPendingConnections: maxPendingConnections,
 		maxPendingSessions:    maxPendingSessions,
 		firstRequestTimeout:   firstRequestTimeout,

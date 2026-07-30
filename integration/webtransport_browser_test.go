@@ -128,7 +128,7 @@ func TestWebTransportBrowserWASMPeer(t *testing.T) {
 			"--webtransportcert=" + certificatePath,
 			"--webtransportkey=" + keyPath,
 			"--webtransportpath=" + webTransportTestPath,
-			"--webtransportorigin=" + browserOrigin,
+			"--webtransportorigin=*",
 		}, "",
 	)
 	require.NoError(t, err)

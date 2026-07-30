@@ -11,7 +11,9 @@ package to programmatically drive nodes via RPC.
 ## Browser WebTransport test
 
 The WebTransport test builds btcd's peer package as Go/WASM, runs it in a
-stock Chrome or Chromium browser, and connects it to a native btcd simnet node:
+stock Chrome or Chromium browser, and connects it across origins to a native
+btcd simnet node whose WebTransport listener allows every HTTP(S) browser
+origin:
 
 ```bash
 go test -v -tags=rpctest ./integration \
