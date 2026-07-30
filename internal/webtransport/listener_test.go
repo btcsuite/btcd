@@ -445,7 +445,9 @@ func TestListenerKeepAlivePreservesIdlePeer(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("listener did not accept idle peer")
 	}
-	defer serverConn.Close()
+	defer func() {
+		_ = serverConn.Close()
+	}()
 	initial := make([]byte, 1)
 	_, err = io.ReadFull(serverConn, initial)
 	require.NoError(t, err)
@@ -494,7 +496,9 @@ func TestListenerRejectsAdditionalStreams(t *testing.T) {
 
 	select {
 	case conn := <-accepted:
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close()
+		}()
 	case <-ctx.Done():
 		t.Fatal("listener did not accept the first stream")
 	}
@@ -534,7 +538,9 @@ func TestListenerRejectsDatagrams(t *testing.T) {
 
 	select {
 	case conn := <-accepted:
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close()
+		}()
 	case <-ctx.Done():
 		t.Fatal("listener did not accept the first stream")
 	}

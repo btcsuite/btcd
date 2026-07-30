@@ -355,7 +355,11 @@ func (l *Listener) connectionContext(ctx context.Context,
 
 	select {
 	case <-l.done:
-		go state.close(http3.ErrCodeNoError, "listener is shutting down")
+		go func() {
+			_ = state.close(
+				http3.ErrCodeNoError, "listener is shutting down",
+			)
+		}()
 		return context.WithValue(ctx, connectionStateKey{}, state)
 	default:
 	}
@@ -367,10 +371,12 @@ func (l *Listener) connectionContext(ctx context.Context,
 		go l.expirePendingConnection(ctx, state)
 
 	default:
-		go state.close(
-			http3.ErrCodeExcessiveLoad,
-			"too many pending WebTransport connections",
-		)
+		go func() {
+			_ = state.close(
+				http3.ErrCodeExcessiveLoad,
+				"too many pending WebTransport connections",
+			)
+		}()
 	}
 
 	return context.WithValue(ctx, connectionStateKey{}, state)
