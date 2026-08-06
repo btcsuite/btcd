@@ -22,6 +22,7 @@ DEV_TAGS := rpctest
 GOTEST_DEV = go test -v -tags=$(DEV_TAGS)
 GOTEST := go test -v
 COVER_FLAGS = -coverprofile=coverage.txt -covermode=atomic -coverpkg=$(PKG)/...
+MODULES := address btcec btcutil chaincfg chainhash psbt txscript v2transport wire
 
 # Linting uses a lot of memory, so keep it under control by limiting the number
 # of workers if requested.
@@ -96,14 +97,11 @@ check: unit
 unit:
 	@$(call print, "Running unit tests.")
 	$(GOTEST_DEV) ./... -test.timeout=20m
-	cd address && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd btcec && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd btcutil && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd chaincfg && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd chainhash && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd txscript && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd psbt && $(GOTEST_DEV) ./... -test.timeout=20m
-	cd wire && $(GOTEST_DEV) ./... -test.timeout=20m
+	for module in $(MODULES); do \
+		( cd $$module; echo $$module; \
+		  $(GOTEST_DEV) ./... -test.timeout=20m \
+		); \
+	done
 
 #? unit-cover: Run unit coverage tests
 unit-cover:
@@ -112,27 +110,22 @@ unit-cover:
 
 	# We need to remove the /v2 pathing from the module to have it work
 	# nicely with the CI tool we use to render live code coverage.
-	cd address && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd btcec && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd btcutil && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd chaincfg && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd chainhash && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd txscript && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd psbt && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
-	cd wire && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	for module in $(MODULES); do \
+		( cd $$module; echo $$module; \
+		  $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt \
+		); \
+	done
 
 #? unit-race: Run unit race tests
 unit-race:
 	@$(call print, "Running unit race tests.")
 	env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd address && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd btcec && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd btcutil && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd chaincfg && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd chainhash && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd txscript && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
-	cd wire && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+
+	for module in $(MODULES); do \
+		( cd $$module; echo $$module; \
+		  env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./... \
+	    ); \
+	done
 
 # =========
 # UTILITIES
