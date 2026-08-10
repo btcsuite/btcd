@@ -1,7 +1,9 @@
 package miniscript
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -227,4 +229,71 @@ func TestThreshSelection(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestThreshLargeParse is the regression test for the threshold analysis passes
+// being exponential in space: a thresh with 28 sub expressions is a perfectly
+// valid miniscript, about two kilobytes long with concrete keys and well under
+// every script limit, but enumerating its C(28, 14) selections allocated around
+// five gigabytes and aborted the process with a fatal out-of-memory error.
+// Parsing it must simply work, and produce the same values as the brute-force
+// oracle does for a size it can still handle.
+func TestThreshLargeParse(t *testing.T) {
+	t.Parallel()
+
+	// buildThresh assembles thresh(k, pk(K1), s:pk(K2), ..., s:pk(Kn)). All
+	// sub expressions but the first need the s: wrapper to be of type W.
+	buildThresh := func(k, n int) string {
+		var b strings.Builder
+		fmt.Fprintf(&b, "thresh(%d,pk(key1)", k)
+		for i := 2; i <= n; i++ {
+			fmt.Fprintf(&b, ",s:pk(key%d)", i)
+		}
+		b.WriteByte(')')
+		return b.String()
+	}
+
+	// The number of sub expressions that used to be fatal, and a threshold
+	// of half of them, which maximizes the number of selections.
+	const (
+		n = 28
+		k = 14
+	)
+
+	node, err := Parse(buildThresh(k, n), P2WSH)
+	require.NoError(t, err)
+
+	// Every sub expression needs exactly one witness element, whether it is
+	// satisfied (a signature) or dissatisfied (an empty element), so the
+	// satisfaction needs one element per sub expression.
+	require.True(t, node.stackSize.sat.valid)
+	require.Equal(t, n, node.stackSize.sat.value)
+	require.True(t, node.stackSize.dsat.valid)
+	require.Equal(t, n, node.stackSize.dsat.value)
+
+	// None of the sub expressions is an OP_CHECKMULTISIG, so no additional
+	// ops are needed to satisfy the script beyond the ones it contains.
+	require.True(t, node.opCount.sat.valid)
+	require.Equal(t, 0, node.opCount.sat.value)
+
+	// The same expression at a size the brute-force oracle can still handle
+	// must produce identical values, which ties the fast path back to the
+	// enumeration for a real, parsed expression.
+	small, err := Parse(buildThresh(6, 12), P2WSH)
+	require.NoError(t, err)
+
+	subs := small.args[1:]
+	sat := make([]maxInt, len(subs))
+	dsat := make([]maxInt, len(subs))
+	for i, sub := range subs {
+		sat[i], dsat[i] = sub.stackSize.sat, sub.stackSize.dsat
+	}
+	require.Equal(
+		t, bruteForceMaxSum(6, sat, dsat), small.stackSize.sat,
+	)
+
+	for i, sub := range subs {
+		sat[i], dsat[i] = sub.opCount.sat, sub.opCount.dsat
+	}
+	require.Equal(t, bruteForceMaxSum(6, sat, dsat), small.opCount.sat)
 }
