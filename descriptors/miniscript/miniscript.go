@@ -77,6 +77,24 @@ const (
 	// multi_a (OP_CHECKSIGADD) expression.
 	checkSigAddMaxKeys = 999
 
+	// maxNestingDepth is the maximum nesting depth of a miniscript
+	// expression, where every sub expression and every wrapper counts as
+	// one level.
+	//
+	// The limit exists because every tree pass (the analysis passes run by
+	// Parse, but also Script, Satisfy, Clone, Keys, Lift and DrawTree)
+	// recurses once per level, and Go grows a goroutine stack only up to a
+	// hard limit, after which the runtime throws a fatal stack overflow
+	// that recover() cannot catch, killing the process rather than the
+	// request. Roughly one megabyte of `n:` wrappers was enough to reach
+	// it.
+	//
+	// The value matches rust-miniscript's MAX_RECURSION_DEPTH, which exists
+	// for the same reason and is far beyond any legitimate expression. See
+	// https://github.com/sipa/miniscript/pull/5 for a discussion of the
+	// number.
+	maxNestingDepth = 402
+
 	// All fragment identifiers.
 
 	f_0         = "0"         // 0
@@ -333,6 +351,17 @@ func Parse(miniscript string, ctx Context) (*AST, error) {
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	// Reject expressions that nest too deeply before anything walks the
+	// tree recursively, since that is what a deeply nested expression would
+	// otherwise crash.
+	if err := checkNestingDepth(node); err != nil {
+		return nil, err
+	}
+
+	if err := checkSortedMultiA(node); err != nil {
 		return nil, err
 	}
 
@@ -782,6 +811,83 @@ func (a *AST) isSubExpression(i int) bool {
 	}
 
 	return true
+}
+
+// checkNestingDepth returns an error if the tree rooted at the given node nests
+// deeper than maxNestingDepth. Every wrapper character counts as one level,
+// because expandWrappers turns each of them into a node of its own.
+//
+// The tree is walked with an explicit stack: a recursive walk would itself
+// overflow the goroutine stack on the very inputs this check exists to reject.
+func checkNestingDepth(node *AST) error {
+	type item struct {
+		node *AST
+
+		// depth is the nesting level of the node: its parent's level,
+		// plus one for the node itself, plus one per wrapper it
+		// carries.
+		depth int
+	}
+
+	stack := []item{{node: node, depth: 1 + len(node.wrappers)}}
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		if current.depth > maxNestingDepth {
+			return fmt.Errorf("expression nests at least %d levels "+
+				"deep, which is more than the maximum nesting "+
+				"depth of %d", current.depth, maxNestingDepth)
+		}
+
+		for i, arg := range current.node.args {
+			if !current.node.isSubExpression(i) {
+				continue
+			}
+			stack = append(stack, item{
+				node:  arg,
+				depth: current.depth + 1 + len(arg.wrappers),
+			})
+		}
+	}
+
+	return nil
+}
+
+// checkSortedMultiA returns an error if a sortedmulti_a appears anywhere but as
+// the whole expression, without wrappers. BIP387 defines sortedmulti_a as a
+// script expression, i.e. a whole tr() leaf, and BIP379 has no such fragment,
+// so Core rejects it inside a miniscript. Accepting it there would produce
+// descriptors Core cannot import.
+//
+// Like checkNestingDepth, it walks the tree with an explicit stack.
+func checkSortedMultiA(root *AST) error {
+	if root.identifier == f_sortedmulti_a && root.wrappers != "" {
+		return errors.New(
+			"sortedmulti_a cannot be wrapped, it is only allowed " +
+				"as a whole expression",
+		)
+	}
+
+	stack := []*AST{root}
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		for i, arg := range current.args {
+			if !current.isSubExpression(i) {
+				continue
+			}
+			if arg.identifier == f_sortedmulti_a {
+				return fmt.Errorf("sortedmulti_a is only allowed "+
+					"as a whole expression, not inside %s",
+					current.identifier)
+			}
+			stack = append(stack, arg)
+		}
+	}
+
+	return nil
 }
 
 // apply transforms subexpressions bottom-up, replacing each child before its
