@@ -3,12 +3,12 @@ module github.com/btcsuite/btcd/descriptors
 go 1.26.9
 
 require (
+	github.com/btcsuite/btcd/address/v2 v2.0.0
 	github.com/btcsuite/btcd/txscript/v2 v2.0.0
 	github.com/stretchr/testify v1.12.1
 )
 
 require (
-	github.com/btcsuite/btcd/address/v2 v2.0.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0 // indirect
 	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0 // indirect
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0 // indirect
