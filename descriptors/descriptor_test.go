@@ -1,11 +1,111 @@
 package descriptors
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
+
+// networkParams maps a test-vector network name to its chaincfg parameters.
+func networkParams(t *testing.T, network string) *chaincfg.Params {
+	t.Helper()
+
+	switch network {
+	case "mainnet":
+		return &chaincfg.MainNetParams
+
+	case "testnet":
+		return &chaincfg.TestNet3Params
+
+	case "regtest":
+		return &chaincfg.RegressionNetParams
+
+	default:
+		require.FailNowf(t, "unknown network", "network: %s", network)
+		return nil
+	}
+}
+
+// testAddress is an address derivation and its expected result or error.
+type testAddress struct {
+	Network         string `json:"network"`
+	MultipathIndex  uint32 `json:"multipathIndex"`
+	DerivationIndex uint32 `json:"derivationIndex"`
+	Address         string `json:"address"`
+	ExpectErr       string `json:"expectErr"`
+}
+
+// derivationTestVector checks parsing, checksum display and address derivation.
+type derivationTestVector struct {
+	Name         string         `json:"name"`
+	Descriptor   string         `json:"descriptor"`
+	HasChecksum  bool           `json:"hasChecksum"`
+	Checksum     string         `json:"checksum"`
+	NumMultipath uint32         `json:"numMultipath"`
+	ExpectErr    string         `json:"expectErr"`
+	Addresses    []*testAddress `json:"addresses"`
+}
+
+// TestDerivationVectors runs the derivation test vectors copied from the
+// descriptors-go reference implementation.
+func TestDerivationVectors(t *testing.T) {
+	t.Parallel()
+
+	file, err := os.Open(filepath.Join("testdata", "derivation.json"))
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, file.Close())
+	}()
+
+	var vectors []*derivationTestVector
+	require.NoError(t, json.NewDecoder(file).Decode(&vectors))
+
+	for _, vector := range vectors {
+		t.Run(vector.Name, func(t *testing.T) {
+			t.Parallel()
+
+			descriptor, err := NewDescriptor(vector.Descriptor)
+			if vector.ExpectErr != "" {
+				require.ErrorContains(t, err, vector.ExpectErr)
+				return
+			}
+			require.NoError(t, err)
+
+			require.EqualValues(
+				t, vector.NumMultipath,
+				descriptor.MultipathLen(),
+			)
+
+			expected := vector.Descriptor
+			if !vector.HasChecksum {
+				expected += vector.Checksum
+			}
+			require.Equal(t, expected, descriptor.String())
+
+			for _, addr := range vector.Addresses {
+				params := networkParams(t, addr.Network)
+				got, err := descriptor.AddressAt(
+					params, addr.MultipathIndex,
+					addr.DerivationIndex,
+				)
+				if addr.ExpectErr != "" {
+					require.ErrorContains(
+						t, err, addr.ExpectErr,
+					)
+					continue
+				}
+
+				require.NoError(t, err)
+				require.Equal(t, addr.Address, got)
+			}
+		})
+	}
+}
 
 // TestSplitArgs checks that a comma-separated argument list is split only at
 // the top nesting level, respecting (), {}, [] and <> grouping.
@@ -234,4 +334,73 @@ func TestNewDescriptorRejectsInsaneMiniscript(t *testing.T) {
 			require.ErrorContains(t, err, tc.errStr)
 		})
 	}
+}
+
+// TestDuplicateDerivedKeys checks that a miniscript is rejected at parse time
+// if two of its keys are the same public key written differently, as Core does.
+// Such a descriptor used to parse, and then failed to derive any address. The
+// keys are compared as Core's KeyCompare does: derived at child 0 of the first
+// multipath path, or as written if they cannot be derived there.
+func TestDuplicateDerivedKeys(t *testing.T) {
+	t.Parallel()
+
+	const (
+		// key is the public key of wif, the key pair of the BIP381
+		// and BIP383 test vectors.
+		key = "03a34b99f22c790c4e36b2b3c2c35a36db06226e41c692fc82b8b5" +
+			"6ac1c540c5bd"
+		wif = "L4rK1yDtCWekvXuE6oXD9jCYfFNV2cWRpVuPLBcCU2z8TrisoyY1"
+
+		// xpub is the extended key of the BIP387 test vectors.
+		xpub = "xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhM" +
+			"khgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZ" +
+			"ZvRcEL"
+	)
+	andV := func(a, b string) string {
+		return "and_v(v:pk(" + a + "),pk(" + b + "))"
+	}
+
+	for _, desc := range []string{
+		"wsh(" + andV(wif, key) + ")",
+		"wsh(" + andV("[deadbeef/1]"+key, key) + ")",
+		"wsh(" + andV(xpub+"/0/*", "[01020304/5]"+xpub+"/0/*") + ")",
+		"wsh(" + andV(xpub+"/<0;1>/*", xpub+"/0/*") + ")",
+		"sh(" + andV(wif, key) + ")",
+
+		// In a tap leaf the x-only and the compressed form of a key
+		// are the same key in the script.
+		"tr(" + key + "," + andV(key[2:], key) + ")",
+	} {
+
+		_, err := NewDescriptor(desc)
+		require.ErrorContainsf(
+			t, err, "duplicate key", "descriptor %s", desc,
+		)
+	}
+
+	// Only the first multipath path is compared, as in Core, so a
+	// descriptor whose keys only collide on a later path parses, and
+	// that path is where it fails.
+	desc, err := NewDescriptor(
+		"wsh(" + andV(xpub+"/<0;1>/*", xpub+"/<2;1>/*") + ")",
+	)
+	require.NoError(t, err)
+	_, err = desc.AddressAt(&chaincfg.MainNetParams, 0, 0)
+	require.NoError(t, err)
+	_, err = desc.AddressAt(&chaincfg.MainNetParams, 1, 0)
+	require.ErrorContains(t, err, "duplicate key")
+
+	// A hardened step below an xpub cannot be derived, so such keys are
+	// compared as written, and two different spellings are not taken for
+	// the same key.
+	_, err = NewDescriptor(
+		"wsh(" + andV(xpub+"/0h/*", "[01020304/5]"+xpub+"/0h/*") + ")",
+	)
+	require.NoError(t, err)
+
+	// A tr() leaf that is a single multi_a may repeat a key, as in Core.
+	_, err = NewDescriptor(
+		"tr(" + key + ",multi_a(1," + key[2:] + "," + key + "))",
+	)
+	require.NoError(t, err)
 }
