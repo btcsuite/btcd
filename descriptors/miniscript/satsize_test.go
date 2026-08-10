@@ -3,6 +3,7 @@ package miniscript
 import (
 	"testing"
 
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -99,4 +100,101 @@ func TestThreshSatField(t *testing.T) {
 	}
 	_, ok = threshSatField(impossible, 0, size)
 	require.False(t, ok)
+}
+
+// TestSatSizeAgainstSatisfier checks the computed maximum satisfaction size of
+// the d: wrapper against the witness its own satisfier produces. The wrapper
+// adds a selector element holding 0x01, which is two bytes on the witness
+// stack: the length prefix and the byte itself, the same as the <1> selector of
+// or_i. Since d: only wraps fragments that consume no witness elements of their
+// own (its argument is of type Vz), the selector is the whole difference.
+func TestSatSizeAgainstSatisfier(t *testing.T) {
+	t.Parallel()
+
+	for _, ctx := range []Context{P2WSH, P2TR} {
+		// A signature of the size the satisfaction size pass assumes
+		// for the context, so that the computed maximum and the
+		// produced witness are directly comparable.
+		sigLen, keyLen := 72, compressedPubKeyLen
+		if ctx == P2TR {
+			sigLen, keyLen = 65, xOnlyPubKeyLen
+		}
+
+		for _, tc := range []struct {
+			expr string
+			want int
+		}{{
+			// <1>
+			expr: "dv:older(144)",
+			want: 2,
+		}, {
+			// <1> <1> plus the empty element of the a: branch
+			expr: "and_b(dv:older(144),adv:older(100))",
+			want: 4,
+		}, {
+			// <signature> <1>
+			expr: "and_v(v:pk(A),dv:older(144))",
+			want: sigLen + 1 + 2,
+		}} {
+
+			t.Run(tc.expr+" "+ctx.String(), func(t *testing.T) {
+				t.Parallel()
+
+				// The first two expressions hold no
+				// signature at all, which makes them
+				// insane, so the sanity checks are
+				// skipped here.
+				node, err := ParseInsane(tc.expr, ctx)
+				require.NoError(t, err)
+
+				stated, err := node.MaxSatisfactionSize()
+				require.NoError(t, err)
+				require.Equal(t, tc.want, stated)
+
+				key := make([]byte, keyLen)
+				key[keyLen-1] = 1
+				if keyLen == compressedPubKeyLen {
+					key[0] = 2
+				}
+				require.NoError(t, node.ApplyVars(
+					func(string) ([]byte, error) {
+						return key, nil
+					},
+				))
+
+				witness, err := node.Satisfy(&Satisfier{
+					Sign: func([]byte) ([]byte, bool) {
+						return make([]byte, sigLen),
+							true
+					},
+					CheckOlder: func(uint32) (bool, error) {
+						return true, nil
+					},
+					CheckAfter: func(uint32) (bool, error) {
+						return true, nil
+					},
+					Preimage: func(string, []byte) ([]byte,
+						bool) {
+
+						return nil, false
+					},
+				})
+				require.NoError(t, err)
+				require.Equal(t, tc.want, witnessSize(witness))
+			})
+		}
+	}
+}
+
+// witnessSize returns the size in bytes of the given witness elements, each
+// including its own length prefix but without the prefix that encodes the
+// number of elements, which is the convention of the satisfaction size pass.
+func witnessSize(witness [][]byte) int {
+	size := 0
+	for _, element := range witness {
+		size += wire.VarIntSerializeSize(uint64(len(element))) +
+			len(element)
+	}
+
+	return size
 }
