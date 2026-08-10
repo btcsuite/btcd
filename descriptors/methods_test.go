@@ -2,6 +2,7 @@ package descriptors
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
@@ -93,6 +94,61 @@ func TestMaxWeightToSatisfy(t *testing.T) {
 	require.NoError(t, err)
 	_, err = descriptor.MaxWeightToSatisfy()
 	require.Error(t, err)
+}
+
+// TestLift checks that a descriptor lifts to the expected semantic policy,
+// including the nested-threshold structure and JSON encoding, against the
+// descriptors-go reference values.
+func TestLift(t *testing.T) {
+	t.Parallel()
+
+	descriptor, err := NewDescriptor(testTr)
+	require.NoError(t, err)
+
+	policy, err := descriptor.Lift()
+	require.NoError(t, err)
+
+	threshold1 := uint(1)
+	threshold2 := uint(2)
+	key1 := testXpub1
+	key2 := testXpub2
+	lockTime := uint32(65535)
+	require.Equal(t, &SemanticPolicy{
+		Type:      SemanticPolicyTypeThresh,
+		Threshold: &threshold1,
+		Policies: []*SemanticPolicy{{
+			Type: SemanticPolicyTypeKey,
+			Key:  &key1,
+		}, {
+			Type:      SemanticPolicyTypeThresh,
+			Threshold: &threshold2,
+			Policies: []*SemanticPolicy{{
+				Type: SemanticPolicyTypeKey,
+				Key:  &key2,
+			}, {
+				Type:     SemanticPolicyTypeOlder,
+				LockTime: &lockTime,
+			}},
+		}},
+	}, policy)
+
+	jsonPolicy, err := json.Marshal(policy)
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"type": "thresh",
+		"threshold": 1,
+		"policies": [
+			{"type": "key", "key": "`+testXpub1+`"},
+			{
+				"type": "thresh",
+				"threshold": 2,
+				"policies": [
+					{"type": "key", "key": "`+testXpub2+`"},
+					{"type": "older", "lockTime": 65535}
+				]
+			}
+		]
+	}`, string(jsonPolicy))
 }
 
 // TestScriptCodeAt checks the script code derived for a P2WSH sorted-multisig.
