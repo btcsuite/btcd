@@ -12,12 +12,11 @@ import (
 // A sub expression that cannot be dissatisfied has to be satisfied by every
 // selection, one that cannot be satisfied has to be dissatisfied by every
 // selection, and the remaining ones are free to go either way. That is enough
-// to answer the two questions the analysis passes ask - the maximum sum of the
-// per-sub-expression costs (op count, witness element count) and whether a
-// given sub expression can be satisfied or dissatisfied at all (execution stack
-// peak) - in O(n log n) time and O(n) space instead of enumerating all C(n, k)
-// selections, which grows exponentially and made Parse abort the process with
-// an out-of-memory error for n as small as 28.
+// to answer the question the analysis passes ask - the maximum sum of the
+// per-sub-expression costs (op count, witness element count) - in O(n log n)
+// time and O(n) space instead of enumerating all C(n, k) selections, which
+// grows exponentially and made Parse abort the process with an out-of-memory
+// error for n as small as 28.
 type threshSelection struct {
 	// k is the number of sub expressions a satisfaction has to satisfy.
 	k int
@@ -118,40 +117,4 @@ func (s threshSelection) maxSum() maxInt {
 	}
 
 	return maxInt{valid: true, value: total}
-}
-
-// canSatisfy returns whether some valid selection satisfies the sub expression
-// at index i.
-func (s threshSelection) canSatisfy(i int) bool {
-	if !s.possible || !s.sat[i].valid {
-		return false
-	}
-
-	// A mandatory sub expression is satisfied by every selection.
-	if !s.dsat[i].valid {
-		return true
-	}
-
-	// A free sub expression can be satisfied as long as the mandatory ones
-	// do not already account for all k satisfactions. The other k-1
-	// satisfactions can always be assigned, because the selection is
-	// possible at all.
-	return s.numMandatory < s.k
-}
-
-// canDissatisfy returns whether some valid selection dissatisfies the sub
-// expression at index i.
-func (s threshSelection) canDissatisfy(i int) bool {
-	if !s.possible || !s.dsat[i].valid {
-		return false
-	}
-
-	// A forbidden sub expression is dissatisfied by every selection.
-	if !s.sat[i].valid {
-		return true
-	}
-
-	// A free sub expression can be dissatisfied if the satisfactions that
-	// are still to be assigned fit in the remaining free sub expressions.
-	return s.k-s.numMandatory <= s.numFree-1
 }
