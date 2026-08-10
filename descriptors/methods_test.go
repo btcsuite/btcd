@@ -3,6 +3,7 @@ package descriptors
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
@@ -164,6 +165,32 @@ func TestLift(t *testing.T) {
 	)
 }
 
+// TestMultipathIndexBounds checks that a multipath index past the descriptor's
+// multipath length is rejected with an error rather than silently accepted or
+// panicking. The bound must be overflow-safe: on 32-bit platforms a uint32
+// index above math.MaxInt32 must not wrap to a negative int and slip past it.
+func TestMultipathIndexBounds(t *testing.T) {
+	t.Parallel()
+
+	// testTr contains a "<0;1>" element, so its multipath length is 2.
+	descriptor, err := NewDescriptor(testTr)
+	require.NoError(t, err)
+	require.Equal(t, 2, descriptor.MultipathLen())
+
+	// The maximum uint32 is out of bounds for every method that takes a
+	// multipath index, which must error instead of panicking.
+	const outOfBounds = uint32(math.MaxUint32)
+
+	_, err = descriptor.AddressAt(&chaincfg.MainNetParams, outOfBounds, 0)
+	require.Error(t, err)
+
+	_, err = descriptor.ScriptCodeAt(outOfBounds, 0)
+	require.Error(t, err)
+
+	_, err = descriptor.PlanAt(outOfBounds, 0, Assets{})
+	require.Error(t, err)
+}
+
 // TestScriptCodeAt checks the script code derived for a P2WSH sorted-multisig.
 func TestScriptCodeAt(t *testing.T) {
 	t.Parallel()
@@ -231,9 +258,9 @@ func TestBareScriptCode(t *testing.T) {
 
 			script, err := d.ScriptCodeAt(0, 0)
 			require.NoError(t, err)
-			require.Equal(
-				t, tc.wantScript, hex.EncodeToString(script),
-			)
+			require.Equal(t, tc.wantScript, hex.EncodeToString(
+				script,
+			))
 
 			// A bare descriptor has no address.
 			_, err = d.AddressAt(&chaincfg.MainNetParams, 0, 0)
