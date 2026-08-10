@@ -2,6 +2,7 @@ package descriptors
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -23,11 +24,16 @@ const (
 	// byte of a control block (combined with the output key parity).
 	tapLeafVersion = byte(txscript.BaseLeafVersion)
 
+	// minSchnorrSigLen is the size in bytes of a BIP341 signature for the
+	// default sighash type, which is the smallest one that exists: it has
+	// no sighash byte at all.
+	minSchnorrSigLen = 64
+
 	// maxSchnorrSigLen is the largest size in bytes a BIP341 signature can
 	// have: 64 bytes, plus a sighash byte for any sighash type other than
-	// the default. A size reported by an asset provider that exceeds it
-	// cannot describe a signature, so it is treated as unavailable rather
-	// than allocated.
+	// the default. A size reported by an asset provider outside of the two
+	// valid ones cannot describe a signature, so it is treated as
+	// unavailable rather than allocated.
 	maxSchnorrSigLen = 65
 
 	// hashPreimageLen is the size in bytes of the preimage of a miniscript
@@ -63,14 +69,16 @@ type Assets struct {
 	LookupEcdsaSig func(pk string) bool
 
 	// LookupTapKeySpendSig reports whether a taproot key-spend signature is
-	// available for the given public key, and its size. A size larger than
-	// a BIP341 signature (maxSchnorrSigLen) is treated as unavailable.
+	// available for the given public key, and its size. A BIP341 signature
+	// is 64 bytes, or 65 with the sighash byte of a type other than the
+	// default, so any other size is treated as unavailable.
 	LookupTapKeySpendSig func(pk string) (uint32, bool)
 
 	// LookupTapLeafScriptSig reports whether a taproot leaf-script
 	// signature is available for the given public key and leaf hash, and
-	// its size. A size larger than a BIP341 signature (maxSchnorrSigLen) is
-	// treated as unavailable.
+	// its size. A BIP341 signature is 64 bytes, or 65 with the sighash byte
+	// of a type other than the default, so any other size is treated as
+	// unavailable.
 	LookupTapLeafScriptSig func(pk string, leafHash string) (uint32, bool)
 
 	// LookupPreimage reports whether the preimage of a hash fragment is
@@ -236,6 +244,9 @@ func (d *Descriptor) planNode(n *node, mp, idx uint32, assets Assets) (*Plan,
 	error) {
 
 	switch n.kind {
+	case nodeTr:
+		return d.planTr(n, mp, idx, assets)
+
 	case nodeWsh:
 		return d.planWitnessScript(
 			n.sub, mp, idx, assets, emptyScriptSigSize, nil,
@@ -328,8 +339,8 @@ func (d *Descriptor) planWitnessScript(sub *node, mp, idx uint32, assets Assets,
 		return nil, err
 	}
 
-	template, err := d.satisfyScript(
-		sub, mp, idx, assets, planEcdsa(assets), planPreimage(assets),
+	template, satisfy, err := d.planScript(
+		sub, mp, idx, assets, planEcdsa(assets), realEcdsa,
 	)
 	if err != nil {
 		return nil, errCouldNotPlan
@@ -344,16 +355,15 @@ func (d *Descriptor) planWitnessScript(sub *node, mp, idx uint32, assets Assets,
 		witnessSize:   witnessSerializedSize(template),
 		scriptSigSize: scriptSigSize,
 		satisfy: func(s *Satisfier) (*SatisfyResult, error) {
-			witness, err := d.satisfyScript(
-				sub, mp, idx, assets, realEcdsa(s),
-				realPreimage(s),
-			)
+			witness, err := satisfy(s)
 			if err != nil {
 				return nil, errCouldNotSatisfy
 			}
 			return &SatisfyResult{
-				Witness:   append(witness, witnessScript),
-				ScriptSig: scriptSig,
+				Witness: append(witness, bytes.Clone(
+					witnessScript,
+				)),
+				ScriptSig: bytes.Clone(scriptSig),
 			}, nil
 		},
 	}, nil
@@ -365,8 +375,8 @@ func (d *Descriptor) planWitnessScript(sub *node, mp, idx uint32, assets Assets,
 func (d *Descriptor) planBare(sub *node, mp, idx uint32, assets Assets,
 	redeem []byte) (*Plan, error) {
 
-	template, err := d.satisfyScript(
-		sub, mp, idx, assets, planEcdsa(assets), planPreimage(assets),
+	template, satisfy, err := d.planScript(
+		sub, mp, idx, assets, planEcdsa(assets), realEcdsa,
 	)
 	if err != nil {
 		return nil, errCouldNotPlan
@@ -378,10 +388,7 @@ func (d *Descriptor) planBare(sub *node, mp, idx uint32, assets Assets,
 			legacyScriptSig(template, redeem),
 		),
 		satisfy: func(s *Satisfier) (*SatisfyResult, error) {
-			witness, err := d.satisfyScript(
-				sub, mp, idx, assets, realEcdsa(s),
-				realPreimage(s),
-			)
+			witness, err := satisfy(s)
 			if err != nil {
 				return nil, errCouldNotSatisfy
 			}
@@ -445,8 +452,12 @@ func (d *Descriptor) planKeyHash(n *node, mp, idx uint32, assets Assets,
 		}
 		if segwit {
 			return &SatisfyResult{
-				Witness:   [][]byte{sig, pubKey},
-				ScriptSig: scriptSig,
+				Witness: [][]byte{
+					bytes.Clone(
+						sig,
+					), bytes.Clone(pubKey),
+				},
+				ScriptSig: bytes.Clone(scriptSig),
 			}, nil
 		}
 		scriptSig, err := pushAll([][]byte{sig, pubKey})
@@ -460,6 +471,197 @@ func (d *Descriptor) planKeyHash(n *node, mp, idx uint32, assets Assets,
 	}
 
 	return plan, nil
+}
+
+// planTr builds a plan for a taproot output, choosing the cheapest of the key
+// path and each script-tree leaf that the assets can satisfy.
+func (d *Descriptor) planTr(n *node, mp, idx uint32, assets Assets) (*Plan,
+	error) {
+
+	// Availability is not proof that the output's internal key can be
+	// derived. Validate it even for key-only descriptors, which never
+	// construct a control block and would otherwise skip key derivation.
+	internal, err := n.keys[0].derive(mp, idx)
+	if err != nil {
+		return nil, err
+	}
+
+	var candidates []*Plan
+
+	// Key-path candidate.
+	internalDef := n.keys[0].definiteString(mp, idx)
+	if assets.LookupTapKeySpendSig != nil {
+		size, ok := assets.LookupTapKeySpendSig(internalDef)
+		if sig, valid := sigTemplate(size); ok && valid {
+			template := [][]byte{sig}
+			candidates = append(candidates, &Plan{
+				witnessSize:   witnessSerializedSize(template),
+				scriptSigSize: emptyScriptSigSize,
+				satisfy:       trKeySpendSatisfy(),
+			})
+		}
+	}
+
+	// Script-path candidates: one per leaf of the tree.
+	if n.tapTree != nil {
+		leaves, _, err := d.collectLeafPlans(n.tapTree, mp, idx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Every control block starts with the leaf version combined
+		// with the output key parity, then the x-only internal key.
+		outputKey, err := d.taprootOutputKey(n, mp, idx)
+		if err != nil {
+			return nil, err
+		}
+		version := tapLeafVersion
+		if outputKey.SerializeCompressed()[0] == 0x03 {
+			version |= 1
+		}
+
+		for _, lp := range leaves {
+			controlBlock := make([]byte, 0, 33+len(lp.proof))
+			controlBlock = append(controlBlock, version)
+			controlBlock = append(controlBlock, internal...)
+			controlBlock = append(controlBlock, lp.proof...)
+
+			plan, err := d.planTrLeaf(
+				lp, controlBlock, mp, idx, assets,
+			)
+			if err == nil {
+				candidates = append(candidates, plan)
+			}
+		}
+	}
+
+	if len(candidates) == 0 {
+		return nil, errCouldNotPlan
+	}
+
+	// Keep the first candidate on a weight tie: key path precedes script
+	// paths, and leaves retain their descriptor's left-to-right order.
+	best := candidates[0]
+	for _, c := range candidates[1:] {
+		if c.SatisfactionWeight() < best.SatisfactionWeight() {
+			best = c
+		}
+	}
+	return best, nil
+}
+
+// trKeySpendSatisfy returns the satisfy closure for a taproot key-path spend.
+func trKeySpendSatisfy() func(*Satisfier) (*SatisfyResult, error) {
+	return func(s *Satisfier) (*SatisfyResult, error) {
+		if s.LookupTapKeySpendSig == nil {
+			return nil, errCouldNotSatisfy
+		}
+		sig, ok := s.LookupTapKeySpendSig()
+		if !ok || !validSchnorrSig(sig) {
+			return nil, errCouldNotSatisfy
+		}
+		return &SatisfyResult{
+			Witness:   [][]byte{sig},
+			ScriptSig: []byte{},
+		}, nil
+	}
+}
+
+// leafPlan holds the derived data needed to spend one tapscript leaf: its
+// miniscript node, its compiled script and the merkle path (ordered from the
+// leaf's sibling up toward the root) proving its position in the tree.
+type leafPlan struct {
+	leaf   *node
+	script []byte
+	proof  []byte
+}
+
+// planTrLeaf builds the script-path candidate plan for one tapscript leaf,
+// given its fully-assembled control block.
+func (d *Descriptor) planTrLeaf(lp leafPlan, controlBlock []byte, mp,
+	idx uint32, assets Assets) (*Plan, error) {
+
+	// Tap leaf hashes are displayed in forward byte order, unlike the
+	// reversed order used for transaction and block hashes.
+	leafHashBytes := txscript.NewBaseTapLeaf(lp.script).TapHash()
+	leafHash := hex.EncodeToString(leafHashBytes[:])
+
+	leafSat, satisfy, err := d.planScript(
+		lp.leaf, mp, idx, assets, planTapLeaf(assets, leafHash),
+		func(s *Satisfier) func(string) ([]byte, bool) {
+			return realTapLeaf(s, leafHash)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	template := append(leafSat, lp.script, controlBlock)
+
+	return &Plan{
+		witnessSize:   witnessSerializedSize(template),
+		scriptSigSize: emptyScriptSigSize,
+		satisfy: func(s *Satisfier) (*SatisfyResult, error) {
+			witness, err := satisfy(s)
+			if err != nil {
+				return nil, errCouldNotSatisfy
+			}
+			witness = append(
+				witness, bytes.Clone(lp.script),
+				bytes.Clone(controlBlock),
+			)
+			return &SatisfyResult{
+				Witness:   witness,
+				ScriptSig: []byte{},
+			}, nil
+		},
+	}, nil
+}
+
+// collectLeafPlans walks a taproot script tree and returns, for every leaf, its
+// compiled script and merkle path, along with the tree's merkle root. Each
+// path is ordered from the leaf's sibling up toward the root.
+func (d *Descriptor) collectLeafPlans(t *tapTree, mp, idx uint32) ([]leafPlan,
+	chainhash.Hash, error) {
+
+	if t.leaf != nil {
+		script, err := d.innerScript(t.leaf, mp, idx)
+		if err != nil {
+			return nil, chainhash.Hash{}, err
+		}
+		hash := txscript.NewBaseTapLeaf(script).TapHash()
+		return []leafPlan{{leaf: t.leaf, script: script}}, hash, nil
+	}
+
+	left, leftHash, err := d.collectLeafPlans(t.left, mp, idx)
+	if err != nil {
+		return nil, chainhash.Hash{}, err
+	}
+	right, rightHash, err := d.collectLeafPlans(t.right, mp, idx)
+	if err != nil {
+		return nil, chainhash.Hash{}, err
+	}
+
+	// Each leaf of one side gains the other side's subtree hash as the next
+	// (shallower) element of its merkle path.
+	for i := range left {
+		left[i].proof = append(left[i].proof, rightHash[:]...)
+	}
+	for i := range right {
+		right[i].proof = append(right[i].proof, leftHash[:]...)
+	}
+
+	return append(left, right...), branchHash(leftHash, rightHash), nil
+}
+
+// branchHash computes the tagged hash of a taproot branch, sorting the two
+// child hashes lexicographically as required by BIP341.
+func branchHash(a, b chainhash.Hash) chainhash.Hash {
+	left, right := a[:], b[:]
+	if bytes.Compare(left, right) > 0 {
+		left, right = right, left
+	}
+	return *chainhash.TaggedHash(chainhash.TagTapBranch, left, right)
 }
 
 // satisfyScript runs the miniscript satisfaction of a wsh inner or tapscript
@@ -752,6 +954,88 @@ func realEcdsa(s *Satisfier) func(string) ([]byte, bool) {
 			return s.LookupEcdsaSig(defKey)
 		}
 		return nil, false
+	}
+}
+
+// planTapLeaf returns a lookup that reports an asset-sized taproot leaf-script
+// signature as available whenever the assets provide one for the key.
+func planTapLeaf(assets Assets, leafHash string) func(string) ([]byte, bool) {
+	return func(defKey string) ([]byte, bool) {
+		if assets.LookupTapLeafScriptSig == nil {
+			return nil, false
+		}
+		size, ok := assets.LookupTapLeafScriptSig(defKey, leafHash)
+		if !ok {
+			return nil, false
+		}
+		return sigTemplate(size)
+	}
+}
+
+// sigTemplate turns a signature size reported by an asset provider into the
+// dummy signature a plan is sized with, or reports the signature as unavailable
+// if the size cannot describe one.
+//
+// A BIP341 signature is 64 bytes, or 65 with the sighash byte of a type other
+// than the default; every other size fails script validation. A size of zero in
+// particular does not describe an available signature but the dissatisfaction
+// of one, which the satisfier produces itself where a fragment allows it, so
+// counting it as available would let a plan pick a path that cannot be spent.
+//
+// The provider is the caller's own code, but the size it reports may come from
+// data the caller does not control (a policy document, a remote signer), in
+// which case an unbounded uint32 size would make PlanAt an allocation
+// amplifier.
+func sigTemplate(size uint32) ([]byte, bool) {
+	if size < minSchnorrSigLen || size > maxSchnorrSigLen {
+		return nil, false
+	}
+	return make([]byte, size), true
+}
+
+// validSchnorrSig checks only a signature's BIP341 length and sighash byte:
+// 64 bytes for the default type, or 65 bytes ending in one of the six defined
+// non-default types. It does not validate the signature against a message/key.
+func validSchnorrSig(sig []byte) bool {
+	switch len(sig) {
+	case minSchnorrSigLen:
+		return true
+
+	case maxSchnorrSigLen:
+		switch txscript.SigHashType(sig[maxSchnorrSigLen-1]) {
+		case txscript.SigHashAll, txscript.SigHashNone,
+			txscript.SigHashSingle,
+			txscript.SigHashAll | txscript.SigHashAnyOneCanPay,
+			txscript.SigHashNone | txscript.SigHashAnyOneCanPay,
+			txscript.SigHashSingle | txscript.SigHashAnyOneCanPay:
+
+			return true
+
+		default:
+			return false
+		}
+
+	default:
+		return false
+	}
+}
+
+// realTapLeaf returns a lookup backed by the satisfier's taproot leaf-script
+// signatures. A signature that cannot be a valid BIP341 one is reported as
+// unavailable, so the satisfaction fails or takes another branch instead of
+// producing a witness that script validation rejects.
+func realTapLeaf(s *Satisfier, leafHash string) func(string) ([]byte, bool) {
+	return func(defKey string) ([]byte, bool) {
+		if s.LookupTapLeafScriptSig == nil {
+			return nil, false
+		}
+
+		sig, ok := s.LookupTapLeafScriptSig(defKey, leafHash)
+		if !ok || !validSchnorrSig(sig) {
+			return nil, false
+		}
+
+		return sig, true
 	}
 }
 
