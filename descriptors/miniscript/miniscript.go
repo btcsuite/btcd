@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 const (
@@ -322,22 +323,22 @@ func Parse(miniscript string, ctx Context) (*AST, error) {
 //  1. argCheck: Checks that the nodes have the correct number of arguments.
 //  2. expandWrappers: Unwraps the numbers before the colon, for example:
 //     dv:older(144) is d(v(older(144)))
-//  1. deSugar: Miniscript defines six instances of syntactic sugar. We replace
+//  3. deSugar: Miniscript defines six instances of syntactic sugar. We replace
 //     these with fixed equations.
-//  1. typeCheck: Not all fragments compose with each other to produce a valid
+//  4. typeCheck: Not all fragments compose with each other to produce a valid
 //     Bitcoin Script and valid witness. This function checks that and sets the
 //     types of the Miniscript fragments. Only if the top level basic type is of
 //     type B the miniscript is valid.
-//  1. canCollapseVerify: If the rightmost script byte of a node is OP_EQUAL,
+//  5. canCollapseVerify: If the rightmost script byte of a node is OP_EQUAL,
 //     OP_CHECKSIG or OP_CHECKMULTISIG. We can convert it to the VERIFY version
 //     of the opcode, e.g. OP_EQUALVERIFY.
-//  2. malleabilityCheck: Checks each node if it is malleable (checking that the
+//  6. malleabilityCheck: Checks each node if it is malleable (checking that the
 //     transaction hash can not be changes without altering the content).
-//  1. computeScriptLen: Simply computes the script length.
-//  2. computeOpCount: Counts the amount of opcodes the script contains.
-//  3. computeStackSize: Computes the maximum witness stack size needed to
+//  7. computeScriptLen: Simply computes the script length.
+//  8. computeOpCount: Counts the amount of opcodes the script contains.
+//  9. computeStackSize: Computes the maximum witness stack size needed to
 //     (dis)satisfy the script.
-//  1. computeTimelocks: Computes the time lock info used to detect time lock
+//  10. computeTimelocks: Computes the time lock info used to detect time lock
 //     mixing.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
@@ -2455,4 +2456,28 @@ func scriptStr(node *AST, collapseVerify bool) string {
 	default:
 		return "<unknown>"
 	}
+}
+
+// Satisfy returns a valid non-malleable witness for this miniscript, given the
+// available secrets (private keys and hash preimages). If no such witness could
+// be found, an error is returned.
+//
+// The satisfier has to provide a function for every kind of secret the
+// expression needs; a missing one is reported as an error naming it.
+//
+// The witness returned is a list of witness elements, each of which should be
+// pushed onto the witness stack as a data push.
+func (a *AST) Satisfy(satisfier *Satisfier) (wire.TxWitness, error) {
+	if err := satisfier.check(a); err != nil {
+		return nil, err
+	}
+
+	satisfactions, err := satisfy(a, satisfier)
+	if err != nil {
+		return nil, err
+	}
+	if !satisfactions.sat.available {
+		return nil, errors.New("no satisfaction could be found")
+	}
+	return satisfactions.sat.witness, nil
 }
