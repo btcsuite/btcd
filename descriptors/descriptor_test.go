@@ -1,11 +1,111 @@
 package descriptors
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
+
+// networkParams maps a test-vector network name to its chaincfg parameters.
+func networkParams(t *testing.T, network string) *chaincfg.Params {
+	t.Helper()
+
+	switch network {
+	case "mainnet":
+		return &chaincfg.MainNetParams
+
+	case "testnet":
+		return &chaincfg.TestNet3Params
+
+	case "regtest":
+		return &chaincfg.RegressionNetParams
+
+	default:
+		require.FailNowf(t, "unknown network", "network: %s", network)
+		return nil
+	}
+}
+
+// testAddress is an address derivation and its expected result or error.
+type testAddress struct {
+	Network         string `json:"network"`
+	MultipathIndex  uint32 `json:"multipathIndex"`
+	DerivationIndex uint32 `json:"derivationIndex"`
+	Address         string `json:"address"`
+	ExpectErr       string `json:"expectErr"`
+}
+
+// derivationTestVector checks parsing, checksum display and address derivation.
+type derivationTestVector struct {
+	Name         string         `json:"name"`
+	Descriptor   string         `json:"descriptor"`
+	HasChecksum  bool           `json:"hasChecksum"`
+	Checksum     string         `json:"checksum"`
+	NumMultipath uint32         `json:"numMultipath"`
+	ExpectErr    string         `json:"expectErr"`
+	Addresses    []*testAddress `json:"addresses"`
+}
+
+// TestDerivationVectors runs the derivation test vectors copied from the
+// descriptors-go reference implementation.
+func TestDerivationVectors(t *testing.T) {
+	t.Parallel()
+
+	file, err := os.Open(filepath.Join("testdata", "derivation.json"))
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, file.Close())
+	}()
+
+	var vectors []*derivationTestVector
+	require.NoError(t, json.NewDecoder(file).Decode(&vectors))
+
+	for _, vector := range vectors {
+		t.Run(vector.Name, func(t *testing.T) {
+			t.Parallel()
+
+			descriptor, err := NewDescriptor(vector.Descriptor)
+			if vector.ExpectErr != "" {
+				require.ErrorContains(t, err, vector.ExpectErr)
+				return
+			}
+			require.NoError(t, err)
+
+			require.EqualValues(
+				t, vector.NumMultipath,
+				descriptor.MultipathLen(),
+			)
+
+			expected := vector.Descriptor
+			if !vector.HasChecksum {
+				expected += vector.Checksum
+			}
+			require.Equal(t, expected, descriptor.String())
+
+			for _, addr := range vector.Addresses {
+				params := networkParams(t, addr.Network)
+				got, err := descriptor.AddressAt(
+					params, addr.MultipathIndex,
+					addr.DerivationIndex,
+				)
+				if addr.ExpectErr != "" {
+					require.ErrorContains(
+						t, err, addr.ExpectErr,
+					)
+					continue
+				}
+
+				require.NoError(t, err)
+				require.Equal(t, addr.Address, got)
+			}
+		})
+	}
+}
 
 // TestSplitArgs checks that a comma-separated argument list is split only at
 // the top nesting level, respecting (), {}, [] and <> grouping.
