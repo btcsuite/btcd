@@ -300,6 +300,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		computeScriptLen,
 		computeOpCount,
 		computeStackSize,
+		computeSatSize,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -342,6 +343,10 @@ type AST struct {
 	// stackSize is the maximum number of witness stack elements needed to
 	// satisfy or dissatisfy this node.
 	stackSize stackSize
+
+	// satSize is the maximum witness byte size (and element count) needed
+	// to satisfy or dissatisfy this node, used for weight estimation.
+	satSize witSize
 }
 
 // formattedType returns the basic type (B, V, K or W) followed by all type
