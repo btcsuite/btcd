@@ -1,10 +1,13 @@
 package miniscript
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -159,6 +162,158 @@ func TestStackSize(t *testing.T) {
 	saneErr := overLimit.IsSane()
 	require.Error(t, saneErr)
 	require.Contains(t, saneErr.Error(), "witness stack elements")
+}
+
+// TestSatisfyMultiThresh exercises the (rewritten, non-naive) satisfaction
+// logic for multi and thresh fragments. For every possible subset of available
+// signers it builds a real P2WSH spend and checks that the transaction is valid
+// exactly when a valid satisfaction should exist.
+func TestSatisfyMultiThresh(t *testing.T) {
+	t.Parallel()
+
+	// Generate a set of distinct test keys, one per single-letter name.
+	names := []string{"A", "B", "C", "D", "E"}
+	privKeys := make(map[string]*btcec.PrivateKey)
+	pubKeys := make(map[string][]byte)
+	for _, name := range names {
+		priv, err := btcec.NewPrivateKey()
+		require.NoError(t, err)
+		privKeys[name] = priv
+		pubKeys[name] = priv.PubKey().SerializeCompressed()
+	}
+
+	lookupVar := func(identifier string) ([]byte, error) {
+		if pk, ok := pubKeys[identifier]; ok {
+			return pk, nil
+		}
+		return nil, fmt.Errorf("unknown identifier %s", identifier)
+	}
+
+	// signWith returns a sign function that can produce signatures only for
+	// the keys whose names are in the given set.
+	signWith := func(canSign map[string]bool) testSignFn {
+		return func(pk []byte, hash []byte) ([]byte, bool) {
+			for name, pub := range pubKeys {
+				if !bytes.Equal(pk, pub) || !canSign[name] {
+					continue
+				}
+				return ecdsa.Sign(
+					privKeys[name], hash,
+				).Serialize(), true
+			}
+			return nil, false
+		}
+	}
+
+	noPreimage := func(string, []byte) ([]byte, bool) { return nil, false }
+
+	testCases := []struct {
+		miniscript string
+
+		// satisfiable returns whether a valid, non-malleable
+		// satisfaction should exist given the set of signers.
+		satisfiable func(signers map[string]bool) bool
+	}{{
+		// 2-of-3 multisig.
+		miniscript: "multi(2,A,B,C)",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C") >= 2
+		},
+	}, {
+		// 3-of-5 multisig: exercises dropping surplus signatures.
+		miniscript: "multi(3,A,B,C,D,E)",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C", "D", "E") >= 3
+		},
+	}, {
+		// 2-of-3 threshold of single-key checks.
+		miniscript: "thresh(2,pk(A),s:pk(B),s:pk(C))",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C") >= 2
+		},
+	}, {
+		// 2-of-4 threshold: exercises picking the best 2 of 4.
+		miniscript: "thresh(2,pk(A),s:pk(B),s:pk(C),s:pk(D))",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C", "D") >= 2
+		},
+	}, {
+		// Disjunction of two multisigs: the dissatisfaction of the
+		// first branch combined with the second is also a valid path.
+		miniscript: "or_d(multi(2,A,B,C),multi(2,D,E))",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C") >= 2 ||
+				countSigners(s, "D", "E") >= 2
+		},
+	}, {
+		// 1-of-2 threshold of pkh sub expressions. This is a regression
+		// test for the pk_h satisfaction missing its withSig() marker:
+		// with the bug, having more signers available than needed made
+		// the threshold wrongly report itself unsatisfiable.
+		miniscript: "thresh(1,pkh(A),a:pkh(B))",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B") >= 1
+		},
+	}, {
+		// 2-of-3 threshold of pkh sub expressions.
+		miniscript: "thresh(2,pkh(A),a:pkh(B),a:pkh(C))",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C") >= 2
+		},
+	}, {
+		// pkh mixed with pk in a threshold.
+		miniscript: "thresh(2,pk(A),a:pkh(B),a:pk(C))",
+		satisfiable: func(s map[string]bool) bool {
+			return countSigners(s, "A", "B", "C") >= 2
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.miniscript, func(t *testing.T) {
+			t.Parallel()
+
+			// Sweep over every subset of the signer set.
+			for mask := 0; mask < (1 << len(names)); mask++ {
+				signers := make(map[string]bool)
+				for i, name := range names {
+					if mask&(1<<i) != 0 {
+						signers[name] = true
+					}
+				}
+
+				err := testRedeem(
+					t, tc.miniscript, lookupVar, 0,
+					signWith(signers), noPreimage,
+				)
+
+				want := tc.satisfiable(signers)
+				if want {
+					require.NoErrorf(
+						t, err, "signers %v should "+
+							"satisfy %s", signers,
+						tc.miniscript,
+					)
+				} else {
+					require.Errorf(
+						t, err, "signers %v should "+
+							"not satisfy %s",
+						signers, tc.miniscript,
+					)
+				}
+			}
+		})
+	}
+}
+
+// countSigners returns how many of the given key names are in the signer set.
+func countSigners(signers map[string]bool, names ...string) int {
+	count := 0
+	for _, name := range names {
+		if signers[name] {
+			count++
+		}
+	}
+	return count
 }
 
 // TestTapscriptSizeLimit checks that the Tapscript script size limit is one the
