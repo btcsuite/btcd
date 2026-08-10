@@ -176,6 +176,10 @@ type node struct {
 	// sub is the inner node of an sh or wsh wrapper.
 	sub *node
 
+	// tapTree is the taproot script tree of a tr output, or nil for a
+	// key-path-only tr.
+	tapTree *tapTree
+
 	// msExpr and msCtx describe a miniscript node: its expression string
 	// and the context (P2WSH, P2TR or Legacy) it is compiled in.
 	msExpr string
@@ -453,6 +457,9 @@ func parseNode(s string, pos scriptPos, keys *[]*descKey) (*node, error) {
 		}
 		return &node{kind: nodeWsh, pos: pos, sub: sub}, nil
 
+	case nodeTr:
+		return parseTr(inner, keys)
+
 	case nodeMulti, nodeSortedMulti:
 		return parseMulti(nodeKind(name), inner, pos, keys)
 
@@ -461,6 +468,127 @@ func parseNode(s string, pos scriptPos, keys *[]*descKey) (*node, error) {
 		// current context.
 		return parseMs(s, pos, keys)
 	}
+}
+
+// parseTr parses the inner arguments of a tr() descriptor: an internal key and
+// an optional taproot script tree.
+func parseTr(inner string, keys *[]*descKey) (*node, error) {
+	args := splitArgs(inner)
+	internal, err := parseDescKey(args[0], keyFormXOnly)
+	if err != nil {
+		return nil, err
+	}
+	*keys = append(*keys, internal)
+
+	n := &node{kind: nodeTr, pos: posTop, keys: []*descKey{internal}}
+	switch len(args) {
+	case 1:
+
+	case 2:
+		tree, err := parseTapTree(args[1], 0, keys)
+		if err != nil {
+			return nil, err
+		}
+		n.tapTree = tree
+
+	default:
+		return nil, fmt.Errorf("tr() takes at most two arguments")
+	}
+
+	return n, nil
+}
+
+// parseTapTree parses a taproot script tree: either a "{left,right}" branch or
+// a single tapscript leaf. A leaf is always a miniscript in the P2TR context,
+// using x-only keys. depth is the level the tree starts at, i.e. the length of
+// the merkle path a leaf at this position needs.
+func parseTapTree(s string, depth int, keys *[]*descKey) (*tapTree, error) {
+	if !strings.HasPrefix(s, "{") {
+		leaf, err := parseMs(s, posTr, keys)
+		if err != nil {
+			return nil, err
+		}
+		return &tapTree{leaf: leaf}, nil
+	}
+
+	// Every level of the tree adds one 32-byte hash to the merkle path in
+	// the control block of the leaves below it, and BIP341 allows at most
+	// 128 of them, so the leaves of a deeper tree could never be spent.
+	// Bounding the depth also bounds the parsing cost and the recursion of
+	// every later walk of the tree (address derivation, planning, lifting).
+	if depth >= maxTapTreeDepth {
+		return nil, fmt.Errorf("the taproot script tree is deeper than "+
+			"%d levels, which is more than the merkle path of a "+
+			"control block can hold", maxTapTreeDepth)
+	}
+
+	if !strings.HasSuffix(s, "}") {
+		return nil, fmt.Errorf("malformed taproot tree branch %q", s)
+	}
+	leftStr, rightStr, err := splitTapBranch(s[1 : len(s)-1])
+	if err != nil {
+		return nil, err
+	}
+
+	left, err := parseTapTree(leftStr, depth+1, keys)
+	if err != nil {
+		return nil, err
+	}
+	right, err := parseTapTree(rightStr, depth+1, keys)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tapTree{left: left, right: right}, nil
+}
+
+// splitTapBranch splits the content of a "{left,right}" taproot tree branch
+// into its two children at the top-level comma.
+//
+// It stops at the first top-level comma instead of scanning the rest of the
+// subtree for further arguments. A branch has exactly two children, so anything
+// after that comma belongs to the right child, which is validated when it is
+// parsed - except when the right child is a leaf, where a second top-level
+// comma is checked for directly. This avoids repeatedly scanning the remaining
+// right subtree of a right-skewed tree. Left subtrees still need scanning to
+// locate the separator; the depth limit bounds how often they are revisited.
+func splitTapBranch(s string) (string, string, error) {
+	twoChildren := fmt.Errorf("taproot tree branch must have exactly two " +
+		"children")
+
+	comma := topLevelComma(s)
+	if comma < 0 {
+		return "", "", twoChildren
+	}
+
+	left, right := s[:comma], s[comma+1:]
+	if !strings.HasPrefix(right, "{") && topLevelComma(right) >= 0 {
+		return "", "", twoChildren
+	}
+
+	return left, right, nil
+}
+
+// topLevelComma returns the index of the first comma at the top nesting level
+// of s, respecting (), {}, [] and <> grouping, or -1 if there is none.
+func topLevelComma(s string) int {
+	depth := 0
+	for i, ch := range s {
+		switch ch {
+		case '(', '{', '[', '<':
+			depth++
+
+		case ')', '}', ']', '>':
+			depth--
+
+		case ',':
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+
+	return -1
 }
 
 // parseMulti parses the arguments of a multi()/sortedmulti() descriptor.
