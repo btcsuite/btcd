@@ -39,6 +39,10 @@ define print
 	echo $(GREEN)$1$(NC)
 endef
 
+# Time budget per fuzz target for go-fuzz. Override with `fuzztime=10m` for a
+# long (nightly-style) run; the default is a quick local smoke.
+fuzztime ?= 15s
+
 #? default: Run `make build`
 default: build
 
@@ -127,6 +131,26 @@ unit-race:
 		); \
 	done
 
+#? go-fuzz: Run every Fuzz* target, coverage-guided, for `fuzztime` (default 15s) each. Seed corpora always run as part of go-unit; this target is the mutation engine on top.
+# Assign discovery results before iterating so set -e sees failures from go
+# list and go test. No matching fuzz targets is a successful discovery result.
+go-fuzz:
+	@set -e; \
+	for module in $(MODULES); do \
+		( cd "$$module"; \
+			packages=$$(go list ./...); \
+			for pkg in $$packages; do \
+				listing=$$(go test -list='^Fuzz' "$$pkg"); \
+				targets=$$(printf '%s\n' "$$listing" | grep '^Fuzz' || true); \
+				for target in $$targets; do \
+					echo "=== go-fuzz: $$target ($$pkg)"; \
+					go test -run='^$$' -fuzz="^$$target\$$" \
+						-fuzztime=$(fuzztime) "$$pkg"; \
+				done; \
+			done; \
+		); \
+	done
+
 # =========
 # UTILITIES
 # =========
@@ -164,6 +188,7 @@ tidy-module:
 	fmt \
 	lint \
 	clean \
+	go-fuzz \
 	tidy-module
 
 #? help: Get more info on make commands
