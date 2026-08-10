@@ -1,11 +1,15 @@
 package miniscript
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 )
 
@@ -146,6 +150,12 @@ func (c Context) keyLen() int {
 	return compressedPubKeyLen
 }
 
+// keyPushLen returns the length of a public key data push in the script, which
+// is the key length plus one byte for the length prefix.
+func (c Context) keyPushLen() int {
+	return c.keyLen() + 1
+}
+
 // maxScriptSize returns the maximum allowed script size in bytes for this
 // context.
 func (c Context) maxScriptSize() int {
@@ -261,8 +271,12 @@ func (p properties) String() string {
 //     Bitcoin Script and valid witness. This function checks that and sets the
 //     types of the Miniscript fragments. Only if the top level basic type is of
 //     type B the miniscript is valid.
-//  1. malleabilityCheck: Checks each node if it is malleable (checking that the
+//  1. canCollapseVerify: If the rightmost script byte of a node is OP_EQUAL,
+//     OP_CHECKSIG or OP_CHECKMULTISIG. We can convert it to the VERIFY version
+//     of the opcode, e.g. OP_EQUALVERIFY.
+//  2. malleabilityCheck: Checks each node if it is malleable (checking that the
 //     transaction hash can not be changes without altering the content).
+//  1. computeScriptLen: Simply computes the script length.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -285,7 +299,9 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		setContext,
 		checkContextFragments,
 		typeCheck,
+		canCollapseVerify,
 		malleabilityCheck,
+		computeScriptLen,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -317,7 +333,13 @@ type AST struct {
 	// what makes the two fragments differ (BIP387).
 	sortedKeys bool
 
-	args []*AST
+	// For key arguments, value holds a compressed or x-only public key,
+	// according to the script context.
+	// For hash arguments, this will be the 32 bytes (sha256, hash256) or
+	// 20 bytes (ripemd160, hash160) hash.
+	value     []byte
+	args      []*AST
+	scriptLen int
 }
 
 // formattedType returns the basic type (B, V, K or W) followed by all type
@@ -326,10 +348,77 @@ func (a *AST) formattedType() string {
 	return fmt.Sprintf("%s%s", a.basicType, a.props)
 }
 
+// isValid checks the encoded script size, independently of whether this node
+// is a valid top-level expression or has a usable satisfaction.
+func (a *AST) isValid() error {
+	if a.scriptLen > a.ctx.maxScriptSize() {
+		return fmt.Errorf("the script size is %v, which is larger "+
+			"than the maximum script size of %v in the %v context",
+			a.scriptLen, a.ctx.maxScriptSize(), a.ctx)
+	}
+	return nil
+}
+
 // IsValidTopLevel checks whether this node is valid as a script on its own.
 func (a *AST) IsValidTopLevel() error {
+	if err := a.isValid(); err != nil {
+		return err
+	}
+
 	// Top-level expression must be of type "B".
 	return a.expectBasicType(typeB)
+}
+
+// drawTree renders this node and its descendants for diagnostics. Writer errors
+// are ignored because DrawTree supplies an in-memory strings.Builder.
+func (a *AST) drawTree(w io.Writer, indent string) {
+	// Show the expression's analyzed type next to its symbolic identifier;
+	// include substituted bytes only when they add information.
+	if a.wrappers != "" {
+		_, _ = fmt.Fprintf(w, "%s:", a.wrappers)
+	}
+	_, _ = fmt.Fprint(w, a.identifier)
+	typ := a.formattedType()
+	if a.props.canCollapseVerify {
+		typ += "v"
+	}
+	if typ != "" {
+		_, _ = fmt.Fprintf(w, " [%s]", typ)
+	}
+	if a.value != nil {
+		h := hex.EncodeToString(a.value)
+		if h != a.identifier {
+			_, _ = fmt.Fprintf(w, " [%x]", a.value)
+		}
+	}
+	_, _ = fmt.Fprintln(w)
+
+	// Keep sibling connectors aligned by rune count rather than byte
+	// length, since the branch markers themselves are multibyte characters.
+	for i, arg := range a.args {
+		mark := ""
+		delim := ""
+		if i == len(a.args)-1 {
+			mark = "└──"
+		} else {
+			mark = "├──"
+			delim = "|"
+		}
+		_, _ = fmt.Fprintf(w, "%s%s", indent, mark)
+		padLen := utf8.RuneCountInString(arg.identifier) +
+			utf8.RuneCountInString(mark) -
+			1 - len(delim)
+		padding := strings.Repeat(" ", padLen)
+		arg.drawTree(w, indent+delim+padding)
+	}
+}
+
+// DrawTree returns a diagnostic tree with fragment types and substituted
+// values. It does not modify the parsed expression.
+func (a *AST) DrawTree() string {
+	var b strings.Builder
+	a.drawTree(&b, "")
+	return b.String()
 }
 
 // isSubExpression returns whether the argument at the given index is a
@@ -1208,6 +1297,31 @@ func typeCheck(node *AST) (*AST, error) {
 	return node, nil
 }
 
+// canCollapseVerify records whether the final emitted opcode has a VERIFY
+// variant. Children have already been analyzed, allowing and_v and s: to
+// inherit the property from the child that emits their final opcode.
+func canCollapseVerify(node *AST) (*AST, error) {
+	switch node.identifier {
+	case f_sha256, f_ripemd160, f_hash256, f_hash160, f_thresh, f_multi,
+		f_multi_a, f_wrap_c:
+
+		// The final opcode of each of these is OP_EQUAL, OP_CHECKSIG,
+		// OP_CHECKMULTISIG or OP_NUMEQUAL (multi_a), all of which have
+		// a VERIFY variant.
+		node.props.canCollapseVerify = true
+
+	case f_and_v:
+		otherProps := node.args[1].props
+		node.props.canCollapseVerify = otherProps.canCollapseVerify
+
+	case f_wrap_s:
+		otherProps := node.args[0].props
+		node.props.canCollapseVerify = otherProps.canCollapseVerify
+	}
+
+	return node, nil
+}
+
 // malleabilityCheck derives BIP379's m/s/f/e properties from already-analyzed
 // children. The auxiliary s/f/e properties are meaningful only when m holds.
 func malleabilityCheck(node *AST) (*AST, error) {
@@ -1386,4 +1500,586 @@ func malleabilityCheck(node *AST) (*AST, error) {
 	}
 
 	return node, nil
+}
+
+// computeScriptLen derives the encoded script length from already-analyzed
+// children. Concrete keys are unnecessary because the context fixes their size.
+func computeScriptLen(node *AST) (*AST, error) {
+	// Match the builder's minimal number encoding, including the
+	// small-integer opcodes. A single int64 push cannot exceed the
+	// builder's size limit.
+	numPushLen := func(n int64) int {
+		numPush, _ := txscript.NewScriptBuilder().AddInt64(n).Script()
+		return len(numPush)
+	}
+
+	// Value arguments have no script of their own; expression children
+	// supply the recursive contribution before fragment-specific opcodes
+	// are added.
+	argsSummed := 0
+	for _, arg := range node.args {
+		argsSummed += arg.scriptLen
+	}
+
+	switch node.identifier {
+	case f_0, f_1:
+		node.scriptLen = 1
+
+	case f_pk_k:
+		node.scriptLen = node.ctx.keyPushLen()
+
+	case f_pk_h:
+		node.scriptLen = 24
+
+	case f_older, f_after:
+		n := node.args[0].num
+		node.scriptLen = 1 + numPushLen(int64(n))
+
+	case f_sha256, f_hash256:
+		node.scriptLen = 39
+
+	case f_ripemd160, f_hash160:
+		node.scriptLen = 27
+
+	case f_andor, f_or_i, f_or_d, f_wrap_d:
+		node.scriptLen = argsSummed + 3
+
+	case f_and_v:
+		node.scriptLen = argsSummed
+
+	case f_and_b, f_or_b, f_wrap_s, f_wrap_c, f_wrap_n:
+		node.scriptLen = argsSummed + 1
+
+	case f_or_c, f_wrap_a:
+		node.scriptLen = argsSummed + 2
+
+	case f_thresh:
+		k := node.args[0].num
+		numSubs := len(node.args) - 1
+
+		// The script is `sub_1 [sub_i OP_ADD](n-1 times) <k> OP_EQUAL`,
+		// i.e. all sub expressions, (numSubs-1) OP_ADDs, the push of k,
+		// and the final OP_EQUAL.
+		node.scriptLen = argsSummed + (numSubs - 1) + numPushLen(
+			int64(k),
+		) + 1
+
+	case f_multi:
+		k := node.args[0].num
+		numKeys := len(node.args) - 1
+		node.scriptLen = numPushLen(int64(k)) +
+			numKeys*node.ctx.keyPushLen() +
+			numPushLen(int64(numKeys)) + 1
+
+	case f_multi_a:
+		k := node.args[0].num
+		numKeys := len(node.args) - 1
+
+		// The script is `<pk1> CHECKSIG <pk2> CHECKSIGADD ... <pkn>
+		// CHECKSIGADD <k> NUMEQUAL`: n key pushes, one CHECKSIG plus
+		// (n-1) CHECKSIGADDs, the push of k, and the final NUMEQUAL.
+		node.scriptLen = numKeys*node.ctx.keyPushLen() +
+			numKeys + numPushLen(int64(k)) + 1
+
+	case f_wrap_v:
+		if node.args[0].props.canCollapseVerify {
+			// A VERIFY variant replaces the final opcode without
+			// adding a byte (including NUMEQUALVERIFY for multi_a).
+			node.scriptLen = argsSummed
+		} else {
+			node.scriptLen = argsSummed + 1
+		}
+
+	case f_wrap_j:
+		node.scriptLen = argsSummed + 4
+
+	default:
+		return nil, fmt.Errorf("unknown identifier: %s",
+			node.identifier)
+	}
+
+	return node, nil
+}
+
+// Script encodes the parsed expression in its script context. ApplyVars must
+// first supply concrete key/hash values. The returned bytes are caller-owned.
+func (a *AST) Script() ([]byte, error) {
+	b := txscript.NewScriptBuilder()
+	if err := buildScript(a, b, false); err != nil {
+		return nil, err
+	}
+	return b.Script()
+}
+
+// buildScript builds the script from the tree. collapseVerify is true if a `v`
+// wrapper (VERIFY wrapper) applies to the *final* opcode produced by this node.
+// If so, and if that final opcode is OP_CHECKSIG, OP_EQUAL, OP_NUMEQUAL or
+// OP_CHECKMULTISIG,
+// it can be collapsed into the VERIFY variant (OP_CHECKSIGVERIFY,
+// OP_EQUALVERIFY, OP_CHECKMULTISIGVERIFY) instead of emitting a separate
+// OP_VERIFY.
+//
+// A `v:` wrapper only affects the single last opcode of its child (see
+// rust-miniscript's `push_verify`), so collapseVerify must only be forwarded to
+// the child that produces this node's final opcode: the second argument of
+// and_v and the argument of the s: wrapper. Every other combinator's final
+// opcode is a fixed, non-collapsible opcode (OP_BOOLAND, OP_BOOLOR, OP_ENDIF,
+// OP_FROMALTSTACK, ...), so its children must be built with collapseVerify set
+// to false, otherwise inner collapsible opcodes would be wrongly turned into
+// their VERIFY variants and produce an invalid script.
+func buildScript(node *AST, b *txscript.ScriptBuilder,
+	collapseVerify bool) error {
+
+	switch node.identifier {
+	case f_0:
+		b.AddOp(txscript.OP_FALSE)
+
+	case f_1:
+		b.AddOp(txscript.OP_TRUE)
+
+	case f_pk_k:
+		arg := node.args[0]
+		key := arg.value
+		if key == nil {
+			return fmt.Errorf("empty key for %s (%s)",
+				node.identifier, arg.identifier)
+		}
+		b.AddData(key)
+
+	case f_pk_h:
+		arg := node.args[0]
+		key := arg.value
+		if key == nil {
+			return fmt.Errorf("empty key for %s (%s)",
+				node.identifier, arg.identifier)
+		}
+		b.AddOp(txscript.OP_DUP)
+		b.AddOp(txscript.OP_HASH160)
+		b.AddData(address.Hash160(key))
+		b.AddOp(txscript.OP_EQUALVERIFY)
+
+	case f_older:
+		b.AddInt64(int64(node.args[0].num))
+		b.AddOp(txscript.OP_CHECKSEQUENCEVERIFY)
+
+	case f_after:
+		b.AddInt64(int64(node.args[0].num))
+		b.AddOp(txscript.OP_CHECKLOCKTIMEVERIFY)
+
+	case f_sha256, f_hash256, f_ripemd160, f_hash160:
+		hashOp := map[string]byte{
+			f_sha256:    txscript.OP_SHA256,
+			f_hash256:   txscript.OP_HASH256,
+			f_ripemd160: txscript.OP_RIPEMD160,
+			f_hash160:   txscript.OP_HASH160,
+		}[node.identifier]
+
+		hashValue := node.args[0].value
+		if hashValue == nil {
+			return fmt.Errorf("hash value empty for %s (%s)",
+				node.identifier, node.args[0].identifier)
+		}
+		b.AddOp(txscript.OP_SIZE)
+		b.AddInt64(32)
+		b.AddOp(txscript.OP_EQUALVERIFY)
+		b.AddOp(hashOp)
+		b.AddData(hashValue)
+		if node.props.canCollapseVerify && collapseVerify {
+			b.AddOp(txscript.OP_EQUALVERIFY)
+		} else {
+			b.AddOp(txscript.OP_EQUAL)
+		}
+
+	case f_andor:
+		// andor's final opcode is OP_ENDIF, so no child is the collapse
+		// target.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_NOTIF)
+		err = buildScript(node.args[2], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ELSE)
+		err = buildScript(node.args[1], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ENDIF)
+
+	case f_and_v:
+		// and_v emits [X][Y], so the final opcode is Y's final opcode:
+		// forward collapseVerify to the second argument only.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		err = buildScript(node.args[1], b, collapseVerify)
+		if err != nil {
+			return err
+		}
+
+	case f_and_b:
+		// and_b's final opcode is OP_BOOLAND.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		err = buildScript(node.args[1], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_BOOLAND)
+
+	case f_or_b:
+		// or_b's final opcode is OP_BOOLOR.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		err = buildScript(node.args[1], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_BOOLOR)
+
+	case f_or_c:
+		// or_c's final opcode is OP_ENDIF.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_NOTIF)
+		err = buildScript(node.args[1], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ENDIF)
+
+	case f_or_d:
+		// or_d's final opcode is OP_ENDIF.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_IFDUP)
+		b.AddOp(txscript.OP_NOTIF)
+		err = buildScript(node.args[1], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ENDIF)
+
+	case f_or_i:
+		// or_i's final opcode is OP_ENDIF.
+		b.AddOp(txscript.OP_IF)
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ELSE)
+		err = buildScript(node.args[1], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ENDIF)
+
+	case f_thresh:
+		k := node.args[0].num
+
+		// The sub expressions never produce the final opcode (that is
+		// the OP_EQUAL below), so they are built without collapse.
+		for i, arg := range node.args[1:] {
+			err := buildScript(arg, b, false)
+			if err != nil {
+				return err
+			}
+			if i > 0 {
+				b.AddOp(txscript.OP_ADD)
+			}
+		}
+		b.AddInt64(int64(k))
+		if node.props.canCollapseVerify && collapseVerify {
+			b.AddOp(txscript.OP_EQUALVERIFY)
+		} else {
+			b.AddOp(txscript.OP_EQUAL)
+		}
+
+	case f_multi:
+		k := node.args[0].num
+		b.AddInt64(int64(k))
+		for _, arg := range node.args[1:] {
+			if arg.value == nil {
+				return fmt.Errorf("empty key for %s (%s)",
+					node.identifier, arg.identifier)
+			}
+			b.AddData(arg.value)
+		}
+		b.AddInt64(int64(len(node.args) - 1))
+		if node.props.canCollapseVerify && collapseVerify {
+			b.AddOp(txscript.OP_CHECKMULTISIGVERIFY)
+		} else {
+			b.AddOp(txscript.OP_CHECKMULTISIG)
+		}
+
+	case f_multi_a:
+		// multi_a emits `<pk1> CHECKSIG <pk2> CHECKSIGADD ... <pkn>
+		// CHECKSIGADD <k> NUMEQUAL`. The final opcode is OP_NUMEQUAL,
+		// which is collapsed into OP_NUMEQUALVERIFY under a v: wrapper.
+		k := node.args[0].num
+		for i, arg := range node.args[1:] {
+			if arg.value == nil {
+				return fmt.Errorf("empty key for %s (%s)",
+					node.identifier, arg.identifier)
+			}
+			b.AddData(arg.value)
+			if i == 0 {
+				b.AddOp(txscript.OP_CHECKSIG)
+			} else {
+				b.AddOp(txscript.OP_CHECKSIGADD)
+			}
+		}
+		b.AddInt64(int64(k))
+		if node.props.canCollapseVerify && collapseVerify {
+			b.AddOp(txscript.OP_NUMEQUALVERIFY)
+		} else {
+			b.AddOp(txscript.OP_NUMEQUAL)
+		}
+
+	case f_wrap_a:
+		// a: emits OP_TOALTSTACK [X] OP_FROMALTSTACK, so the final
+		// opcode is OP_FROMALTSTACK.
+		b.AddOp(txscript.OP_TOALTSTACK)
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_FROMALTSTACK)
+
+	case f_wrap_s:
+		// s: emits OP_SWAP [X], so the final opcode is X's final
+		// opcode: forward collapseVerify to the child.
+		b.AddOp(txscript.OP_SWAP)
+		err := buildScript(node.args[0], b, collapseVerify)
+		if err != nil {
+			return err
+		}
+
+	case f_wrap_c:
+		// c: emits [X] OP_CHECKSIG; the final opcode is the OP_CHECKSIG
+		// below, so the child is not the collapse target.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		if node.props.canCollapseVerify && collapseVerify {
+			b.AddOp(txscript.OP_CHECKSIGVERIFY)
+		} else {
+			b.AddOp(txscript.OP_CHECKSIG)
+		}
+
+	case f_wrap_d:
+		// d: emits OP_DUP OP_IF [X] OP_ENDIF, so the final opcode is
+		// OP_ENDIF.
+		b.AddOp(txscript.OP_DUP)
+		b.AddOp(txscript.OP_IF)
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ENDIF)
+
+	case f_wrap_v:
+		if err := buildScript(node.args[0], b, true); err != nil {
+			return err
+		}
+		if !node.args[0].props.canCollapseVerify {
+			b.AddOp(txscript.OP_VERIFY)
+		}
+
+	case f_wrap_j:
+		// j: emits OP_SIZE OP_0NOTEQUAL OP_IF [X] OP_ENDIF, so the
+		// final opcode is OP_ENDIF.
+		b.AddOp(txscript.OP_SIZE)
+		b.AddOp(txscript.OP_0NOTEQUAL)
+		b.AddOp(txscript.OP_IF)
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_ENDIF)
+
+	case f_wrap_n:
+		// n: emits [X] OP_0NOTEQUAL, so the final opcode is
+		// OP_0NOTEQUAL.
+		err := buildScript(node.args[0], b, false)
+		if err != nil {
+			return err
+		}
+		b.AddOp(txscript.OP_0NOTEQUAL)
+
+	default:
+		return fmt.Errorf("unknown identifier: %s", node.identifier)
+	}
+
+	return nil
+}
+
+// scriptStr outputs a human-readable version of the script for debugging
+// purposes. collapseVerify applies only to this node's final opcode, exactly
+// as in buildScript; it is not propagated to every descendant of a v: wrapper.
+func scriptStr(node *AST, collapseVerify bool) string {
+	switch node.identifier {
+	case f_0, f_1:
+		return node.identifier
+
+	case f_pk_k:
+		return fmt.Sprintf("<%s>", node.args[0].identifier)
+
+	case f_pk_h:
+		return fmt.Sprintf("DUP HASH160 <HASH160(%s)> EQUALVERIFY",
+			node.args[0].identifier)
+
+	case f_older:
+		return fmt.Sprintf("<%s> CHECKSEQUENCEVERIFY",
+			node.args[0].identifier)
+
+	case f_after:
+		return fmt.Sprintf("<%s> CHECKLOCKTIMEVERIFY",
+			node.args[0].identifier)
+
+	case f_sha256, f_hash256, f_ripemd160, f_hash160:
+		opVerify := "EQUAL"
+		if node.props.canCollapseVerify && collapseVerify {
+			opVerify = "EQUALVERIFY"
+		}
+		return fmt.Sprintf("SIZE <32> EQUALVERIFY %s <%s> %s",
+			strings.ToUpper(node.identifier),
+			node.args[0].identifier, opVerify)
+
+	case f_andor:
+		return fmt.Sprintf("%s NOTIF %s ELSE %s ENDIF",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[2], false),
+			scriptStr(node.args[1], false))
+
+	case f_and_v:
+		return fmt.Sprintf("%s %s",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[1], collapseVerify))
+
+	case f_and_b:
+		return fmt.Sprintf("%s %s BOOLAND",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[1], false))
+
+	case f_or_b:
+		return fmt.Sprintf("%s %s BOOLOR",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[1], false))
+
+	case f_or_c:
+		return fmt.Sprintf("%s NOTIF %s ENDIF",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[1], false))
+
+	case f_or_d:
+		return fmt.Sprintf("%s IFDUP NOTIF %s ENDIF",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[1], false))
+
+	case f_or_i:
+		return fmt.Sprintf("IF %s ELSE %s ENDIF",
+			scriptStr(node.args[0], false),
+			scriptStr(node.args[1], false))
+
+	case f_thresh:
+		var s []string
+		for i, arg := range node.args[1:] {
+			s = append(s, scriptStr(arg, false))
+			if i > 0 {
+				s = append(s, "ADD")
+			}
+		}
+
+		opVerify := "EQUAL"
+		if node.props.canCollapseVerify && collapseVerify {
+			opVerify = "EQUALVERIFY"
+		}
+		s = append(s, node.args[0].identifier)
+		s = append(s, opVerify)
+		return strings.Join(s, " ")
+
+	case f_multi:
+		s := []string{node.args[0].identifier}
+		for _, arg := range node.args[1:] {
+			s = append(s, fmt.Sprintf("<%s>", arg.identifier))
+		}
+		opVerify := "CHECKMULTISIG"
+		if node.props.canCollapseVerify && collapseVerify {
+			opVerify = "CHECKMULTISIGVERIFY"
+		}
+		s = append(s, fmt.Sprint(len(node.args)-1))
+		s = append(s, opVerify)
+		return strings.Join(s, " ")
+
+	case f_multi_a:
+		var s []string
+		for i, arg := range node.args[1:] {
+			s = append(s, fmt.Sprintf("<%s>", arg.identifier))
+			if i == 0 {
+				s = append(s, "CHECKSIG")
+			} else {
+				s = append(s, "CHECKSIGADD")
+			}
+		}
+		opVerify := "NUMEQUAL"
+		if node.props.canCollapseVerify && collapseVerify {
+			opVerify = "NUMEQUALVERIFY"
+		}
+		s = append(s, node.args[0].identifier)
+		s = append(s, opVerify)
+		return strings.Join(s, " ")
+
+	case f_wrap_a:
+		return fmt.Sprintf("TOALTSTACK %s FROMALTSTACK",
+			scriptStr(node.args[0], false))
+
+	case f_wrap_s:
+		return fmt.Sprintf("SWAP %s",
+			scriptStr(node.args[0], collapseVerify))
+
+	case f_wrap_c:
+		opVerify := "CHECKSIG"
+		if node.props.canCollapseVerify && collapseVerify {
+			opVerify = "CHECKSIGVERIFY"
+		}
+		return fmt.Sprintf("%s %s",
+			scriptStr(node.args[0], false),
+			opVerify)
+
+	case f_wrap_d:
+		return fmt.Sprintf("DUP IF %s ENDIF",
+			scriptStr(node.args[0], false))
+
+	case f_wrap_v:
+		s := scriptStr(node.args[0], true)
+		if !node.args[0].props.canCollapseVerify {
+			s += " VERIFY"
+		}
+		return s
+
+	case f_wrap_j:
+		return fmt.Sprintf("SIZE 0NOTEQUAL IF %s ENDIF",
+			scriptStr(node.args[0], false))
+
+	case f_wrap_n:
+		return fmt.Sprintf("%s 0NOTEQUAL",
+			scriptStr(node.args[0], false))
+
+	default:
+		return "<unknown>"
+	}
 }
