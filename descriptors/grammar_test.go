@@ -103,3 +103,72 @@ func TestMultiThresholdSyntax(t *testing.T) {
 		})
 	}
 }
+
+// TestUnsatisfiableRejected checks that a descriptor whose script can never be
+// satisfied is rejected, and that NewDescriptorInsane still parses it.
+//
+// Such a descriptor used to parse and derive an address, so a receive flow
+// that only called NewDescriptor and AddressAt handed out an address whose
+// coins nobody can ever move. The sanity check did not cover it because the
+// unsatisfiable fragment 0 carries the "s" and "f" properties vacuously, which
+// is why wsh(1) was rejected for needing no signature while wsh(0) was not.
+func TestUnsatisfiableRejected(t *testing.T) {
+	t.Parallel()
+
+	const key = "03d04e74a4a87f872d20c9e1a7195379364e8e3596926bfa346d0" +
+		"ea4bfee7e3e28"
+	xOnly := key[2:]
+
+	for _, desc := range []string{
+		"wsh(0)",
+		"wsh(and_v(v:pk(" + key + "),0))",
+		"sh(wsh(0))",
+		"wsh(and_b(pk(" + key + "),a:0))",
+		"sh(and_v(v:pk(" + key + "),0))",
+
+		// A dead tap leaf does not lock up the coins, since the key
+		// path still spends them, but Core rejects the descriptor all
+		// the same.
+		"tr(" + xOnly + ",0)",
+	} {
+
+		t.Run(desc, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := NewDescriptor(desc)
+			require.ErrorContains(t, err, "cannot be satisfied")
+
+			// The insane parse accepts it, so an expression that is
+			// known not to be sane can still be inspected.
+			d, err := NewDescriptorInsane(desc)
+			require.NoError(t, err)
+			require.Equal(t, desc, stripChecksumOrFail(t, d))
+		})
+	}
+
+	// A branch that can never be taken is not the same thing: the
+	// expression as a whole still has a satisfaction, so it stays valid.
+	for _, desc := range []string{
+		"wsh(or_i(0,pk(" + key + ")))",
+		"wsh(thresh(1,pk(" + key + "),a:0))",
+	} {
+
+		t.Run(desc, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := NewDescriptor(desc)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// stripChecksumOrFail returns the canonical string of the descriptor without
+// the checksum String appends to it.
+func stripChecksumOrFail(t *testing.T, d *Descriptor) string {
+	t.Helper()
+
+	body, err := stripChecksum(d.String())
+	require.NoError(t, err)
+
+	return body
+}
