@@ -184,14 +184,31 @@ func (c Context) maxMultiKeys() int {
 //
 // The following transformations are applied to the AST in order:
 //  1. argCheck: Checks that the nodes have the correct number of arguments.
+//  2. expandWrappers: Unwraps the numbers before the colon, for example:
+//     dv:older(144) is d(v(older(144)))
+//  1. deSugar: Miniscript defines six instances of syntactic sugar. We replace
+//     these with fixed equations.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	// expandWrappers and deSugar create new nodes, so we stamp the context
+	// onto every node of the (now final-shaped) tree right after them. The
+	// preceding argCheck only ever inspects the original createAST nodes,
+	// which already carry the context.
+	setContext := func(node *AST) (*AST, error) {
+		node.ctx = ctx
+		return node, nil
+	}
+
 	transformers := []func(*AST) (*AST, error){
 		argCheck,
+		expandWrappers,
+		deSugar,
+		setContext,
+		checkContextFragments,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -215,6 +232,11 @@ type AST struct {
 	// number, i.e. the first argument of older/after/multi/thresh. This is
 	// not used otherwise.
 	num uint64
+
+	// sortedKeys is set on the multi_a a sortedmulti_a desugars to. Its
+	// keys are sorted by their serialization once they are known, which is
+	// what makes the two fragments differ (BIP387).
+	sortedKeys bool
 
 	args []*AST
 }
@@ -579,5 +601,127 @@ func argCheck(node *AST) (*AST, error) {
 		return nil, fmt.Errorf("unrecognized identifier: %s",
 			node.identifier)
 	}
+	return node, nil
+}
+
+// checkContextFragments rejects fragments that must not be used in the script
+// context the expression is parsed in.
+//
+// It runs after deSugar, so it sees the fragments the syntactic sugar expands
+// to: the u: and l: wrappers are or_i, and the t: wrapper is and_v.
+func checkContextFragments(node *AST) (*AST, error) {
+	if node.ctx != Legacy {
+		return node, nil
+	}
+
+	// Both or_i and d: select a branch with an OP_IF, whose argument is
+	// only required to be minimally encoded from segwit on
+	// (SCRIPT_VERIFY_MINIMALIF is not a consensus rule for pre-segwit
+	// scripts). A third party can therefore replace the branch selector of
+	// a legacy satisfaction with any other non-zero value, changing the
+	// transaction id without invalidating the spend, which is why
+	// rust-miniscript rejects both fragments in its Legacy context as well.
+	switch node.identifier {
+	case f_or_i:
+		return nil, errors.New("or_i (and the u: and l: wrappers, " +
+			"which are defined in terms of it) is malleable in " +
+			"the Legacy context and not allowed there")
+
+	case f_wrap_d:
+		return nil, errors.New("the d: wrapper is malleable in the " +
+			"Legacy context and not allowed there")
+	}
+
+	return node, nil
+}
+
+// expandWrappers applies wrappers (the characters before a colon), e.g.
+// `ascd:X` => `a(s(c(d(X))))`.
+func expandWrappers(node *AST) (*AST, error) {
+	const allWrappers = "asctdvjnlu"
+
+	wrappers := []rune(node.wrappers)
+	node.wrappers = ""
+	for i := len(wrappers) - 1; i >= 0; i-- {
+		wrapper := wrappers[i]
+		if !strings.ContainsRune(allWrappers, wrapper) {
+			return nil, fmt.Errorf("unknown wrapper: %s",
+				string(wrapper))
+		}
+		node = &AST{identifier: string(wrapper), args: []*AST{node}}
+	}
+	return node, nil
+}
+
+// deSugar replaces syntactic sugar with the final form.
+func deSugar(node *AST) (*AST, error) {
+	switch node.identifier {
+	case f_pk: // pk(key) = c:pk_k(key)
+		return &AST{
+			identifier: f_wrap_c,
+			args: []*AST{
+				{
+					identifier: f_pk_k,
+					args:       node.args,
+				},
+			},
+		}, nil
+
+	case f_pkh: // pkh(key) = c:pk_h(key)
+		return &AST{
+			identifier: f_wrap_c,
+			args: []*AST{
+				{
+					identifier: f_pk_h,
+					args:       node.args,
+				},
+			},
+		}, nil
+
+	case f_and_n: // and_n(X,Y) = andor(X,Y,0)
+		return &AST{
+			identifier: f_andor,
+			args: []*AST{
+				node.args[0],
+				node.args[1],
+				{identifier: f_0},
+			},
+		}, nil
+
+	case f_wrap_t: // t:X = and_v(X,1)
+		return &AST{
+			identifier: f_and_v,
+			args: []*AST{
+				node.args[0],
+				{identifier: f_1},
+			},
+		}, nil
+
+	case f_wrap_l: // l:X = or_i(0,X)
+		return &AST{
+			identifier: f_or_i,
+			args: []*AST{
+				{identifier: f_0},
+				node.args[0],
+			},
+		}, nil
+
+	case f_sortedmulti_a: // sortedmulti_a(k,...) = sorted multi_a(k,...)
+		return &AST{
+			identifier: f_multi_a,
+			args:       node.args,
+			sortedKeys: true,
+		}, nil
+
+	case f_wrap_u: // u:X = or_i(X,0)
+		return &AST{
+			identifier: f_or_i,
+			args: []*AST{
+				node.args[0],
+				{identifier: f_0},
+			},
+		}, nil
+	}
+
 	return node, nil
 }
