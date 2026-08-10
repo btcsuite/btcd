@@ -282,6 +282,8 @@ func (p properties) String() string {
 //  2. computeOpCount: Counts the amount of opcodes the script contains.
 //  3. computeStackSize: Computes the maximum witness stack size needed to
 //     (dis)satisfy the script.
+//  1. computeTimelocks: Computes the time lock info used to detect time lock
+//     mixing.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -311,6 +313,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		computeStackSize,
 		computeSatSize,
 		computeExecStack,
+		computeTimelocks,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -363,6 +366,11 @@ type AST struct {
 	// execution (beyond the initial witness) to satisfy or dissatisfy this
 	// node. Both segwit contexts use it to enforce the stack element limit.
 	execStack execSize
+
+	// timelock tracks the height- and time-based time locks that may be
+	// encountered when satisfying this node, used to detect time lock
+	// mixing.
+	timelock timelockInfo
 }
 
 // formattedType returns the basic type (B, V, K or W) followed by all type
