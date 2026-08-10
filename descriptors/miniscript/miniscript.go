@@ -188,7 +188,8 @@ type properties struct {
 	z, o, n, d, u bool
 
 	// Malleability properties.
-	// If `m`, a non-malleable satisfaction is guaranteed to exist.
+	// If `m`, the fragment meets the structural non-malleability rules;
+	// this does not imply a satisfaction is available for given assets.
 	// The purpose of s/f/e is only to compute `m` and can be disregarded
 	// afterward.
 	m, s, f, e bool
@@ -260,6 +261,8 @@ func (p properties) String() string {
 //     Bitcoin Script and valid witness. This function checks that and sets the
 //     types of the Miniscript fragments. Only if the top level basic type is of
 //     type B the miniscript is valid.
+//  1. malleabilityCheck: Checks each node if it is malleable (checking that the
+//     transaction hash can not be changes without altering the content).
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -282,6 +285,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		setContext,
 		checkContextFragments,
 		typeCheck,
+		malleabilityCheck,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -1201,5 +1205,185 @@ func typeCheck(node *AST) (*AST, error) {
 		return nil, fmt.Errorf("unknown identifier: %s",
 			node.identifier)
 	}
+	return node, nil
+}
+
+// malleabilityCheck derives BIP379's m/s/f/e properties from already-analyzed
+// children. The auxiliary s/f/e properties are meaningful only when m holds.
+func malleabilityCheck(node *AST) (*AST, error) {
+	// Keep the rules in fragment-table order so the Boolean conditions can
+	// be checked directly against the specification. Availability of actual
+	// signatures and preimages is handled by the satisfaction pass instead.
+	switch node.identifier {
+	case f_0:
+		node.props.m = true
+		node.props.s = true
+		node.props.e = true
+
+	case f_1:
+		node.props.m = true
+		node.props.f = true
+
+	case f_pk_k, f_pk_h:
+		node.props.m = true
+		node.props.s = true
+		node.props.e = true
+
+	case f_older, f_after:
+		node.props.m = true
+		node.props.f = true
+
+	case f_sha256, f_ripemd160, f_hash256, f_hash160:
+		node.props.m = true
+
+	case f_andor:
+		x, y := node.args[0].props, node.args[1].props
+		z := node.args[2].props
+		node.props.m = x.m && y.m && z.m && (x.e && (x.s || y.s || z.s))
+		node.props.s = z.s && (x.s || y.s)
+		node.props.f = z.f && (x.s || y.f)
+		node.props.e = z.e && (x.s || y.f)
+
+	case f_and_v:
+		x, y := node.args[0].props, node.args[1].props
+		node.props.m = x.m && y.m
+		node.props.s = x.s || y.s
+		node.props.f = x.s || y.f
+
+	case f_and_b:
+		x, y := node.args[0].props, node.args[1].props
+		node.props.m = x.m && y.m
+		node.props.s = x.s || y.s
+		node.props.f = x.f && y.f || x.s && x.f || y.s && y.f
+		node.props.e = x.e && y.e && x.s && y.s
+
+	case f_or_b:
+		x, z := node.args[0].props, node.args[1].props
+		node.props.m = x.m && z.m && (x.e && z.e && (x.s || z.s))
+		node.props.s = x.s && z.s
+		node.props.e = true
+
+	case f_or_c:
+		x, z := node.args[0].props, node.args[1].props
+		node.props.m = x.m && z.m && (x.e && (x.s || z.s))
+		node.props.s = x.s && z.s
+		node.props.f = true
+
+	case f_or_d:
+		x, z := node.args[0].props, node.args[1].props
+		node.props.m = x.m && z.m && (x.e && (x.s || z.s))
+		node.props.s = x.s && z.s
+		node.props.f = z.f
+
+		// The specification uses e_z here. An earlier reference used
+		// e_x && e_z, which differs only when m is false and e is
+		// discarded below. A false m means non-malleable satisfaction
+		// is not guaranteed, not that every satisfaction is malleable.
+		// See https://github.com/sipa/miniscript/issues/128.
+		node.props.e = z.e
+
+	case f_or_i:
+		x, z := node.args[0].props, node.args[1].props
+		node.props.m = x.m && z.m && (x.s || z.s)
+		node.props.s = x.s && z.s
+		node.props.f = x.f && z.f
+		node.props.e = x.e && z.f || z.e && x.f
+
+	case f_thresh:
+		k := node.args[0].num
+
+		// A threshold must not leave more than k signature-free
+		// children interchangeable. Requiring a signature tightens that
+		// bound by one, ensuring at least one selected child must be
+		// signed.
+		notSCount := 0
+		node.props.m = true
+		for _, arg := range node.args[1:] {
+			node.props.m = node.props.m && arg.props.m &&
+				arg.props.e
+
+			if !arg.props.s {
+				notSCount++
+			}
+		}
+		node.props.m = node.props.m && uint64(notSCount) <= k
+		node.props.s = uint64(notSCount) <= k-1
+
+		// BIP379's rule is "e=all are s". The m computed above already
+		// requires every sub expression to be expressive, and a
+		// threshold that does not meet that requirement carries no
+		// malleability property at all (see the end of this function),
+		// so the two readings of the rule agree.
+		node.props.e = true
+		for _, arg := range node.args[1:] {
+			node.props.e = node.props.e && arg.props.s
+		}
+
+	case f_multi, f_multi_a:
+		node.props.m = true
+		node.props.s = true
+		node.props.e = true
+
+	case f_wrap_a, f_wrap_s:
+		x := node.args[0].props
+		node.props.m = x.m
+		node.props.s = x.s
+		node.props.f = x.f
+		node.props.e = x.e
+
+	case f_wrap_c:
+		x := node.args[0].props
+		node.props.m = x.m
+		node.props.s = true
+		node.props.f = x.f
+		node.props.e = x.e
+
+	case f_wrap_d:
+		x := node.args[0].props
+		node.props.m = x.m
+		node.props.s = x.s
+		node.props.e = true
+
+	case f_wrap_v:
+		x := node.args[0].props
+		node.props.m = x.m
+		node.props.s = x.s
+		node.props.f = true
+
+	case f_wrap_j:
+		x := node.args[0].props
+		node.props.m = x.m
+		node.props.s = x.s
+		node.props.e = x.f
+
+	case f_wrap_n:
+		x := node.args[0].props
+		node.props.m = x.m
+		node.props.s = x.s
+		node.props.f = x.f
+		node.props.e = x.e
+
+	default:
+		return nil, fmt.Errorf("unknown identifier: %s",
+			node.identifier)
+	}
+
+	// The s, f and e properties describe the satisfactions and
+	// dissatisfactions of an expression only if it meets the malleability
+	// requirement of every fragment it is built from, which is what m
+	// tracks. Once an expression is malleable, so is every expression
+	// containing it, and none of the three says anything about any of them,
+	// so they are not carried for a malleable expression. BIP379 states
+	// this below its malleability table.
+	//
+	// Clearing them here rather than at every use is sound because the m of
+	// a parent requires the m of each of its sub expressions, so a parent
+	// that consults a cleared property is malleable either way.
+	if !node.props.m {
+		node.props.s = false
+		node.props.f = false
+		node.props.e = false
+	}
+
 	return node, nil
 }
