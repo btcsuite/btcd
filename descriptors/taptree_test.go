@@ -184,3 +184,69 @@ func TestTapLeafFragments(t *testing.T) {
 	_, err := NewDescriptor("tr(" + xOnly[0] + ", pk(" + xOnly[1] + "))")
 	require.Error(t, err)
 }
+
+// TestTapLeafDuplicateKeys checks that a tr() leaf that is a single multi_a or
+// sortedmulti_a may repeat a key, as Core allows: BIP387 defines it as a script
+// expression of its own, like multi() and sortedmulti(), which accept repeated
+// keys as well. Inside any other miniscript a repeated key is still rejected,
+// as is a sortedmulti_a anywhere but as a whole leaf.
+func TestTapLeafDuplicateKeys(t *testing.T) {
+	t.Parallel()
+
+	keys := testCompressedKeys(4)
+	xOnly := make([]string, len(keys))
+	for i, key := range keys {
+		xOnly[i] = key[2:]
+	}
+	a, b, c := xOnly[1], xOnly[2], xOnly[3]
+
+	assets := Assets{
+		LookupTapLeafScriptSig: func(string, string) (uint32, bool) {
+			return 64, true
+		},
+	}
+
+	for _, leaf := range []string{
+		"multi_a(1," + a + "," + a + ")",
+		"multi_a(2," + a + "," + b + "," + a + ")",
+		"sortedmulti_a(1," + a + "," + a + ")",
+		"{multi_a(1," + a + "," + a + "),pk(" + b + ")}",
+		// The same key written once x-only and once compressed.
+		"multi_a(1," + a + "," + keys[1] + ")",
+	} {
+
+		desc, err := NewDescriptor("tr(" + xOnly[0] + "," + leaf + ")")
+		require.NoErrorf(t, err, "leaf %s", leaf)
+
+		_, err = desc.AddressAt(&chaincfg.MainNetParams, 0, 0)
+		require.NoErrorf(t, err, "leaf %s", leaf)
+
+		_, err = desc.MaxWeightToSatisfy()
+		require.NoErrorf(t, err, "leaf %s", leaf)
+
+		_, err = desc.PlanAt(0, 0, assets)
+		require.NoErrorf(t, err, "leaf %s", leaf)
+	}
+
+	for _, leaf := range []string{
+		"and_v(v:pk(" + c + "),multi_a(1," + a + "," + a + "))",
+		"n:multi_a(1," + a + "," + a + ")",
+		"or_b(pk(" + a + "),s:pk(" + a + "))",
+	} {
+
+		_, err := NewDescriptor("tr(" + xOnly[0] + "," + leaf + ")")
+		require.ErrorContainsf(t, err, "duplicate key", "leaf %s", leaf)
+	}
+
+	for _, leaf := range []string{
+		"n:sortedmulti_a(1," + a + "," + b + ")",
+		"and_v(v:pk(" + c + "),sortedmulti_a(1," + a + "," + b + "))",
+	} {
+
+		_, err := NewDescriptor("tr(" + xOnly[0] + "," + leaf + ")")
+		require.ErrorContainsf(
+			t, err, "allowed as a whole expression", "leaf %s",
+			leaf,
+		)
+	}
+}
