@@ -308,6 +308,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		computeOpCount,
 		computeStackSize,
 		computeSatSize,
+		computeExecStack,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -320,8 +321,8 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 
 // AST is the abstract syntax tree representing a miniscript expression.
 type AST struct {
-	// ctx is the script context (P2WSH or P2TR) the expression is parsed
-	// in. It is the same for every node of a tree.
+	// ctx is the script context (P2WSH, P2TR or Legacy) the expression is
+	// parsed in. It is the same for every node of a tree.
 	ctx Context
 
 	basicType  basicType
@@ -355,6 +356,12 @@ type AST struct {
 	// satSize is the maximum witness byte size (and element count) needed
 	// to satisfy or dissatisfy this node, used for weight estimation.
 	satSize witSize
+
+	// execStack is the stack size effect of satisfying or dissatisfying
+	// this node, from which the peak number of stack elements during
+	// execution follows. Both segwit contexts use it to enforce the stack
+	// element limit.
+	execStack execSize
 }
 
 // formattedType returns the basic type (B, V, K or W) followed by all type
