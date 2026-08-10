@@ -1,8 +1,10 @@
 package descriptors
 
 import (
+	"encoding/hex"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,5 +69,83 @@ func TestDescType(t *testing.T) {
 		descriptor, err := NewDescriptor(test.desc)
 		require.NoError(t, err)
 		require.Equal(t, test.expected, descriptor.DescType())
+	}
+}
+
+// TestScriptCodeAt checks the script code derived for a P2WSH sorted-multisig.
+func TestScriptCodeAt(t *testing.T) {
+	t.Parallel()
+
+	descriptor, err := NewDescriptor(
+		"wsh(sortedmulti(2," + testXpub1 + "," + testXpub2 +
+			"))#jx2cv4q8",
+	)
+	require.NoError(t, err)
+
+	expected := "5221020b44e43e2f276697d23c2248f80bb09e84f702ddae399d" +
+		"194f5132f472bf8713210326547ceb5352bd238ca7e1da004e9d6625ba" +
+		"f3324feda4ead69436042a53510452ae"
+	script, err := descriptor.ScriptCodeAt(0, 0)
+	require.NoError(t, err)
+	require.Equal(t, expected, hex.EncodeToString(script))
+}
+
+// TestBareScriptCode checks that a bare descriptor exposes its output script.
+// Only pk() and pkh() used to be handled, so the bare multisigs of BIP383
+// parsed and derived a satisfaction weight, but their script - the very thing
+// the output pays to - could not be obtained at all.
+func TestBareScriptCode(t *testing.T) {
+	t.Parallel()
+
+	const (
+		key1 = "03a34b99f22c790c4e36b2b3c2c35a36db06226e41c692fc82b8b" +
+			"56ac1c540c5bd"
+		key2 = "0260b2003c386519fc9eadf2b5cf124dd8eea4c4e68d5e154050a" +
+			"9346ea98ce600"
+	)
+
+	tests := []struct {
+		name string
+		desc string
+
+		// wantScript is the output script of the bare descriptor, which
+		// is also the script code its sighash is computed over.
+		wantScript string
+	}{{
+		// The BIP383 test vector, with the keys in the order the
+		// descriptor writes them.
+		name:       "bare multi",
+		desc:       "multi(1," + key1 + "," + key2 + ")",
+		wantScript: "5121" + key1 + "21" + key2 + "52ae",
+	}, {
+		// sortedmulti sorts the keys, and key2 (0260...) sorts before
+		// key1 (03a3...).
+		name:       "bare sortedmulti",
+		desc:       "sortedmulti(1," + key1 + "," + key2 + ")",
+		wantScript: "5121" + key2 + "21" + key1 + "52ae",
+	}, {
+		name:       "bare pk",
+		desc:       "pk(" + key1 + ")",
+		wantScript: "21" + key1 + "ac",
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			d, err := NewDescriptor(tc.desc)
+			require.NoError(t, err)
+			require.Equal(t, DescTypeBare, d.DescType())
+
+			script, err := d.ScriptCodeAt(0, 0)
+			require.NoError(t, err)
+			require.Equal(
+				t, tc.wantScript, hex.EncodeToString(script),
+			)
+
+			// A bare descriptor has no address.
+			_, err = d.AddressAt(&chaincfg.MainNetParams, 0, 0)
+			require.ErrorContains(t, err, "has no address")
+		})
 	}
 }
