@@ -42,14 +42,17 @@ func loadCorpus(tb testing.TB) []string {
 }
 
 // networkParams maps a test-vector network name to its chaincfg parameters.
+// The two reference implementations spell the names differently, and
+// rust-bitcoin shortened its own spelling along the way, so every name a vector
+// file carries is accepted here.
 func networkParams(t *testing.T, network string) *chaincfg.Params {
 	t.Helper()
 
 	switch network {
-	case "mainnet":
+	case "mainnet", "main":
 		return &chaincfg.MainNetParams
 
-	case "testnet":
+	case "testnet", "test":
 		return &chaincfg.TestNet3Params
 
 	case "regtest":
