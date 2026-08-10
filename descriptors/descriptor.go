@@ -448,6 +448,9 @@ func parseNode(s string, pos scriptPos, keys *[]*descKey) (*node, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := checkRedeemScript(sub); err != nil {
+			return nil, err
+		}
 		return &node{kind: nodeSh, pos: pos, sub: sub}, nil
 
 	case nodeWsh:
@@ -468,6 +471,54 @@ func parseNode(s string, pos scriptPos, keys *[]*descKey) (*node, error) {
 		// current context.
 		return parseMs(s, pos, keys)
 	}
+}
+
+// checkRedeemScript returns an error if the given inner node cannot be used as
+// the redeem script of a P2SH output.
+//
+// The redeem script is pushed as a single data element in the spending
+// scriptSig, so it must not exceed the consensus limit on the size of a script
+// element (520 bytes): coins sent to a P2SH address whose redeem script is
+// larger are unspendable. The scriptSig also holds the satisfaction, and a
+// scriptSig over the standardness limit (1650 bytes) is not relayed.
+//
+// A miniscript inner is compiled in the Legacy context, which enforces both
+// limits itself, so only the nodes that build their script directly are checked
+// here.
+func checkRedeemScript(sub *node) error {
+	switch sub.kind {
+	case nodePk, nodePkh, nodeMulti, nodeSortedMulti:
+
+	default:
+		// A P2SH-wrapped segwit output commits to a fixed-size witness
+		// program, which is far below either limit, and a miniscript
+		// inner is compiled in the Legacy context, which enforces both
+		// limits itself.
+		return nil
+	}
+
+	scriptSize, satSize, _, err := satInfo(sub)
+	if err != nil {
+		return err
+	}
+
+	if scriptSize > maxRedeemScriptSize {
+		return fmt.Errorf("the redeem script of the sh() descriptor is "+
+			"%d bytes, which is larger than the maximum redeem "+
+			"script size of %d", scriptSize, maxRedeemScriptSize)
+	}
+
+	// The scriptSig holds the satisfaction and the push of the redeem
+	// script.
+	scriptSig := satSize + pushOpcodeSize(scriptSize) + scriptSize
+	if scriptSig > maxScriptSigSize {
+		return fmt.Errorf("spending the sh() descriptor requires a "+
+			"scriptSig of %d bytes, which is larger than the "+
+			"maximum scriptSig size of %d", scriptSig,
+			maxScriptSigSize)
+	}
+
+	return nil
 }
 
 // parseTr parses the inner arguments of a tr() descriptor: an internal key and
@@ -600,6 +651,7 @@ func parseMulti(kind nodeKind, inner string, pos scriptPos,
 		return nil, fmt.Errorf("%s requires a threshold and at least "+
 			"one key", kind)
 	}
+
 	// The threshold is a plain decimal number, which is what ParseUint
 	// accepts and what the miniscript parser uses as well. strconv.Atoi
 	// would also take a leading plus or minus sign, so multi(+1,KEY) used
@@ -633,6 +685,14 @@ func parseMulti(kind nodeKind, inner string, pos scriptPos,
 			maxMultisigKeys)
 	}
 
+	// A bare multisig is only standard with up to three keys (BIP383), so a
+	// larger one is not relayed. Inside an sh() the redeem script size
+	// limits the key count instead, and a wsh() takes the full 20.
+	if pos == posTop && len(n.keys) > maxBareMultisigKeys {
+		return nil, fmt.Errorf("a bare %s has %d keys, which is more "+
+			"than the %d keys a bare multisig may have to be "+
+			"standard", kind, len(n.keys), maxBareMultisigKeys)
+	}
 	if k < 1 || k > len(n.keys) {
 		return nil, fmt.Errorf("%s threshold %d out of range for %d "+
 			"keys", kind, k, len(n.keys))
