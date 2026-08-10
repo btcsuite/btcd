@@ -271,6 +271,8 @@ func (p properties) String() string {
 //     transaction hash can not be changes without altering the content).
 //  1. computeScriptLen: Simply computes the script length.
 //  2. computeOpCount: Counts the amount of opcodes the script contains.
+//  3. computeStackSize: Computes the maximum witness stack size needed to
+//     (dis)satisfy the script.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -297,6 +299,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		malleabilityCheck,
 		computeScriptLen,
 		computeOpCount,
+		computeStackSize,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -335,6 +338,10 @@ type AST struct {
 	args      []*AST
 	scriptLen int
 	opCount   ops
+
+	// stackSize is the maximum number of witness stack elements needed to
+	// satisfy or dissatisfy this node.
+	stackSize stackSize
 }
 
 // formattedType returns the basic type (B, V, K or W) followed by all type
