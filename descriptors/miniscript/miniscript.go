@@ -270,6 +270,7 @@ func (p properties) String() string {
 //  2. malleabilityCheck: Checks each node if it is malleable (checking that the
 //     transaction hash can not be changes without altering the content).
 //  1. computeScriptLen: Simply computes the script length.
+//  2. computeOpCount: Counts the amount of opcodes the script contains.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -295,6 +296,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		canCollapseVerify,
 		malleabilityCheck,
 		computeScriptLen,
+		computeOpCount,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -332,6 +334,7 @@ type AST struct {
 	value     []byte
 	args      []*AST
 	scriptLen int
+	opCount   ops
 }
 
 // formattedType returns the basic type (B, V, K or W) followed by all type
@@ -625,6 +628,12 @@ func (a *AST) ApplyVars(
 		return node, nil
 	})
 	return err
+}
+
+// maxOpCount returns the maximum number of ops needed to satisfy this script
+// in a non-malleable way.
+func (a *AST) maxOpCount() int {
+	return a.opCount.count + a.opCount.sat.value
 }
 
 // expectBasicType is a helper function to check that this node has a specific
