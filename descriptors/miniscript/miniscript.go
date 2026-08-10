@@ -253,6 +253,8 @@ func (p properties) String() string {
 //     Bitcoin Script and valid witness. This function checks that and sets the
 //     types of the Miniscript fragments. Only if the top level basic type is of
 //     type B the miniscript is valid.
+//  1. malleabilityCheck: Checks each node if it is malleable (checking that the
+//     transaction hash can not be changes without altering the content).
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -275,6 +277,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		setContext,
 		checkContextFragments,
 		typeCheck,
+		malleabilityCheck,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -1152,5 +1155,160 @@ func typeCheck(node *AST) (*AST, error) {
 		return nil, fmt.Errorf("unknown identifier: %s",
 			node.identifier)
 	}
+	return node, nil
+}
+
+func malleabilityCheck(node *AST) (*AST, error) {
+	switch node.identifier {
+	case f_0:
+		node.props.m = true
+		node.props.s = true
+		node.props.e = true
+
+	case f_1:
+		node.props.m = true
+		node.props.f = true
+
+	case f_pk_k, f_pk_h:
+		node.props.m = true
+		node.props.s = true
+		node.props.e = true
+
+	case f_older, f_after:
+		node.props.m = true
+		node.props.f = true
+
+	case f_sha256, f_ripemd160, f_hash256, f_hash160:
+		node.props.m = true
+
+	case f_andor:
+		_x, _y := node.args[0].props, node.args[1].props
+		_z := node.args[2].props
+		node.props.m = _x.m && _y.m && _z.m &&
+			(_x.e && (_x.s || _y.s || _z.s))
+		node.props.s = _z.s && (_x.s || _y.s)
+		node.props.f = _z.f && (_x.s || _y.f)
+		node.props.e = _z.e && (_x.s || _y.f)
+
+	case f_and_v:
+		_x, _y := node.args[0].props, node.args[1].props
+		node.props.m = _x.m && _y.m
+		node.props.s = _x.s || _y.s
+		node.props.f = _x.s || _y.f
+
+	case f_and_b:
+		_x, _y := node.args[0].props, node.args[1].props
+		node.props.m = _x.m && _y.m
+		node.props.s = _x.s || _y.s
+		node.props.f = _x.f && _y.f || _x.s && _x.f || _y.s && _y.f
+		node.props.e = _x.e && _y.e && _x.s && _y.s
+
+	case f_or_b:
+		_x, _z := node.args[0].props, node.args[1].props
+		node.props.m = _x.m && _z.m && (_x.e && _z.e && (_x.s || _z.s))
+		node.props.s = _x.s && _z.s
+		node.props.e = true
+
+	case f_or_c:
+		_x, _z := node.args[0].props, node.args[1].props
+		node.props.m = _x.m && _z.m && (_x.e && (_x.s || _z.s))
+		node.props.s = _x.s && _z.s
+		node.props.f = true
+
+	case f_or_d:
+		_x, _z := node.args[0].props, node.args[1].props
+		node.props.m = _x.m && _z.m && (_x.e && (_x.s || _z.s))
+		node.props.s = _x.s && _z.s
+		node.props.f = _z.f
+
+		// Note: the implementation at
+		// https://github.com/sipa/miniscript/ uses `e=e_x*e_z`:
+		// https://github.com/sipa/miniscript/blob/484386a50dbda962669cc163f239fe16e101b6f0/bitcoin/script/miniscript.cpp#L175
+		// while the specification and rust-miniscript both use `e=e_z`:
+		// - https://github.com/sipa/miniscript/blob/484386a50dbda962669cc163f239fe16e101b6f0/index.html#L624
+		// - https://github.com/rust-bitcoin/rust-miniscript/blob/a0648b3a4d63abbe53f621308614f97f04a04096/src/miniscript/types/malleability.rs#L241
+		// In case of `m==false` (all satisfactions are malleable), `e`
+		// can have a different type in each of the two possible
+		// implementations, but it does not matter, as its purpose is to
+		// compute `m`.
+		// See https://github.com/sipa/miniscript/issues/128
+		node.props.e = _z.e
+
+	case f_or_i:
+		_x, _z := node.args[0].props, node.args[1].props
+		node.props.m = _x.m && _z.m && (_x.s || _z.s)
+		node.props.s = _x.s && _z.s
+		node.props.f = _x.f && _z.f
+		node.props.e = _x.e && _z.f || _z.e && _x.f
+
+	case f_thresh:
+		k := node.args[0].num
+		notSCount := 0
+		node.props.m = true
+		for _, arg := range node.args[1:] {
+			node.props.m = node.props.m && arg.props.m &&
+				arg.props.e
+
+			if !arg.props.s {
+				notSCount++
+			}
+		}
+		node.props.m = node.props.m && uint64(notSCount) <= k
+		node.props.s = uint64(notSCount) <= k-1
+		node.props.e = true
+		for _, arg := range node.args[1:] {
+			node.props.e = node.props.e && arg.props.e &&
+				arg.props.s
+		}
+
+	case f_multi, f_multi_a:
+		node.props.m = true
+		node.props.s = true
+		node.props.e = true
+
+	case f_wrap_a, f_wrap_s:
+		_x := node.args[0].props
+		node.props.m = _x.m
+		node.props.s = _x.s
+		node.props.f = _x.f
+		node.props.e = _x.e
+
+	case f_wrap_c:
+		_x := node.args[0].props
+		node.props.m = _x.m
+		node.props.s = true
+		node.props.f = _x.f
+		node.props.e = _x.e
+
+	case f_wrap_d:
+		_x := node.args[0].props
+		node.props.m = _x.m
+		node.props.s = _x.s
+		node.props.e = true
+
+	case f_wrap_v:
+		_x := node.args[0].props
+		node.props.m = _x.m
+		node.props.s = _x.s
+		node.props.f = true
+
+	case f_wrap_j:
+		_x := node.args[0].props
+		node.props.m = _x.m
+		node.props.s = _x.s
+		node.props.e = _x.f
+
+	case f_wrap_n:
+		_x := node.args[0].props
+		node.props.m = _x.m
+		node.props.s = _x.s
+		node.props.f = _x.f
+		node.props.e = _x.e
+
+	default:
+		return nil, fmt.Errorf("unknown identifier: %s",
+			node.identifier)
+	}
+
 	return node, nil
 }
