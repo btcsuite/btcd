@@ -56,3 +56,32 @@ func TestValueArgumentWrappers(t *testing.T) {
 		})
 	}
 }
+
+// TestDupIfUnit checks that the d: wrapper is unit in Tapscript but not in
+// P2WSH. MINIMALIF is a consensus rule in Tapscript, so the only element that
+// satisfies the OP_IF of a d: there is the single byte 0x01, which is what the
+// u property means; in P2WSH any non-empty element does. BIP379 assigns the
+// property accordingly, and without it a valid Tapscript expression was
+// rejected for the type requirements of its parent fragment.
+func TestDupIfUnit(t *testing.T) {
+	t.Parallel()
+
+	tap, err := ParseInsane("dv:older(1)", P2TR)
+	require.NoError(t, err)
+	require.True(t, tap.props.u)
+
+	wsh, err := ParseInsane("dv:older(1)", P2WSH)
+	require.NoError(t, err)
+	require.False(t, wsh.props.u)
+
+	// The first argument of andor has to be unit, so the same expression
+	// only type-checks in the Tapscript context.
+	_, err = ParseInsane("andor(dv:older(1),pk(A),pk(B))", P2TR)
+	require.NoError(t, err)
+
+	_, err = ParseInsane("andor(dv:older(1),pk(A),pk(B))", P2WSH)
+	require.ErrorContains(
+		t, err, "wrong properties on `d` in the first argument of "+
+			"`andor`",
+	)
+}
