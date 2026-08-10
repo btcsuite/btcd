@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 )
 
 const (
@@ -327,27 +328,12 @@ func Parse(miniscript string, ctx Context) (*AST, error) {
 // do should validate what they care about through IsSane, IsValidTopLevel or
 // the computed properties.
 //
-// The following transformations are applied to the AST in order:
-//  1. argCheck: Checks that the nodes have the correct number of arguments.
-//  2. expandWrappers: Unwraps the numbers before the colon, for example:
-//     dv:older(144) is d(v(older(144)))
-//  1. deSugar: Miniscript defines six instances of syntactic sugar. We replace
-//     these with fixed equations.
-//  1. typeCheck: Not all fragments compose with each other to produce a valid
-//     Bitcoin Script and valid witness. This function checks that and sets the
-//     types of the Miniscript fragments. Only if the top level basic type is of
-//     type B the miniscript is valid.
-//  1. canCollapseVerify: If the rightmost script byte of a node is OP_EQUAL,
-//     OP_CHECKSIG or OP_CHECKMULTISIG. We can convert it to the VERIFY version
-//     of the opcode, e.g. OP_EQUALVERIFY.
-//  2. malleabilityCheck: Checks each node if it is malleable (checking that the
-//     transaction hash can not be changes without altering the content).
-//  1. computeScriptLen: Simply computes the script length.
-//  2. computeOpCount: Counts the amount of opcodes the script contains.
-//  3. computeStackSize: Computes the maximum witness stack size needed to
-//     (dis)satisfy the script.
-//  1. computeTimelocks: Computes the time lock info used to detect time lock
-//     mixing.
+// Parsing first checks argument shapes and nesting depth, then expands wrapper
+// letters and syntactic sugar. Bottom-up passes check fragment composition and
+// malleability properties, determine VERIFY folding, and compute Script size,
+// opcode, witness-size, execution-stack and timelock bounds. These passes do
+// not require concrete key values or signing data; ApplyVars supplies values
+// when the expression is ready to be compiled or satisfied.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -2683,4 +2669,33 @@ func scriptStr(node *AST, collapseVerify bool) string {
 	default:
 		return "<unknown>"
 	}
+}
+
+// Satisfy constructs a witness using the Miniscript satisfaction rules and
+// available signatures, preimages and timelock context. If no candidate is
+// available, it returns an error. Use Parse or IsSane first for the structural
+// non-malleability guarantees; ParseInsane deliberately does not enforce them.
+//
+// The satisfier has to provide a function for every kind of secret the
+// expression needs; a missing one is reported as an error naming it.
+//
+// The witness returned is a list of witness elements, each of which should be
+// pushed onto the witness stack as a data push.
+// It excludes the script and any Taproot control block. Element bytes may
+// share storage with ApplyVars or satisfier callback results. The callbacks
+// must provide correct signatures and preimages: Satisfy checks preimage
+// length but does not verify signatures or hash the supplied preimages.
+func (a *AST) Satisfy(satisfier *Satisfier) (wire.TxWitness, error) {
+	if err := satisfier.check(a); err != nil {
+		return nil, err
+	}
+
+	satisfactions, err := satisfy(a, satisfier)
+	if err != nil {
+		return nil, err
+	}
+	if !satisfactions.sat.available {
+		return nil, errors.New("no satisfaction could be found")
+	}
+	return satisfactions.sat.witness, nil
 }
