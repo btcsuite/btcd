@@ -72,6 +72,38 @@ func TestDescType(t *testing.T) {
 	}
 }
 
+// TestMaxWeightToSatisfy checks the satisfaction weight bound, including the
+// impossible-to-satisfy error case, against the descriptors-go reference
+// values.
+func TestMaxWeightToSatisfy(t *testing.T) {
+	t.Parallel()
+
+	descriptor, err := NewDescriptor(
+		"wpkh(xpub6BzikmgQmvoYG3ShFhXU1LFKaUeU832dHoYL6ka9JpCqKXr7PTH" +
+			"QHaoSMbGU36CZNcoryVPsFBjt9aYyCQHtYi6BQTo6VfRv9xVRuSN" +
+			"NteB/*)",
+	)
+	require.NoError(t, err)
+	weight, err := descriptor.MaxWeightToSatisfy()
+	require.NoError(t, err)
+	require.Equal(t, uint64(107), weight)
+
+	// A descriptor whose script is a bare OP_FALSE can never be satisfied,
+	// which is why NewDescriptor rejects it outright and the insane parse
+	// is needed to get one at all. Such a descriptor still has a script and
+	// an address, so it can be inspected; what it has no answer for is the
+	// weight of a satisfaction it does not have.
+	descriptor, err = NewDescriptorInsane("wsh(0)")
+	require.NoError(t, err)
+
+	address, err := descriptor.AddressAt(&chaincfg.MainNetParams, 0, 0)
+	require.NoError(t, err)
+	require.NotEmpty(t, address)
+
+	_, err = descriptor.MaxWeightToSatisfy()
+	require.Error(t, err)
+}
+
 // TestScriptCodeAt checks the script code derived for a P2WSH sorted-multisig.
 func TestScriptCodeAt(t *testing.T) {
 	t.Parallel()
