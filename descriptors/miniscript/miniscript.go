@@ -1,10 +1,12 @@
 package miniscript
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -399,6 +401,47 @@ func (a *AST) DrawTree() string {
 	return b.String()
 }
 
+// Keys returns the public key identifiers appearing in the expression, in the
+// order they appear. These are the arguments of the pk_k, pk_h, multi and
+// multi_a fragments. Hash values and time lock numbers are not keys and are not
+// returned.
+func (a *AST) Keys() []string {
+	var keys []string
+	a.collectKeys(&keys)
+	return keys
+}
+
+// collectKeys appends the key identifiers of this node and its sub expressions
+// to out, in order.
+func (a *AST) collectKeys(out *[]string) {
+	switch a.identifier {
+	case f_pk_k, f_pk_h, f_pk, f_pkh:
+		*out = append(*out, a.args[0].identifier)
+
+	case f_multi, f_multi_a:
+		for _, arg := range a.args[1:] {
+			*out = append(*out, arg.identifier)
+		}
+
+	case f_0, f_1, f_older, f_after, f_sha256, f_hash256, f_ripemd160,
+		f_hash160:
+
+		// These fragments contain no public keys.
+
+	case f_thresh:
+		// The first argument is the threshold number, the rest are sub
+		// expressions.
+		for _, arg := range a.args[1:] {
+			arg.collectKeys(out)
+		}
+
+	default:
+		for _, arg := range a.args {
+			arg.collectKeys(out)
+		}
+	}
+}
+
 // isSubExpression returns whether the argument at the given index is a
 // miniscript sub expression, as opposed to a key/hash variable or the numeric
 // argument of older/after/multi/thresh. Only sub expressions are visited by the
@@ -440,6 +483,148 @@ func (a *AST) apply(f func(*AST) (*AST, error)) (*AST, error) {
 		a.args[i] = newArg
 	}
 	return f(a)
+}
+
+// Clone returns a deep copy of the AST. The copy shares no mutable state with
+// the original, so it is safe to run ApplyVars (which assigns concrete key and
+// hash values into the tree) on the clone without affecting the original.
+//
+// This lets a parsed expression be cached and reused: parsing runs the full
+// analysis pipeline (tokenization, wrapper expansion, type/malleability checks,
+// resource computation), all of which is independent of the concrete key
+// values, whereas cloning only copies the resulting tree.
+func (a *AST) Clone() *AST {
+	if a == nil {
+		return nil
+	}
+
+	// A shallow struct copy duplicates every value-typed field, including
+	// the computed properties, script length, op count, stack/sat/exec
+	// sizes and time lock info, which contain no pointers, slices or maps.
+	clone := *a
+
+	// The value bytes and argument list are the only reference-typed
+	// fields, so they need to be copied explicitly to fully decouple the
+	// clone from the original.
+	if a.value != nil {
+		clone.value = append([]byte(nil), a.value...)
+	}
+	if a.args != nil {
+		clone.args = make([]*AST, len(a.args))
+		for i, arg := range a.args {
+			clone.args[i] = arg.Clone()
+		}
+	}
+
+	return &clone
+}
+
+// ApplyVars replaces key and hash values in the miniscript. It must be called
+// before running Script() or Satisfy().
+//
+// The callback should return `nil, nil` if the variable is unknown. In this
+// case, the identifier itself will be parsed as the value (hex-encoded pubkey,
+// hex-encoded hash value).
+func (a *AST) ApplyVars(
+	lookupVar func(identifier string) ([]byte, error)) error {
+
+	// Set of all pubkeys to check for duplicates
+	allPubKeys := map[string]struct{}{}
+
+	_, err := a.apply(func(node *AST) (*AST, error) {
+		switch node.identifier {
+		case f_pk_k, f_pk_h, f_multi, f_multi_a:
+			var keyArgs []*AST
+			if node.identifier == f_multi ||
+				node.identifier == f_multi_a {
+
+				keyArgs = node.args[1:]
+			} else {
+				keyArgs = node.args[:1]
+			}
+			for _, arg := range keyArgs {
+				key, err := lookupVar(arg.identifier)
+				if err != nil {
+					return nil, err
+				}
+				if key == nil {
+					// If the key was not a variable, assume
+					// it's the key value directly encoded
+					// as hex.
+					key, err = hex.DecodeString(
+						arg.identifier,
+					)
+					if err != nil {
+						return nil, err
+					}
+				}
+				if len(key) != node.ctx.keyLen() {
+					return nil, fmt.Errorf("pubkey "+
+						"argument of %s expected to "+
+						"be of size %d, but got %d",
+						node.identifier,
+						node.ctx.keyLen(), len(key))
+				}
+
+				pubKeyHex := hex.EncodeToString(key)
+				if _, ok := allPubKeys[pubKeyHex]; ok {
+					return nil, fmt.Errorf("duplicate key "+
+						"found at %s (key=%s, arg "+
+						"identifier=%s)",
+						node.identifier, pubKeyHex,
+						arg.identifier)
+				}
+				allPubKeys[pubKeyHex] = struct{}{}
+
+				arg.value = key
+			}
+
+			// The keys of a sortedmulti_a are sorted by their
+			// serialization before the script is built, which the
+			// order of the satisfaction follows as well, since
+			// every later pass works off the argument order.
+			if node.sortedKeys {
+				sort.Slice(keyArgs, func(i, j int) bool {
+					return bytes.Compare(
+						keyArgs[i].value,
+						keyArgs[j].value,
+					) < 0
+				})
+			}
+
+		case f_sha256, f_hash256, f_ripemd160, f_hash160:
+			arg := node.args[0]
+			hashLen := map[string]int{
+				f_sha256:    32,
+				f_hash256:   32,
+				f_ripemd160: 20,
+				f_hash160:   20,
+			}[node.identifier]
+			hashValue, err := lookupVar(arg.identifier)
+			if err != nil {
+				return nil, err
+			}
+			if hashValue == nil {
+				// If the hash value was not a variable, assume
+				// it's the hash value directly encoded as hex.
+				hashValue, err = hex.DecodeString(
+					node.args[0].identifier,
+				)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if len(hashValue) != hashLen {
+				return nil, fmt.Errorf("%s len must be %d, got"+
+					"%d", node.identifier, hashLen,
+					len(hashValue))
+			}
+			arg.value = hashValue
+
+		}
+		return node, nil
+	})
+	return err
 }
 
 // expectBasicType is a helper function to check that this node has a specific
