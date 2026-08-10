@@ -1,15 +1,45 @@
 package descriptors
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
+
+// loadCorpus reads the descriptor corpus test vector file, returning every
+// non-empty, non-comment line as a descriptor string.
+func loadCorpus(tb testing.TB) []string {
+	tb.Helper()
+
+	file, err := os.Open(filepath.Join(
+		"testdata", "descriptors_corpus.txt",
+	))
+	require.NoError(tb, err, "open corpus")
+	defer func() {
+		require.NoError(tb, file.Close())
+	}()
+
+	var descs []string
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		descs = append(descs, line)
+	}
+	require.NoError(tb, scanner.Err(), "scan corpus")
+
+	return descs
+}
 
 // networkParams maps a test-vector network name to its chaincfg parameters.
 func networkParams(t *testing.T, network string) *chaincfg.Params {
@@ -265,8 +295,7 @@ func TestForEachLeaf(t *testing.T) {
 	require.Equal(t, []visit{{"A", 1}, {"B", 2}, {"C", 2}}, collect(tree))
 
 	// A single leaf is at depth zero.
-	require.Equal(t, []visit{{"A", 0}},
-		collect(&tapTree{leaf: leaf("A")}))
+	require.Equal(t, []visit{{"A", 0}}, collect(&tapTree{leaf: leaf("A")}))
 
 	// An error from the callback halts the walk and propagates.
 	sentinel := errors.New("stop")
