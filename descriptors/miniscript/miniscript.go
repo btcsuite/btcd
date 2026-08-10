@@ -171,6 +171,67 @@ func (c Context) maxMultiKeys() int {
 	return multisigMaxKeys
 }
 
+type basicType string
+
+const (
+	typeB basicType = "B"
+	typeV basicType = "V"
+	typeK basicType = "K"
+	typeW basicType = "W"
+)
+
+type properties struct {
+	// Basic type properties.
+	z, o, n, d, u bool
+
+	// Malleability properties.
+	// If `m`, a non-malleable satisfaction is guaranteed to exist.
+	// The purpose of s/f/e is only to compute `m` and can be disregarded
+	// afterward.
+	m, s, f, e bool
+
+	// canCollapseVerify enables checking if the rightmost script byte
+	// produced by this node is OP_EQUAL, OP_CHECKSIG or OP_CHECKMULTISIG.
+	//
+	// If so, it can be converted into the VERIFY version if an ancestor is
+	// the verify wrapper `v`, i.e. OP_EQUALVERIFY, OP_CHECKSIGVERIFY and
+	// OP_CHECKMULTISIGVERIFY instead of using two opcodes, e.g.
+	// `OP_EQUAL OP_VERIFY`.
+	canCollapseVerify bool
+}
+
+func (p properties) String() string {
+	s := strings.Builder{}
+	if p.z {
+		s.WriteRune('z')
+	}
+	if p.o {
+		s.WriteRune('o')
+	}
+	if p.n {
+		s.WriteRune('n')
+	}
+	if p.d {
+		s.WriteRune('d')
+	}
+	if p.u {
+		s.WriteRune('u')
+	}
+	if p.m {
+		s.WriteRune('m')
+	}
+	if p.s {
+		s.WriteRune('s')
+	}
+	if p.f {
+		s.WriteRune('f')
+	}
+	if p.e {
+		s.WriteRune('e')
+	}
+	return s.String()
+}
+
 // ParseInsane parses a miniscript expression like Parse, but without checking
 // that the result is sane.
 //
@@ -188,6 +249,10 @@ func (c Context) maxMultiKeys() int {
 //     dv:older(144) is d(v(older(144)))
 //  1. deSugar: Miniscript defines six instances of syntactic sugar. We replace
 //     these with fixed equations.
+//  1. typeCheck: Not all fragments compose with each other to produce a valid
+//     Bitcoin Script and valid witness. This function checks that and sets the
+//     types of the Miniscript fragments. Only if the top level basic type is of
+//     type B the miniscript is valid.
 func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 	node, err := createAST(miniscript, ctx)
 	if err != nil {
@@ -209,6 +274,7 @@ func ParseInsane(miniscript string, ctx Context) (*AST, error) {
 		deSugar,
 		setContext,
 		checkContextFragments,
+		typeCheck,
 	}
 	for _, transform := range transformers {
 		node, err = node.apply(transform)
@@ -225,6 +291,8 @@ type AST struct {
 	// in. It is the same for every node of a tree.
 	ctx Context
 
+	basicType  basicType
+	props      properties
 	wrappers   string
 	identifier string
 
@@ -239,6 +307,18 @@ type AST struct {
 	sortedKeys bool
 
 	args []*AST
+}
+
+// formattedType returns the basic type (B, V, K or W) followed by all type
+// properties.
+func (a *AST) formattedType() string {
+	return fmt.Sprintf("%s%s", a.basicType, a.props)
+}
+
+// IsValidTopLevel checks whether this node is valid as a script on its own.
+func (a *AST) IsValidTopLevel() error {
+	// Top-level expression must be of type "B".
+	return a.expectBasicType(typeB)
 }
 
 // isSubExpression returns whether the argument at the given index is a
@@ -282,6 +362,16 @@ func (a *AST) apply(f func(*AST) (*AST, error)) (*AST, error) {
 		a.args[i] = newArg
 	}
 	return f(a)
+}
+
+// expectBasicType is a helper function to check that this node has a specific
+// type.
+func (a *AST) expectBasicType(typ basicType) error {
+	if a.basicType != typ {
+		return fmt.Errorf("expression `%s` expected to have type %s, "+
+			"but is type %s", a.identifier, typ, a.basicType)
+	}
+	return nil
 }
 
 type stack struct {
@@ -723,5 +813,344 @@ func deSugar(node *AST) (*AST, error) {
 		}, nil
 	}
 
+	return node, nil
+}
+
+func typeCheck(node *AST) (*AST, error) {
+	switch node.identifier {
+	case f_0:
+		node.basicType = typeB
+		node.props.z = true
+		node.props.u = true
+		node.props.d = true
+
+	case f_1:
+		node.basicType = typeB
+		node.props.z = true
+		node.props.u = true
+
+	case f_pk_k:
+		node.basicType = typeK
+		node.props.o = true
+		node.props.n = true
+		node.props.d = true
+		node.props.u = true
+
+	case f_pk_h:
+		node.basicType = typeK
+		node.props.n = true
+		node.props.d = true
+		node.props.u = true
+
+	case f_older, f_after:
+		node.basicType = typeB
+		node.props.z = true
+
+	case f_sha256, f_ripemd160, f_hash256, f_hash160:
+		node.basicType = typeB
+		node.props.o = true
+		node.props.n = true
+		node.props.d = true
+		node.props.u = true
+
+	case f_andor:
+		_x, _y, _z := node.args[0], node.args[1], node.args[2]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !_x.props.d || !_x.props.u {
+			return nil, fmt.Errorf("wrong properties on `%s` in "+
+				"the first argument of `%s`", _x.identifier,
+				node.identifier)
+		}
+		if _y.basicType != typeB && _y.basicType != typeK &&
+			_y.basicType != typeV {
+
+			return nil, fmt.Errorf("in `%s`, the second argument "+
+				"type is not B, K or V, but: %s",
+				node.identifier, _y.basicType)
+		}
+		if _z.basicType != _y.basicType {
+			return nil, fmt.Errorf("in `%s`, the third of the "+
+				"argument is not the same as the type of the "+
+				"second argument, which is: %s",
+				node.identifier, _y.basicType)
+		}
+		node.basicType = _y.basicType
+		node.props.z = _x.props.z && _y.props.z && _z.props.z
+		node.props.o = (_x.props.z && _y.props.o && _z.props.o) ||
+			(_x.props.o && _y.props.z && _z.props.z)
+		node.props.u = _y.props.u && _z.props.u
+		node.props.d = _z.props.d
+
+	case f_and_v:
+		_x, _y := node.args[0], node.args[1]
+		if err := _x.expectBasicType(typeV); err != nil {
+			return nil, err
+		}
+		if _y.basicType != typeB && _y.basicType != typeK &&
+			_y.basicType != typeV {
+
+			return nil, fmt.Errorf("in `%s`, the second argument "+
+				"type is not B, K or V, but: %s",
+				node.identifier, _y.basicType)
+		}
+		node.basicType = _y.basicType
+		node.props.z = _x.props.z && _y.props.z
+		node.props.o = (_x.props.z && _y.props.o) ||
+			(_y.props.z && _x.props.o)
+		node.props.n = _x.props.n || (_x.props.z && _y.props.n)
+		node.props.u = _y.props.u
+
+	case f_and_b:
+		_x, _y := node.args[0], node.args[1]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if err := _y.expectBasicType(typeW); err != nil {
+			return nil, err
+		}
+		node.basicType = typeB
+		node.props.z = _x.props.z && _y.props.z
+		node.props.o = (_x.props.z && _y.props.o) ||
+			(_y.props.z && _x.props.o)
+		node.props.n = _x.props.n || (_x.props.z && _y.props.n)
+		node.props.d = _x.props.d && _y.props.d
+		node.props.u = true
+
+	case f_or_b:
+		_x, _z := node.args[0], node.args[1]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !_x.props.d {
+			return nil, fmt.Errorf("wrong properties on `%s`, the "+
+				"first argument of `%s`", _x.identifier,
+				node.identifier)
+		}
+		if err := _z.expectBasicType(typeW); err != nil {
+			return nil, err
+		}
+		if !_z.props.d {
+			return nil, fmt.Errorf(
+				"wrong properties on `%s`, the second "+
+					"argument of `%s`", _z.identifier,
+				node.identifier)
+		}
+		node.basicType = typeB
+		node.props.z = _x.props.z && _z.props.z
+		node.props.o = (_x.props.z && _z.props.o) ||
+			(_z.props.z && _x.props.o)
+		node.props.d = true
+		node.props.u = true
+
+	case f_or_c:
+		_x, _z := node.args[0], node.args[1]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !_x.props.d || !_x.props.u {
+			return nil, fmt.Errorf("wrong properties on `%s`, the "+
+				"first argument of `%s`", _x.identifier,
+				node.identifier)
+		}
+		if err := _z.expectBasicType(typeV); err != nil {
+			return nil, err
+		}
+		node.basicType = typeV
+		node.props.z = _x.props.z && _z.props.z
+		node.props.o = _x.props.o && _z.props.z
+
+	case f_or_d:
+		_x, _z := node.args[0], node.args[1]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !_x.props.d || !_x.props.u {
+			return nil, fmt.Errorf(
+				"wrong properties on `%s`, the first argument "+
+					"of `%s`", _x.identifier,
+				node.identifier)
+		}
+		if err := _z.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		node.basicType = typeB
+		node.props.z = _x.props.z && _z.props.z
+		node.props.o = _x.props.o && _z.props.z
+		node.props.d = _z.props.d
+		node.props.u = _z.props.u
+
+	case f_or_i:
+		_x, _z := node.args[0], node.args[1]
+		if _x.basicType != typeB && _x.basicType != typeK &&
+			_x.basicType != typeV {
+
+			return nil, errors.New("or_i: wrong type of first " +
+				"argument")
+		}
+		if _z.basicType != _x.basicType {
+			return nil, errors.New("or_i: wrong type of second " +
+				"argument")
+		}
+		node.basicType = _x.basicType
+		node.props.o = _x.props.z && _z.props.z
+		node.props.u = _x.props.u && _z.props.u
+		node.props.d = _x.props.d || _z.props.d
+
+	case f_thresh:
+		//  X1 is Bdu; others are Wdu
+		if err := node.args[1].expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !node.args[1].props.d || !node.args[1].props.u {
+			return nil, fmt.Errorf("wrong properties on `%s`, the "+
+				"second argument of `%s`",
+				node.args[1].identifier, node.identifier)
+		}
+		for i := 2; i < len(node.args); i++ {
+			arg := node.args[i]
+			if err := arg.expectBasicType(typeW); err != nil {
+				return nil, err
+			}
+			if !arg.props.d || !arg.props.u {
+				return nil, fmt.Errorf("wrong properties on "+
+					"`%s`, argument #%d of `%s`",
+					arg.identifier, i+1, node.identifier)
+			}
+		}
+
+		node.basicType = typeB
+
+		// z: all sub expressions read zero elements from the stack.
+		// o: the sub expressions read exactly one element in total,
+		// i.e. exactly one reads one and all others read zero. This
+		// mirrors rust-miniscript's num_args computation: a z sub
+		// contributes 0, an o sub contributes 1, anything else
+		// contributes 2, and o holds iff the total is exactly 1
+		// (reachable only for a single-sub thresh, or in general a
+		// thresh whose subs are all z except one o).
+		node.props.z = true
+		numArgs := 0
+		for _, arg := range node.args[1:] {
+			node.props.z = node.props.z && arg.props.z
+			switch {
+			case arg.props.z:
+
+			case arg.props.o:
+				numArgs++
+
+			default:
+				numArgs += 2
+			}
+		}
+		node.props.o = numArgs == 1
+		node.props.d = true
+		node.props.u = true
+
+	case f_multi:
+		node.basicType = typeB
+		node.props.n = true
+		node.props.d = true
+		node.props.u = true
+
+	case f_multi_a:
+		// Unlike multi, multi_a is not `n`: it can be dissatisfied with
+		// an all-zero witness (input Any, not AnyNonZero).
+		node.basicType = typeB
+		node.props.d = true
+		node.props.u = true
+
+	case f_wrap_a:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		node.basicType = typeW
+		node.props.d = _x.props.d
+		node.props.u = _x.props.u
+
+	case f_wrap_s:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !_x.props.o {
+			return nil, fmt.Errorf("wrong properties on `%s`, the "+
+				"first argument of `%s`", _x.identifier,
+				node.identifier)
+		}
+		node.basicType = typeW
+		node.props.d = _x.props.d
+		node.props.u = _x.props.u
+
+	case f_wrap_c:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeK); err != nil {
+			return nil, err
+		}
+		node.basicType = typeB
+		node.props.o = _x.props.o
+		node.props.n = _x.props.n
+		node.props.d = _x.props.d
+		node.props.u = true
+
+	case f_wrap_d:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeV); err != nil {
+			return nil, err
+		}
+		if !_x.props.z {
+			return nil, fmt.Errorf("wrong property of `%s`, the "+
+				"first argument of `%s`", _x.identifier,
+				node.identifier)
+		}
+		node.basicType = typeB
+		node.props.o = true
+		node.props.n = true
+		node.props.d = true
+
+	case f_wrap_v:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		node.basicType = typeV
+		node.props.z = _x.props.z
+		node.props.o = _x.props.o
+		node.props.n = _x.props.n
+
+	case f_wrap_j:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		if !_x.props.n {
+			return nil, fmt.Errorf("wrong property of `%s`, the "+
+				"first argument of `%s`", _x.identifier,
+				node.identifier)
+		}
+		node.basicType = typeB
+		node.props.o = _x.props.o
+		node.props.n = true
+		node.props.d = true
+		node.props.u = _x.props.u
+
+	case f_wrap_n:
+		_x := node.args[0]
+		if err := _x.expectBasicType(typeB); err != nil {
+			return nil, err
+		}
+		node.basicType = typeB
+		node.props.z = _x.props.z
+		node.props.o = _x.props.o
+		node.props.n = _x.props.n
+		node.props.d = _x.props.d
+		node.props.u = true
+
+	default:
+		return nil, fmt.Errorf("unknown identifier: %s",
+			node.identifier)
+	}
 	return node, nil
 }
