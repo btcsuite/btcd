@@ -40,12 +40,34 @@ const (
 	// the size we can actually emit.
 	maxTapscriptSize = txscript.MaxScriptSize
 
+	// maxOpsPerScript is the maximum number of non-push operations per
+	// script. This is a consensus rule in the P2WSH context; it does not
+	// apply in the Tapscript context.
+	maxOpsPerScript = 201
+
+	// maxStandardP2WSHStackItems is the maximum number of witness stack
+	// items a standard P2WSH spend may have, not counting the witness
+	// script that is pushed as the final witness element. This is a
+	// standardness rule.
+	maxStandardP2WSHStackItems = 100
+
 	// maxRedeemScriptSize is the maximum size in bytes of the redeem script
 	// of a P2SH output. The redeem script is pushed as a single data
 	// element in the spending scriptSig, so the consensus limit on the size
 	// of a script element applies to it: an output whose redeem script is
 	// larger can never be spent.
 	maxRedeemScriptSize = 520
+
+	// maxScriptSigSize is the maximum size in bytes of a standard
+	// scriptSig. This is a standardness rule, so a spend needing a larger
+	// scriptSig is not relayed.
+	maxScriptSigSize = 1650
+
+	// maxStackSize is the maximum number of stack elements that may exist
+	// at any point before or during script execution (a consensus rule). It
+	// bounds the sum of the initial witness elements and the elements
+	// pushed during execution, and applies to Tapscript as well as P2WSH.
+	maxStackSize = 1000
 
 	// multisigMaxKeys is the maximum number of keys in a P2WSH multisig
 	// (OP_CHECKMULTISIG).
@@ -252,6 +274,32 @@ func (p properties) String() string {
 	return s.String()
 }
 
+// Parse a miniscript expression to be executed in the given script context
+// (P2WSH or P2TR). The context determines the allowed fragments, the public key
+// encoding and the resource limits.
+//
+// The parsed expression is checked to be sane, i.e. safe to use as a script on
+// its own: it must be a valid base expression (type "B"), non-malleable, must
+// require a signature, must not mix height- and time-based time locks on a
+// single spending path, and its script and satisfaction must stay within the
+// resource limits of the context. This mirrors rust-miniscript's `from_str`,
+// which validates with `Ctx::SANE`.
+//
+// Use ParseInsane to parse an expression without these checks, for example to
+// analyze a script that is known not to be sane.
+func Parse(miniscript string, ctx Context) (*AST, error) {
+	node, err := ParseInsane(miniscript, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := node.IsSane(); err != nil {
+		return nil, fmt.Errorf("miniscript is not sane: %w", err)
+	}
+
+	return node, nil
+}
+
 // ParseInsane parses a miniscript expression like Parse, but without checking
 // that the result is sane.
 //
@@ -398,6 +446,172 @@ func (a *AST) IsValidTopLevel() error {
 
 	// Top-level expression must be of type "B".
 	return a.expectBasicType(typeB)
+}
+
+// validSatisfactions checks whether successful non-malleable satisfactions are
+// guaranteed to be valid and that a satisfaction does not violate the context's
+// resource limits.
+func (a *AST) validSatisfactions() error {
+	if err := a.isValid(); err != nil {
+		return err
+	}
+
+	// Consensus rule in both segwit contexts: the number of stack elements
+	// at any point before or during execution is limited to 1000, i.e. the
+	// initial witness elements plus the elements pushed while executing the
+	// script. It cannot be reached within the 520-byte script limit of the
+	// legacy context, which is why that context does not check it, matching
+	// rust-miniscript.
+	if a.ctx != Legacy && a.stackSize.sat.valid && a.execStack.sat.valid {
+		stackElems := a.maxWitnessSize() + a.maxExecStackSize()
+		if stackElems > maxStackSize {
+			return fmt.Errorf("the satisfaction requires a stack of "+
+				"%d elements, which is larger than the "+
+				"consensus limit of %d", stackElems,
+				maxStackSize)
+		}
+	}
+
+	switch a.ctx {
+	case Legacy:
+		// Consensus rule, in the legacy context as well: the number of
+		// non-push operations is limited to 201.
+		if a.maxOpCount() > maxOpsPerScript {
+			return fmt.Errorf("the script requires a maximum "+
+				"number of %d ops, which is larger than the "+
+				"consensus limit of %d", a.maxOpCount(),
+				maxOpsPerScript)
+		}
+
+		// Standardness rule: a legacy satisfaction lives in the
+		// scriptSig, together with the redeem script it spends, and a
+		// scriptSig larger than 1650 bytes is not relayed. The stack
+		// element limit of 1000 cannot be reached within the 520-byte
+		// redeem script limit, so it is not checked, matching
+		// rust-miniscript.
+		if a.satSize.sat.valid {
+			scriptSig := a.satSize.sat.size +
+				pushScriptSize(a.scriptLen)
+			if scriptSig > maxScriptSigSize {
+				return fmt.Errorf("the satisfaction requires a "+
+					"scriptSig of %d bytes, which is larger "+
+					"than the standardness limit of %d",
+					scriptSig, maxScriptSigSize)
+			}
+		}
+
+	case P2WSH:
+		// P2WSH consensus rule: the number of non-push operations is
+		// limited to 201.
+		if a.maxOpCount() > maxOpsPerScript {
+			return fmt.Errorf("the script requires a maximum "+
+				"number of %d ops, which is larger than the "+
+				"consensus limit of %d", a.maxOpCount(),
+				maxOpsPerScript)
+		}
+
+		// P2WSH standardness rule: the number of witness stack elements
+		// a spend may push is limited. The witness script itself, which
+		// is pushed as the final witness stack element, is excluded
+		// from the count, as BIP379 states and Core implements
+		// (policy.cpp:312 in Core c4fbd3c7211).
+		if a.stackSize.sat.valid {
+			witnessItems := a.maxWitnessSize()
+			if witnessItems > maxStandardP2WSHStackItems {
+				return fmt.Errorf("the satisfaction requires "+
+					"%d witness stack elements, which is "+
+					"larger than the standardness limit "+
+					"of %d", witnessItems,
+					maxStandardP2WSHStackItems)
+			}
+		}
+
+	case P2TR:
+		// Tapscript has no op count limit and no standardness limit on
+		// the number of witness elements, so the stack element limit
+		// checked above is all that applies to it.
+	}
+
+	return nil
+}
+
+// pushScriptSize returns the number of bytes it takes to push a script of the
+// given size as a single data element, i.e. the push opcode (with its length
+// bytes) plus the script itself. In the legacy context this is what the redeem
+// script contributes to the scriptSig.
+func pushScriptSize(scriptLen int) int {
+	switch {
+	case scriptLen < 76:
+		return 1 + scriptLen
+
+	case scriptLen < 256:
+		return 2 + scriptLen
+
+	default:
+		return 3 + scriptLen
+	}
+}
+
+// isSaneSubexpression checks whether the apparent policy of this node matches
+// its script semantics. Doesn't guarantee it is a safe script on its own.
+func (a *AST) isSaneSubexpression() error {
+	if err := a.validSatisfactions(); err != nil {
+		return err
+	}
+	if !a.props.m {
+		return errors.New("malleable")
+	}
+
+	// A script that mixes height-based and time-based time locks of the
+	// same kind (absolute or relative) on a single spending path has a
+	// branch that can never be satisfied, see
+	// https://medium.com/blockstream/dont-mix-your-timelocks-d9939b665094.
+	if a.timelock.containsCombination {
+		return errors.New(
+			"contains a combination of height-based and time-" +
+				"based time locks on a single spending path",
+		)
+	}
+
+	return a.checkDuplicateKeys()
+}
+
+// checkDuplicateKeys checks that no public key appears more than once in the
+// expression. BIP379's security analysis assumes they are all distinct, and a
+// repeated key makes the analysis wrong: a signature made for one occurrence
+// can be replayed into the other, so a policy that reads as needing two
+// signatures may be satisfiable with one. Core rejects the same thing as part
+// of its sanity check (miniscript.h:1699 in Core c4fbd3c7211).
+//
+// The keys are compared as the identifiers they are written as, which is all
+// there is to compare before ApplyVars substitutes the bytes. Two different
+// identifiers that resolve to the same key are caught by the check ApplyVars
+// runs on the substituted keys.
+func (a *AST) checkDuplicateKeys() error {
+	keys := a.Keys()
+	seen := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if _, ok := seen[key]; ok {
+			return fmt.Errorf("duplicate key %s", key)
+		}
+		seen[key] = struct{}{}
+	}
+
+	return nil
+}
+
+// IsSane checks whether this node is safe as a script on its own.
+func (a *AST) IsSane() error {
+	if err := a.IsValidTopLevel(); err != nil {
+		return err
+	}
+	if err := a.isSaneSubexpression(); err != nil {
+		return err
+	}
+	if !a.props.s {
+		return errors.New("does not need signature")
+	}
+	return nil
 }
 
 // drawTree renders this node and its descendants for diagnostics. Writer errors
