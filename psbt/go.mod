@@ -6,6 +6,7 @@ require (
 	github.com/btcsuite/btcd/address/v2 v2.0.0
 	github.com/btcsuite/btcd/btcec/v2 v2.5.0
 	github.com/btcsuite/btcd/btcutil/v2 v2.0.0
+	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0
 	github.com/btcsuite/btcd/chainhash/v2 v2.0.0
 	github.com/btcsuite/btcd/txscript/v2 v2.0.0
 	github.com/btcsuite/btcd/wire/v2 v2.0.0
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/btcsuite/btcd/chaincfg/v2 v2.0.0 // indirect
 	github.com/btcsuite/btclog v1.0.0 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
@@ -24,3 +24,6 @@ require (
 	golang.org/x/sys v0.35.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// TODO(guggero): Remove this once PR #2198 is merged.
+replace github.com/btcsuite/btcd/btcec/v2 => ../btcec
