@@ -64,6 +64,11 @@ const (
 	// the active chain tip for which we are willing to serve a compact block.
 	// Requests for blocks older than this will fallback to get a full block.
 	maxCompactBlockDepth = 10
+
+	// maxHighBandwidthCompactBlockPeers is the maximum number of peers to
+	// which we request high-bandwidth compact block announcements.
+	// BIP 152 recommends three such peers.
+	maxHighBandwidthCompactBlockPeers = 3
 )
 
 var (
@@ -222,14 +227,61 @@ type peerLifecycleEvent struct {
 	sp     *serverPeer
 }
 
+// highBandwidthPeerList tracks the bounded set of peers from which we request
+// high-bandwidth compact block announcements. The ordering permits the least
+// recently successful peer to be replaced when a new peer proves useful.
+type highBandwidthPeerList struct {
+	peers []int32
+}
+
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
-	inboundPeers    map[int32]*serverPeer
-	outboundPeers   map[int32]*serverPeer
-	persistentPeers map[int32]*serverPeer
-	banned          map[string]time.Time
-	outboundGroups  map[string]int
+	inboundPeers                   map[int32]*serverPeer
+	outboundPeers                  map[int32]*serverPeer
+	persistentPeers                map[int32]*serverPeer
+	banned                         map[string]time.Time
+	outboundGroups                 map[string]int
+	highBandwidthCompactBlockPeers highBandwidthPeerList
+}
+
+// promote adds id to the high bandwidth list, or marks it as the most recently
+// selected when it is already present. When the list is full, it returns the
+// evicted peer.
+func (s *highBandwidthPeerList) promote(id int32) (evicted int32, replaced bool) {
+	for i, peerID := range s.peers {
+		if peerID != id {
+			continue
+		}
+
+		s.peers = append(s.peers[:i], s.peers[i+1:]...)
+		s.peers = append(s.peers, id)
+		return 0, false
+	}
+
+	if len(s.peers) >= maxHighBandwidthCompactBlockPeers {
+		evicted = s.peers[0]
+		s.peers = s.peers[1:]
+		replaced = true
+	}
+
+	s.peers = append(s.peers, id)
+	return evicted, replaced
+}
+
+// remove removes id from the high bandwidth list and reports whether
+// it was present.
+func (s *highBandwidthPeerList) remove(id int32) bool {
+	for i, peerID := range s.peers {
+		if peerID != id {
+			continue
+		}
+
+		s.peers = append(s.peers[:i], s.peers[i+1:]...)
+		return true
+	}
+
+	return false
 }
 
 // Count returns the count of all known peers.
@@ -256,6 +308,18 @@ func (ps *peerState) forAllPeers(closure func(sp *serverPeer)) {
 		closure(e)
 	}
 	ps.forAllOutboundPeers(closure)
+}
+
+// peer returns the server peer with the given ID, if it is still connected to
+// this server.
+func (ps *peerState) peer(id int32) *serverPeer {
+	if sp := ps.inboundPeers[id]; sp != nil {
+		return sp
+	}
+	if sp := ps.outboundPeers[id]; sp != nil {
+		return sp
+	}
+	return ps.persistentPeers[id]
 }
 
 // cfHeaderKV is a tuple of a filter header and its associated block hash. The
@@ -2087,6 +2151,41 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 			sp.UpdateLastAnnouncedBlock(nil)
 		}
 	})
+
+	// Request future compact block announcements from a peer that delivered a
+	// newly accepted block for low latency block relay, while keeping the
+	// BIP 152 limit of high-bandwidth peers.
+	if umsg.originPeer != nil {
+		if sp := state.peer(umsg.originPeer.ID()); sp != nil {
+			s.promoteHighBandwidthCompactBlockPeer(state, sp)
+		}
+	}
+}
+
+// compactBlockVersion returns the compact block version negotiated for
+// receiving compact blocks from a peer.
+func compactBlockVersion(sp *serverPeer) uint64 {
+	return sp.CompactBlockVersion()
+}
+
+// promoteHighBandwidthCompactBlockPeer asks sp to announce new blocks using
+// BIP 152 high-bandwidth mode.
+func (s *server) promoteHighBandwidthCompactBlockPeer(state *peerState,
+	sp *serverPeer) {
+	if !sp.Connected() || !sp.IsCompactBlocksEnabled() {
+		return
+	}
+
+	evictedID, replaced := state.highBandwidthCompactBlockPeers.promote(sp.ID())
+	if replaced {
+		if evicted := state.peer(evictedID); evicted != nil && evicted.Connected() {
+			evicted.PushSendCmpctMsg(0, compactBlockVersion(evicted))
+			peerLog.Debugf("Requested low-bandwidth compact block relay from %v", evicted)
+		}
+	}
+
+	sp.PushSendCmpctMsg(1, compactBlockVersion(sp))
+	peerLog.Debugf("Requested high-bandwidth compact block relay from %v", sp)
 }
 
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
@@ -2199,6 +2298,8 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
+	state.highBandwidthCompactBlockPeers.remove(sp.ID())
+
 	var list map[int32]*serverPeer
 	if sp.persistent {
 		list = state.persistentPeers
