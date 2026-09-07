@@ -81,6 +81,10 @@ BIP379 and BIP387 postdate it and allow any miniscript fragment plus
   `ScriptSigSize` and `SatisfactionWeight` account for those scripts and their
   serialization prefixes. Signature sizes are estimates: 72 bytes for ECDSA,
   and the advertised 64 or 65 bytes for Schnorr.
+- **Completion preserves the selected path.** `Plan.Satisfy` fills the plan's
+  chosen signatures and preimages. Additional data cannot change its branch
+  or multisig subset; missing required data fails even if another path could
+  spend the descriptor.
 - **Key validity is checked at derivation, not at parse time.** A hex key of the
   right length that is not a point on the curve parses, and `AddressAt` is where
   it fails. Core rejects it at parse time.
@@ -111,3 +115,8 @@ codes, weights, lifted policies and plans (`testdata/descriptors_from_rust.tsv`)
 and reference derivations from the descriptors-go implementation
 (`testdata/derivation.json`). `FuzzNewDescriptor` fuzzes the parser and the
 derivation paths.
+
+Portable planning and satisfaction fixtures in `testdata/spending_vectors.json`
+are checked by `TestSpendingVectors`. They include exact stacks and sizes,
+negative cases, and independently signed transactions. See
+[the vector format](testdata/spending_vectors.md).
