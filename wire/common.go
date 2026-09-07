@@ -39,11 +39,8 @@ func readBytes(r io.Reader, count uint64) ([]byte, error) {
 		return []byte{}, nil
 	}
 
-	type lenReader interface {
-		Len() int
-	}
-
-	if lr, ok := r.(lenReader); ok && count <= uint64(lr.Len()) {
+	remaining, known := readerRemaining(r)
+	if known && count <= remaining {
 		result := make([]byte, count)
 		n, err := io.ReadFull(r, result)
 		return result[:n], err
@@ -58,6 +55,52 @@ func readBytes(r io.Reader, count uint64) ([]byte, error) {
 
 	return result.Bytes(), err
 }
+
+// readerRemaining returns the number of buffered bytes exposed by the concrete
+// readers used by wire decoders. Other readers use the staged streaming path.
+func readerRemaining(r io.Reader) (uint64, bool) {
+	switch r := r.(type) {
+	case *bytes.Buffer:
+		return uint64(r.Len()), true
+
+	case *bytes.Reader:
+		return uint64(r.Len()), true
+
+	default:
+		return 0, false
+	}
+}
+
+// validateElementCount ensures a buffered payload has enough bytes remaining
+// to encode the claimed number of elements before a decoder allocates for the
+// count. The framed wire path passes a bytes.Buffer to each message decoder,
+// while callers without a measurable remainder retain streaming semantics.
+func validateElementCount(r io.Reader, count,
+	minElementSize uint64) error {
+
+	remaining, ok := readerRemaining(r)
+	if !ok || minElementSize == 0 {
+		return nil
+	}
+
+	requiredBytes := count * minElementSize
+	if requiredBytes <= remaining {
+		return nil
+	}
+
+	return elementCountError(remaining)
+}
+
+// elementCountError preserves the short-read error returned by the element
+// decoder when the claimed vector cannot fit in the remaining payload.
+func elementCountError(remaining uint64) error {
+	if remaining == 0 {
+		return io.EOF
+	}
+
+	return io.ErrUnexpectedEOF
+}
+
 var (
 	// littleEndian is a convenience variable since binary.LittleEndian is
 	// quite long.

@@ -477,6 +477,11 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			maxTxInPerMessage)
 		return messageError("MsgTx.BtcDecode", str)
 	}
+	if err := validateElementCount(
+		r, count, minTxInPayload,
+	); err != nil {
+		return err
+	}
 
 	// Deserialize the inputs.
 	var totalScriptSize uint64
@@ -507,6 +512,11 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			"max message size [count %d, max %d]", count,
 			maxTxOutPerMessage)
 		return messageError("MsgTx.BtcDecode", str)
+	}
+	if err := validateElementCount(
+		r, count, MinTxOutPayload,
+	); err != nil {
+		return err
 	}
 
 	// Deserialize the outputs.
@@ -543,6 +553,11 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 					"into max message size [count %d, max %d]",
 					witCount, maxWitnessItemsPerInput)
 				return messageError("MsgTx.BtcDecode", str)
+			}
+			if err := validateElementCount(
+				r, witCount, 1,
+			); err != nil {
+				return err
 			}
 
 			// Then for witCount number of stack items, each item

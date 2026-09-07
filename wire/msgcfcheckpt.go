@@ -83,6 +83,11 @@ func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 	if count > maxCFHeadersLen {
 		return ErrInsaneCFHeaderCount
 	}
+	if err := validateElementCount(
+		r, count, chainhash.HashSize,
+	); err != nil {
+		return err
+	}
 
 	if count == 0 {
 		msg.FilterHeaders = make([]*chainhash.Hash, 0)

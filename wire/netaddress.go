@@ -10,11 +10,17 @@ import (
 	"time"
 )
 
+const (
+	// minNetAddressPayload is the encoded size of an address without its
+	// optional timestamp.
+	minNetAddressPayload = 26
+)
+
 // maxNetAddressPayload returns the max payload size for a bitcoin NetAddress
 // based on the protocol version.
 func maxNetAddressPayload(pver uint32) uint32 {
 	// Services 8 bytes + ip 16 bytes + port 2 bytes.
-	plen := uint32(26)
+	plen := uint32(minNetAddressPayload)
 
 	// NetAddressTimeVersion added a timestamp field.
 	if pver >= NetAddressTimeVersion {

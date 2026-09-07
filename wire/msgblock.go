@@ -97,6 +97,11 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 			"[count %d, max %d]", txCount, maxTxPerBlock)
 		return messageError("MsgBlock.BtcDecode", str)
 	}
+	if err := validateElementCount(
+		r, txCount, minTxPayload,
+	); err != nil {
+		return err
+	}
 
 	// A single arena is shared by every transaction in the block.  Each
 	// transaction's btcDecode rewinds it, which is safe because the
@@ -176,6 +181,11 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		str := fmt.Sprintf("too many transactions to fit into a block "+
 			"[count %d, max %d]", txCount, maxTxPerBlock)
 		return nil, messageError("MsgBlock.DeserializeTxLoc", str)
+	}
+	if err := validateElementCount(
+		r, txCount, minTxPayload,
+	); err != nil {
+		return nil, err
 	}
 
 	ar := borrowScriptArena(blockScriptChunkClass)

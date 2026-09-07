@@ -10,6 +10,241 @@ import (
 	"testing"
 )
 
+func countPayload(t *testing.T, prefix []byte, count uint64) []byte {
+	t.Helper()
+
+	var payload bytes.Buffer
+	_, err := payload.Write(prefix)
+	if err != nil {
+		t.Fatalf("unable to write payload prefix: %v", err)
+	}
+	if err := WriteVarInt(&payload, ProtocolVersion, count); err != nil {
+		t.Fatalf("unable to write element count: %v", err)
+	}
+
+	return payload.Bytes()
+}
+
+// TestTruncatedVectorDecodeBudget ensures a legal maximum element count cannot
+// reserve the corresponding maximum slice when no elements follow it.
+func TestTruncatedVectorDecodeBudget(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload []byte
+		decode  func(io.Reader) (int, error)
+		maxCap  int
+	}{
+		{
+			name:    "inventory",
+			payload: countPayload(t, nil, MaxInvPerMsg),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgInv
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.InvList), err
+			},
+			maxCap: 0,
+		},
+		{
+			name:    "getdata",
+			payload: countPayload(t, nil, MaxInvPerMsg),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgGetData
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.InvList), err
+			},
+			maxCap: 0,
+		},
+		{
+			name:    "notfound",
+			payload: countPayload(t, nil, MaxInvPerMsg),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgNotFound
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.InvList), err
+			},
+			maxCap: 0,
+		},
+		{
+			name:    "addresses",
+			payload: countPayload(t, nil, MaxAddrPerMsg),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgAddr
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.AddrList), err
+			},
+			maxCap: 0,
+		},
+		{
+			name:    "addresses v2",
+			payload: countPayload(t, nil, MaxV2AddrPerMsg),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgAddrV2
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.AddrList), err
+			},
+			maxCap: 0,
+		},
+		{
+			name:    "headers",
+			payload: countPayload(t, nil, MaxBlockHeadersPerMsg),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgHeaders
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.Headers), err
+			},
+			maxCap: 0,
+		},
+		{
+			name: "getblocks locators",
+			payload: countPayload(
+				t, make([]byte, 4), MaxBlockLocatorsPerMsg,
+			),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgGetBlocks
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.BlockLocatorHashes), err
+			},
+			maxCap: 0,
+		},
+		{
+			name: "getheaders locators",
+			payload: countPayload(
+				t, make([]byte, 4), MaxBlockLocatorsPerMsg,
+			),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgGetHeaders
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.BlockLocatorHashes), err
+			},
+			maxCap: 0,
+		},
+		{
+			name: "compact filter headers",
+			payload: countPayload(
+				t, make([]byte, 65), MaxCFHeadersPerMsg,
+			),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgCFHeaders
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.FilterHashes), err
+			},
+			maxCap: 0,
+		},
+		{
+			name: "compact filter checkpoints",
+			payload: countPayload(
+				t, make([]byte, 33), maxCFHeadersLen,
+			),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgCFCheckpt
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.FilterHeaders), err
+			},
+			maxCap: 0,
+		},
+		{
+			name: "merkle block hashes",
+			payload: countPayload(
+				t, make([]byte, MaxBlockHeaderPayload+4),
+				maxTxPerBlock,
+			),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgMerkleBlock
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.Hashes), err
+			},
+			maxCap: 0,
+		},
+		{
+			name: "block transactions",
+			payload: countPayload(
+				t, make([]byte, MaxBlockHeaderPayload), maxTxPerBlock,
+			),
+			decode: func(r io.Reader) (int, error) {
+				var msg MsgBlock
+				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
+				return cap(msg.Transactions), err
+			},
+			maxCap: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			capacity, err := test.decode(bytes.NewReader(test.payload))
+			if err == nil {
+				t.Fatal("expected a truncated payload error")
+			}
+			if capacity > test.maxCap {
+				t.Fatalf("decode reserved %d elements, want at most %d",
+					capacity, test.maxCap)
+			}
+		})
+	}
+}
+
+// TestTruncatedTxDecodeBudget covers each count-driven transaction slice.
+func TestTruncatedTxDecodeBudget(t *testing.T) {
+	t.Run("inputs", func(t *testing.T) {
+		payload := countPayload(t, make([]byte, 4), maxTxInPerMessage)
+		var msg MsgTx
+		err := msg.BtcDecode(
+			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
+		)
+		if err == nil {
+			t.Fatal("expected a truncated input error")
+		}
+		if len(msg.TxIn) != 0 {
+			t.Fatalf("decode retained %d inputs", len(msg.TxIn))
+		}
+	})
+
+	inputPrefix := make([]byte, 4)
+	inputPrefix = append(inputPrefix, 1)
+	inputPrefix = append(inputPrefix, make([]byte, minTxInPayload)...)
+
+	t.Run("outputs", func(t *testing.T) {
+		payload := countPayload(t, inputPrefix, maxTxOutPerMessage)
+		var msg MsgTx
+		err := msg.BtcDecode(
+			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
+		)
+		if err == nil {
+			t.Fatal("expected a truncated output error")
+		}
+		if len(msg.TxOut) != 0 {
+			t.Fatalf("decode retained %d outputs", len(msg.TxOut))
+		}
+	})
+
+	t.Run("witness items", func(t *testing.T) {
+		witnessPrefix := make([]byte, 4)
+		witnessPrefix = append(witnessPrefix, TxFlagMarker, WitnessFlag, 1)
+		witnessPrefix = append(witnessPrefix, make([]byte, minTxInPayload)...)
+		witnessPrefix = append(witnessPrefix, 0)
+		payload := countPayload(
+			t, witnessPrefix, maxWitnessItemsPerInput,
+		)
+
+		var msg MsgTx
+		err := msg.BtcDecode(
+			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
+		)
+		if err == nil {
+			t.Fatal("expected a truncated witness error")
+		}
+		if len(msg.TxIn) != 1 {
+			t.Fatalf("decoded %d inputs, want 1", len(msg.TxIn))
+		}
+		if capacity := cap(msg.TxIn[0].Witness); capacity >
+			defaultTxInOutAlloc {
+
+			t.Fatalf("decode reserved %d witness items, want at most %d",
+				capacity, defaultTxInOutAlloc)
+		}
+	})
+}
+
 // TestTruncatedVariableBytesBudget ensures inner length prefixes grow memory
 // with bytes delivered rather than with the claimed length.
 func TestTruncatedVariableBytesBudget(t *testing.T) {
