@@ -5,6 +5,7 @@
 package wire
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -22,8 +23,41 @@ const (
 	// binaryFreeListMaxItems is the number of buffers to keep in the free
 	// list to use for binary serialization and deserialization.
 	binaryFreeListMaxItems = 1024
+
+	// defaultReadBufferSize bounds speculative allocation when a reader does
+	// not expose the number of bytes it has remaining.
+	defaultReadBufferSize = 4096
 )
 
+// readBytes reads count bytes without allocating the full claimed size until
+// the reader proves that the bytes are available. Buffered message decoders
+// expose their remaining length, which preserves the single allocation fast
+// path for complete payloads. Streaming readers grow in small increments as
+// data arrives.
+func readBytes(r io.Reader, count uint64) ([]byte, error) {
+	if count == 0 {
+		return []byte{}, nil
+	}
+
+	type lenReader interface {
+		Len() int
+	}
+
+	if lr, ok := r.(lenReader); ok && count <= uint64(lr.Len()) {
+		result := make([]byte, count)
+		n, err := io.ReadFull(r, result)
+		return result[:n], err
+	}
+
+	var result bytes.Buffer
+	result.Grow(int(min(count, defaultReadBufferSize)))
+	n, err := io.CopyN(&result, r, int64(count))
+	if err == io.EOF && n > 0 {
+		err = io.ErrUnexpectedEOF
+	}
+
+	return result.Bytes(), err
+}
 var (
 	// littleEndian is a convenience variable since binary.LittleEndian is
 	// quite long.
@@ -663,8 +697,7 @@ func readVarStringBuf(r io.Reader, pver uint32, buf []byte) (string, error) {
 		return "", messageError("ReadVarString", str)
 	}
 
-	str := make([]byte, count)
-	_, err = io.ReadFull(r, str)
+	str, err := readBytes(r, count)
 	if err != nil {
 		return "", err
 	}
@@ -744,11 +777,11 @@ func ReadVarBytesBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32,
 		return nil, messageError("ReadVarBytes", str)
 	}
 
-	bytes := make([]byte, count)
-	_, err = io.ReadFull(r, bytes)
+	bytes, err := readBytes(r, count)
 	if err != nil {
 		return nil, err
 	}
+
 	return bytes, nil
 }
 
