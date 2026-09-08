@@ -562,23 +562,23 @@ func finalizeTaprootInput(p *Packet, inIndex int) error {
 				"signature not found: %w", err)
 		}
 
-		// The witness stack will contain all signatures, followed by
-		// the script itself and then the control block.
+		// Make sure that all script spend signatures reference the same
+		// target leaf. Signing multiple possible execution paths at the same
+		// time is currently not supported by this library.
 		for idx, scriptSpendSig := range pInput.TaprootScriptSpendSig {
-			// Make sure that if there are indeed multiple
-			// signatures, they all reference the same leaf hash.
 			if !bytes.Equal(scriptSpendSig.LeafHash, targetLeafHash) {
 				return fmt.Errorf("script spend signature %d "+
 					"references different target leaf "+
 					"hash than first signature; only one "+
 					"script path is supported", idx)
 			}
+		}
 
-			sig := append([]byte{}, scriptSpendSig.Signature...)
-			if scriptSpendSig.SigHash != txscript.SigHashDefault {
-				sig = append(sig, byte(scriptSpendSig.SigHash))
-			}
-			witnessStack = append(witnessStack, sig)
+		witnessStack, err = taprootScriptSpendWitnessStack(
+			leafScript.Script, pInput.TaprootScriptSpendSig,
+		)
+		if err != nil {
+			return err
 		}
 
 		// Complete the witness stack with the executed script and the
