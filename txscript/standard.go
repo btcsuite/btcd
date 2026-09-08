@@ -836,6 +836,11 @@ func CalcScriptInfo(sigScript, pkScript []byte, witness wire.TxWitness,
 	// If segwit is active, and this is a p2wsh output, then we'll need to
 	// examine the witness script to generate accurate script info.
 	case si.PkScriptClass == WitnessV0ScriptHashTy && segwit:
+		if len(witness) == 0 {
+			return nil, scriptError(ErrWitnessProgramEmpty,
+				"witness program empty passed empty witness")
+		}
+
 		witnessScript := witness[len(witness)-1]
 		redeemClass := typeOfScript(scriptVersion, witnessScript)
 		shInputs := expectedInputs(witnessScript, redeemClass)
