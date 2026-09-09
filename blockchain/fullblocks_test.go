@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -48,13 +49,7 @@ func fileExists(name string) bool {
 // currently supported.
 func isSupportedDbType(dbType string) bool {
 	supportedDrivers := database.SupportedDrivers()
-	for _, driver := range supportedDrivers {
-		if dbType == driver {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(supportedDrivers, dbType)
 }
 
 // chainSetup is used to create a new db and chain instance with the genesis
