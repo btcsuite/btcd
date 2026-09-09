@@ -6,6 +6,7 @@ package wire
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -246,6 +247,24 @@ func TestScriptArenaPropertyAllocator(t *testing.T) {
 // TestReadTxOutOwnedScript ensures the script returned by the exported
 // ReadTxOut has an exact-sized backing allocation owned by the output.
 func TestReadTxOutOwnedScript(t *testing.T) {
+	class := txScriptChunkClass
+	size := scriptChunkClasses[class]
+	testPool := &chunkClassPool{
+		fixed: make(chan *[]byte, 1),
+		pool: sync.Pool{
+			New: func() interface{} {
+				chunk := make([]byte, size)
+				return &chunk
+			},
+		},
+	}
+
+	origPool := scriptChunkPools[class]
+	scriptChunkPools[class] = testPool
+	t.Cleanup(func() {
+		scriptChunkPools[class] = origPool
+	})
+
 	orig := blockOne.Transactions[0].TxOut[0]
 	var buf bytes.Buffer
 	require.NoError(t, WriteTxOut(&buf, 0, 0, orig))
@@ -254,6 +273,15 @@ func TestReadTxOutOwnedScript(t *testing.T) {
 	require.NoError(t, ReadTxOut(bytes.NewReader(buf.Bytes()), 0, 0, &txOut))
 	require.Equal(t, orig.PkScript, txOut.PkScript)
 	require.Equal(t, len(txOut.PkScript), cap(txOut.PkScript))
+
+	// ReadTxOut releases its staging arena before returning. Pull the exact
+	// chunk back out of the isolated pool and overwrite it to ensure the
+	// returned script does not alias staging memory.
+	chunk := testPool.get()
+	for i := range *chunk {
+		(*chunk)[i] = 0xaa
+	}
+	require.Equal(t, orig.PkScript, txOut.PkScript)
 }
 
 // TestScriptArenaReleaseSafety exercises the misuse guards within a single
