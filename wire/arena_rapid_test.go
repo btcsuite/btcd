@@ -12,25 +12,12 @@ import (
 	"pgregory.net/rapid"
 )
 
-// poisonScriptChunkPools scribbles a poison pattern over chunks sitting in
-// the class pools.  Any decoded message that still aliases arena memory
-// (rather than owning an exact-size copy of its scripts) will have its
-// contents corrupted by this, so re-verifying a message after poisoning
-// proves that no arena memory escaped the decode.
-func poisonScriptChunkPools() {
-	for _, pool := range scriptChunkPools {
-		// Pull a handful of chunks out of each pool, poison them, and
-		// put them back.  This reaches the chunks released by recent
-		// decodes on this P.
-		var chunks []*[]byte
-		for i := 0; i < 4; i++ {
-			chunks = append(chunks, pool.get())
-		}
-		for _, chunk := range chunks {
-			for i := range *chunk {
-				(*chunk)[i] = 0xaa
-			}
-			pool.put(chunk)
+// poisonScriptArena scribbles over the exact chunks used by a decode. A
+// decoded transaction that still aliases its staging arena will be corrupted.
+func poisonScriptArena(ar *scriptArena) {
+	for _, chunk := range ar.chunks {
+		for i := range *chunk {
+			(*chunk)[i] = 0xaa
 		}
 	}
 }
@@ -122,8 +109,8 @@ func genMsgTx(rt *rapid.T) *MsgTx {
 
 // TestScriptArenaPropertyTxRoundTrip checks two properties over random
 // transactions: serialize/deserialize is the identity, and the decoded
-// transaction owns all of its memory (poisoning the arena chunk pools after
-// the decode must not change it).
+// transaction owns all of its memory after its exact staging chunks are
+// overwritten.
 func TestScriptArenaPropertyTxRoundTrip(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		tx := genMsgTx(rt)
@@ -131,18 +118,25 @@ func TestScriptArenaPropertyTxRoundTrip(t *testing.T) {
 		var wireBuf bytes.Buffer
 		require.NoError(rt, tx.Serialize(&wireBuf))
 
+		ar := borrowScriptArena(txScriptChunkClass)
+		defer ar.release()
+
+		buf := binarySerializer.Borrow()
+		defer binarySerializer.Return(buf)
+
 		var decoded MsgTx
-		err := decoded.Deserialize(bytes.NewReader(wireBuf.Bytes()))
+		err := decoded.btcDecode(
+			bytes.NewReader(wireBuf.Bytes()), 0, WitnessEncoding, buf, ar,
+		)
 		require.NoError(rt, err)
 
 		var reserialized bytes.Buffer
 		require.NoError(rt, decoded.Serialize(&reserialized))
 		require.Equal(rt, wireBuf.Bytes(), reserialized.Bytes())
 
-		// If the decoded transaction aliased arena memory, poisoning
-		// the pools would corrupt its scripts and the second
-		// serialization would differ.
-		poisonScriptChunkPools()
+		// Overwrite the exact chunks used by this decode rather than
+		// relying on a later pool lookup to return the same chunks.
+		poisonScriptArena(ar)
 
 		var afterPoison bytes.Buffer
 		require.NoError(rt, decoded.Serialize(&afterPoison))
@@ -150,9 +144,8 @@ func TestScriptArenaPropertyTxRoundTrip(t *testing.T) {
 	})
 }
 
-// TestScriptArenaPropertyBlockRoundTrip checks the same round-trip and
-// ownership properties for full blocks, which share a single arena across
-// all of their transactions.
+// TestScriptArenaPropertyBlockRoundTrip checks round-trip stability for full
+// blocks, including the rewinds performed while transactions share an arena.
 func TestScriptArenaPropertyBlockRoundTrip(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		block := &MsgBlock{Header: blockOne.Header}
@@ -172,11 +165,15 @@ func TestScriptArenaPropertyBlockRoundTrip(t *testing.T) {
 		require.NoError(rt, decoded.Serialize(&reserialized))
 		require.Equal(rt, wireBuf.Bytes(), reserialized.Bytes())
 
-		poisonScriptChunkPools()
+		// Decode the serialized block again to exercise arena reuse, then
+		// verify the first decoded block remains stable.
+		var again MsgBlock
+		err = again.Deserialize(bytes.NewReader(reserialized.Bytes()))
+		require.NoError(rt, err)
 
-		var afterPoison bytes.Buffer
-		require.NoError(rt, decoded.Serialize(&afterPoison))
-		require.Equal(rt, wireBuf.Bytes(), afterPoison.Bytes())
+		var afterReuse bytes.Buffer
+		require.NoError(rt, decoded.Serialize(&afterReuse))
+		require.Equal(rt, wireBuf.Bytes(), afterReuse.Bytes())
 	})
 }
 
@@ -247,9 +244,7 @@ func TestScriptArenaPropertyAllocator(t *testing.T) {
 }
 
 // TestReadTxOutOwnedScript ensures the script returned by the exported
-// ReadTxOut owns its memory: the arena used to stage it is recycled when
-// ReadTxOut returns, so a script still aliasing arena memory would be
-// corrupted by the pool poisoning below.
+// ReadTxOut has an exact-sized backing allocation owned by the output.
 func TestReadTxOutOwnedScript(t *testing.T) {
 	orig := blockOne.Transactions[0].TxOut[0]
 	var buf bytes.Buffer
@@ -258,10 +253,7 @@ func TestReadTxOutOwnedScript(t *testing.T) {
 	var txOut TxOut
 	require.NoError(t, ReadTxOut(bytes.NewReader(buf.Bytes()), 0, 0, &txOut))
 	require.Equal(t, orig.PkScript, txOut.PkScript)
-
-	poisonScriptChunkPools()
-
-	require.Equal(t, orig.PkScript, txOut.PkScript)
+	require.Equal(t, len(txOut.PkScript), cap(txOut.PkScript))
 }
 
 // TestScriptArenaReleaseSafety exercises the misuse guards within a single

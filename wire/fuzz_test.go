@@ -11,9 +11,8 @@ import (
 
 // FuzzTxDecode feeds arbitrary bytes to the transaction decoder, which
 // stages script data in the decode arena.  Inputs that decode successfully
-// must round-trip: re-serializing and re-decoding yields the same bytes,
-// which would fail if any script aliased recycled arena memory or if the
-// arena handed out overlapping allocations.
+// must round-trip: re-serializing and re-decoding yields the same bytes, and
+// the first decoded transaction remains stable after the second decode.
 func FuzzTxDecode(f *testing.F) {
 	// Seed with existing test vectors: the block one coinbase, the
 	// multi input/output transaction, and a witness transaction.
@@ -55,12 +54,21 @@ func FuzzTxDecode(f *testing.F) {
 		if !bytes.Equal(first.Bytes(), second.Bytes()) {
 			t.Fatal("tx serialization is not a fixed point")
 		}
+
+		var afterReuse bytes.Buffer
+		if err := tx.Serialize(&afterReuse); err != nil {
+			t.Fatalf("serialize first tx after re-decode: %v", err)
+		}
+		if !bytes.Equal(first.Bytes(), afterReuse.Bytes()) {
+			t.Fatal("first tx changed after arena reuse")
+		}
 	})
 }
 
 // FuzzBlockDecode feeds arbitrary bytes to the block decoder, which shares
 // a single decode arena across every transaction in the block, rewinding it
-// between transactions.  Successful decodes must round-trip byte for byte.
+// between transactions. Successful decodes must round-trip byte for byte, and
+// the first decoded block must remain stable after the second decode.
 func FuzzBlockDecode(f *testing.F) {
 	var seed bytes.Buffer
 	if err := blockOne.Serialize(&seed); err != nil {
@@ -91,6 +99,14 @@ func FuzzBlockDecode(f *testing.F) {
 		}
 		if !bytes.Equal(first.Bytes(), second.Bytes()) {
 			t.Fatal("block serialization is not a fixed point")
+		}
+
+		var afterReuse bytes.Buffer
+		if err := block.Serialize(&afterReuse); err != nil {
+			t.Fatalf("serialize first block after re-decode: %v", err)
+		}
+		if !bytes.Equal(first.Bytes(), afterReuse.Bytes()) {
+			t.Fatal("first block changed after arena reuse")
 		}
 	})
 }
