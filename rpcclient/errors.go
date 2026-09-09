@@ -174,7 +174,7 @@ const (
 	ErrDust
 
 	// ErrMultiOpReturn is returned when the transactions are not standard
-	// - muiltiple OP_RETURNs.
+	// - multiple OP_RETURNs.
 	ErrMultiOpReturn
 
 	// ErrNonFinal is returned when spending a timelocked transaction that
@@ -468,7 +468,7 @@ var BtcdErrMap = map[string]error{
 	// Some nonstandard transactions - output too small.
 	"payment is dust": ErrDust,
 
-	// Some nonstandard transactions - muiltiple OP_RETURNs.
+	// Some nonstandard transactions - multiple OP_RETURNs.
 	"more than one transaction output in a nulldata script": ErrMultiOpReturn,
 
 	// A timelocked transaction.
