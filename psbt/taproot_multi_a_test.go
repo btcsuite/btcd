@@ -21,20 +21,43 @@ func TestTaprootMultiAFinalizerOrdersSignatures(t *testing.T) {
 		AddInt64(2).AddOp(txscript.OP_NUMEQUAL).Script()
 	require.NoError(t, err)
 
-	packet := taprootMultiATestPacket(t, script, []*TaprootScriptSpendSig{
-		{XOnlyPubKey: keyA, Signature: sigA},
-		{XOnlyPubKey: keyB, Signature: sigB},
-	})
+	testCases := []struct {
+		name string
+		sigs []*TaprootScriptSpendSig
+	}{
+		{
+			name: "script order",
+			sigs: []*TaprootScriptSpendSig{
+				{XOnlyPubKey: keyA, Signature: sigA},
+				{XOnlyPubKey: keyB, Signature: sigB},
+			},
+		},
+		{
+			name: "reverse script order",
+			sigs: []*TaprootScriptSpendSig{
+				{XOnlyPubKey: keyB, Signature: sigB},
+				{XOnlyPubKey: keyA, Signature: sigA},
+			},
+		},
+	}
 
-	require.NoError(t, MaybeFinalizeAll(packet))
-	finalTx, err := Extract(packet)
-	require.NoError(t, err)
-	require.Equal(t, wire.TxWitness{
-		sigB,
-		sigA,
-		script,
-		make([]byte, 33),
-	}, finalTx.TxIn[0].Witness)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			packet := taprootMultiATestPacket(
+				t, script, testCase.sigs,
+			)
+
+			require.NoError(t, MaybeFinalizeAll(packet))
+			finalTx, err := Extract(packet)
+			require.NoError(t, err)
+			require.Equal(t, wire.TxWitness{
+				sigB,
+				sigA,
+				script,
+				make([]byte, 33),
+			}, finalTx.TxIn[0].Witness)
+		})
+	}
 }
 
 func TestTaprootMultiAFinalizerAddsPlaceholders(t *testing.T) {
