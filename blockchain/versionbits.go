@@ -153,8 +153,8 @@ type deploymentChecker struct {
 // interface.
 var _ thresholdConditionChecker = deploymentChecker{}
 
-// HasEnded returns true if the target consensus rule change has expired
-// or timed out (at the next window).
+// HasStarted returns true if based on the passed block blockNode the consensus
+// is eligible for deployment.
 //
 // This implementation returns the value defined by the specific deployment the
 // checker is associated with.
