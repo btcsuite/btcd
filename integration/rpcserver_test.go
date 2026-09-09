@@ -13,14 +13,17 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/stretchr/testify/require"
 )
 
 func testGetBestBlock(r *rpctest.Harness, t *testing.T) {
@@ -289,6 +292,102 @@ func testGetNetworkHashPS3(r *rpctest.Harness, t *testing.T) {
 	}
 }
 
+func ensureSegwitActive(r *rpctest.Harness, t *testing.T) {
+	t.Helper()
+
+	for {
+		info, err := r.Client.GetBlockChainInfo()
+		require.NoError(t, err, "unable to get blockchain info")
+
+		require.NotNil(t, info.Bip9SoftForks,
+			"segwit softfork status not found in blockchain info")
+		require.NotNil(t, info.Bip9SoftForks["segwit"],
+			"segwit softfork status not found in blockchain info")
+
+		if info.Bip9SoftForks["segwit"].Status == "active" {
+			break
+		}
+
+		_, err = r.Client.Generate(100)
+		require.NoError(t, err, "unable to generate blocks to"+
+			" activate segwit")
+	}
+}
+
+func testGetBlockTemplateSegwitActiveNoRule(r *rpctest.Harness, t *testing.T) {
+	// Guarantee SegWit is fully active before testing
+	ensureSegwitActive(r, t)
+
+	// Call getblocktemplate with empty rules when segwit is active
+	req := &btcjson.TemplateRequest{
+		Rules: []string{},
+	}
+
+	_, err := r.Client.GetBlockTemplate(req)
+	require.Error(t, err, "Expected getblocktemplate to fail without "+
+		"'segwit' rule")
+
+	// Expect: ErrRPCInvalidParameter with correct message
+	var rpcErr *btcjson.RPCError
+	require.ErrorAs(t, err, &rpcErr)
+	require.Equal(t, btcjson.ErrRPCInvalidParameter, rpcErr.Code)
+
+	expectedMessage := "Support for 'segwit' rule requires explicit " +
+		"client support"
+
+	require.Equal(t, expectedMessage, rpcErr.Message)
+}
+
+func testGetBlockTemplateSegwitActiveWithRule(
+	r *rpctest.Harness, t *testing.T) {
+	// Guarantee SegWit is fully active before testing
+	ensureSegwitActive(r, t)
+
+	// Call getblocktemplate with 'segwit' rule when segwit is active
+	req := &btcjson.TemplateRequest{
+		Rules: []string{"segwit"},
+	}
+
+	result, err := r.Client.GetBlockTemplate(req)
+	require.NoError(t, err, "Expected getblocktemplate to succeed")
+	require.NotNil(t, result, "Expected non-nil result")
+
+	hasSegwitRule := slices.Contains(result.Rules, "segwit") ||
+		slices.Contains(result.Rules, "!segwit")
+
+	require.True(t, hasSegwitRule, "Expected 'segwit' rule to be present "+
+		"in the response")
+}
+
+func testGetBlockTemplateResponseRules(r *rpctest.Harness, t *testing.T) {
+	// Guarantee SegWit is fully active before testing
+	ensureSegwitActive(r, t)
+
+	// Call getblocktemplate with 'segwit' rule when segwit is active
+	req := &btcjson.TemplateRequest{
+		Rules: []string{"segwit"},
+	}
+
+	result, err := r.Client.GetBlockTemplate(req)
+	require.NoError(t, err, "Expected getblocktemplate to succeed")
+	require.NotNil(t, result, "Expected non-nil result")
+
+	// Verify blockTemplateResult includes "!segwit" in Rules when
+	// WitnessCommitment is non-nil and "segwit" when WitnessCommitment
+	// is nil.
+	hasNotSegwit := slices.Contains(result.Rules, "!segwit")
+	hasSegwit := slices.Contains(result.Rules, "segwit")
+
+	if result.DefaultWitnessCommitment != "" {
+		require.True(t, hasNotSegwit, "Expected Rules to contain "+
+			"'!segwit' because WitnessCommitment is present")
+
+	} else {
+		require.True(t, hasSegwit, "Expected Rules to contain "+
+			"'segwit' because WitnessCommitment is absent")
+	}
+}
+
 var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetBestBlock,
 	testGetBlockCount,
@@ -297,6 +396,9 @@ var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetNetworkHashPS,
 	testGetNetworkHashPS2,
 	testGetNetworkHashPS3,
+	testGetBlockTemplateSegwitActiveNoRule,
+	testGetBlockTemplateSegwitActiveWithRule,
+	testGetBlockTemplateResponseRules,
 }
 
 var primaryHarness *rpctest.Harness
