@@ -60,7 +60,8 @@ func BenchmarkDeserializeTxSmallParallel(b *testing.B) {
 		for pb.Next() {
 			r.Seek(0, 0)
 			if err := tx.Deserialize(r); err != nil {
-				b.Fatal(err)
+				b.Error(err)
+				return
 			}
 		}
 	})
@@ -89,7 +90,8 @@ func BenchmarkDeserializeTxLargeParallel(b *testing.B) {
 		for pb.Next() {
 			r.Seek(0, 0)
 			if err := tx.Deserialize(r); err != nil {
-				b.Fatal(err)
+				b.Error(err)
+				return
 			}
 		}
 	})
@@ -115,7 +117,8 @@ func BenchmarkDeserializeBlockParallel(b *testing.B) {
 		for pb.Next() {
 			r.Seek(0, 0)
 			if err := block.Deserialize(r); err != nil {
-				b.Fatal(err)
+				b.Error(err)
+				return
 			}
 		}
 	})
