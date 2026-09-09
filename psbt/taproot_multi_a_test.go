@@ -91,6 +91,39 @@ func TestTaprootMultiAFinalizerAddsPlaceholders(t *testing.T) {
 	}, finalTx.TxIn[0].Witness)
 }
 
+func TestTaprootMultiAFinalizerIgnoresExcessSignatures(t *testing.T) {
+	keyA := bytes.Repeat([]byte{0x02}, 32)
+	keyB := bytes.Repeat([]byte{0x03}, 32)
+	keyC := bytes.Repeat([]byte{0x04}, 32)
+	sigA := bytes.Repeat([]byte{0xaa}, 64)
+	sigB := bytes.Repeat([]byte{0xbb}, 64)
+	sigC := bytes.Repeat([]byte{0xcc}, 64)
+
+	script, err := txscript.NewScriptBuilder().
+		AddData(keyA).AddOp(txscript.OP_CHECKSIG).
+		AddData(keyB).AddOp(txscript.OP_CHECKSIGADD).
+		AddData(keyC).AddOp(txscript.OP_CHECKSIGADD).
+		AddInt64(2).AddOp(txscript.OP_NUMEQUAL).Script()
+	require.NoError(t, err)
+
+	packet := taprootMultiATestPacket(t, script, []*TaprootScriptSpendSig{
+		{XOnlyPubKey: keyA, Signature: sigA},
+		{XOnlyPubKey: keyB, Signature: sigB},
+		{XOnlyPubKey: keyC, Signature: sigC},
+	})
+
+	require.NoError(t, MaybeFinalizeAll(packet))
+	finalTx, err := Extract(packet)
+	require.NoError(t, err)
+	require.Equal(t, wire.TxWitness{
+		[]byte{},
+		sigB,
+		sigA,
+		script,
+		make([]byte, 33),
+	}, finalTx.TxIn[0].Witness)
+}
+
 func TestTaprootMultiAFinalizerRejectsInsufficientSignatures(t *testing.T) {
 	keyA := bytes.Repeat([]byte{0x02}, 32)
 	keyB := bytes.Repeat([]byte{0x03}, 32)
