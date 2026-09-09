@@ -29,10 +29,9 @@ func TestPayToAnchorSimple(t *testing.T) {
 	// default, but the sub-dust and non-empty-witness cases below rely on
 	// standardness checks running, so we start the node with
 	// --rejectnonstd.
-	btcdCfg := []string{"--rejectnonstd"}
-	harness, err := rpctest.New(
-		&chaincfg.SimNetParams, nil, btcdCfg, "",
-	)
+	harness, err := rpctest.New(&rpctest.HarnessOpts{
+		ExtraArgs: []string{"--rejectnonstd"},
+	})
 	if err != nil {
 		t.Fatalf("unable to create test harness: %v", err)
 	}
@@ -40,7 +39,10 @@ func TestPayToAnchorSimple(t *testing.T) {
 
 	// Initialize the test harness with mining enabled to confirm
 	// transactions.
-	err = harness.SetUp(true, 25)
+	err = harness.SetUp(&rpctest.SetUpOpts{
+		CreateTestChain:  true,
+		NumMatureOutputs: 25,
+	})
 	if err != nil {
 		t.Fatalf("unable to setup test harness: %v", err)
 	}
@@ -197,4 +199,3 @@ func TestPayToAnchorSimple(t *testing.T) {
 		}
 	})
 }
-

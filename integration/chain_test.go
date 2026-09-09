@@ -8,7 +8,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript/v2"
@@ -26,12 +25,16 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	t.Parallel()
 
 	// Boilerplate codetestDir to make a pruned node.
-	btcdCfg := []string{"--rejectnonstd", "--debuglevel=debug"}
-	r, err := rpctest.New(&chaincfg.SimNetParams, nil, btcdCfg, "")
+	r, err := rpctest.New(&rpctest.HarnessOpts{
+		ExtraArgs: []string{"--rejectnonstd", "--debuglevel=debug"},
+	})
 	require.NoError(t, err)
 
 	// Setup the node.
-	require.NoError(t, r.SetUp(true, 100))
+	require.NoError(t, r.SetUp(&rpctest.SetUpOpts{
+		CreateTestChain:  true,
+		NumMatureOutputs: 100,
+	}))
 	t.Cleanup(func() {
 		require.NoError(t, r.TearDown())
 	})

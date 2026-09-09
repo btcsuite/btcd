@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -106,11 +105,11 @@ func assertConnectedTo(t *testing.T, nodeA *Harness, nodeB *Harness) {
 
 func testConnectNode(r *Harness, t *testing.T) {
 	// Create a fresh test harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(false, 0); err != nil {
+	if err := harness.SetUp(nil); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -154,7 +153,7 @@ func testActiveHarnesses(r *Harness, t *testing.T) {
 	numInitialHarnesses := len(ActiveHarnesses())
 
 	// Create a single test harness.
-	harness1, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness1, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,11 +181,11 @@ func testJoinMempools(r *Harness, t *testing.T) {
 	// Create a local test harness with only the genesis block.  The nodes
 	// will be synced below so the same transaction can be sent to both
 	// nodes without it being an orphan.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(false, 0); err != nil {
+	if err := harness.SetUp(nil); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -282,11 +281,11 @@ func testJoinMempools(r *Harness, t *testing.T) {
 func testJoinBlocks(r *Harness, t *testing.T) {
 	// Create a second harness with only the genesis block so it is behind
 	// the main harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(false, 0); err != nil {
+	if err := harness.SetUp(nil); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -470,11 +469,14 @@ func testGenerateAndSubmitBlockWithCustomCoinbaseOutputs(r *Harness,
 func testMemWalletReorg(r *Harness, t *testing.T) {
 	// Create a fresh harness, we'll be using the main harness to force a
 	// re-org on this local harness.
-	harness, err := New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := harness.SetUp(true, 5); err != nil {
+	if err := harness.SetUp(&SetUpOpts{
+		CreateTestChain:  true,
+		NumMatureOutputs: 5,
+	}); err != nil {
 		t.Fatalf("unable to complete rpctest setup: %v", err)
 	}
 	defer harness.TearDown()
@@ -567,7 +569,7 @@ const (
 
 func TestMain(m *testing.M) {
 	var err error
-	mainHarness, err = New(&chaincfg.SimNetParams, nil, nil, "")
+	mainHarness, err = New(nil)
 	if err != nil {
 		fmt.Println("unable to create main harness: ", err)
 		os.Exit(1)
@@ -576,7 +578,10 @@ func TestMain(m *testing.M) {
 	// Initialize the main mining node with a chain of length 125,
 	// providing 25 mature coinbases to allow spending from for testing
 	// purposes.
-	if err = mainHarness.SetUp(true, numMatureOutputs); err != nil {
+	if err = mainHarness.SetUp(&SetUpOpts{
+		CreateTestChain:  true,
+		NumMatureOutputs: numMatureOutputs,
+	}); err != nil {
 		fmt.Println("unable to setup test chain: ", err)
 
 		// Even though the harness was not fully setup, it still needs
