@@ -54,8 +54,10 @@ const (
 	txScriptChunkClass = 0
 
 	// blockScriptChunkClass is the chunk size class used as the starting
-	// point when decoding full blocks.  See scriptChunkClasses.
-	blockScriptChunkClass = 2
+	// point when decoding full blocks. The arena is rewound between each
+	// transaction, so blocks have the same initial requirement as standalone
+	// transactions and grow only when an individual transaction requires it.
+	blockScriptChunkClass = txScriptChunkClass
 )
 
 // scriptChunkClasses defines the ladder of chunk sizes that back script
@@ -66,7 +68,7 @@ const (
 //     network, which typically carry well under 1 KiB of script data.
 //   - 128 KiB covers large non-standard transactions (the standardness
 //     limit for a transaction is 100 KB).
-//   - 1 MiB covers the script data of typical full blocks.
+//   - 1 MiB covers transactions with unusually large aggregate script data.
 //   - 4 MiB covers the worst case: total script data in a message is
 //     bounded by scriptArenaMaxAlloc, and a single witness item is bounded
 //     by maxWitnessItemSize, so the largest class can always satisfy any
@@ -91,10 +93,11 @@ var _ [maxScriptChunkSize - scriptArenaMaxAlloc]byte
 // once since block decode concurrency is bounded, so pinning a few of them
 // buys stable block decode performance for at most 16*1 MiB + 8*4 MiB =
 // 48 MiB, and only once block traffic has actually warmed them.  The 1 MiB
-// class gets the deepest list since every block decode starts there, while
-// the 4 MiB class only serves the rare transaction that stages more than
-// 1 MiB of script data.  The small classes cost well under a microsecond
-// to re-create, so they are left entirely to the GC-cooperating sync.Pool.
+// class gets the deepest list to absorb concurrent decodes of transactions
+// with large aggregate script data, while the 4 MiB class only serves the
+// rare transaction that stages more than 1 MiB. The small classes cost well
+// under a microsecond to re-create, so they are left entirely to the
+// GC-cooperating sync.Pool.
 var scriptChunkFixedCaps = [len(scriptChunkClasses)]int{0, 0, 16, 8}
 
 // chunkClassPool hands out chunks of a single size class.  It layers a
@@ -194,11 +197,10 @@ type scriptArena struct {
 	// (at minimum) when the current chunk is exhausted.
 	class int
 
-	// dead marks an arena that has been released.  A dead arena rejects
-	// all allocations and ignores rewinds until it is borrowed again, so
-	// a stale reference held past release fails loudly with a decode
-	// error instead of silently carving memory out of chunks that
-	// another decode may now own.
+	// dead marks an arena that has been released. A dead arena rejects all
+	// allocations and ignores rewinds until the arena is borrowed again.
+	// Arenas have a single lexical owner and references must not be retained
+	// after release.
 	dead bool
 }
 
@@ -359,13 +361,10 @@ func (a *scriptArena) rewindSlow() {
 // release returns every chunk to its class pool and recycles the arena
 // struct itself.  All slices previously returned by alloc are invalidated.
 //
-// release is idempotent: a second call on an already released arena is a
-// no-op rather than double-inserting the arena into the pool, which would
-// hand the same arena to two concurrent decodes.  A released arena also
-// rejects any further alloc calls with errScriptArenaFull (used is poisoned
-// past the capacity limit) so a stale reference held past release fails
-// loudly instead of silently carving memory out of chunks that another
-// decode may now own.
+// release is idempotent until the arena is borrowed again: a second call on
+// an already released arena is a no-op rather than double-inserting it into
+// the pool. A released arena also rejects further allocations until it is
+// borrowed again. Callers must not retain an arena reference after release.
 func (a *scriptArena) release() {
 	if a.dead {
 		return

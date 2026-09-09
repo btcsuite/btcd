@@ -264,8 +264,9 @@ func TestReadTxOutOwnedScript(t *testing.T) {
 	require.Equal(t, orig.PkScript, txOut.PkScript)
 }
 
-// TestScriptArenaReleaseSafety exercises the misuse guards: double release
-// is a no-op, and a released arena refuses to allocate even after a rewind.
+// TestScriptArenaReleaseSafety exercises the misuse guards within a single
+// ownership interval: double release is a no-op, and a released arena refuses
+// to allocate even after a rewind.
 func TestScriptArenaReleaseSafety(t *testing.T) {
 	ar := borrowScriptArena(txScriptChunkClass)
 	_, err := ar.alloc(128)

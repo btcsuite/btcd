@@ -130,8 +130,7 @@ func TestScriptArenaRewind(t *testing.T) {
 
 // TestScriptArenaDecodeGrowth decodes a transaction whose script data
 // overflows the starting chunk class for standalone transactions, ensuring
-// the decode path grows the arena transparently rather than erroring like
-// the old fixed-buffer bounds check would have.
+// the decode path grows the arena transparently.
 func TestScriptArenaDecodeGrowth(t *testing.T) {
 	// Build a transaction with a signature script comfortably larger
 	// than the 16 KiB starting chunk.
