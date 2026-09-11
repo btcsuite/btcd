@@ -1221,6 +1221,70 @@ func TestStartSyncChainCurrent(t *testing.T) {
 		"ibdMode should not be activated when chain is already current")
 }
 
+// TestLostSyncPeerNearTip verifies that losing the sync peer near the tip
+// leaves announcements from the remaining peers eligible for download.
+func TestLostSyncPeerNearTip(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	coinbase1 := createTestCoinbase(1, &params)
+	header1 := wire.BlockHeader{
+		Version:    4,
+		PrevBlock:  *params.GenesisHash,
+		MerkleRoot: coinbase1.TxHash(),
+		Timestamp:  time.Now().Truncate(time.Second),
+		Bits:       params.PowLimitBits,
+	}
+	require.True(t, solveTestBlock(&header1, &params))
+	block1 := btcutil.NewBlock(&wire.MsgBlock{
+		Header:       header1,
+		Transactions: []*wire.MsgTx{coinbase1},
+	})
+	_, _, err := sm.chain.ProcessBlock(block1, blockchain.BFNone)
+	require.NoError(t, err)
+	require.True(t, sm.chain.IsCurrent())
+
+	coinbase2 := createTestCoinbase(2, &params)
+	header2 := wire.BlockHeader{
+		Version:    4,
+		PrevBlock:  *block1.Hash(),
+		MerkleRoot: coinbase2.TxHash(),
+		Timestamp:  header1.Timestamp.Add(time.Minute),
+		Bits:       params.PowLimitBits,
+	}
+	require.True(t, solveTestBlock(&header2, &params))
+	block2 := btcutil.NewBlock(&wire.MsgBlock{
+		Header:       header2,
+		Transactions: []*wire.MsgTx{coinbase2},
+	})
+
+	disconnectedPeer := newSyncCandidate(t, sm, 1)
+	remainingPeer := newSyncCandidate(t, sm, 1)
+	sm.syncPeer = disconnectedPeer
+	sm.ibdMode = true
+
+	sm.handleDonePeerMsg(disconnectedPeer)
+
+	require.Nil(t, sm.syncPeer)
+	require.False(t, sm.ibdMode)
+
+	blockHash := block2.Hash()
+	inv := wire.NewMsgInvSizeHint(1)
+	err = inv.AddInvVect(wire.NewInvVect(
+		wire.InvTypeWitnessBlock, blockHash,
+	))
+	require.NoError(t, err)
+	sm.handleInvMsg(&invMsg{peer: remainingPeer, inv: inv})
+
+	require.Contains(t, sm.requestedBlocks, *blockHash,
+		"the remaining peer's announcement should be requested")
+}
+
 // TestIsSyncCandidateRegtest verifies that isSyncCandidate accepts peers
 // on regtest and simnet based on their service flags.
 func TestIsSyncCandidateRegtest(t *testing.T) {

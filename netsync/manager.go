@@ -556,6 +556,10 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 	}
 
 	sm.syncPeer = nil
+	// IBD requires an active sync peer. Clear it with the peer so a lost
+	// sync peer cannot leave the manager in a state where announcements are
+	// ignored indefinitely.
+	sm.ibdMode = false
 	sm.startSync()
 }
 
