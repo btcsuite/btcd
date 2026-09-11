@@ -27,12 +27,10 @@ func readCookieFile(path string) (username, password string, err error) {
 	}
 	s := scanner.Text()
 
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 {
+	username, password, found := strings.Cut(s, ":")
+	if !found {
 		err = fmt.Errorf("malformed cookie file")
 		return
 	}
-
-	username, password = parts[0], parts[1]
 	return
 }
