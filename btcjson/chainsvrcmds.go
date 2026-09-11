@@ -137,6 +137,8 @@ var (
 	ChangeTypeP2SHSegWit ChangeType = "p2sh-segwit"
 	// ChangeTypeBech32 indicates a P2WPKH change address type.
 	ChangeTypeBech32 ChangeType = "bech32"
+	// ChangeTypeBech32m indicates a P2TR change address type.
+	ChangeTypeBech32m ChangeType = "bech32m"
 )
 
 // FundRawTransactionOpts are the different options that can be passed to rawtransaction
