@@ -83,9 +83,10 @@ func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 	if count > maxCFHeadersLen {
 		return ErrInsaneCFHeaderCount
 	}
-	if err := validateElementCount(
+	preallocate, err := canPreallocateElements(
 		r, count, chainhash.HashSize,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
@@ -94,19 +95,40 @@ func (msg *MsgCFCheckpt) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 		return nil
 	}
 
-	// Optimize memory allocation by creating a single backing array for
-	// all hashes. This reduces GC pressure and improves cache locality.
-	hashes := make([]chainhash.Hash, count)
-	msg.FilterHeaders = make([]*chainhash.Hash, count)
+	// Optimize memory allocation by creating a single backing array for all
+	// hashes. Buffered readers reserve the exact count, while streaming
+	// readers grow the array as hashes arrive.
+	var hashes []chainhash.Hash
+	if preallocate {
+		hashes = make([]chainhash.Hash, count)
+		msg.FilterHeaders = make([]*chainhash.Hash, count)
+	} else {
+		hashes = make(
+			[]chainhash.Hash, 0,
+			min(count, defaultStreamingElementCap),
+		)
+		msg.FilterHeaders = nil
+	}
 
 	// Now we'll read all the hashes directly into the backing array we've
 	// created above. We'll then point the underlying filter header hashes
 	// into this backing array.
 	for i := uint64(0); i < count; i++ {
+		if !preallocate {
+			hashes = append(hashes, chainhash.Hash{})
+		}
 		if _, err := io.ReadFull(r, hashes[i][:]); err != nil {
 			return err
 		}
-		msg.FilterHeaders[i] = &hashes[i]
+		if preallocate {
+			msg.FilterHeaders[i] = &hashes[i]
+		}
+	}
+	if !preallocate {
+		msg.FilterHeaders = make([]*chainhash.Hash, len(hashes))
+		for i := range hashes {
+			msg.FilterHeaders[i] = &hashes[i]
+		}
 	}
 
 	return nil

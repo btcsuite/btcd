@@ -477,26 +477,48 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			maxTxInPerMessage)
 		return messageError("MsgTx.BtcDecode", str)
 	}
-	if err := validateElementCount(
+	preallocateInputs, err := canPreallocateElements(
 		r, count, minTxInPayload,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
 	// Deserialize the inputs.
 	var totalScriptSize uint64
-	txIns := make([]TxIn, count)
-	msg.TxIn = make([]*TxIn, count)
+	var txIns []TxIn
+	if preallocateInputs {
+		txIns = make([]TxIn, count)
+		msg.TxIn = make([]*TxIn, count)
+	} else {
+		txIns = make(
+			[]TxIn, 0, min(count, defaultStreamingElementCap),
+		)
+		msg.TxIn = nil
+	}
 	for i := uint64(0); i < count; i++ {
-		// The pointer is assigned into the message before the decode
-		// call that populates it.
+		if !preallocateInputs {
+			txIns = append(txIns, TxIn{})
+		}
+
+		// Buffered inputs can point into their final backing array before
+		// the decode call populates it. Streaming inputs are wired up once
+		// their backing array stops growing.
 		ti := &txIns[i]
-		msg.TxIn[i] = ti
+		if preallocateInputs {
+			msg.TxIn[i] = ti
+		}
 		err = readTxInBuf(r, pver, msg.Version, ti, buf, ar)
 		if err != nil {
 			return err
 		}
 		totalScriptSize += uint64(len(ti.SignatureScript))
+	}
+	if !preallocateInputs {
+		msg.TxIn = make([]*TxIn, len(txIns))
+		for i := range txIns {
+			msg.TxIn[i] = &txIns[i]
+		}
 	}
 
 	count, err = ReadVarIntBuf(r, pver, buf)
@@ -513,25 +535,47 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			maxTxOutPerMessage)
 		return messageError("MsgTx.BtcDecode", str)
 	}
-	if err := validateElementCount(
+	preallocateOutputs, err := canPreallocateElements(
 		r, count, MinTxOutPayload,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
 	// Deserialize the outputs.
-	txOuts := make([]TxOut, count)
-	msg.TxOut = make([]*TxOut, count)
+	var txOuts []TxOut
+	if preallocateOutputs {
+		txOuts = make([]TxOut, count)
+		msg.TxOut = make([]*TxOut, count)
+	} else {
+		txOuts = make(
+			[]TxOut, 0, min(count, defaultStreamingElementCap),
+		)
+		msg.TxOut = nil
+	}
 	for i := uint64(0); i < count; i++ {
-		// The pointer is assigned into the message before the decode
-		// call that populates it.
+		if !preallocateOutputs {
+			txOuts = append(txOuts, TxOut{})
+		}
+
+		// Buffered outputs can point into their final backing array before
+		// the decode call populates it. Streaming outputs are wired up once
+		// their backing array stops growing.
 		to := &txOuts[i]
-		msg.TxOut[i] = to
+		if preallocateOutputs {
+			msg.TxOut[i] = to
+		}
 		err = readTxOutBuf(r, pver, msg.Version, to, buf, ar)
 		if err != nil {
 			return err
 		}
 		totalScriptSize += uint64(len(to.PkScript))
+	}
+	if !preallocateOutputs {
+		msg.TxOut = make([]*TxOut, len(txOuts))
+		for i := range txOuts {
+			msg.TxOut[i] = &txOuts[i]
+		}
 	}
 
 	// If the transaction's flag byte isn't 0x00 at this point, then one or
@@ -554,24 +598,37 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 					witCount, maxWitnessItemsPerInput)
 				return messageError("MsgTx.BtcDecode", str)
 			}
-			if err := validateElementCount(
+			preallocateWitness, err := canPreallocateElements(
 				r, witCount, 1,
-			); err != nil {
+			)
+			if err != nil {
 				return err
 			}
 
 			// Then for witCount number of stack items, each item
 			// has a varint length prefix, followed by the witness
 			// item itself.
-			txin.Witness = make([][]byte, witCount)
+			if preallocateWitness {
+				txin.Witness = make([][]byte, witCount)
+			} else {
+				txin.Witness = make(
+					[][]byte, 0,
+					min(witCount, defaultStreamingElementCap),
+				)
+			}
 			for j := uint64(0); j < witCount; j++ {
-				txin.Witness[j], err = readScriptBuf(
+				item, err := readScriptBuf(
 					r, pver, buf, ar, "script witness item",
 				)
 				if err != nil {
 					return err
 				}
-				totalScriptSize += uint64(len(txin.Witness[j]))
+				if preallocateWitness {
+					txin.Witness[j] = item
+				} else {
+					txin.Witness = append(txin.Witness, item)
+				}
+				totalScriptSize += uint64(len(item))
 			}
 		}
 

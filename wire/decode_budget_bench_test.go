@@ -118,4 +118,49 @@ func BenchmarkTruncatedDecodeBudget(b *testing.B) {
 			}
 		}
 	})
+
+	b.Run("streaming_transaction_inputs", func(b *testing.B) {
+		payload := benchmarkCountPayload(
+			b, make([]byte, 4), maxTxInPerMessage,
+		)
+
+		ar := borrowScriptArena(txScriptChunkClass)
+		ar.release()
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			reader := &readSizeRecorder{
+				reader: bytes.NewReader(payload),
+			}
+			var msg MsgTx
+			err := msg.BtcDecode(
+				reader, ProtocolVersion, WitnessEncoding,
+			)
+			if err == nil {
+				b.Fatal("expected a truncated transaction input error")
+			}
+		}
+	})
+
+	b.Run("streaming_filter_checkpoints", func(b *testing.B) {
+		payload := benchmarkCountPayload(
+			b, make([]byte, 33), maxCFHeadersLen,
+		)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			reader := &readSizeRecorder{
+				reader: bytes.NewReader(payload),
+			}
+			var msg MsgCFCheckpt
+			err := msg.BtcDecode(
+				reader, ProtocolVersion, BaseEncoding,
+			)
+			if err == nil {
+				b.Fatal("expected a truncated checkpoint error")
+			}
+		}
+	})
 }

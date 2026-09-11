@@ -27,6 +27,10 @@ const (
 	// defaultReadBufferSize bounds speculative allocation when a reader does
 	// not expose the number of bytes it has remaining.
 	defaultReadBufferSize = 4096
+
+	// defaultStreamingElementCap bounds speculative vector allocation when a
+	// reader does not expose the number of bytes it has remaining.
+	defaultStreamingElementCap = 128
 )
 
 // readBytes reads count bytes without allocating the full claimed size until
@@ -78,17 +82,26 @@ func readerRemaining(r io.Reader) (uint64, bool) {
 func validateElementCount(r io.Reader, count,
 	minElementSize uint64) error {
 
+	_, err := canPreallocateElements(r, count, minElementSize)
+	return err
+}
+
+// canPreallocateElements reports whether a reader proves that the minimum
+// encoding for count elements is already buffered. Readers without a
+// measurable remainder must grow element storage as decoding makes progress.
+func canPreallocateElements(r io.Reader, count,
+	minElementSize uint64) (bool, error) {
+
 	remaining, ok := readerRemaining(r)
 	if !ok || minElementSize == 0 {
-		return nil
+		return false, nil
 	}
 
-	requiredBytes := count * minElementSize
-	if requiredBytes <= remaining {
-		return nil
+	if count <= remaining/minElementSize {
+		return true, nil
 	}
 
-	return elementCountError(remaining)
+	return false, elementCountError(remaining)
 }
 
 // elementCountError preserves the short-read error returned by the element

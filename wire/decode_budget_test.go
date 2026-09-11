@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	"github.com/btcsuite/btcd/chainhash/v2"
 )
 
 func countPayload(t *testing.T, prefix []byte, count uint64) []byte {
@@ -357,5 +359,97 @@ func TestTruncatedMessagePayloadBudget(t *testing.T) {
 	}
 	if totalBytes != len(payload) {
 		t.Fatalf("read counted %d bytes, want %d", totalBytes, len(payload))
+	}
+}
+
+// TestStreamingTxDecodeBudget verifies that transaction vectors grow as a
+// reader without a measurable remainder supplies each element. The element
+// counts cross the initial streaming capacity to exercise backing slice
+// growth and final pointer wiring.
+func TestStreamingTxDecodeBudget(t *testing.T) {
+	const elementCount = defaultStreamingElementCap + 42
+
+	msg := NewMsgTx(2)
+	for i := 0; i < elementCount; i++ {
+		hash := chainhash.Hash{byte(i), byte(i >> 8)}
+		prevOut := NewOutPoint(&hash, uint32(i))
+		witness := make([][]byte, elementCount)
+		for j := range witness {
+			witness[j] = []byte{byte(i), byte(j)}
+		}
+
+		msg.AddTxIn(NewTxIn(
+			prevOut, []byte{0x01, byte(i)}, witness,
+		))
+	}
+	for i := 0; i < elementCount; i++ {
+		msg.AddTxOut(NewTxOut(
+			int64(i), []byte{0x02, byte(i)},
+		))
+	}
+
+	var encoded bytes.Buffer
+	if err := msg.Serialize(&encoded); err != nil {
+		t.Fatalf("unable to encode transaction: %v", err)
+	}
+
+	reader := &readSizeRecorder{
+		reader: bytes.NewReader(encoded.Bytes()),
+	}
+	var decoded MsgTx
+	if err := decoded.BtcDecode(
+		reader, ProtocolVersion, WitnessEncoding,
+	); err != nil {
+		t.Fatalf("unable to decode transaction: %v", err)
+	}
+
+	var reencoded bytes.Buffer
+	if err := decoded.Serialize(&reencoded); err != nil {
+		t.Fatalf("unable to re-encode transaction: %v", err)
+	}
+	if !bytes.Equal(encoded.Bytes(), reencoded.Bytes()) {
+		t.Fatal("streaming transaction decode changed the encoding")
+	}
+}
+
+// TestStreamingCFCheckptDecodeBudget verifies that compact filter checkpoint
+// hashes grow as a reader without a measurable remainder supplies them.
+func TestStreamingCFCheckptDecodeBudget(t *testing.T) {
+	const headerCount = defaultStreamingElementCap + 42
+
+	stopHash := chainhash.Hash{0x01, 0x02, 0x03}
+	msg := NewMsgCFCheckpt(GCSFilterRegular, &stopHash, headerCount)
+	for i := 0; i < headerCount; i++ {
+		header := chainhash.Hash{byte(i), byte(i >> 8), 0x04}
+		if err := msg.AddCFHeader(&header); err != nil {
+			t.Fatalf("unable to add filter header: %v", err)
+		}
+	}
+
+	var encoded bytes.Buffer
+	if err := msg.BtcEncode(
+		&encoded, ProtocolVersion, BaseEncoding,
+	); err != nil {
+		t.Fatalf("unable to encode checkpoint: %v", err)
+	}
+
+	reader := &readSizeRecorder{
+		reader: bytes.NewReader(encoded.Bytes()),
+	}
+	var decoded MsgCFCheckpt
+	if err := decoded.BtcDecode(
+		reader, ProtocolVersion, BaseEncoding,
+	); err != nil {
+		t.Fatalf("unable to decode checkpoint: %v", err)
+	}
+
+	var reencoded bytes.Buffer
+	if err := decoded.BtcEncode(
+		&reencoded, ProtocolVersion, BaseEncoding,
+	); err != nil {
+		t.Fatalf("unable to re-encode checkpoint: %v", err)
+	}
+	if !bytes.Equal(encoded.Bytes(), reencoded.Bytes()) {
+		t.Fatal("streaming checkpoint decode changed the encoding")
 	}
 }
