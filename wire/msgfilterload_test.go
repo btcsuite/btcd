@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// TestFilterCLearLatest tests the MsgFilterLoad API against the latest protocol
+// TestFilterLoadLatest tests the MsgFilterLoad API against the latest protocol
 // version.
 func TestFilterLoadLatest(t *testing.T) {
 	pver := ProtocolVersion
