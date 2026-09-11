@@ -5,6 +5,7 @@
 package wire
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -22,7 +23,96 @@ const (
 	// binaryFreeListMaxItems is the number of buffers to keep in the free
 	// list to use for binary serialization and deserialization.
 	binaryFreeListMaxItems = 1024
+
+	// defaultReadBufferSize bounds speculative allocation when a reader does
+	// not expose the number of bytes it has remaining.
+	defaultReadBufferSize = 4096
+
+	// defaultStreamingElementCap bounds speculative vector allocation when a
+	// reader does not expose the number of bytes it has remaining.
+	defaultStreamingElementCap = 128
 )
+
+// readBytes reads count bytes without allocating the full claimed size until
+// the reader proves that the bytes are available. Buffered message decoders
+// expose their remaining length, which preserves the single allocation fast
+// path for complete payloads. Streaming readers grow in small increments as
+// data arrives.
+func readBytes(r io.Reader, count uint64) ([]byte, error) {
+	if count == 0 {
+		return []byte{}, nil
+	}
+
+	remaining, known := readerRemaining(r)
+	if known && count <= remaining {
+		result := make([]byte, count)
+		n, err := io.ReadFull(r, result)
+		return result[:n], err
+	}
+
+	var result bytes.Buffer
+	result.Grow(int(min(count, defaultReadBufferSize)))
+	n, err := io.CopyN(&result, r, int64(count))
+	if err == io.EOF && n > 0 {
+		err = io.ErrUnexpectedEOF
+	}
+
+	return result.Bytes(), err
+}
+
+// readerRemaining returns the number of buffered bytes exposed by the concrete
+// readers used by wire decoders. Other readers use the staged streaming path.
+func readerRemaining(r io.Reader) (uint64, bool) {
+	switch r := r.(type) {
+	case *bytes.Buffer:
+		return uint64(r.Len()), true
+
+	case *bytes.Reader:
+		return uint64(r.Len()), true
+
+	default:
+		return 0, false
+	}
+}
+
+// validateElementCount ensures a buffered payload has enough bytes remaining
+// to encode the claimed number of elements before a decoder allocates for the
+// count. The framed wire path passes a bytes.Buffer to each message decoder,
+// while callers without a measurable remainder retain streaming semantics.
+func validateElementCount(r io.Reader, count,
+	minElementSize uint64) error {
+
+	_, err := canPreallocateElements(r, count, minElementSize)
+	return err
+}
+
+// canPreallocateElements reports whether a reader proves that the minimum
+// encoding for count elements is already buffered. Readers without a
+// measurable remainder must grow element storage as decoding makes progress.
+func canPreallocateElements(r io.Reader, count,
+	minElementSize uint64) (bool, error) {
+
+	remaining, ok := readerRemaining(r)
+	if !ok || minElementSize == 0 {
+		return false, nil
+	}
+
+	if count <= remaining/minElementSize {
+		return true, nil
+	}
+
+	return false, elementCountError(remaining)
+}
+
+// elementCountError preserves the short-read error returned by the element
+// decoder when the claimed vector cannot fit in the remaining payload.
+func elementCountError(remaining uint64) error {
+	if remaining == 0 {
+		return io.EOF
+	}
+
+	return io.ErrUnexpectedEOF
+}
 
 var (
 	// littleEndian is a convenience variable since binary.LittleEndian is
@@ -663,8 +753,7 @@ func readVarStringBuf(r io.Reader, pver uint32, buf []byte) (string, error) {
 		return "", messageError("ReadVarString", str)
 	}
 
-	str := make([]byte, count)
-	_, err = io.ReadFull(r, str)
+	str, err := readBytes(r, count)
 	if err != nil {
 		return "", err
 	}
@@ -744,11 +833,11 @@ func ReadVarBytesBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32,
 		return nil, messageError("ReadVarBytes", str)
 	}
 
-	bytes := make([]byte, count)
-	_, err = io.ReadFull(r, bytes)
+	bytes, err := readBytes(r, count)
 	if err != nil {
 		return nil, err
 	}
+
 	return bytes, nil
 }
 
