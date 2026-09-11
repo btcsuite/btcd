@@ -8,6 +8,7 @@ package schnorr
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"testing/quick"
@@ -16,6 +17,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	ecdsa_schnorr "github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
+	"github.com/stretchr/testify/require"
 )
 
 type bip340Test struct {
@@ -147,6 +149,42 @@ var bip340TestVectors = []bip340Test{
 		verifyResult: false,
 		validPubKey:  false,
 		expectErr:    secp_ecdsa.ErrPubKeyXTooBig,
+	},
+	{
+		secretKey:    "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:    "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:      "0000000000000000000000000000000000000000000000000000000000000000",
+		message:      "",
+		signature:    "71535DB165ECD9FBBC046E5FFAEA61186BB6AD436732FCCC25291A55895464CF6069CE26BF03466228F19A3A62DB8A649F2D560FAC652827D1AF0574E427AB63",
+		verifyResult: true,
+		validPubKey:  true,
+	},
+	{
+		secretKey:    "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:    "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:      "0000000000000000000000000000000000000000000000000000000000000000",
+		message:      "11",
+		signature:    "08A20A0AFEF64124649232E0693C583AB1B9934AE63B4C3511F3AE1134C6A303EA3173BFEA6683BD101FA5AA5DBC1996FE7CACFC5A577D33EC14564CEC2BACBF",
+		verifyResult: true,
+		validPubKey:  true,
+	},
+	{
+		secretKey:    "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:    "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:      "0000000000000000000000000000000000000000000000000000000000000000",
+		message:      "0102030405060708090A0B0C0D0E0F1011",
+		signature:    "5130F39A4059B43BC7CAC09A19ECE52B5D8699D1A71E3C52DA9AFDB6B50AC370C4A482B77BF960F8681540E25B6771ECE1E5A37FD80E5A51897C5566A97EA5A5",
+		verifyResult: true,
+		validPubKey:  true,
+	},
+	{
+		secretKey:    "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:    "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:      "0000000000000000000000000000000000000000000000000000000000000000",
+		message:      "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+		signature:    "403B12B0D8555A344175EA7EC746566303321E5DBFA8BE6F091635163ECA79A8585ED3E3170807E7C03B720FC54C7B23897FCBA0E9D0B4A06894CFD249F22367",
+		verifyResult: true,
+		validPubKey:  true,
 	},
 }
 
@@ -327,5 +365,47 @@ func TestParseSignatureComponentRange(t *testing.T) {
 			t.Errorf("%s: mismatched err -- got %v, want %v",
 				test.name, err, test.err)
 		}
+	}
+}
+
+// TestSchnorrSignArbitraryLengthNoNonceCollision checks that different
+// messages don't result in the same nonce when using RFC 6979 due to message
+// truncation or padding during nonce generation.
+func TestSchnorrSignArbitraryLengthNoNonceCollision(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		msg1 string
+		msg2 string
+	}{
+		{
+			msg1: strings.Repeat("ab", 40),
+			msg2: strings.Repeat("ab", 32),
+		},
+		{
+			msg1: strings.Repeat("cd", 32) + "01",
+			msg2: strings.Repeat("cd", 32) + "02",
+		},
+		{
+			msg1: "11",
+			msg2: strings.Repeat("00", 31) + "11",
+		},
+	}
+
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
+			msg1 := decodeHex(tc.msg1)
+			sig1, err := Sign(privKey, msg1)
+			require.NoError(t, err)
+
+			msg2 := decodeHex(tc.msg2)
+			sig2, err := Sign(privKey, msg2)
+			require.NoError(t, err)
+
+			require.NotEqual(t, sig1.r, sig2.r)
+		})
 	}
 }
