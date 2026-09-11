@@ -205,7 +205,7 @@ func (t *Mutable) Delete(key []byte) {
 		} else if node.right == nil {
 			child = node.left
 			isLeft = true
-		} else if node.left.priority >= node.right.priority {
+		} else if node.left.priority < node.right.priority {
 			child = node.left
 			isLeft = true
 		} else {
