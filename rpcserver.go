@@ -1703,6 +1703,32 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 	return nil
 }
 
+// coinbaseTxForTemplate returns the coinbase transaction to expose through the
+// getblocktemplate coinbasetxn field. BIP 145 requires the witness commitment
+// to be omitted so the client can append the commitment for its final
+// transaction set.
+func coinbaseTxForTemplate(tx *wire.MsgTx, witnessCommitment []byte) *wire.MsgTx {
+	if len(witnessCommitment) == 0 || len(tx.TxOut) == 0 {
+		return tx
+	}
+
+	expectedScript := make(
+		[]byte, 0, len(blockchain.WitnessMagicBytes)+len(witnessCommitment),
+	)
+	expectedScript = append(expectedScript, blockchain.WitnessMagicBytes...)
+	expectedScript = append(expectedScript, witnessCommitment...)
+
+	lastOutput := len(tx.TxOut) - 1
+	if !bytes.Equal(tx.TxOut[lastOutput].PkScript, expectedScript) {
+		return tx
+	}
+
+	tx = tx.Copy()
+	tx.TxOut = tx.TxOut[:lastOutput]
+
+	return tx
+}
+
 // blockTemplateResult returns the current block template associated with the
 // state as a btcjson.GetBlockTemplateResult that is ready to be encoded to JSON
 // and returned to the caller.
@@ -1827,8 +1853,11 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			}
 		}
 
-		// Serialize the transaction for conversion to hex.
-		tx := msgBlock.Transactions[0]
+		// Serialize the transaction for conversion to hex. BIP 145 requires
+		// coinbasetxn to omit the witness commitment.
+		tx := coinbaseTxForTemplate(
+			msgBlock.Transactions[0], template.WitnessCommitment,
+		)
 		txBuf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
 		if err := tx.Serialize(txBuf); err != nil {
 			context := "Failed to serialize transaction"
