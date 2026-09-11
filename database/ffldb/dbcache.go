@@ -611,24 +611,30 @@ func (c *dbCache) commitTx(tx *transaction) error {
 	c.cacheLock.RUnlock()
 
 	// Apply every key to add in the database transaction to the cache.
+	// Both puts and deletes are batched to enable intermediary node
+	// recycling via sync.Pool, reducing GC pressure during IBD.
 	pendingKVs := make([]treap.KVPair, 0, tx.pendingKeys.Len())
+	removeDeleteKeys := make([][]byte, 0, tx.pendingKeys.Len())
 	tx.pendingKeys.ForEach(func(k, v []byte) bool {
 		pendingKVs = append(pendingKVs, treap.KVPair{Key: k, Value: v})
-
-		newCachedRemove = newCachedRemove.Delete(k)
+		removeDeleteKeys = append(removeDeleteKeys, k)
 		return true
 	})
+	newCachedRemove = newCachedRemove.Delete(removeDeleteKeys...)
 	newCachedKeys = newCachedKeys.Put(pendingKVs...)
 	tx.pendingKeys = nil
 
 	// Apply every key to remove in the database transaction to the cache.
 	pendingRemoveKVs := make([]treap.KVPair, 0, tx.pendingRemove.Len())
+	keysDeleteKeys := make([][]byte, 0, tx.pendingRemove.Len())
 	tx.pendingRemove.ForEach(func(k, v []byte) bool {
-		pendingRemoveKVs = append(pendingRemoveKVs, treap.KVPair{Key: k, Value: v})
-
-		newCachedKeys = newCachedKeys.Delete(k)
+		pendingRemoveKVs = append(pendingRemoveKVs, treap.KVPair{
+			Key: k, Value: nil,
+		})
+		keysDeleteKeys = append(keysDeleteKeys, k)
 		return true
 	})
+	newCachedKeys = newCachedKeys.Delete(keysDeleteKeys...)
 	newCachedRemove = newCachedRemove.Put(pendingRemoveKVs...)
 	tx.pendingRemove = nil
 
