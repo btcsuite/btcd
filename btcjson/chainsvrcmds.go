@@ -225,6 +225,15 @@ func NewGetBlockChainInfoCmd() *GetBlockChainInfoCmd {
 	return &GetBlockChainInfoCmd{}
 }
 
+// GetIndexInfoCmd defines the getindexinfo JSON-RPC command.
+type GetIndexInfoCmd struct{}
+
+// NewGetIndexInfoCmd returns a new instance which can be used to issue a
+// getindexinfo JSON-RPC command.
+func NewGetIndexInfoCmd() *GetIndexInfoCmd {
+	return &GetIndexInfoCmd{}
+}
+
 // GetBlockCountCmd defines the getblockcount JSON-RPC command.
 type GetBlockCountCmd struct{}
 
@@ -1131,6 +1140,7 @@ func init() {
 	MustRegisterCmd("getgenerate", (*GetGenerateCmd)(nil), flags)
 	MustRegisterCmd("gethashespersec", (*GetHashesPerSecCmd)(nil), flags)
 	MustRegisterCmd("getinfo", (*GetInfoCmd)(nil), flags)
+	MustRegisterCmd("getindexinfo", (*GetIndexInfoCmd)(nil), flags)
 	MustRegisterCmd("getmempoolentry", (*GetMempoolEntryCmd)(nil), flags)
 	MustRegisterCmd("getmempoolinfo", (*GetMempoolInfoCmd)(nil), flags)
 	MustRegisterCmd("getmininginfo", (*GetMiningInfoCmd)(nil), flags)
