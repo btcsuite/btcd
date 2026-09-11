@@ -96,9 +96,7 @@ func genMsgTx(rt *rapid.T) *MsgTx {
 	numOut := rapid.IntRange(0, 6).Draw(rt, "numOut")
 	for i := 0; i < numOut; i++ {
 		tx.AddTxOut(&TxOut{
-			Value: int64(
-				rapid.IntRange(0, 1<<40).Draw(rt, "value"),
-			),
+			Value:    rapid.Int64Range(0, 1<<40).Draw(rt, "value"),
 			PkScript: genScript(rt, "pkScript", scriptMax),
 		})
 	}
