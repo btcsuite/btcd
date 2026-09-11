@@ -59,8 +59,6 @@ func TestParseBitcoindVersion(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			version := parseBitcoindVersion(tc.rpcVersion)
 			require.Equal(t, tc.parsedVersion, version)
@@ -96,8 +94,6 @@ func TestParseBtcdVersion(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			version := parseBtcdVersion(tc.rpcVersion)
 			require.Equal(t, tc.parsedVersion, version)
