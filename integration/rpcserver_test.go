@@ -10,6 +10,7 @@ package integration
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
@@ -96,6 +98,39 @@ func testGetBlockHash(r *rpctest.Harness, t *testing.T) {
 	if !bytes.Equal(generatedBlockHashes[0][:], blockHash[:]) {
 		t.Fatalf("Block hashes do not match. Returned hash %v, wanted "+
 			"hash %v", blockHash, generatedBlockHashes[0][:])
+	}
+}
+
+func testGetBlockNullVerbosity(r *rpctest.Harness, t *testing.T) {
+	hash, err := r.Client.GetBestBlockHash()
+	if err != nil {
+		t.Fatalf("Unable to get best block hash: %v", err)
+	}
+
+	hashJSON, err := json.Marshal(hash.String())
+	if err != nil {
+		t.Fatalf("Unable to marshal block hash: %v", err)
+	}
+
+	resultJSON, err := r.Client.RawRequest(
+		"getblock", []json.RawMessage{
+			hashJSON, json.RawMessage("null"),
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unable to get block with null verbosity: %v", err)
+	}
+
+	var result btcjson.GetBlockVerboseResult
+	if err := json.Unmarshal(resultJSON, &result); err != nil {
+		t.Fatalf("Unable to unmarshal verbose block result: %v", err)
+	}
+	if result.Hash != hash.String() {
+		t.Fatalf("Block hashes do not match. Got %v, wanted %v",
+			result.Hash, hash)
+	}
+	if len(result.Tx) == 0 {
+		t.Fatal("Verbose block result contains no transactions")
 	}
 }
 
@@ -293,6 +328,7 @@ var rpcTestCases = []rpctest.HarnessTestCase{
 	testGetBestBlock,
 	testGetBlockCount,
 	testGetBlockHash,
+	testGetBlockNullVerbosity,
 	testBulkClient,
 	testGetNetworkHashPS,
 	testGetNetworkHashPS2,
