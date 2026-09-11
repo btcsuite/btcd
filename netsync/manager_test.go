@@ -22,6 +22,7 @@ import (
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
+	"pgregory.net/rapid"
 )
 
 // The package-level log variable is nil by default. Set it to the
@@ -602,7 +603,11 @@ func solveTestBlock(header *wire.BlockHeader, params *chaincfg.Params) bool {
 }
 
 // generateTestBlocks creates count valid blocks chaining from the genesis
-// block of the given params.  Each block contains only a coinbase transaction.
+// block of the given params. Each block contains only a coinbase transaction.
+//
+// The timestamps start from the current time so the chain is IsCurrent at
+// any height, which keeps the near-tip sync paths reachable (a chain built
+// from the 2011 regtest genesis timestamp is never current).
 func generateTestBlocks(
 	t *testing.T, params *chaincfg.Params, count int) []*btcutil.Block {
 
@@ -610,7 +615,7 @@ func generateTestBlocks(
 
 	blocks := make([]*btcutil.Block, 0, count)
 	prevHash := params.GenesisHash
-	prevTime := params.GenesisBlock.Header.Timestamp
+	prevTime := time.Now().Truncate(time.Minute)
 
 	for h := int32(1); h <= int32(count); h++ {
 		cb := createTestCoinbase(h, params)
@@ -1219,6 +1224,426 @@ func TestStartSyncChainCurrent(t *testing.T) {
 		"syncPeer should not be set when chain is already current")
 	require.False(t, sm.ibdMode,
 		"ibdMode should not be activated when chain is already current")
+}
+
+// TestLostSyncPeerNearTip verifies that losing the sync peer near the tip
+// leaves announcements from the remaining peers eligible for download.
+func TestLostSyncPeerNearTip(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	sm, tearDown := makeMockSyncManager(t, &params)
+	defer tearDown()
+
+	coinbase1 := createTestCoinbase(1, &params)
+	header1 := wire.BlockHeader{
+		Version:    4,
+		PrevBlock:  *params.GenesisHash,
+		MerkleRoot: coinbase1.TxHash(),
+		Timestamp:  time.Now().Truncate(time.Second),
+		Bits:       params.PowLimitBits,
+	}
+	require.True(t, solveTestBlock(&header1, &params))
+	block1 := btcutil.NewBlock(&wire.MsgBlock{
+		Header:       header1,
+		Transactions: []*wire.MsgTx{coinbase1},
+	})
+	_, _, err := sm.chain.ProcessBlock(block1, blockchain.BFNone)
+	require.NoError(t, err)
+	require.True(t, sm.chain.IsCurrent())
+
+	coinbase2 := createTestCoinbase(2, &params)
+	header2 := wire.BlockHeader{
+		Version:    4,
+		PrevBlock:  *block1.Hash(),
+		MerkleRoot: coinbase2.TxHash(),
+		Timestamp:  header1.Timestamp.Add(time.Minute),
+		Bits:       params.PowLimitBits,
+	}
+	require.True(t, solveTestBlock(&header2, &params))
+	block2 := btcutil.NewBlock(&wire.MsgBlock{
+		Header:       header2,
+		Transactions: []*wire.MsgTx{coinbase2},
+	})
+
+	disconnectedPeer := newSyncCandidate(t, sm, 1)
+	remainingPeer := newSyncCandidate(t, sm, 1)
+	sm.syncPeer = disconnectedPeer
+	sm.ibdMode = true
+
+	sm.handleDonePeerMsg(disconnectedPeer)
+
+	require.Nil(t, sm.syncPeer)
+	require.False(t, sm.ibdMode)
+
+	blockHash := block2.Hash()
+	inv := wire.NewMsgInvSizeHint(1)
+	err = inv.AddInvVect(wire.NewInvVect(
+		wire.InvTypeWitnessBlock, blockHash,
+	))
+	require.NoError(t, err)
+	sm.handleInvMsg(&invMsg{peer: remainingPeer, inv: inv})
+
+	require.Contains(t, sm.requestedBlocks, *blockHash,
+		"the remaining peer's announcement should be requested")
+}
+
+// TestPropertyLostSyncPeerRecovers is the property-based companion to
+// TestLostSyncPeerNearTip. For any chain height, any set of remaining peer
+// heights, and any subsequent new-block announcement, losing the sync peer
+// with IBD enabled must never leave the manager ignoring announcements:
+// either a strictly higher peer is promoted to sync peer and re-enters IBD, or
+// the sync state resets so that the announcement from any remaining peer is
+// requested.
+func TestPropertyLostSyncPeerRecovers(t *testing.T) {
+	t.Parallel()
+
+	rapid.Check(t, func(rt *rapid.T) {
+		// Keep runtimes modest: a full chain setup with proof-of-work
+		// solving per generated case.
+		chainHeight := rapid.IntRange(1, 3*minInFlightBlocks+1).Draw(rt, "chainHeight")
+		numPeers := rapid.IntRange(1, 4).Draw(rt, "numPeers")
+		// Remaining peers sit within a small window of the chain tip:
+		// equal or one ahead, which is the near-tip regime from the
+		// issue report.
+		peerHeightDeltas := rapid.SliceOfN(
+			rapid.IntRange(0, 1), numPeers, numPeers,
+		).Draw(rt, "peerHeightDeltas")
+
+		params := chaincfg.RegressionNetParams
+		params.Checkpoints = nil
+
+		sm, tearDown := makeMockSyncManager(t, &params)
+		defer tearDown()
+
+		blocks := generateTestBlocks(t, &params, chainHeight)
+		for _, block := range blocks {
+			_, _, err := sm.chain.ProcessBlock(
+				block, blockchain.BFNone)
+			require.NoError(t, err)
+		}
+
+		// The next block to be announced, built on the tip but never
+		// processed so the manager does not already know it.
+		nextBlock := extendTestBlocks(t, &params, blocks, 1)[0]
+		nextHash := nextBlock.Hash()
+
+		// A sync peer at or above the tip with IBD enabled, plus the
+		// remaining peers the chain will hear announcements from.
+		syncPeer := newSyncCandidate(t, sm, int32(chainHeight))
+		var remainingPeers []*peer.Peer
+		for _, delta := range peerHeightDeltas {
+			remainingPeers = append(remainingPeers, newSyncCandidate(t, sm,
+				int32(chainHeight)+int32(delta)))
+		}
+		sm.syncPeer = syncPeer
+		sm.ibdMode = true
+
+		sm.handleDonePeerMsg(syncPeer)
+
+		// The invariant: no dead state. Either a replacement was
+		// promoted (re-entering IBD against a strictly higher peer), or
+		// the sync state was fully reset.
+		if sm.syncPeer != nil {
+			require.True(t, sm.ibdMode,
+				"a promoted sync peer implies IBD mode")
+		} else {
+			require.False(t, sm.ibdMode,
+				"no sync peer implies IBD mode must be cleared")
+		}
+
+		// End-to-end recovery must hold on either branch. When the sync
+		// state was reset, the new-block announcement from any remaining
+		// peer must be requested directly. When a strictly higher peer was
+		// promoted and IBD re-entered, the header-first path applies
+		// instead: the promoted peer delivers the header, and the block
+		// is then requested from it.
+		if !sm.ibdMode {
+			inv := wire.NewMsgInvSizeHint(1)
+			err := inv.AddInvVect(wire.NewInvVect(
+				wire.InvTypeWitnessBlock, nextHash,
+			))
+			require.NoError(t, err)
+			announcer := remainingPeers[rapid.IntRange(0, len(remainingPeers)-1).Draw(rt, "announcerIdx")]
+			sm.handleInvMsg(&invMsg{peer: announcer, inv: inv})
+			require.Contains(t, sm.requestedBlocks, *nextHash,
+				"announcement after losing the sync peer must be requested")
+			return
+		}
+
+		// IBD re-entered with a promoted sync peer: deliver the header
+		// through it and verify the block is requested.
+		require.NotNil(t, sm.syncPeer)
+		headers := wire.NewMsgHeaders()
+		err := headers.AddBlockHeader(&nextBlock.MsgBlock().Header)
+		require.NoError(t, err)
+		sm.handleHeadersMsg(&headersMsg{
+			headers: headers, peer: sm.syncPeer,
+		})
+		require.Contains(t, sm.requestedBlocks, *nextHash,
+			"block must be requested after header delivery recovers")
+	})
+}
+
+// syncEvent is one step of the generated event schedule replayed against
+// the sync manager by TestPropertySyncStateTransition. The integer values
+// match the range drawn by the property (0-4) so a drawn event maps
+// directly onto a named case.
+type syncEvent int
+
+const (
+	eventDeliverHeaders syncEvent = iota
+	eventDeliverBlock
+	eventSyncPeerStalls
+	eventSyncPeerLost
+	eventNewPeer
+)
+
+// TestPropertySyncStateTransition is a stateful property over the whole
+// header-first sync state machine. A generated schedule of events -- new
+// peers connecting at arbitrary heights, headers arriving from the sync
+// peer, blocks arriving, stalls, and sync-peer disconnects -- is replayed
+// against the manager, and the invariant below is asserted after every
+// event: the (syncPeer, ibdMode) pair never takes the dead combination
+// (nil, true), and any announced block the chain does not know is either
+// already requested or gets requested once the dead combination is absent.
+// Property: for all event sequences, the manager never ignores a new-block
+// announcement indefinitely.
+func TestPropertySyncStateTransition(t *testing.T) {
+	t.Parallel()
+
+	rapid.Check(t, func(rt *rapid.T) {
+		totalBlocks := rapid.IntRange(1, 2*minInFlightBlocks+2).Draw(rt, "totalBlocks")
+
+		params := chaincfg.RegressionNetParams
+		params.Checkpoints = nil
+
+		sm, tearDown := makeMockSyncManager(t, &params)
+		defer tearDown()
+
+		blocks := generateTestBlocks(t, &params, totalBlocks)
+
+		// State tracked by the property driver.
+		headersDelivered := 0
+		blocksProcessed := 0
+		var peers []*peer.Peer // live, registered sync candidates
+
+		newPeer := func(height int32) *peer.Peer {
+			p := newSyncCandidate(t, sm, height)
+			peers = append(peers, p)
+			return p
+		}
+
+		// Kick off IBD with an initial peer at the full height.
+		initial := newPeer(int32(totalBlocks))
+		sm.startSync()
+		require.True(t, sm.ibdMode)
+		require.Equal(t, initial, sm.syncPeer)
+
+		maxEvents := 6*totalBlocks + 20
+		numEvents := rapid.IntRange(1, maxEvents).Draw(rt, "numEvents")
+		for i := 0; i < numEvents; i++ {
+			// While IBD is active and headers remain, the only
+			// sensible events are headers, blocks, stalls, and peer
+			// loss; once headers are exhausted, blocks and stalls
+			// dominate. Drawing from the full range regardless keeps
+			// the schedule adversarial.
+			event := rapid.IntRange(0, 4).Draw(rt, "event")
+			switch syncEvent(event) {
+			// The sync peer delivers the next batch of headers.
+			case eventDeliverHeaders:
+				if sm.syncPeer == nil || headersDelivered >= totalBlocks {
+					continue
+				}
+
+				batch := rapid.IntRange(
+					1, totalBlocks-headersDelivered,
+				).Draw(rt, "headerBatch")
+
+				headers := wire.NewMsgHeaders()
+				for _, block := range blocks[headersDelivered : headersDelivered+batch] {
+					err := headers.AddBlockHeader(
+						&block.MsgBlock().Header)
+					require.NoError(t, err)
+				}
+
+				sm.handleHeadersMsg(&headersMsg{
+					headers: headers, peer: sm.syncPeer})
+				headersDelivered += batch
+
+			// The sync peer delivers one of the blocks requested
+			// from it.
+			case eventDeliverBlock:
+				if sm.syncPeer == nil {
+					continue
+				}
+
+				// Only deliver blocks that were actually
+				// requested by this peer; unrequested blocks
+				// would be rejected as misbehavior.
+				state := sm.peerStates[sm.syncPeer]
+				if blocksProcessed >= totalBlocks ||
+					len(state.requestedBlocks) == 0 {
+					continue
+				}
+
+				// Pick the lowest requested block so parents
+				// are always processed first.
+				var deliver *btcutil.Block
+				for _, b := range blocks[blocksProcessed:] {
+					if _, ok := state.requestedBlocks[*b.Hash()]; ok {
+						deliver = b
+						break
+					}
+				}
+				if deliver == nil {
+					continue
+				}
+
+				sm.handleBlockMsg(&blockMsg{
+					block: deliver, peer: sm.syncPeer,
+					reply: make(chan struct{}, 1),
+				})
+				blocksProcessed++
+
+			// The sync peer stops making progress and the stall
+			// handler fires.
+			case eventSyncPeerStalls:
+				if sm.syncPeer == nil {
+					continue
+				}
+
+				sm.lastProgressTime = time.Now().Add(
+					-(maxStallDuration + time.Minute))
+				sm.handleStallSample()
+
+			// The sync peer disconnects.
+			case eventSyncPeerLost:
+				if sm.syncPeer == nil {
+					continue
+				}
+
+				lost := sm.syncPeer
+				sm.handleDonePeerMsg(lost)
+				for j, p := range peers {
+					if p == lost {
+						peers = append(peers[:j], peers[j+1:]...)
+						break
+					}
+				}
+
+			// A new candidate peer connects at an arbitrary
+			// height.
+			case eventNewPeer:
+				height := int32(rapid.IntRange(
+					0, totalBlocks).Draw(rt, "newPeerHeight"))
+				newPeer(height)
+
+				if sm.syncPeer == nil {
+					// A new candidate arriving while there is no
+					// sync peer mirrors handleNewPeerMsg.
+					sm.startSync()
+				}
+			}
+
+			// The invariant: the dead state (nil sync peer with IBD
+			// enabled) must never hold after any event. It is the
+			// state in which handleInvMsg drops every announcement.
+			require.False(t, sm.syncPeer == nil && sm.ibdMode,
+				"dead state: no sync peer but IBD mode still enabled")
+
+			// A stalled sync peer that was disconnected by
+			// handleStallSample is replaced by updateSyncPeer, but
+			// its state remains registered until handleDonePeerMsg
+			// runs (as the server would deliver it in production),
+			// so complete the removal here as well.
+			if sm.syncPeer != nil && !sm.syncPeer.Connected() {
+				lost := sm.syncPeer
+				sm.handleDonePeerMsg(lost)
+				for j, p := range peers {
+					if p == lost {
+						peers = append(peers[:j], peers[j+1:]...)
+						break
+					}
+				}
+			}
+		}
+
+		// Final property: after the generated schedule, whichever
+		// peer the manager ends up hearing an announcement from, the
+		// unknown block must end up requested -- provided the manager
+		// is not still mid-IBD (where announcements are legitimately
+		// ignored until the download completes).
+		if len(peers) == 0 {
+			return
+		}
+		if sm.syncPeer == nil {
+			require.False(t, sm.ibdMode)
+		}
+
+		// Announce the next block after everything processed. If
+		// IBD is still active with a live sync peer, the manager is
+		// legitimately ignoring announcements, so only assert when
+		// the dead-state invariant is the thing at risk.
+		if !sm.ibdMode && blocksProcessed < totalBlocks {
+			next := blocks[blocksProcessed]
+			inv := wire.NewMsgInvSizeHint(1)
+			err := inv.AddInvVect(wire.NewInvVect(
+				wire.InvTypeWitnessBlock, next.Hash(),
+			))
+			require.NoError(t, err)
+			announcer := peers[rapid.IntRange(0, len(peers)-1).Draw(rt, "finalAnnouncerIdx")]
+			sm.handleInvMsg(&invMsg{peer: announcer, inv: inv})
+			require.Contains(t, sm.requestedBlocks, *next.Hash(),
+				"announcement must be requested once not in IBD")
+		}
+	})
+}
+
+// extendTestBlocks extends a chain of test blocks with count additional
+// blocks, continuing the timestamp and proof-of-work sequence. The new
+// blocks are not processed by any chain instance.
+func extendTestBlocks(t *testing.T, params *chaincfg.Params,
+	blocks []*btcutil.Block, count int) []*btcutil.Block {
+
+	t.Helper()
+
+	require.NotEmpty(t, blocks, "cannot extend an empty chain")
+
+	prev := blocks[len(blocks)-1]
+	prevHash := prev.Hash()
+	prevTime := prev.MsgBlock().Header.Timestamp
+
+	extended := make([]*btcutil.Block, 0, count)
+	for h := len(blocks) + 1; h <= len(blocks)+count; h++ {
+		cb := createTestCoinbase(int32(h), params)
+		merkleRoot := cb.TxHash()
+
+		header := wire.BlockHeader{
+			Version:    4,
+			PrevBlock:  *prevHash,
+			MerkleRoot: merkleRoot,
+			Timestamp:  prevTime.Add(time.Minute),
+			Bits:       params.PowLimitBits,
+		}
+		require.True(t, solveTestBlock(&header, params),
+			"failed to solve block at height %d", h)
+
+		msgBlock := &wire.MsgBlock{
+			Header:       header,
+			Transactions: []*wire.MsgTx{cb},
+		}
+		block := btcutil.NewBlock(msgBlock)
+		extended = append(extended, block)
+
+		bh := block.Hash()
+		prevHash = bh
+		prevTime = header.Timestamp
+	}
+
+	return extended
 }
 
 // TestIsSyncCandidateRegtest verifies that isSyncCandidate accepts peers
