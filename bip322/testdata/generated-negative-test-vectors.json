@@ -1,0 +1,508 @@
+{
+  "error": [
+    {
+      "description": "simple witness declares too many items",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "smp/gEAQAA=",
+      "expected_result": "invalid",
+      "error_substr": "too many witness items"
+    },
+    {
+      "description": "simple witness declares an oversized item",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "smpAf4BAEAA",
+      "expected_result": "invalid",
+      "error_substr": "witness item too large"
+    },
+    {
+      "description": "simple witness item exceeds remaining bytes",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "smpAf2ghqo=",
+      "expected_result": "invalid",
+      "error_substr": "exceeds remaining input"
+    },
+    {
+      "description": "full transaction contains trailing data",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "fulAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8A/////wEAAAAAAAAAAAFqAAAAAN6tvu8=",
+      "expected_result": "invalid",
+      "error_substr": "more data present after parsing input"
+    },
+    {
+      "description": "proof-of-funds packet contains trailing data",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAD0AAAAAAWYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAAQAAAAAAAAAAAWoAAAAAAQkFcHJvYmUAAQCAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8iACAKiEasJCYwdpxXcJwZ0viQaRuaJPDJYhCgWFCPIymYBAAAAAABAAAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAAAAAABASsAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAQgDAQFRAADerb7v",
+      "expected_result": "invalid",
+      "error_substr": "Invalid PSBT serialization format"
+    },
+    {
+      "description": "OP_CODESEPARATOR in P2WSH witness script",
+      "message": "probe",
+      "address": "bc1q00yx5wpnln4c2ya097u0cu3ae4auxcglk4rwkyvs58ayv2lnsvwqj7h0zr",
+      "signature": "smpAQKrUQ==",
+      "expected_result": "invalid",
+      "error_substr": "OP_CODESEPARATOR is forbidden"
+    },
+    {
+      "description": "OP_CODESEPARATOR in tapscript leaf",
+      "message": "probe",
+      "address": "bc1p72n3yteydvuu97pzgyjgchk026ltvy98gusf309zg2zxjy6v7qhq25d7gs",
+      "signature": "smpAgKrUSHBeb5mfvncu6xVoGKVzocLBwKb/NstzijZWfKBWxb4F5g=",
+      "expected_result": "invalid",
+      "error_substr": "OP_CODESEPARATOR is forbidden"
+    },
+    {
+      "description": "P2WPKH simple signature uses SIGHASH_NONE",
+      "message": "probe",
+      "address": "bc1qq6hag67dl53wl99vzg42z8eyzfz2xlkvxechjp",
+      "signature": "smpAkcwRAIgMh+rdOmc651iZZigbqSCahW5jjZ8Huxg/3rK7KJPucUCIBVZDCfnaSCCi3GG1vci2ehXfBqc0jlbmNfRX8YUqblJAiECxgR/lEHtfW0wRUBulcB82Fx3jkuM7zynq6wJuVxwnuU=",
+      "expected_result": "invalid",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "taproot key-path simple signature uses SIGHASH_SINGLE",
+      "message": "probe",
+      "address": "bc1pgxxyvcmdncdxs06cudd5yvmwwahaesaj6n3eu7st7x4sw9hrchaqjy33gs",
+      "signature": "smpAUHhEngJtmfWGYo53RDcHbICSSRSCvJA5d9U7xC8i3sMNKIMj3xk/ZKuG03VQkJbR/FTGwCiQkCrZ7W3a7RillvlAw==",
+      "expected_result": "invalid",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "tapscript simple signature uses SIGHASH_SINGLE",
+      "message": "probe",
+      "address": "bc1pp74w6dvxx90yd5mw4n88sxjh3grspnxvyfkmfwfd2076sr3tzy6q747c5q",
+      "signature": "smpA0F1eKTPPFbINCXgwpeNFTOyEoy84eMUNGtOOBSr765wlX28IS6t63V+heo3s9jKioZE+ryDRw8kCqIbKRv2LOWFAyIg5JPb8cENgPNYHkkEkwsUBMxsE5AO4HWEdPqUq+jEzROsIcEvi95NGgcgk1W0pyUKXFEo6IuEvdxhmrfLqNVpskDv5A==",
+      "expected_result": "invalid",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "P2WSH multisig second signature uses SIGHASH_SINGLE",
+      "message": "probe",
+      "address": "bc1qtmql22z0wlv7kwq700hlnz8dhv2h5sr2f579ec3uuzg2mpzam9nsm22fjy",
+      "signature": "smpBABHMEQCIDuIlI7khlDEhJD5jawV+Qjj+82uVxCMQAHlzdUFAHQmAiAkHSs8/rViup/9fNtOZtkDesIXc/+MADxMYhvdfxAWjAFHMEQCIHQjmOHJ8Gn5XtJVtggYWvIi46bcD0LTuB+zlF1ED3L9AiAqK16U/0m8nxzpa/b2/ZJgsUMQnw4cYUViV+ofmADgegNHUiED//l71XVe7qQgRToUNVI104L2Ry+FaKGLLwV6FGApdVYhAly98GRuXbTqo5jzZfLqeg49QZt+AzDjnOkr3e3KxPm8Uq4=",
+      "expected_result": "invalid",
+      "error_substr": "invalid sighash flag"
+    },
+    {
+      "description": "legacy P2SH OP_IF uses non-minimal true",
+      "message": "probe",
+      "address": "33cqhRZ7BcuusfSsMQEMKNLjkTfp9vbo1r",
+      "signature": "fulAAAAAAEJHFa1ED3rbaBjz7XxTW2szMdLirOXJHlYeJ7MHQt1WwAAAAAHUgVjUWdRaAAAAAABAAAAAAAAAAABagAAAAA=",
+      "expected_result": "invalid",
+      "error_substr": "ErrMinimalIf"
+    },
+    {
+      "description": "legacy P2SH OP_NOTIF uses non-minimal true",
+      "message": "probe",
+      "address": "3DYfPq8oyDMVw6qJmRsFXxHxEv7SiEki6A",
+      "signature": "fulAAAAAAHZcdUnlT+qg86YWl4QEDUeJe2d6WtADsQDAUj76DsCsAAAAAAHUgVkUWdRaAAAAAABAAAAAAAAAAABagAAAAA=",
+      "expected_result": "invalid",
+      "error_substr": "ErrMinimalIf"
+    },
+    {
+      "description": "reserved OP_NOP5 is inconclusive",
+      "message": "probe",
+      "address": "bc1qqv2jj3l8f73fkcqj3dwgduc2dfur30u3mgk5n4zm8dupl8jq5lhqmjjpa3",
+      "signature": "smpAQK0UQ==",
+      "expected_result": "inconclusive",
+      "error_substr": "inconclusive"
+    },
+    {
+      "description": "full transaction version 1 is inconclusive",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "fulAQAAAAABAWYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAAQAAAAAAAAAAAWoBAVEAAAAA",
+      "expected_result": "inconclusive",
+      "error_substr": "inconclusive"
+    },
+    {
+      "description": "invalid script precedes inconclusive transaction version",
+      "message": "probe",
+      "address": "bc1qdc6qh88lkdaf3899gnntk7q293ufq8flkvmnsa59zx3sv9a05qws6lzc42",
+      "signature": "fulAwAAAAABAYiyF4mvk6mAXUIeIzeEBXEQWFk4u5AmfoJBofQhE6iWAAAAAAAAAAAAAQAAAAAAAAAAAWoBAQAAAAAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "proof-of-funds legacy input has only witness UTXO",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAhZYTGgxx7pkNefMQAJNSXKzo+ziim4DtqjyAKkKn1/sAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQEiAOH1BQAAAAAZdqkUllLYa+30OtJkNi5ubrput2RQgSeIrAEHakcwRAIgSPhD/8hzVDSIZSsI2OsfFPQ2vqTo22QPwV0jfpi5wlsCICE4yTp6EmuYlWXi08KJyR6Nb4P5zjsiAkHk6f6cFdS7ASECLwHl4VzKNR2v84Q/tw88Lwob3QXlr4iKZ3hO8+EKKgEBCAEAAAA=",
+      "expected_result": "invalid",
+      "error_substr": "witness UTXO for spending a non-segwit script"
+    },
+    {
+      "description": "proof-of-funds non-witness UTXO has wrong txid",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQBeAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8A/////wEBAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEIAwEBUQAA",
+      "expected_result": "invalid",
+      "error_substr": "non witness utxo does not match input prevout"
+    },
+    {
+      "description": "proof-of-funds witness UTXO has conflicting amount",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAkHPh4/08dh+gfDQ74/MR6h/Cwwps7xUv2PRWJ3/w0ZEAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQBeAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8A/////wEBAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwIAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAA==",
+      "expected_result": "invalid",
+      "error_substr": "witness utxo does not match non witness utxo"
+    },
+    {
+      "description": "proof-of-funds witness UTXO has conflicting script",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAkHPh4/08dh+gfDQ74/MR6h/Cwwps7xUv2PRWJ3/w0ZEAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQBeAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8A/////wEBAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwEAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmEBCAMBAVEAAA==",
+      "expected_result": "invalid",
+      "error_substr": "witness utxo does not match non witness utxo"
+    },
+    {
+      "description": "proof-of-funds contains duplicate additional inputs",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAI8AAAAAA2Yb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAFqAAAAAAEJBXByb2JlAAEAgAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////IgAgCohGrCQmMHacV3CcGdL4kGkbmiTwyWIQoFhQjyMpmAQAAAAAAQAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmAAAAAAAQErAAAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAEIAwEBUQABASsBAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAQgDAQFRAAEBKwEAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAA==",
+      "expected_result": "invalid",
+      "error_substr": "duplicate inputs"
+    },
+    {
+      "description": "proof-of-funds contains null additional input",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////AAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQErAQAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAEIAwEBUQAA",
+      "expected_result": "invalid",
+      "error_substr": "zero hash present"
+    },
+    {
+      "description": "proof-of-funds witness declares too many items",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAD0AAAAAAWYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAAQAAAAAAAAAAAWoAAAAAAQkFcHJvYmUAAQCAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8iACAKiEasJCYwdpxXcJwZ0viQaRuaJPDJYhCgWFCPIymYBAAAAAABAAAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAAAAAABASsAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAQgF/v////8AAA==",
+      "expected_result": "invalid",
+      "error_substr": "too many witness items"
+    },
+    {
+      "description": "proof-of-funds reuses a later non-witness UTXO",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAI8AAAAAA2Yb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAVYIU6HCzQwuQMYOJsAY/00dtF9iw7ch94cC89GZCRUIAAAAAAAAAAABVghTocLNDC5Axg4mwBj/TR20X2LDtyH3hwLz0ZkJFQgEAAAAAAAAAAAEAAAAAAAAAAAFqAAAAAAEJBXByb2JlAAEAgAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////IgAgCohGrCQmMHacV3CcGdL4kGkbmiTwyWIQoFhQjyMpmAQAAAAAAQAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmAAAAAAAQErAAAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAEIAwEBUQABCAMBAVEAAQCJAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8A/////wIBAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAQAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAAAAAABCAMBAVEAAA==",
+      "expected_result": "invalid",
+      "error_substr": "UTXO not found"
+    },
+    {
+      "description": "proof-of-funds generic signed message does not match",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCRFkaWZmZXJlbnQgbWVzc2FnZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQErAQAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAEIAwEBUQAA",
+      "expected_result": "invalid",
+      "error_substr": "generic signed message field"
+    },
+    {
+      "description": "proof-of-funds to_sign output is not OP_RETURN",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAD0AAAAAAWYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAAAQAAAAAAAAAAAVEAAAAAAQkFcHJvYmUAAQCAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8iACAKiEasJCYwdpxXcJwZ0viQaRuaJPDJYhCgWFCPIymYBAAAAAABAAAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAAAAAABASsAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAQgDAQFRAAA=",
+      "expected_result": "invalid",
+      "error_substr": "single OP_RETURN byte"
+    },
+    {
+      "description": "proof-of-funds transaction version 3 is inconclusive",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYDAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAARQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQErAQAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAEIAwEBUQAA",
+      "expected_result": "inconclusive",
+      "error_substr": "inconclusive"
+    },
+    {
+      "description": "proof-of-funds base64 contains embedded newline",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNi\ndP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAARgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQABAIAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIAqIRqwkJjB2nFdwnBnS+JBpG5ok8MliEKBYUI8jKZgEAAAAAAEAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAAAAAAEBKwAAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAQErAQAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAEIAwEBUQAA",
+      "expected_result": "invalid",
+      "error_substr": "base64"
+    },
+    {
+      "description": "proof-of-funds base64 has non-canonical padding bits",
+      "message": "probe",
+      "address": "bc1qft5p2uhsdcdc3l2ua4ap5qqfg4pjaqlp250x7us7a8qqhrxrxfsq2gp3gp",
+      "signature": "pofcHNidP8BAGYAAAAAAmYb1fFuDTtm8ZysRgBkdesyTwY3KY18Cy3BNkDnQv0NAAAAAAAAAAAARgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAABagAAAAABCQVwcm9iZQGqAQAAAQCAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8iACAKiEasJCYwdpxXcJwZ0viQaRuaJPDJYhCgWFCPIymYBAAAAAABAAAAAAAAAAAiACBK6BVy8G4biP1c7XoaAAlFQy6D4VUeb3Ie6cALjMMyYAAAAAABASsAAAAAAAAAACIAIEroFXLwbhuI/VztehoACUVDLoPhVR5vch7pwAuMwzJgAQgDAQFRAAEBKwEAAAAAAAAAIgAgSugVcvBuG4j9XO16GgAJRUMug+FVHm9yHunAC4zDMmABCAMBAVEAAB==",
+      "expected_result": "invalid",
+      "error_substr": "illegal base64 data"
+    },
+    {
+      "description": "wrong message for p2wpkh simple signature",
+      "message": "not the correct message",
+      "address": "bc1q090mjp3fangcwx3pcpdvnx2etdp99skt9p4vk9",
+      "signature": "smpAkgwRQIhALqdF6nJrsRYgUY4UeMZ/IlfFAj0K43HM9DSKBwYrCZGAiB7oEbn6MQ8zRrTZOkv0k2dnBofPCsM9hvpXiHMTsaf3AEhAqywYj2W44HMCxv+rcxoryJjUNnfYA5AmwlKzjcgoig6",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong address for p2wpkh simple signature",
+      "message": "DWKEDKK2C5SCLJB46FD4N5XVIH",
+      "address": "bc1q9u22da393gq5s6lc3ww6kvpx076hj8nnctx5ew",
+      "signature": "smpAkgwRQIhALqdF6nJrsRYgUY4UeMZ/IlfFAj0K43HM9DSKBwYrCZGAiB7oEbn6MQ8zRrTZOkv0k2dnBofPCsM9hvpXiHMTsaf3AEhAqywYj2W44HMCxv+rcxoryJjUNnfYA5AmwlKzjcgoig6",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong message for p2tr simple signature",
+      "message": "not the correct message",
+      "address": "bc1pud70rjk9wrcm62s465s70ynjz5mpyrvfyr2v7yrklsf8xq4z04csd4kp97",
+      "signature": "smpAUDp1jDqJyx/+FBRLy0GWSo8InmrDxcz2tZ1eeYR/QM+OPsXG841HOnFCi5Z9jgFiyThNKUHRC2b0LQQTNNLESX2",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong address for p2tr simple signature",
+      "message": "GWX7UEKBRIBFSYORDOFQQNP7BH",
+      "address": "bc1p0gwr72v2vtmfnp9gyht6c2fwf5apa9cp8pxcsqhurhp44f0v0auqnsglu9",
+      "signature": "smpAUDp1jDqJyx/+FBRLy0GWSo8InmrDxcz2tZ1eeYR/QM+OPsXG841HOnFCi5Z9jgFiyThNKUHRC2b0LQQTNNLESX2",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong message for p2wsh-multisig-2of2 simple signature",
+      "message": "not the correct message",
+      "address": "bc1q0aduk9j2v8kn4fd5ux4uzejje8vekdfkpdl6fmdtus0h43wc0tmqvhklds",
+      "signature": "smpBABIMEUCIQDNbOUISwseZi7zTTWon52IZA/uWLKA5dO0nC/qlJNKsQIgKt9DRBcPgR3+mkgY9btMd0X6VZOUE9cKEjFvCPYXESUBSDBFAiEAjYatzWASwnYVdPuW4J3CNuAjdi3QkVn6lk7wi87O0YsCIET0T43N25WhsHGpFtPImYvnQ4mgbpQ+6HiZ65ezrSHKAUdSIQO4FoDhfzoUJgtXF7X8SyrUkqTkxf/IoSfl6JqUg7m41iEDLRP7T4tvYOKlrXW3tGeU6GhltbCJt/GaqFnDEfXD6QtSrg==",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong address for p2wsh-multisig-2of2 simple signature",
+      "message": "EOYMRLSL6QMSGALT4LDZDACRQX",
+      "address": "bc1qnugu84ufn5g9kmcg9fq9te7zc8jrt57h34kuq3ej9um4g9aruv3sc000y7",
+      "signature": "smpBABIMEUCIQDNbOUISwseZi7zTTWon52IZA/uWLKA5dO0nC/qlJNKsQIgKt9DRBcPgR3+mkgY9btMd0X6VZOUE9cKEjFvCPYXESUBSDBFAiEAjYatzWASwnYVdPuW4J3CNuAjdi3QkVn6lk7wi87O0YsCIET0T43N25WhsHGpFtPImYvnQ4mgbpQ+6HiZ65ezrSHKAUdSIQO4FoDhfzoUJgtXF7X8SyrUkqTkxf/IoSfl6JqUg7m41iEDLRP7T4tvYOKlrXW3tGeU6GhltbCJt/GaqFnDEfXD6QtSrg==",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong message for p2wsh-multisig-3of3 simple signature",
+      "message": "not the correct message",
+      "address": "bc1qj2wph7l089xksx3yjafd5r9p7d0nfwpzul28dvwgac7fy26myzcq9fx428",
+      "signature": "smpBQBHMEQCIAsmBmCU8lABOVvvU8XCLt4Dza/0UukLStNMtH3CsOS+AiBH0y5mKRORqpVsDjewYTLyDaQ7ZxoMUxSc7ZeK6zx/9gFHMEQCIH7uqO5c2jWeFqymma/KX8kEabjjjqlxxbK5W1nsqgHwAiAjZcwfww+PNTP7TgY/QNcC4FGCiy8N7tSKhW+wzwMAdwFHMEQCIGMLlgYW01vsyDGkAhOP9kcvZrAllcV4agCmYeOUttVfAiAcHAHVPUPD9F+GKno+N6ei4f8qQZzHQrvC9cPLEiSPpQFpUyEDqc2gSHsMw0kyj89NTc4R+aQbCaV7rMMMqiuHHLqSrKghAisiNz7HwTIqWWXjb1whGtbBJiogk9pMjngwlC0mjj/RIQOOdpE+/99nBai/xd4rTQUWU2n2j64i2fACR4+0uds1PVOu",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong address for p2wsh-multisig-3of3 simple signature",
+      "message": "UF6EAYJVM4INFEFNUOQOV5MFLY",
+      "address": "bc1qqxazpgaqh9zcw73ae2f490yg5kw768yhdtkqletclm53mlemshqqxya0tc",
+      "signature": "smpBQBHMEQCIAsmBmCU8lABOVvvU8XCLt4Dza/0UukLStNMtH3CsOS+AiBH0y5mKRORqpVsDjewYTLyDaQ7ZxoMUxSc7ZeK6zx/9gFHMEQCIH7uqO5c2jWeFqymma/KX8kEabjjjqlxxbK5W1nsqgHwAiAjZcwfww+PNTP7TgY/QNcC4FGCiy8N7tSKhW+wzwMAdwFHMEQCIGMLlgYW01vsyDGkAhOP9kcvZrAllcV4agCmYeOUttVfAiAcHAHVPUPD9F+GKno+N6ei4f8qQZzHQrvC9cPLEiSPpQFpUyEDqc2gSHsMw0kyj89NTc4R+aQbCaV7rMMMqiuHHLqSrKghAisiNz7HwTIqWWXjb1whGtbBJiogk9pMjngwlC0mjj/RIQOOdpE+/99nBai/xd4rTQUWU2n2j64i2fACR4+0uds1PVOu",
+      "expected_result": "invalid",
+      "error_substr": "invalid signature"
+    },
+    {
+      "description": "wrong message for p2pkh full signature",
+      "message": "not the correct message",
+      "address": "1MZPxUBqc5DS3RTC8WTh1VYxJp65AHG5X",
+      "signature": "fulAgAAAAE4Q2BTvhQOFbtSdO5Vb3uYV3uo5EGqEo8ORW8gd8mRRQAAAABrSDBFAiEAgp8LwYzt8GrCj+wlIbFsTi7fJCRSFrPWeh/X1AyC5+YCIG1Ea+fmGcnC/h5rqhcVeRQBfdbg5gkFmScXr7jlppIYASEDI7cMtsm1/aN6H5bLakkfn8M5xB4RQLmKxlEEfXm8Ew3gBwAAAQAAAAAAAAAAAWrgBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2pkh full signature",
+      "message": "MBC2L6KNBD7UQABVPAHQ3E7JLJ",
+      "address": "15HwVxRamgjBkCsp9FQEbwLF9BFvtdEY3L",
+      "signature": "fulAgAAAAE4Q2BTvhQOFbtSdO5Vb3uYV3uo5EGqEo8ORW8gd8mRRQAAAABrSDBFAiEAgp8LwYzt8GrCj+wlIbFsTi7fJCRSFrPWeh/X1AyC5+YCIG1Ea+fmGcnC/h5rqhcVeRQBfdbg5gkFmScXr7jlppIYASEDI7cMtsm1/aN6H5bLakkfn8M5xB4RQLmKxlEEfXm8Ew3gBwAAAQAAAAAAAAAAAWrgBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2wpkh full signature",
+      "message": "not the correct message",
+      "address": "bc1qyct9q2dt33fwp36ndctl9qjxp2wyp4lkxyrrke",
+      "signature": "fulAgAAAAABARhcUa+co2TTcV3YFt0xVCeiy0tPngbuOXz2TidvIxgjAAAAAADgBwAAAQAAAAAAAAAAAWoCSDBFAiEA5qoIVPxw4+ZL3AtJZnxb0gkMrxnqPrV+Cbw3GlYy570CIAjjCRmP9/mJG0iPMCq9ZCzHdl3tQZ6CL8qpCn/hirKqASEDP5mOTnq5psmfip3kCAI6oCpgvKGeom3Sd9MJrSyU3orgBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2wpkh full signature",
+      "message": "IFCSDWSHR5YUM6ATSTZN4A37UB",
+      "address": "bc1q9u22da393gq5s6lc3ww6kvpx076hj8nnctx5ew",
+      "signature": "fulAgAAAAABARhcUa+co2TTcV3YFt0xVCeiy0tPngbuOXz2TidvIxgjAAAAAADgBwAAAQAAAAAAAAAAAWoCSDBFAiEA5qoIVPxw4+ZL3AtJZnxb0gkMrxnqPrV+Cbw3GlYy570CIAjjCRmP9/mJG0iPMCq9ZCzHdl3tQZ6CL8qpCn/hirKqASEDP5mOTnq5psmfip3kCAI6oCpgvKGeom3Sd9MJrSyU3orgBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2tr full signature",
+      "message": "not the correct message",
+      "address": "bc1pwge6ts0a5dpnzaz6cedk88scrga0q4udaz6ad0u0402atng3y0pq8r7qtw",
+      "signature": "fulAgAAAAABAb17jzVmxvgSiVm+dn6Ob1/rXWESvf7WHX7eOcbxJrgWAAAAAADgBwAAAQAAAAAAAAAAAWoBQMKitvm0qbmmios5ZoVUzv3C4vErEwScValAySAgGQ/N5coNRFVmVdbfyEF85DUN2EyynJBEAM1JQsCjEZsIOU7gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2tr full signature",
+      "message": "7CTUGAM2KLQPVZJ3IJXOFC7WMZ",
+      "address": "bc1p0gwr72v2vtmfnp9gyht6c2fwf5apa9cp8pxcsqhurhp44f0v0auqnsglu9",
+      "signature": "fulAgAAAAABAb17jzVmxvgSiVm+dn6Ob1/rXWESvf7WHX7eOcbxJrgWAAAAAADgBwAAAQAAAAAAAAAAAWoBQMKitvm0qbmmios5ZoVUzv3C4vErEwScValAySAgGQ/N5coNRFVmVdbfyEF85DUN2EyynJBEAM1JQsCjEZsIOU7gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2tr-time-lock full signature",
+      "message": "not the correct message",
+      "address": "bc1p8pa69clqmu5ue8gfskha0txgdmm644y8aj5ark7x42gpftky9r6q5c54sz",
+      "signature": "fulAgAAAAABAWHsykrvU5UhgczJ0I1FO2J0PTEr9CGU7CioMPQn05qgAAAAAADgBwAAAQAAAAAAAAAAAWoEQPCB3xQj+6rNL6Ui5d8K8NO1/5Xu31KKip94G2JOxZPOiWh7RAp1kH1V9miQ0dgLMAfQvr2FT0QLqm1UlaYHUgkAS2MgrYfXhOkh0CvwuJpB+O3tal2ECfO0v7k1/A4PTlGcQiBnAuAHsnUgizZJ3WHj13vvpfC0y1D3IbbpZfk/NtWzjy9Brz+gGA5orCHAizZJ3WHj13vvpfC0y1D3IbbpZfk/NtWzjy9Brz+gGA7gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2tr-time-lock full signature",
+      "message": "B5UFDLDC6XUEUNIKIUCUFS6A5P",
+      "address": "bc1pnwsdqfqdw5mf3yf2w6gfgzqksptqzm2fc332ryyyqxphffdj4leqdc2s67",
+      "signature": "fulAgAAAAABAWHsykrvU5UhgczJ0I1FO2J0PTEr9CGU7CioMPQn05qgAAAAAADgBwAAAQAAAAAAAAAAAWoEQPCB3xQj+6rNL6Ui5d8K8NO1/5Xu31KKip94G2JOxZPOiWh7RAp1kH1V9miQ0dgLMAfQvr2FT0QLqm1UlaYHUgkAS2MgrYfXhOkh0CvwuJpB+O3tal2ECfO0v7k1/A4PTlGcQiBnAuAHsnUgizZJ3WHj13vvpfC0y1D3IbbpZfk/NtWzjy9Brz+gGA5orCHAizZJ3WHj13vvpfC0y1D3IbbpZfk/NtWzjy9Brz+gGA7gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2sh-p2wpkh full signature",
+      "message": "not the correct message",
+      "address": "34Rpaf7qKjEFtSa5cgjFV65Gesn1MG6RRj",
+      "signature": "fulAgAAAAABAQMtwtqA+ZStiSLrfJX3ec/a4pLdlUfuTSt9abma5PL/AAAAABcWABS9SnOwd4tfU/UhvE0+TWxou2gO/+AHAAABAAAAAAAAAAABagJHMEQCICWcT45/nNjC/SPQBfk+Mh4nWutH1AIGaeOdGadrd2M3AiB8odieK9o74A+BANgOX8XUkZw+tGRu2DBLfheVoDzaQAEhA05byjCvMoykHQ4XgePcWqeVNUMH+fpK8dPKl1ct//EJ4AcAAA==",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2sh-p2wpkh full signature",
+      "message": "SYSIUK3F5ECJCVY7STPPSY7BZG",
+      "address": "3829aHdKNef9qvMW1TqKHMRP8C2HHsTSop",
+      "signature": "fulAgAAAAABAQMtwtqA+ZStiSLrfJX3ec/a4pLdlUfuTSt9abma5PL/AAAAABcWABS9SnOwd4tfU/UhvE0+TWxou2gO/+AHAAABAAAAAAAAAAABagJHMEQCICWcT45/nNjC/SPQBfk+Mh4nWutH1AIGaeOdGadrd2M3AiB8odieK9o74A+BANgOX8XUkZw+tGRu2DBLfheVoDzaQAEhA05byjCvMoykHQ4XgePcWqeVNUMH+fpK8dPKl1ct//EJ4AcAAA==",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2wsh-time-lock full signature",
+      "message": "not the correct message",
+      "address": "bc1qqjvf4qtmq28jpchxedh0c0lphhxmcv3yf5j9tn5a9ywara4qa9xqes7wc3",
+      "signature": "fulAgAAAAABAV2F55emQmzAKIV2VdMFYK9L60v+6btGTxpnKndpnJMnAAAAAADgBwAAAQAAAAAAAAAAAWoDRzBEAiAU8bId2stu5NhW8pokxs5q1nmU5vxI627ez1qAW+/SkwIgAVFOEtEGhAuUvFtRYbT2AhR4XTY8p7vOhynUj3Y5M7cBAE1jIQOth9eE6SHQK/C4mkH47e1qXYQJ87S/uTX8Dg9OUZxCIGcC4AeydSECMQDCnyEtqmJ3PKjaYquaFwcEtqCCsA140ouTuG8doD1orOAHAAA=",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2wsh-time-lock full signature",
+      "message": "EGA4VPOGMJ3RGA6MVU6CQ6OHES",
+      "address": "bc1qfjvf2njl4vu4anvznyftnfpmswqcw90cny4pkdu2uuqv2snzckjs358zcp",
+      "signature": "fulAgAAAAABAV2F55emQmzAKIV2VdMFYK9L60v+6btGTxpnKndpnJMnAAAAAADgBwAAAQAAAAAAAAAAAWoDRzBEAiAU8bId2stu5NhW8pokxs5q1nmU5vxI627ez1qAW+/SkwIgAVFOEtEGhAuUvFtRYbT2AhR4XTY8p7vOhynUj3Y5M7cBAE1jIQOth9eE6SHQK/C4mkH47e1qXYQJ87S/uTX8Dg9OUZxCIGcC4AeydSECMQDCnyEtqmJ3PKjaYquaFwcEtqCCsA140ouTuG8doD1orOAHAAA=",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2wsh-multisig-2of2 full signature",
+      "message": "not the correct message",
+      "address": "bc1qx4yfhk64vsvf78hng6yn3eyudy80mk4fyugjd7y3q7pszkqh9q7s76mwej",
+      "signature": "fulAgAAAAABAeAlTevE8YGUlsjgMRJGD0IMswMYWmAhQfS+CouqnzwBAAAAAADgBwAAAQAAAAAAAAAAAWoEAEgwRQIhAO/+3iXpm3JTGZEHX1+MLk0u+LlHxZoyEB5c1sPrpauOAiBLUUFtBazZc9WT0mCFhcpiebA2mgkcYm51YhXfCmdXgAFHMEQCICwhUWvNFWoe8/3l6+bYY2ykw/uP4nXPqhj/ezhf05VwAiAgki9SUuDNhUW8S8Hpdp/wpe15QblU6Dc9u57l/AvqKgFHUiECoc6ItT1YCk4vJbw0IMj9v6CnwIpJkElyfTKnDQVkaxwhA6rEhwHBr40FY/RUJsvNGXfJeF36SK6qbNfGhSqB4ILZUq7gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2wsh-multisig-2of2 full signature",
+      "message": "WKIFF76HOU7UP5PNACPRDNKJOE",
+      "address": "bc1qnugu84ufn5g9kmcg9fq9te7zc8jrt57h34kuq3ej9um4g9aruv3sc000y7",
+      "signature": "fulAgAAAAABAeAlTevE8YGUlsjgMRJGD0IMswMYWmAhQfS+CouqnzwBAAAAAADgBwAAAQAAAAAAAAAAAWoEAEgwRQIhAO/+3iXpm3JTGZEHX1+MLk0u+LlHxZoyEB5c1sPrpauOAiBLUUFtBazZc9WT0mCFhcpiebA2mgkcYm51YhXfCmdXgAFHMEQCICwhUWvNFWoe8/3l6+bYY2ykw/uP4nXPqhj/ezhf05VwAiAgki9SUuDNhUW8S8Hpdp/wpe15QblU6Dc9u57l/AvqKgFHUiECoc6ItT1YCk4vJbw0IMj9v6CnwIpJkElyfTKnDQVkaxwhA6rEhwHBr40FY/RUJsvNGXfJeF36SK6qbNfGhSqB4ILZUq7gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2wsh-multisig-3of3 full signature",
+      "message": "not the correct message",
+      "address": "bc1qfspfhvzzrqektdx76uj0kzds6h3lu8wdh8vk3z2g28m4zem7xl7s47l3ng",
+      "signature": "fulAgAAAAABAVgs1IXe15rh8SqO2jbTmgmtdP1gsS6/T/RxdRinI8xMAAAAAADgBwAAAQAAAAAAAAAAAWoFAEcwRAIgAyXERMyt400pIZIz3RGO4F2p4n6rsBrnARunlirgXW8CIAHMthgjnkYtDIsP4japYFfDafSPOCTgnD2BBzlqXfWXAUcwRAIgRZPUCX9TMbhAKYZWXk8S7o5K2zzG9eAG/1wZVv9rtZMCIBSmylJ6Y6f9tQnRsYaXmYiB9EuMFE+1laNLGRbvrd+XAUcwRAIgeE6VBIf47QmMNLr9rrD1YrUJt7wyetg+oHYJ/avg5QoCIHxh4zBqYBQxOoHbYmQglu6o3Ap3i5h4RzQylDfyzUASAWlTIQK7JRu8wgagfYM4/Ug7OFEjxHSHfIfjEEJhj2YmnegeiCEDY3O7yk5D0DnzgysEoMMGN2wYs7ZpbzNqUvLNu+phI/MhAuwUllpOEHH0N8jMQYRwjxFuejdXtnhhOSWSTdVxWlNpU67gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2wsh-multisig-3of3 full signature",
+      "message": "A7YVK3GGY4MMUA6C4F2L3ASEDW",
+      "address": "bc1qqxazpgaqh9zcw73ae2f490yg5kw768yhdtkqletclm53mlemshqqxya0tc",
+      "signature": "fulAgAAAAABAVgs1IXe15rh8SqO2jbTmgmtdP1gsS6/T/RxdRinI8xMAAAAAADgBwAAAQAAAAAAAAAAAWoFAEcwRAIgAyXERMyt400pIZIz3RGO4F2p4n6rsBrnARunlirgXW8CIAHMthgjnkYtDIsP4japYFfDafSPOCTgnD2BBzlqXfWXAUcwRAIgRZPUCX9TMbhAKYZWXk8S7o5K2zzG9eAG/1wZVv9rtZMCIBSmylJ6Y6f9tQnRsYaXmYiB9EuMFE+1laNLGRbvrd+XAUcwRAIgeE6VBIf47QmMNLr9rrD1YrUJt7wyetg+oHYJ/avg5QoCIHxh4zBqYBQxOoHbYmQglu6o3Ap3i5h4RzQylDfyzUASAWlTIQK7JRu8wgagfYM4/Ug7OFEjxHSHfIfjEEJhj2YmnegeiCEDY3O7yk5D0DnzgysEoMMGN2wYs7ZpbzNqUvLNu+phI/MhAuwUllpOEHH0N8jMQYRwjxFuejdXtnhhOSWSTdVxWlNpU67gBwAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2sh-p2wsh-multisig-2of2 full signature",
+      "message": "not the correct message",
+      "address": "3QN3gGr1WL5i4Z7njGLJDdosTf9VqukC9m",
+      "signature": "fulAgAAAAABAehf4I+wavWpjzx3T1sLa5ERLVWGKnKTl+j4U5mqHCzLAAAAACMiACC36LM1vvTTMwlLFLFTidJzSIX+OH19Zkx4aYdQ/D6W6uAHAAABAAAAAAAAAAABagQARzBEAiA1/E8KVNhFgVwXFFtvbQWHm7uttryotBvNZLnraDauOgIgFGQS7pBg4g7QRj4ju/s2IlTx4MvVIololRRBKUGXypYBSDBFAiEA7yxOM8miz0NSaezUc3gmcHVGRuVXcmP85aUxQt51bPECIAzUXn6gV9REeRpyt2fLFdh38LR/JqIlDFGMNCknEtiMAUdSIQKs1lIVs9aXZfsXItWlH4Z/v7Rm3Rp3UYLmk8YAPdl4oCECZIOEnG9YDE8eV2ANd89hc5SZBSu5blENClhxJ1hF159SruAHAAA=",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2sh-p2wsh-multisig-2of2 full signature",
+      "message": "4FMVP445Q7UDQA5PHEJAJPEBXT",
+      "address": "348atbk2fwNNrybmZ847eZxUrrQbhb314a",
+      "signature": "fulAgAAAAABAehf4I+wavWpjzx3T1sLa5ERLVWGKnKTl+j4U5mqHCzLAAAAACMiACC36LM1vvTTMwlLFLFTidJzSIX+OH19Zkx4aYdQ/D6W6uAHAAABAAAAAAAAAAABagQARzBEAiA1/E8KVNhFgVwXFFtvbQWHm7uttryotBvNZLnraDauOgIgFGQS7pBg4g7QRj4ju/s2IlTx4MvVIololRRBKUGXypYBSDBFAiEA7yxOM8miz0NSaezUc3gmcHVGRuVXcmP85aUxQt51bPECIAzUXn6gV9REeRpyt2fLFdh38LR/JqIlDFGMNCknEtiMAUdSIQKs1lIVs9aXZfsXItWlH4Z/v7Rm3Rp3UYLmk8YAPdl4oCECZIOEnG9YDE8eV2ANd89hc5SZBSu5blENClhxJ1hF159SruAHAAA=",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2sh-multisig-2of2 full signature",
+      "message": "not the correct message",
+      "address": "3EnD6QQdPwVNLzw7MYdkJN6m9refVLvuYN",
+      "signature": "fulAgAAAAENwuZZhE9piECSsE0ZpR8VUpJwdppH6aVrtpJoKEIfcAAAAADZAEcwRAIgGI69RNIL2JR0dw0raRB2t8mFJPwgU+7bVp/amPMo9t0CIH0/rzAfdfEiUXzhr/3nXdMJPLRGy3uc8k4/9ROVHGM5AUcwRAIgMDqFXDbvCRK9EOxw0vQ9thRDvXpMz/kBL0jnHsz58e0CID4OPnrsKRN5z80oCBKv9THGwjWzI5sScn25cMPrcAtlAUdSIQNmoQbyT39W+zRP0Rr6nsO2sh99TqTZ3XL2Gxglm+PnoCECmjX7zXfdntCWYKfhiC6xxyZzPZF/Nune1w8ewSi9PMBSruAHAAABAAAAAAAAAAABauAHAAA=",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2sh-multisig-2of2 full signature",
+      "message": "2NXJGXTLGKREF37LY4MYDAPAAJ",
+      "address": "3FTvzAat3XN42G6682ENXBMULtmmkdhk16",
+      "signature": "fulAgAAAAENwuZZhE9piECSsE0ZpR8VUpJwdppH6aVrtpJoKEIfcAAAAADZAEcwRAIgGI69RNIL2JR0dw0raRB2t8mFJPwgU+7bVp/amPMo9t0CIH0/rzAfdfEiUXzhr/3nXdMJPLRGy3uc8k4/9ROVHGM5AUcwRAIgMDqFXDbvCRK9EOxw0vQ9thRDvXpMz/kBL0jnHsz58e0CID4OPnrsKRN5z80oCBKv9THGwjWzI5sScn25cMPrcAtlAUdSIQNmoQbyT39W+zRP0Rr6nsO2sh99TqTZ3XL2Gxglm+PnoCECmjX7zXfdntCWYKfhiC6xxyZzPZF/Nune1w8ewSi9PMBSruAHAAABAAAAAAAAAAABauAHAAA=",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2pkh proof-of-funds signature",
+      "message": "not the correct message",
+      "address": "1LBG4ok3P4QmhU1jzBQLkqtgcBak3m6P8U",
+      "signature": "pofcHNidP8BAI8CAAAAAzhakorxa1lQzERqfi97npI+DJlVGuMYSikFL+plY3+XAAAAAADIAQAAmLvvZ6yn5m56ZcXCm1qLScRWBiGKDfmmiwgTkPsfnskAAAAAAAAAAAA9kDdc1fDNQ39XxIoLyGEUeuUOTMl6Tp91HOtae/Dc6gAAAAAAAAAAAAEAAAAAAAAAAAFqewAAAAABAHcAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIMoDOUmC2lXzCG/6HvBljs3sr0VI/sOXkuqPw8ErCeE3AAAAAAEAAAAAAAAAABl2qRTSWyAq7XAwW6scW8wKe0JAF3bAz4isAAAAAAEHakcwRAIgLblNPIyOcYqlWzD1M1P0xRo0f+TLX74j4jXmYBWyDngCIF8cuefb+6oo8FzQfXbV3LNzWj3rvf+w/Bzchko2vi3NASECmXctUKrrhiVdtEyugLljylqDGupLddFXAQrHto4oqZMAAQBVAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFORgUAAAAAABl2qRRj2bA9GLPghwyYJrexCMX4A/uuq4isAAAAAAEHa0gwRQIhAMskmH7nxrPVHQG4fS2x5SW8qwn9reHmf8+siXXH1SQKAiBJl6Pw/yxZOGARGecqMEepCWAFfWPcJrpW2lrO+faH5AEhA3VTGOTrsTuXV/ht+J1ggPYjRGk3Vrzl382thVCR/cPlAAEBIE5GBQAAAAAAF6kUwWEalCaf2qWusyDaO0QvnG5i/fWHAQcXFgAUSrBr53awnJ+3nPi0yy7TzvY+6b4BCGsCRzBEAiAU7pXVKAPZ5OrREjRkXGySWsN6p6ouS4m7jT24aXgUVQIgVNfeiQAfZXQuAujtgp4X+K2LKwRtCJA9wcUF7T1SWZMBIQJo/g2GH5jZrWyxTkYYl+jpYnQJ2hzQjzt34TnuFiR7sAAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2pkh proof-of-funds signature",
+      "message": "DVVJPIKSJBEZIKKH75YMIOWY5U",
+      "address": "15HwVxRamgjBkCsp9FQEbwLF9BFvtdEY3L",
+      "signature": "pofcHNidP8BAI8CAAAAAzhakorxa1lQzERqfi97npI+DJlVGuMYSikFL+plY3+XAAAAAADIAQAAmLvvZ6yn5m56ZcXCm1qLScRWBiGKDfmmiwgTkPsfnskAAAAAAAAAAAA9kDdc1fDNQ39XxIoLyGEUeuUOTMl6Tp91HOtae/Dc6gAAAAAAAAAAAAEAAAAAAAAAAAFqewAAAAABAHcAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////yIAIMoDOUmC2lXzCG/6HvBljs3sr0VI/sOXkuqPw8ErCeE3AAAAAAEAAAAAAAAAABl2qRTSWyAq7XAwW6scW8wKe0JAF3bAz4isAAAAAAEHakcwRAIgLblNPIyOcYqlWzD1M1P0xRo0f+TLX74j4jXmYBWyDngCIF8cuefb+6oo8FzQfXbV3LNzWj3rvf+w/Bzchko2vi3NASECmXctUKrrhiVdtEyugLljylqDGupLddFXAQrHto4oqZMAAQBVAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFORgUAAAAAABl2qRRj2bA9GLPghwyYJrexCMX4A/uuq4isAAAAAAEHa0gwRQIhAMskmH7nxrPVHQG4fS2x5SW8qwn9reHmf8+siXXH1SQKAiBJl6Pw/yxZOGARGecqMEepCWAFfWPcJrpW2lrO+faH5AEhA3VTGOTrsTuXV/ht+J1ggPYjRGk3Vrzl382thVCR/cPlAAEBIE5GBQAAAAAAF6kUwWEalCaf2qWusyDaO0QvnG5i/fWHAQcXFgAUSrBr53awnJ+3nPi0yy7TzvY+6b4BCGsCRzBEAiAU7pXVKAPZ5OrREjRkXGySWsN6p6ouS4m7jT24aXgUVQIgVNfeiQAfZXQuAujtgp4X+K2LKwRtCJA9wcUF7T1SWZMBIQJo/g2GH5jZrWyxTkYYl+jpYnQJ2hzQjzt34TnuFiR7sAAA",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2pkh proof-of-funds signature",
+      "message": "not the correct message",
+      "address": "1FFV3MRZZrzmxDo9ujtZ6foL6jYqR286tR",
+      "signature": "pofcHNidP8BAOECAAAABX924shXghkk7lZFlxQTsqnzhuRZEBIbJjGIv33rhBjgAAAAAADIAQAA+Nf0xvIZBOcDxbzpBF8e2lxZrA2b33cg7zk+vVBo7E0AAAAAAAAAAAD41/TG8hkE5wPFvOkEXx7aXFmsDZvfdyDvOT69UGjsTQEAAAAAAAAAAPjX9MbyGQTnA8W86QRfHtpcWawNm993IO85Pr1QaOxNAgAAAAAAAAAA3WfwpvHV7RuJVgCah2cXmBsy+xTmioRZf/aDrRTOeO0AAAAAAAAAAAABAAAAAAAAAAABansAAAAAAQB3AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8iACBXzO/CT8IkNar6mlFAZs+yBcIWhh27982a++5nJJlT/wAAAAABAAAAAAAAAAAZdqkUnE7909XOub71oVvcQ3+TpiW0ZJ6IrAAAAAABB2pHMEQCIBqmqWOj2VMbgDrvRRIuNXgwhe70hNQs6KLAqcoyZdq5AiBIuxFbH7Qwqx2K8ezeVnLplmzb/GYI2K8UXyQ/12pxrgEhApGMrjqJplDlUQz+hlbCwjG9GbqP1FZGydW4GNNVnBQ2AAEAmQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADTkYFAAAAAAAZdqkUIqdLLotzDVo9koPrjbliK8TEOkeIrE5GBQAAAAAAGXapFBuK3D1hKyCNcC5bjgql39nvxUP7iKxORgUAAAAAABl2qRSQ1tdRvtf3NLQmUCPh/TftLMbSY4isAAAAAAEHakcwRAIgHUwP7f5J9YYQ/BJOnnXkWe8RIHlgccuD+4ZB/D3Wr1cCIEyYt49slk2jY/ijpTCS6FvSAhaGbfVOOYEHIl2kLAORASECBpjIAEQvke2LxLJnFgjGkPo7zK/dXY2MzqQySY5yWPkAAQdqRzBEAiBRae6+A3ow8wXCB9hE/6duwxSrFk7T0+PbeURb+yr6iAIgK0nlMm8dbY6ZUGJ4dc0xIv/CqYdej7OHhJZPiAFRl+gBIQOLBf4vHc5mV2/ecJIWSbXs5W+MJDTdUthepiZFj0kE5QABB2tIMEUCIQD7ewo4ByWfo0lOYx2D4A61pQAKKxXeBG88xkbCW+fSYwIgBG2HE6EeZXon5sJIKEQCbwhbGPwE3z+byVm+/dbWHXsBIQLw5qs9lqCyBYN8qyyxUbIXxB2GMc5rQtVk+14WDIYMagABASBORgUAAAAAABepFAaTSkDIgJd87RpmCAwHrrLmgH/6hwEHFxYAFGoWpRuZCF/8O1ktUDx+9M9FQJhyAQhrAkcwRAIgajWlV8Jo3hVDlgVmaKWYTfS2JcWCjsPI2fxg7QVzM+MCIH89X6MS0F6+x6zZ+hyaliEwoP96TgLFklgF2EQC794YASEDUzmt7UyzNuqkbySie/6CA5XLhlY4wn5BdjaBiG+8yBcAAA==",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2pkh proof-of-funds signature",
+      "message": "B6KTPSLHSE3GO2PXJVGBNOUKWE",
+      "address": "15HwVxRamgjBkCsp9FQEbwLF9BFvtdEY3L",
+      "signature": "pofcHNidP8BAOECAAAABX924shXghkk7lZFlxQTsqnzhuRZEBIbJjGIv33rhBjgAAAAAADIAQAA+Nf0xvIZBOcDxbzpBF8e2lxZrA2b33cg7zk+vVBo7E0AAAAAAAAAAAD41/TG8hkE5wPFvOkEXx7aXFmsDZvfdyDvOT69UGjsTQEAAAAAAAAAAPjX9MbyGQTnA8W86QRfHtpcWawNm993IO85Pr1QaOxNAgAAAAAAAAAA3WfwpvHV7RuJVgCah2cXmBsy+xTmioRZf/aDrRTOeO0AAAAAAAAAAAABAAAAAAAAAAABansAAAAAAQB3AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP////8iACBXzO/CT8IkNar6mlFAZs+yBcIWhh27982a++5nJJlT/wAAAAABAAAAAAAAAAAZdqkUnE7909XOub71oVvcQ3+TpiW0ZJ6IrAAAAAABB2pHMEQCIBqmqWOj2VMbgDrvRRIuNXgwhe70hNQs6KLAqcoyZdq5AiBIuxFbH7Qwqx2K8ezeVnLplmzb/GYI2K8UXyQ/12pxrgEhApGMrjqJplDlUQz+hlbCwjG9GbqP1FZGydW4GNNVnBQ2AAEAmQAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADTkYFAAAAAAAZdqkUIqdLLotzDVo9koPrjbliK8TEOkeIrE5GBQAAAAAAGXapFBuK3D1hKyCNcC5bjgql39nvxUP7iKxORgUAAAAAABl2qRSQ1tdRvtf3NLQmUCPh/TftLMbSY4isAAAAAAEHakcwRAIgHUwP7f5J9YYQ/BJOnnXkWe8RIHlgccuD+4ZB/D3Wr1cCIEyYt49slk2jY/ijpTCS6FvSAhaGbfVOOYEHIl2kLAORASECBpjIAEQvke2LxLJnFgjGkPo7zK/dXY2MzqQySY5yWPkAAQdqRzBEAiBRae6+A3ow8wXCB9hE/6duwxSrFk7T0+PbeURb+yr6iAIgK0nlMm8dbY6ZUGJ4dc0xIv/CqYdej7OHhJZPiAFRl+gBIQOLBf4vHc5mV2/ecJIWSbXs5W+MJDTdUthepiZFj0kE5QABB2tIMEUCIQD7ewo4ByWfo0lOYx2D4A61pQAKKxXeBG88xkbCW+fSYwIgBG2HE6EeZXon5sJIKEQCbwhbGPwE3z+byVm+/dbWHXsBIQLw5qs9lqCyBYN8qyyxUbIXxB2GMc5rQtVk+14WDIYMagABASBORgUAAAAAABepFAaTSkDIgJd87RpmCAwHrrLmgH/6hwEHFxYAFGoWpRuZCF/8O1ktUDx+9M9FQJhyAQhrAkcwRAIgajWlV8Jo3hVDlgVmaKWYTfS2JcWCjsPI2fxg7QVzM+MCIH89X6MS0F6+x6zZ+hyaliEwoP96TgLFklgF2EQC794YASEDUzmt7UyzNuqkbySie/6CA5XLhlY4wn5BdjaBiG+8yBcAAA==",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong message for p2tr proof-of-funds signature",
+      "message": "not the correct message",
+      "address": "bc1p6jw2axp9yf25ftj2sytumrjspyrw7v5gy4zg2nm8n9ndfd4eyamqxwql4p",
+      "signature": "pofcHNidP8BALgCAAAABIGlmfCetQ0TJuRe8FqQIKWyzno553wxHY0/eEJb167IAAAAAADIAQAAsdlHtqOb1NKybMj9TIX0EUcmqPjW4JDwSeS9H6kXLeUAAAAAAAAAAABWUW9kUuUP6CoCUqeMqjLI5VdjAjJ045moMuNK6kukmQAAAAAAAAAAAFZRb2RS5Q/oKgJSp4yqMsjlV2MCMnTjmagy40rqS6SZAQAAAAAAAAAAAQAAAAAAAAAAAWp7AAAAAAEBKwAAAAAAAAAAIlEg1JyumCUiVUSuSoEXzY5QCQbvMoglRIVPZ5lm1La5J3YBCEIBQLyyK2u7G6/sK9q9AqGBrj45zZQ29MnCY6GOY6iOrsIbq+5KSzDiXgwu9viOfgjkQutJFAyJeDQLTx3M4Vsq4wIAAQErTkYFAAAAAAAiUSDhM/8zTiHCEx6s0l/kSBAuavGCOS6AyumKK4CIMRKi6QEIQgFAClyEXlMj3OP3vupZ7MZo4mZ/VbMQjQPuhSv/hGKw/vNLGpilGX0fqddKTci5Oj6z1jPFWDfcixsaeTZHm3ZvkAABAStORgUAAAAAACJRII2TnpxBOcxC+lYs5+c2tYlq0HV1Q7sLpzO9ddKkJVlpAQhCAUCMK3h/p4wxIsTQ/Opg+KLFFaoz3i+BIj+7krRERqNsuHUGUQFCw8py4CB4pcc+Gc0ShQpnQXT24odDu1oISayWAAEBK05GBQAAAAAAIlEgWmtej7ItXqv38Ewp41JKtVX4r7Svr3PBYIhsO7aSvbMBCEIBQFNRtcGU1iGuUCaG2CsUUJpoyucKWIGsJSywQElIhtKpUqTbr5Z3sWTSB3xMPEkU0BDkWISnPwVNOATB7zcEW1kAAA==",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    },
+    {
+      "description": "wrong address for p2tr proof-of-funds signature",
+      "message": "KOWVNEVAHBYFKJJLE4WCQ37DMI",
+      "address": "bc1p0gwr72v2vtmfnp9gyht6c2fwf5apa9cp8pxcsqhurhp44f0v0auqnsglu9",
+      "signature": "pofcHNidP8BALgCAAAABIGlmfCetQ0TJuRe8FqQIKWyzno553wxHY0/eEJb167IAAAAAADIAQAAsdlHtqOb1NKybMj9TIX0EUcmqPjW4JDwSeS9H6kXLeUAAAAAAAAAAABWUW9kUuUP6CoCUqeMqjLI5VdjAjJ045moMuNK6kukmQAAAAAAAAAAAFZRb2RS5Q/oKgJSp4yqMsjlV2MCMnTjmagy40rqS6SZAQAAAAAAAAAAAQAAAAAAAAAAAWp7AAAAAAEBKwAAAAAAAAAAIlEg1JyumCUiVUSuSoEXzY5QCQbvMoglRIVPZ5lm1La5J3YBCEIBQLyyK2u7G6/sK9q9AqGBrj45zZQ29MnCY6GOY6iOrsIbq+5KSzDiXgwu9viOfgjkQutJFAyJeDQLTx3M4Vsq4wIAAQErTkYFAAAAAAAiUSDhM/8zTiHCEx6s0l/kSBAuavGCOS6AyumKK4CIMRKi6QEIQgFAClyEXlMj3OP3vupZ7MZo4mZ/VbMQjQPuhSv/hGKw/vNLGpilGX0fqddKTci5Oj6z1jPFWDfcixsaeTZHm3ZvkAABAStORgUAAAAAACJRII2TnpxBOcxC+lYs5+c2tYlq0HV1Q7sLpzO9ddKkJVlpAQhCAUCMK3h/p4wxIsTQ/Opg+KLFFaoz3i+BIj+7krRERqNsuHUGUQFCw8py4CB4pcc+Gc0ShQpnQXT24odDu1oISayWAAEBK05GBQAAAAAAIlEgWmtej7ItXqv38Ewp41JKtVX4r7Svr3PBYIhsO7aSvbMBCEIBQFNRtcGU1iGuUCaG2CsUUJpoyucKWIGsJSywQElIhtKpUqTbr5Z3sWTSB3xMPEkU0BDkWISnPwVNOATB7zcEW1kAAA==",
+      "expected_result": "invalid",
+      "error_substr": "invalid to_sign transaction"
+    }
+  ]
+}

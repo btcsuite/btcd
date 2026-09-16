@@ -110,6 +110,12 @@ const (
 	// an input's witness data. This value is bounded by the largest
 	// possible block size, post segwit v1 (taproot).
 	maxWitnessItemSize = 4_000_000
+
+	// defaultWitnessAlloc is the conservative initial allocation size for a
+	// transaction's witness stack. Its value is the same as
+	// txscript.MaxStackSize because that is a useful and realistic upper
+	// bound for the number of witness items on a valid transaction.
+	defaultWitnessAlloc = 1_000
 )
 
 var (
@@ -608,19 +614,36 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 				return messageError("MsgTx.BtcDecode", str)
 			}
 
+			// It is theoretically possible (and likely consensus
+			// valid in a non-taproot context before MAX_STACK size
+			// was introduced) to create a witness stack of
+			// maxWitnessItemsPerInput/2 empty items. But to avoid a
+			// trivial memory allocation of maxWitnessItems elements
+			// with a single varInt claiming maxWitnessItems number
+			// of items without providing them, we pre-allocate with
+			// a much smaller size. This doesn't prevent a TX to
+			// actually contain maxWitnessItems empty items, but
+			// they actually need to be encoded fully. So this
+			// simply prevents a ~96MB memory allocation (on a 64bit
+			// system) for a seemingly harmless and short encoded
+			// witness.
+			allocCount := min(witCount, defaultWitnessAlloc)
+
 			// Then for witCount number of stack items, each item
 			// has a varint length prefix, followed by the witness
 			// item itself.
-			txin.Witness = make([][]byte, witCount)
-			for j := uint64(0); j < witCount; j++ {
-				txin.Witness[j], err = readScriptBuf(
-					r, pver, buf, sbuf, "script witness item",
+			txin.Witness = make([][]byte, 0, allocCount)
+			for range witCount {
+				witnessItem, err := readScriptBuf(
+					r, pver, buf, sbuf,
+					"script witness item",
 				)
 				if err != nil {
 					return err
 				}
-				totalScriptSize += uint64(len(txin.Witness[j]))
-				sbuf = sbuf[len(txin.Witness[j]):]
+				totalScriptSize += uint64(len(witnessItem))
+				sbuf = sbuf[len(witnessItem):]
+				txin.Witness = append(txin.Witness, witnessItem)
 			}
 		}
 

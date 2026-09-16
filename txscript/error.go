@@ -416,6 +416,12 @@ const (
 	// non-segwit script.
 	ErrCodeSeparator
 
+	// ErrDisallowedSigHashType is returned when the
+	// ScriptVerifyRestrictSigHash flag is active and a signature uses a
+	// sighash type other than SIGHASH_ALL (or SIGHASH_DEFAULT for taproot
+	// signatures).
+	ErrDisallowedSigHashType
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -504,6 +510,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrTaprootMaxSigOps:                    "ErrTaprootMaxSigOps",
 	ErrNonConstScriptCode:                  "ErrNonConstScriptCode",
 	ErrCodeSeparator:                       "ErrCodeSeparator",
+	ErrDisallowedSigHashType:               "ErrDisallowedSigHashType",
 }
 
 // String returns the ErrorCode as a human-readable name.

@@ -1231,3 +1231,101 @@ func TestTxWitnessOverflowPanic(t *testing.T) {
 	var msgErr *MessageError
 	require.ErrorAs(t, err, &msgErr)
 }
+
+// emptyWitnessTxBytes builds a minimal witness-encoded transaction containing
+// the requested number of empty witness items. When complete is false, the
+// encoding stops immediately after the witness item count so tests can observe
+// allocation behavior before the first item is read.
+func emptyWitnessTxBytes(t testing.TB, witnessItems uint64,
+	complete bool) []byte {
+
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	// Construct the transaction header and its single input. Empty witness
+	// items need no storage in the shared script slab, which keeps these
+	// tests focused on allocation of the witness slice itself.
+	buf.Write([]byte{0x02, 0x00, 0x00, 0x00})
+	buf.WriteByte(TxFlagMarker)
+	buf.WriteByte(byte(WitnessFlag))
+	require.NoError(t, WriteVarInt(&buf, 0, 1))
+	buf.Write(make([]byte, chainhash.HashSize))
+	buf.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	require.NoError(t, WriteVarInt(&buf, 0, 0))
+	buf.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	require.NoError(t, WriteVarInt(&buf, 0, 0))
+	require.NoError(t, WriteVarInt(&buf, 0, witnessItems))
+
+	if !complete {
+		return buf.Bytes()
+	}
+
+	// Each empty witness item is encoded as a zero-length CompactSize. The
+	// lock time completes the transaction after all items have been read.
+	buf.Write(make([]byte, int(witnessItems)))
+	buf.Write([]byte{0x00, 0x00, 0x00, 0x00})
+
+	return buf.Bytes()
+}
+
+// TestTxWitnessCountAllocation ensures a large declared witness item count
+// does not cause a correspondingly large allocation before any items have
+// actually been read. The partially decoded transaction is inspected only for
+// its slice capacity and is discarded immediately after the expected error.
+func TestTxWitnessCountAllocation(t *testing.T) {
+	const witnessItems = 100_000
+
+	rawTx := emptyWitnessTxBytes(t, witnessItems, false)
+	var msg MsgTx
+	err := msg.BtcDecode(
+		bytes.NewReader(rawTx), ProtocolVersion, WitnessEncoding,
+	)
+	require.ErrorIs(t, err, io.EOF)
+	require.Len(t, msg.TxIn, 1)
+	require.Empty(t, msg.TxIn[0].Witness)
+	require.Equal(
+		t, defaultWitnessAlloc, cap(msg.TxIn[0].Witness),
+		"a truncated witness must not preallocate its declared item "+
+			"count",
+	)
+}
+
+// BenchmarkTxWitnessItemCount measures decoding costs as empty witness stacks
+// grow from the normal script-stack bound to the wire decoder's maximum item
+// count. Empty items isolate witness-slice growth from script-byte copying.
+func BenchmarkTxWitnessItemCount(b *testing.B) {
+	testCases := []struct {
+		name         string
+		witnessItems uint64
+	}{
+		{name: "1K", witnessItems: 1_000},
+		{name: "100K", witnessItems: 100_000},
+		{name: "1M", witnessItems: 1_000_000},
+		{name: "max", witnessItems: maxWitnessItemsPerInput},
+	}
+
+	for _, testCase := range testCases {
+		b.Run(testCase.name, func(b *testing.B) {
+			rawTx := emptyWitnessTxBytes(
+				b, testCase.witnessItems, true,
+			)
+			b.ReportAllocs()
+			b.SetBytes(int64(len(rawTx)))
+			b.ResetTimer()
+
+			for b.Loop() {
+				var msg MsgTx
+				err := msg.BtcDecode(
+					bytes.NewReader(rawTx), ProtocolVersion,
+					WitnessEncoding,
+				)
+				require.NoError(b, err)
+				require.Len(
+					b, msg.TxIn[0].Witness,
+					int(testCase.witnessItems),
+				)
+			}
+		})
+	}
+}
