@@ -130,6 +130,14 @@ const (
 	// verification, which require that every signature commit to the entire
 	// transaction.
 	ScriptVerifyRestrictSigHash
+
+	// ScriptVerifyMinimalIfAll extends ScriptVerifyMinimalIf to every
+	// script execution context, including legacy scripts.
+	//
+	// This is NOT a consensus rule and is not part of StandardVerifyFlags.
+	// It is an opt-in policy for applications such as BIP-322 message
+	// verification, which requires MINIMALIF for all scripts.
+	ScriptVerifyMinimalIfAll
 )
 
 const (

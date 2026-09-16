@@ -830,17 +830,21 @@ func opcodeNop(op *opcode, data []byte, vm *Engine) error {
 	return nil
 }
 
-// popIfBool enforces the "minimal if" policy during script execution if the
-// particular flag is set.  If so, in order to eliminate an additional source
-// of nuisance malleability, post-segwit for version 0 witness programs, we now
-// require the following: for OP_IF and OP_NOT_IF, the top stack item MUST
-// either be an empty byte slice, or [0x01]. Otherwise, the item at the top of
-// the stack will be popped and interpreted as a boolean.
+// popIfBool enforces the "minimal if" policy during script execution when the
+// active script context or verification flags require it. To eliminate an
+// additional source of nuisance malleability, the top stack item for OP_IF and
+// OP_NOT_IF MUST be either an empty byte slice or [0x01]. Otherwise, the item
+// is popped and interpreted as a boolean.
 func popIfBool(vm *Engine) (bool, error) {
-	// When not in witness execution mode, not executing a v0 witness
-	// program, or not doing tapscript execution, or the minimal if flag
-	// isn't set pop the top stack item as a normal bool.
+	// Legacy scripts retain their normal boolean coercion unless the caller
+	// opts into applying MINIMALIF in every execution context. Segwit and
+	// tapscript retain their existing activation rules below.
 	switch {
+	// Some applications require MINIMALIF in every script context,
+	// including legacy script execution.
+	case vm.hasFlag(ScriptVerifyMinimalIfAll):
+		break
+
 	// Minimal if is always on for taproot execution.
 	case vm.isWitnessVersionActive(TaprootWitnessVersion):
 		break
