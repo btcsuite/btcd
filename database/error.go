@@ -62,6 +62,11 @@ const (
 	// the database was attempted against a read-only transaction.
 	ErrTxNotWritable
 
+	// ErrAvailableDiskSpace indicates that the user is running out of
+	// disk space.  The database preventively decided to not allow the
+	// transaction to prevent causing hard-to-detect problems.
+	ErrAvailableDiskSpace
+
 	// **************************************
 	// Errors related to metadata operations.
 	// **************************************
@@ -143,6 +148,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrCorruption:         "ErrCorruption",
 	ErrTxClosed:           "ErrTxClosed",
 	ErrTxNotWritable:      "ErrTxNotWritable",
+	ErrAvailableDiskSpace: "ErrAvailableDiskSpace",
 	ErrBucketNotFound:     "ErrBucketNotFound",
 	ErrBucketExists:       "ErrBucketExists",
 	ErrBucketNameRequired: "ErrBucketNameRequired",
