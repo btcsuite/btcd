@@ -7,6 +7,7 @@ import (
 
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSumUtxoInputValues(t *testing.T) {
@@ -70,6 +71,86 @@ func TestSumUtxoInputValues(t *testing.T) {
 	_, err = SumUtxoInputValues(malformedPacket)
 	if err == nil {
 		t.Fatalf("expected sum of malformed packet to fail")
+	}
+}
+
+// TestGetTxFeeConflictingUtxos ensures dual UTXO descriptions must agree before
+// their input value can be used to report a transaction fee.
+func TestGetTxFeeConflictingUtxos(t *testing.T) {
+	// Arrange: vary only the witness description or selected output index
+	// against a fixed 100,000-sat previous output to isolate inconsistency.
+	tests := []struct {
+		name          string
+		witnessValue  int64
+		witnessScript []byte
+		outputIndex   uint32
+		wantErr       bool
+	}{
+		{
+			name:          "matching descriptions",
+			witnessValue:  100_000,
+			witnessScript: []byte{0x51},
+			outputIndex:   0,
+			wantErr:       false,
+		},
+		{
+			name:          "conflicting amount",
+			witnessValue:  1_000_000,
+			witnessScript: []byte{0x51},
+			outputIndex:   0,
+			wantErr:       true,
+		},
+		{
+			name:          "conflicting script",
+			witnessValue:  100_000,
+			witnessScript: []byte{0x00},
+			outputIndex:   0,
+			wantErr:       true,
+		},
+		{
+			name:          "missing referenced output",
+			witnessValue:  100_000,
+			witnessScript: []byte{0x51},
+			outputIndex:   1,
+			wantErr:       true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange: point the spending transaction at the supplied
+			// previous transaction's hash, then attach both descriptions
+			// of that input so the public fee helper must reconcile them.
+			previous := wire.NewMsgTx(2)
+			previous.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+			previous.AddTxOut(wire.NewTxOut(100_000, []byte{0x51}))
+			previousHash := previous.TxHash()
+			spending := wire.NewMsgTx(2)
+			spending.AddTxIn(wire.NewTxIn(
+				wire.NewOutPoint(&previousHash, test.outputIndex),
+				nil, nil,
+			))
+			spending.AddTxOut(wire.NewTxOut(90_000, []byte{0x51}))
+			packet, err := NewFromUnsignedTx(spending)
+			require.NoError(t, err)
+			packet.Inputs[0].NonWitnessUtxo = previous
+			packet.Inputs[0].WitnessUtxo = wire.NewTxOut(
+				test.witnessValue, test.witnessScript,
+			)
+
+			// Act: use the caller-facing fee API to include propagation
+			// of any consistency error from input-value calculation.
+			fee, err := packet.GetTxFee()
+
+			// Assert: inconsistent data must not produce a usable fee;
+			// agreeing descriptions yield 100,000 minus 90,000 satoshis.
+			if test.wantErr {
+				require.Error(t, err)
+				require.Zero(t, fee)
+				return
+			}
+			require.NoError(t, err)
+			require.EqualValues(t, 10_000, fee)
+		})
 	}
 }
 
