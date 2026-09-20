@@ -336,8 +336,9 @@ func readTransaction(txBytes []byte, noWitness bool) (*wire.MsgTx, error) {
 }
 
 // SumUtxoInputValues tries to extract the sum of all inputs specified in the
-// UTXO fields of the PSBT. An error is returned if an input is specified that
-// does not contain any UTXO information.
+// UTXO fields of the PSBT. An error is returned for missing UTXO information,
+// an invalid previous-output index, or conflicting witness and non-witness
+// output descriptions. Consistency does not authenticate the supplied UTXOs.
 func SumUtxoInputValues(packet *Packet) (int64, error) {
 	// We take the TX ins of the unsigned TX as the truth for how many
 	// inputs there should be, as the fields in the extra data part of the
@@ -350,10 +351,6 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 	inputSum := int64(0)
 	for idx, in := range packet.Inputs {
 		switch {
-		case in.WitnessUtxo != nil:
-			// Witness UTXOs only need to reference the TxOut.
-			inputSum += in.WitnessUtxo.Value
-
 		case in.NonWitnessUtxo != nil:
 			// Non-witness UTXOs reference to the whole transaction
 			// the UTXO resides in.
@@ -368,7 +365,20 @@ func SumUtxoInputValues(packet *Packet) (int64, error) {
 					"TxOut field", idx)
 			}
 
-			inputSum += utxOuts[txIn.PreviousOutPoint.Index].Value
+			// Both descriptions must refer to the same output so the
+			// reported fee cannot depend on which one takes precedence.
+			prevOut := utxOuts[opIdx]
+			if in.WitnessUtxo != nil &&
+				!TxOutsEqual(prevOut, in.WitnessUtxo) {
+
+				return 0, fmt.Errorf("input %d has conflicting "+
+					"UTXO information", idx)
+			}
+			inputSum += prevOut.Value
+
+		case in.WitnessUtxo != nil:
+			// Witness UTXOs only need to reference the TxOut.
+			inputSum += in.WitnessUtxo.Value
 
 		default:
 			return 0, fmt.Errorf("input %d has no UTXO information",

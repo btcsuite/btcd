@@ -536,8 +536,10 @@ func (p *Packet) SanityCheck() error {
 	return nil
 }
 
-// GetTxFee returns the transaction fee.  An error is returned if a transaction
-// input does not contain any UTXO information.
+// GetTxFee returns the transaction fee using the supplied UTXO information.
+// An error is returned for missing UTXO information, an invalid previous-output
+// index, or conflicting witness and non-witness output descriptions. The caller
+// remains responsible for authenticating the supplied UTXOs.
 func (p *Packet) GetTxFee() (btcutil.Amount, error) {
 	sumInputs, err := SumUtxoInputValues(p)
 	if err != nil {
