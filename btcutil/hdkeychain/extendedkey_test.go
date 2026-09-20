@@ -19,7 +19,97 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
+
+// childHMACMock supplies cancellation outputs without searching for an
+// infeasible natural HMAC preimage.
+type childHMACMock struct {
+	mock.Mock
+}
+
+// sum records the child derivation request and returns its arranged HMAC
+// output so the real derivation code handles the cancellation.
+func (m *childHMACMock) sum(chainCode, data []byte) []byte {
+	args := m.Called(chainCode, data)
+	return args.Get(0).([]byte)
+}
+
+// TestExtendedKeyRejectInvalidChild checks that both derivation methods reject
+// final scalar/point cancellation instead of returning an unusable child.
+func TestExtendedKeyRejectInvalidChild(t *testing.T) {
+	// Arrange: use a valid parent and its matching public key. Negating a
+	// copy of the private scalar makes Il cancel either parent's key when
+	// added modulo N, producing zero privately and infinity publicly.
+	parent, err := NewMaster(
+		bytes.Repeat([]byte{1}, MinSeedBytes), &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+	publicParent, err := parent.Neuter()
+	require.NoError(t, err)
+	privateKey, err := parent.ECPrivKey()
+	require.NoError(t, err)
+	il := privateKey.Key
+	il.Negate()
+	ilBytes := il.Bytes()
+	forcedILR := make([]byte, 64)
+	copy(forcedILR, ilBytes[:])
+	originalHMAC := hmacSHA512
+
+	tests := []struct {
+		name   string
+		parent *ExtendedKey
+		derive func(*ExtendedKey, uint32) (*ExtendedKey, error)
+	}{
+		{
+			name:   "standardPrivateZero",
+			parent: parent,
+			derive: (*ExtendedKey).Derive,
+		},
+		{
+			name:   "standardPublicInfinity",
+			parent: publicParent,
+			derive: (*ExtendedKey).Derive,
+		},
+		{
+			name:   "nonStandardPrivateZero",
+			parent: parent,
+			derive: (*ExtendedKey).DeriveNonStandard,
+		},
+		{
+			name:   "nonStandardPublicInfinity",
+			parent: publicParent,
+			derive: (*ExtendedKey).DeriveNonStandard,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange: force the cancelling Il at the hash boundary
+			// while the public method performs its normal key math.
+			// Run serially; restore the real hash after each case.
+			childHMAC := &childHMACMock{}
+			childHMAC.On(
+				"sum", test.parent.chainCode, mock.Anything,
+			).Return(forcedILR).Once()
+			hmacSHA512 = childHMAC.sum
+			t.Cleanup(func() {
+				hmacSHA512 = originalHMAC
+				childHMAC.AssertExpectations(t)
+			})
+
+			// Act: call the selected public method at index zero.
+			// Its final addition must reach the cancellation guard,
+			// rather than failing an earlier input check.
+			child, err := test.derive(test.parent, 0)
+
+			// Assert: return ErrInvalidChild without a child key,
+			// allowing callers to skip this unusable index.
+			require.ErrorIs(t, err, ErrInvalidChild)
+			require.Nil(t, child)
+		})
+	}
+}
 
 // TestBIP0032Vectors tests the vectors provided by [BIP32] to ensure the
 // derivation works as intended.
