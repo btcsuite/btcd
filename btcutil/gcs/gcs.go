@@ -149,8 +149,9 @@ func BuildGCSFilter(P uint8, M uint64, key [KeySize]byte, data [][]byte) (*Filte
 		remainder = (v - lastValue) & ((uint64(1) << f.p) - 1)
 
 		// Calculate the difference between this value and the last,
-		// divided by P.
-		value = (v - lastValue - remainder) >> f.p
+		// divided by P. The remainder is already isolated above, so
+		// the shift discards those bits on its own.
+		value = (v - lastValue) >> f.p
 		lastValue = v
 
 		// Write the P multiple into the bitstream in unary; the
