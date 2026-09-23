@@ -78,7 +78,7 @@ func TestImmutableSequential(t *testing.T) {
 		// Ensure the treap length is the expected value.
 		if gotLen := testTreap.Len(); gotLen != (i+1)*keyCount {
 			t.Fatalf("Len #%d: unexpected length - got %d, want %d",
-				i, gotLen, i+1)
+				i, gotLen, (i+1)*keyCount)
 		}
 
 		for j, key := range keys {
@@ -190,7 +190,7 @@ func TestImmutableReverseSequential(t *testing.T) {
 		// Ensure the treap length is the expected value.
 		if gotLen := testTreap.Len(); gotLen != (i+1)*keyCount {
 			t.Fatalf("Len #%d: unexpected length - got %d, want %d",
-				i, gotLen, i+1)
+				i, gotLen, (i+1)*keyCount)
 		}
 
 		for j, key := range keys {
@@ -305,7 +305,7 @@ func TestImmutableUnordered(t *testing.T) {
 		// Ensure the treap length is the expected value.
 		if gotLen := testTreap.Len(); gotLen != (i+1)*keyCount {
 			t.Fatalf("Len #%d: unexpected length - got %d, want %d",
-				i, gotLen, i+1)
+				i, gotLen, (i+1)*keyCount)
 		}
 
 		for j, key := range keys {
@@ -530,6 +530,63 @@ func TestImmutableSnapshot(t *testing.T) {
 		}
 
 		expectedSize += (nodeFieldsSize + 8) * uint64(keyCount)
+	}
+
+	// Verify single-element Put() preserves snapshot immutability.  This
+	// specifically tests the recycling path with a single key where
+	// prevCreated is empty and no recycling should occur.
+	singleSnap := testTreap
+	singleKey := serializeUint32(uint32(numItems + 1))
+	testTreap = testTreap.Put(KVPair{singleKey, singleKey})
+	if singleSnap.Has(singleKey) {
+		t.Fatalf("single-key snapshot: key %q should not be in snapshot",
+			singleKey)
+	}
+	if gotLen := singleSnap.Len(); gotLen != numItems {
+		t.Fatalf("single-key snapshot: unexpected length - got %d, "+
+			"want %d", gotLen, numItems)
+	}
+	testTreap = testTreap.Delete(singleKey)
+
+	// Verify small-batch (3 keys) preserves snapshot immutability.  This
+	// exercises the recycling logic at a granularity where intermediate
+	// node recycling occurs between the 2nd and 3rd insertions.
+	smallSnap := testTreap
+	smallKeys := []KVPair{
+		{serializeUint32(uint32(numItems + 10)), []byte("a")},
+		{serializeUint32(uint32(numItems + 11)), []byte("b")},
+		{serializeUint32(uint32(numItems + 12)), []byte("c")},
+	}
+	testTreap = testTreap.Put(smallKeys...)
+	for _, kv := range smallKeys {
+		if smallSnap.Has(kv.Key) {
+			t.Fatalf("small-batch snapshot: key %q should not "+
+				"be in snapshot", kv.Key)
+		}
+	}
+	if gotLen := smallSnap.Len(); gotLen != numItems {
+		t.Fatalf("small-batch snapshot: unexpected length - got %d, "+
+			"want %d", gotLen, numItems)
+	}
+
+	// Verify that all original keys in the snapshot are still accessible
+	// after the Put with recycling.
+	for i := 0; i < numItems; i++ {
+		key := serializeUint32(uint32(i))
+		if !smallSnap.Has(key) {
+			t.Fatalf("small-batch snapshot integrity: key %q "+
+				"missing from snapshot after Put", key)
+		}
+		if gotVal := smallSnap.Get(key); !bytes.Equal(gotVal, key) {
+			t.Fatalf("small-batch snapshot integrity: key %q "+
+				"value corrupted - got %x, want %x",
+				key, gotVal, key)
+		}
+	}
+
+	// Undo the small-batch additions for the delete phase.
+	for _, kv := range smallKeys {
+		testTreap = testTreap.Delete(kv.Key)
 	}
 
 	// Delete the keys one-by-one while checking several of the treap
