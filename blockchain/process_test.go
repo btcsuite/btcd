@@ -59,7 +59,7 @@ func TestProcessBlockHeader(t *testing.T) {
 	chain, params, tearDown := utxoCacheTestChain("TestProcessBlockHeader")
 	defer tearDown()
 
-	// Generate and process the intial 10 block headers.
+	// Generate and process the initial 10 block headers.
 	//
 	// genesis -> 1  -> 2  -> ...  -> 10 (active)
 	headers := chainedHeaders(&params.GenesisBlock.Header, params, 0, 10)
@@ -180,4 +180,69 @@ func TestProcessBlockHeader(t *testing.T) {
 	// Check that the tip didn't change.
 	tipNode = chain.bestHeader.Tip()
 	require.Equal(t, lastSidechainHeaderHash, tipNode.hash)
+}
+
+// TestProcessBlockHeaderRePromoteSideChain verifies that a known, valid
+// side-chain header with more cumulative work than the current best header
+// tip is re-promoted to the best header chain when it is announced again.
+// This mirrors the state after a restart: initChainState resets the best
+// header chain to the best block tip, while previously known heavier
+// side-chain headers may still exist in the block index.
+func TestProcessBlockHeaderRePromoteSideChain(t *testing.T) {
+	chain, params, tearDown := utxoCacheTestChain(
+		"TestProcessBlockHeaderRePromoteSideChain",
+	)
+	defer tearDown()
+
+	// Build two competing header chains from genesis, with chain B
+	// carrying more cumulative work.
+	//
+	// genesis -> a1 -> a2 -> a3
+	//        \-> b1 -> b2 -> b3 -> b4 -> b5 (active)
+	chainA := chainedHeaders(&params.GenesisBlock.Header, params, 0, 3)
+	for _, header := range chainA {
+		_, err := chain.ProcessBlockHeader(header, BFNone, false)
+		require.NoError(t, err)
+	}
+
+	chainB := chainedHeaders(&params.GenesisBlock.Header, params, 0, 5)
+	for _, header := range chainB {
+		_, err := chain.ProcessBlockHeader(header, BFNone, false)
+		require.NoError(t, err)
+	}
+
+	bTipHeader := chainB[len(chainB)-1]
+	bTipHash := bTipHeader.BlockHash()
+	require.Equal(t, bTipHash, chain.bestHeader.Tip().hash)
+
+	// Simulate a restart by rewinding the best header chain to the best
+	// block tip, which is still the genesis block here.  The chain B
+	// nodes remain in the block index, exactly as they would after
+	// initChainState runs.
+	chain.bestHeader.SetTip(chain.bestChain.Tip())
+	require.Equal(t, int32(0), chain.bestHeader.Tip().height)
+
+	// Re-announce the known chain B tip header.  Even though the header
+	// is already known, it must be promoted back to the best header tip
+	// since it carries more cumulative work.
+	isMainChain, err := chain.ProcessBlockHeader(bTipHeader, BFNone, false)
+	require.NoError(t, err)
+	require.True(t, isMainChain,
+		"known heavier side-chain header should be re-promoted")
+	require.Equal(t, bTipHash, chain.bestHeader.Tip().hash)
+
+	// Re-announcing a known header that is now in the best header chain
+	// must simply report it as main chain.
+	isMainChain, err = chain.ProcessBlockHeader(bTipHeader, BFNone, false)
+	require.NoError(t, err)
+	require.True(t, isMainChain)
+
+	// Re-announcing a known side-chain header with less work must not
+	// change the tip.
+	isMainChain, err = chain.ProcessBlockHeader(
+		chainA[len(chainA)-1], BFNone, false,
+	)
+	require.NoError(t, err)
+	require.False(t, isMainChain)
+	require.Equal(t, bTipHash, chain.bestHeader.Tip().hash)
 }

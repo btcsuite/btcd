@@ -154,43 +154,53 @@ func (b *BlockChain) maybeAcceptBlockHeader(header *wire.BlockHeader,
 			return false, ruleError(ErrInvalidAncestorBlock, str)
 		}
 
-		// If the node is in the bestHeaders chainview, it's in the main chain.
-		// If it isn't, then we'll go through the verification process below.
+		// The header already exists in the block index and is not
+		// invalid.  If it is in the best header chain, report it as
+		// main chain.
 		if b.bestHeader.Contains(node) {
 			return true, nil
 		}
-	}
 
-	// Perform context-free sanity checks on the block header.
-	err := CheckBlockHeaderSanity(
-		header, b.chainParams.PowLimit, b.timeSource, flags)
-	if err != nil {
-		return false, err
-	}
+		// This is a known, valid side-chain header, so re-validation
+		// can be skipped.  However, we still fall through to the tip
+		// promotion logic below: after a restart the best header chain
+		// is reset to the best block tip, so a previously known side
+		// chain with more cumulative work must be able to become the
+		// best header chain again when its headers are re-announced.
+	} else {
+		// Perform context-free sanity checks on the block header.
+		err := CheckBlockHeaderSanity(
+			header, b.chainParams.PowLimit, b.timeSource, flags)
+		if err != nil {
+			return false, err
+		}
 
-	// The block must pass all of the validation rules which depend on the
-	// position of the block within the block chain.
-	err = CheckBlockHeaderContext(header, prevNode, flags, b, skipCheckpoint)
-	if err != nil {
-		return false, err
-	}
+		// The block must pass all of the validation rules which depend
+		// on the position of the block within the block chain.
+		err = CheckBlockHeaderContext(
+			header, prevNode, flags, b, skipCheckpoint,
+		)
+		if err != nil {
+			return false, err
+		}
 
-	// Create a new block node for the block and add it to the block index.
-	//
-	// Note that the additional information for the actual transactions and
-	// witnesses in the block can't be populated until the full block data is
-	// known since that information is not available in the header.
-	if node == nil {
+		// Create a new block node for the block and add it to the
+		// block index.
+		//
+		// Note that the additional information for the actual
+		// transactions and witnesses in the block can't be populated
+		// until the full block data is known since that information is
+		// not available in the header.
 		node = newBlockNode(header, prevNode)
 		node.status = statusHeaderStored
 		b.index.AddNode(node)
-	}
 
-	// Flush the block index to database at this point since we added the
-	// node.
-	err = b.index.flushToDB()
-	if err != nil {
-		return false, err
+		// Flush the block index to database at this point since we
+		// added the node.
+		err = b.index.flushToDB()
+		if err != nil {
+			return false, err
+		}
 	}
 
 	// Check if the header extends the best header tip.
