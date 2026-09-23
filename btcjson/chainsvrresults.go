@@ -227,6 +227,7 @@ type UnifiedSoftForks struct {
 // command.
 type GetBlockChainInfoResult struct {
 	Chain                string        `json:"chain"`
+	SignetChallenge      string        `json:"signet_challenge,omitempty"`
 	Blocks               int32         `json:"blocks"`
 	Headers              int32         `json:"headers"`
 	BestBlockHash        string        `json:"bestblockhash"`
@@ -743,6 +744,7 @@ type GetMiningInfoResult struct {
 	HashesPerSec       float64 `json:"hashespersec"`
 	NetworkHashPS      float64 `json:"networkhashps"`
 	PooledTx           uint64  `json:"pooledtx"`
+	SignetChallenge    string  `json:"signet_challenge,omitempty"`
 	TestNet            bool    `json:"testnet"`
 }
 

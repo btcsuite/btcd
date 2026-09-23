@@ -113,6 +113,21 @@ func TestSigNetMagic(t *testing.T) {
 	require.Equal(t, wire.SigNet, SigNetParams.Net)
 }
 
+// TestSigNetChallenge ensures signet params retain the challenge used to derive
+// their network magic.
+func TestSigNetChallenge(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, DefaultSignetChallenge, SigNetParams.SignetChallenge)
+
+	challenge := []byte{0x51}
+	params := CustomSignetParams(challenge, nil)
+	require.Equal(t, challenge, params.SignetChallenge)
+
+	challenge[0] = 0x52
+	require.Equal(t, []byte{0x51}, params.SignetChallenge)
+}
+
 // compactToBig is a copy of the blockchain.CompactToBig function. We copy it
 // here so we don't run into a circular dependency just because of a test.
 func compactToBig(compact uint32) *big.Int {

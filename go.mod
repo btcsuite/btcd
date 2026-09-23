@@ -71,3 +71,7 @@ retract (
 	v0.13.0-beta2
 	v0.13.0-beta
 )
+
+// TODO: Replace this with a tagged/pseudo chaincfg/v2 version before cutting a
+// release consumed by btcwallet/lnd.
+replace github.com/btcsuite/btcd/chaincfg/v2 => ./chaincfg
