@@ -217,13 +217,13 @@ func computeSigningNonce(combinedNonce [PubNonceSize]byte,
 	nonceBlinder.SetByteSlice(nonceBlindHash[:])
 
 	// Next, we'll parse the public nonces into R1 and R2.
-	r1J, err := btcec.ParseJacobian(
+	r1J, err := parseAggNonceHalf(
 		combinedNonce[:btcec.PubKeyBytesLenCompressed],
 	)
 	if err != nil {
 		return nil, nil, err
 	}
-	r2J, err := btcec.ParseJacobian(
+	r2J, err := parseAggNonceHalf(
 		combinedNonce[btcec.PubKeyBytesLenCompressed:],
 	)
 	if err != nil {
@@ -480,13 +480,13 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 	nonceBlindHash := chainhash.TaggedHash(NonceBlindTag, nonceMsgBuf.Bytes())
 	nonceBlinder.SetByteSlice(nonceBlindHash[:])
 
-	r1J, err := btcec.ParseJacobian(
+	r1J, err := parseAggNonceHalf(
 		combinedNonce[:btcec.PubKeyBytesLenCompressed],
 	)
 	if err != nil {
 		return err
 	}
-	r2J, err := btcec.ParseJacobian(
+	r2J, err := parseAggNonceHalf(
 		combinedNonce[btcec.PubKeyBytesLenCompressed:],
 	)
 	if err != nil {
@@ -502,13 +502,13 @@ func verifyPartialSig(partialSig *PartialSignature, pubNonce [PubNonceSize]byte,
 
 	// Next, we'll parse out the set of public nonces this signer used to
 	// generate the signature.
-	pubNonce1J, err := btcec.ParseJacobian(
+	pubNonce1J, err := parsePubNonceHalf(
 		pubNonce[:btcec.PubKeyBytesLenCompressed],
 	)
 	if err != nil {
 		return err
 	}
-	pubNonce2J, err := btcec.ParseJacobian(
+	pubNonce2J, err := parsePubNonceHalf(
 		pubNonce[btcec.PubKeyBytesLenCompressed:],
 	)
 	if err != nil {
