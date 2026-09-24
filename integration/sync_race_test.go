@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -299,11 +298,11 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 	// This test deliberately opens more concurrent peers than the default
 	// inbound limit. Raise the harness limit so admission does not dilute the
 	// sync-manager lifecycle stress this test is intended to apply.
-	stressedHarness, err := rpctest.New(
-		&chaincfg.SimNetParams, nil, []string{"--maxpeers=400"}, "",
-	)
+	stressedHarness, err := rpctest.New(&rpctest.HarnessOpts{
+		ExtraArgs: []string{"--maxpeers=400"},
+	})
 	require.NoError(t, err)
-	require.NoError(t, stressedHarness.SetUp(true, 0))
+	require.NoError(t, stressedHarness.SetUp(nil))
 	t.Cleanup(func() {
 		require.NoError(t, stressedHarness.TearDown())
 	})
@@ -326,9 +325,9 @@ func TestSyncManagerRaceCorruption(t *testing.T) {
 	// Prove corruption: connect a live node and generate blocks. If
 	// the stressed node was corrupted (dead sync peer, 0 connected
 	// peers), it will not sync from the new one.
-	newHarness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	newHarness, err := rpctest.New(nil)
 	require.NoError(t, err)
-	require.NoError(t, newHarness.SetUp(true, 0))
+	require.NoError(t, newHarness.SetUp(nil))
 	defer func() { _ = newHarness.TearDown() }()
 
 	require.NoError(t, rpctest.ConnectNode(stressedHarness, newHarness),
@@ -420,9 +419,9 @@ func dialPreVerackPeer(nodeAddr string) (net.Conn, error) {
 // produced (no peerAdd), since peerLifecycleHandler only sends
 // peerAdd when verAckCh is closed. The node must remain healthy.
 func TestPreVerackDisconnect(t *testing.T) {
-	harness, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	harness, err := rpctest.New(nil)
 	require.NoError(t, err)
-	require.NoError(t, harness.SetUp(true, 0))
+	require.NoError(t, harness.SetUp(nil))
 	t.Cleanup(func() { _ = harness.TearDown() })
 
 	nodeAddr := harness.P2PAddress()
@@ -463,9 +462,9 @@ func TestPreVerackDisconnect(t *testing.T) {
 
 	// Verify the node is still healthy: connect a real peer, generate
 	// blocks, and confirm the harness syncs them.
-	helper, err := rpctest.New(&chaincfg.SimNetParams, nil, nil, "")
+	helper, err := rpctest.New(nil)
 	require.NoError(t, err)
-	require.NoError(t, helper.SetUp(true, 0))
+	require.NoError(t, helper.SetUp(nil))
 	defer func() { _ = helper.TearDown() }()
 
 	require.NoError(t, rpctest.ConnectNode(harness, helper))

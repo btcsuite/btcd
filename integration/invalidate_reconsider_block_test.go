@@ -9,12 +9,14 @@ import (
 
 func TestInvalidateAndReconsiderBlock(t *testing.T) {
 	// Set up regtest chain.
-	r, err := rpctest.New(&chaincfg.RegressionNetParams, nil, nil, "")
+	r, err := rpctest.New(&rpctest.HarnessOpts{
+		ActiveNet: &chaincfg.RegressionNetParams,
+	})
 	if err != nil {
 		t.Fatalf("TestInvalidateAndReconsiderBlock fail."+
 			"Unable to create primary harness: %v", err)
 	}
-	if err := r.SetUp(true, 0); err != nil {
+	if err := r.SetUp(nil); err != nil {
 		t.Fatalf("TestInvalidateAndReconsiderBlock fail. "+
 			"Unable to setup test chain: %v", err)
 	}
