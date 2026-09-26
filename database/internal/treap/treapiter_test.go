@@ -721,3 +721,62 @@ func TestImmutableEmptyIterator(t *testing.T) {
 		t.Fatal("Prev: iterator should be exhausted")
 	}
 }
+
+// TestIteratorSingleLimit ensures that iterators created with only a start key
+// or only a limit key stay within their range for both mutable and immutable
+// treaps.
+func TestIteratorSingleLimit(t *testing.T) {
+	t.Parallel()
+
+	// Create mutable and immutable treaps with the keys (5, 6).
+	mutable := NewMutable()
+	immutable := NewImmutable()
+	for _, key := range []uint32{5, 6} {
+		mutable.Put(serializeUint32(key), nil)
+		immutable = immutable.Put(KVPair{Key: serializeUint32(key)})
+	}
+
+	iterators := []struct {
+		name    string
+		newIter func() *Iterator
+	}{
+		{"mutable, limit key before all keys", func() *Iterator {
+			return mutable.Iterator(nil, serializeUint32(5))
+		}},
+		{"mutable, start key after all keys", func() *Iterator {
+			return mutable.Iterator(serializeUint32(7), nil)
+		}},
+		{"immutable, limit key before all keys", func() *Iterator {
+			return immutable.Iterator(nil, serializeUint32(5))
+		}},
+		{"immutable, start key after all keys", func() *Iterator {
+			return immutable.Iterator(serializeUint32(7), nil)
+		}},
+	}
+
+	moves := []struct {
+		name string
+		move func(*Iterator) bool
+	}{
+		{"First", func(iter *Iterator) bool { return iter.First() }},
+		{"Last", func(iter *Iterator) bool { return iter.Last() }},
+		{"Next", func(iter *Iterator) bool { return iter.Next() }},
+		{"Prev", func(iter *Iterator) bool { return iter.Prev() }},
+	}
+
+	// Every key is outside the range, so positioning a new iterator in any
+	// way must leave it exhausted.
+	for _, it := range iterators {
+		for _, m := range moves {
+			iter := it.newIter()
+			if m.move(iter) {
+				t.Errorf("%s, %s: iterator should be exhausted",
+					it.name, m.name)
+			}
+			if gotKey := iter.Key(); gotKey != nil {
+				t.Errorf("%s, %s.Key: should be nil - got %x",
+					it.name, m.name, gotKey)
+			}
+		}
+	}
+}

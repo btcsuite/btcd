@@ -122,12 +122,13 @@ func (iter *Iterator) First() bool {
 		return iter.seek(iter.startKey, true, true)
 	}
 
-	// The smallest key is in the left-most node.
+	// The smallest key is in the left-most node, which can still be at or
+	// past the limit key.
 	iter.parents = parentStack{}
 	for node := iter.root; node != nil; node = node.left {
 		if node.left == nil {
 			iter.node = node
-			return true
+			return iter.limitIterator()
 		}
 		iter.parents.Push(node)
 	}
@@ -146,12 +147,13 @@ func (iter *Iterator) Last() bool {
 		return iter.seek(iter.limitKey, false, false)
 	}
 
-	// The highest key is in the right-most node.
+	// The highest key is in the right-most node, which can still be before
+	// the start key.
 	iter.parents = parentStack{}
 	for node := iter.root; node != nil; node = node.right {
 		if node.right == nil {
 			iter.node = node
-			return true
+			return iter.limitIterator()
 		}
 		iter.parents.Push(node)
 	}
