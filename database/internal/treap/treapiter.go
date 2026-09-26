@@ -123,8 +123,9 @@ func (iter *Iterator) First() bool {
 	}
 
 	// The smallest key is in the left-most node, which can still be at or
-	// past the limit key.
+	// past the limit key.  An empty treap leaves the iterator exhausted.
 	iter.parents = parentStack{}
+	iter.node = nil
 	for node := iter.root; node != nil; node = node.left {
 		if node.left == nil {
 			iter.node = node
@@ -148,8 +149,9 @@ func (iter *Iterator) Last() bool {
 	}
 
 	// The highest key is in the right-most node, which can still be before
-	// the start key.
+	// the start key.  An empty treap leaves the iterator exhausted.
 	iter.parents = parentStack{}
+	iter.node = nil
 	for node := iter.root; node != nil; node = node.right {
 		if node.right == nil {
 			iter.node = node

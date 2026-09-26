@@ -780,3 +780,51 @@ func TestIteratorSingleLimit(t *testing.T) {
 		}
 	}
 }
+
+// TestIteratorEmptiedTreap ensures that First and Last leave an iterator
+// exhausted after a forced reseek once every entry of the mutable treap it was
+// positioned in has been deleted.
+func TestIteratorEmptiedTreap(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		move func(*Iterator) bool
+	}{
+		{"First", func(iter *Iterator) bool { return iter.First() }},
+		{"Last", func(iter *Iterator) bool { return iter.Last() }},
+	}
+
+	for _, test := range tests {
+		// Position an iterator at the only key, then delete the key and
+		// force a reseek.
+		testTreap := NewMutable()
+		testTreap.Put(serializeUint32(5), nil)
+		iter := testTreap.Iterator(nil, nil)
+		if !iter.First() {
+			t.Errorf("%s: unexpected exhausted iterator before the "+
+				"delete", test.name)
+			continue
+		}
+		testTreap.Delete(serializeUint32(5))
+		iter.ForceReseek()
+
+		// Ensure the move reports the iterator exhausted and that it no
+		// longer points at the deleted entry.
+		if test.move(iter) {
+			t.Errorf("%s: iterator should be exhausted", test.name)
+		}
+		if iter.Valid() {
+			t.Errorf("%s.Valid: iterator should be exhausted",
+				test.name)
+		}
+		if gotKey := iter.Key(); gotKey != nil {
+			t.Errorf("%s.Key: should be nil - got %x", test.name,
+				gotKey)
+		}
+		if gotVal := iter.Value(); gotVal != nil {
+			t.Errorf("%s.Value: should be nil - got %x", test.name,
+				gotVal)
+		}
+	}
+}
