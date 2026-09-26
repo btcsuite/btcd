@@ -114,10 +114,13 @@ func (iter *Iterator) seek(key []byte, exactMatch bool, greater bool) bool {
 // single key/value pair both First and Last will point to the same pair.
 // Returns false if there are no key/value pairs.
 func (iter *Iterator) First() bool {
+	// Positioning the iterator discards any reseek requested by ForceReseek.
+	iter.isNew = false
+	iter.seekKey = nil
+
 	// Seek the start key if the iterator was created with one.  This will
 	// result in either an exact match, the first greater key, or an
 	// exhausted iterator if no such key exists.
-	iter.isNew = false
 	if iter.startKey != nil {
 		return iter.seek(iter.startKey, true, true)
 	}
@@ -140,10 +143,13 @@ func (iter *Iterator) First() bool {
 // single key/value pair both First and Last will point to the same pair.
 // Returns false if there are no key/value pairs.
 func (iter *Iterator) Last() bool {
+	// Positioning the iterator discards any reseek requested by ForceReseek.
+	iter.isNew = false
+	iter.seekKey = nil
+
 	// Seek the limit key if the iterator was created with one.  This will
 	// result in the first key smaller than the limit key, or an exhausted
 	// iterator if no such key exists.
-	iter.isNew = false
 	if iter.limitKey != nil {
 		return iter.seek(iter.limitKey, false, false)
 	}
@@ -252,7 +258,9 @@ func (iter *Iterator) Prev() bool {
 // Seek moves the iterator to the first key/value pair with a key that is
 // greater than or equal to the given key and returns true if successful.
 func (iter *Iterator) Seek(key []byte) bool {
+	// Positioning the iterator discards any reseek requested by ForceReseek.
 	iter.isNew = false
+	iter.seekKey = nil
 	return iter.seek(key, true, true)
 }
 

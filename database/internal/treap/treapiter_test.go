@@ -722,6 +722,84 @@ func TestImmutableEmptyIterator(t *testing.T) {
 	}
 }
 
+// TestIteratorRepositionAfterReseek ensures that positioning an iterator with
+// First, Last, or Seek after a forced reseek makes the following Next or Prev
+// move from the new position.
+func TestIteratorRepositionAfterReseek(t *testing.T) {
+	t.Parallel()
+
+	first := func(iter *Iterator) bool { return iter.First() }
+	last := func(iter *Iterator) bool { return iter.Last() }
+	next := func(iter *Iterator) bool { return iter.Next() }
+	prev := func(iter *Iterator) bool { return iter.Prev() }
+	seek := func(key uint32) func(*Iterator) bool {
+		return func(iter *Iterator) bool {
+			return iter.Seek(serializeUint32(key))
+		}
+	}
+
+	tests := []struct {
+		name       string
+		initial    func(*Iterator) bool
+		reposition func(*Iterator) bool
+		move       func(*Iterator) bool
+		want       uint32
+	}{
+		{"First then Next", last, first, next, 4},
+		{"Last then Prev", first, last, prev, 7},
+		{"Seek then Next", first, seek(7), next, 11},
+		{"Seek then Prev", last, seek(4), prev, 2},
+	}
+
+	ranges := []struct {
+		name     string
+		startKey []byte
+		limitKey []byte
+	}{
+		{"no limits", nil, nil},
+		{"limits", serializeUint32(1), serializeUint32(12)},
+	}
+
+	for _, r := range ranges {
+		for _, test := range tests {
+			// Create a treap with the keys (2, 4, 7, 11) and position
+			// an iterator over it.
+			testTreap := NewMutable()
+			for _, key := range []uint32{2, 4, 7, 11} {
+				testTreap.Put(serializeUint32(key), nil)
+			}
+			iter := testTreap.Iterator(r.startKey, r.limitKey)
+			if !test.initial(iter) {
+				t.Errorf("%s, %s: unexpected exhausted iterator "+
+					"before the update", r.name, test.name)
+				continue
+			}
+
+			// Add a key and force a reseek, then position the
+			// iterator.  The keys are now (2, 4, 5, 7, 11).
+			testTreap.Put(serializeUint32(5), nil)
+			iter.ForceReseek()
+			if !test.reposition(iter) {
+				t.Errorf("%s, %s: unexpected exhausted iterator "+
+					"after repositioning", r.name, test.name)
+				continue
+			}
+
+			// Ensure the move starts from the new position.
+			if !test.move(iter) {
+				t.Errorf("%s, %s: unexpected exhausted iterator "+
+					"after the move", r.name, test.name)
+				continue
+			}
+			wantKey := serializeUint32(test.want)
+			if gotKey := iter.Key(); !bytes.Equal(gotKey, wantKey) {
+				t.Errorf("%s, %s: unexpected key - got %x, want %x",
+					r.name, test.name, gotKey, wantKey)
+			}
+		}
+	}
+}
+
 // TestIteratorSingleLimit ensures that iterators created with only a start key
 // or only a limit key stay within their range for both mutable and immutable
 // treaps.
