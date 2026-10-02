@@ -104,8 +104,8 @@ const (
 	sendPostRequestTries = 10
 )
 
-// jsonRequest holds information about a json request that is used
-// to properly detect, interpret, and deliver a reply to it.
+// jsonRequest holds information about a json request that is used to properly
+// detect, interpret, and deliver a reply to it.
 type jsonRequest struct {
 	id             uint64
 	method         string
@@ -844,8 +844,7 @@ retryloop:
 
 		httpResponse, err = httpClient.Do(httpReq)
 
-		// Quit the retry loop on success or if we can't retry
-		// anymore.
+		// Quit the retry loop on success or if we can't retry anymore.
 		if err == nil || i == tries-1 {
 			break
 		}
@@ -1004,11 +1003,22 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 	default:
 	}
 
-	// Normal path: either enqueue, or fail if shutdown closes in the race
-	// window after the guard above.
+	ctx := jReq.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		jReq.responseChan <- &Response{err: err}
+		return
+	}
+
+	// Normal path: enqueue, or fail on shutdown or caller cancellation.
 	select {
 	case c.sendPostChan <- jReq:
 		log.Tracef("Sent command [%s] with id %d", jReq.method, jReq.id)
+
+	case <-ctx.Done():
+		jReq.responseChan <- &Response{err: ctx.Err()}
 
 	case <-c.shutdown:
 		jReq.responseChan <- &Response{
@@ -1091,9 +1101,10 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 }
 
 // SendCmdWithContext sends the passed command with the given context.
-// The context is used to cancel the underlying HTTP request in
-// HTTP POST mode. In websocket mode the context is currently
-// ignored. The returned channel delivers the response.
+// The context cancels enqueueing and the underlying HTTP request in
+// HTTP POST mode. In websocket and batch modes the context is currently
+// ignored. The returned channel delivers the response. Waiting on that
+// channel does not observe cancellation while the request is queued.
 func (c *Client) SendCmdWithContext(ctx context.Context,
 	cmd interface{}) chan *Response {
 
@@ -1115,8 +1126,7 @@ func (c *Client) SendCmdWithContext(ctx context.Context,
 		return newFutureError(err)
 	}
 
-	// Generate the request and send it along with a channel to
-	// respond on.
+	// Generate the request and send it along with a channel to respond on.
 	responseChan := make(chan *Response, 1)
 	jReq := &jsonRequest{
 		id:             id,

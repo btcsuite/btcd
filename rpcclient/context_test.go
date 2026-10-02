@@ -122,11 +122,76 @@ func TestSendCmdWithContextRetryRespectsCancel(t *testing.T) {
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
+	client.Shutdown()
+	client.WaitForShutdown()
 	require.Equal(t, 1, attempts)
 	require.Less(
 		t, elapsed, 2*time.Second,
 		"context cancellation should stop retries promptly",
 	)
+}
+
+// TestGetBlockCountWithContextQueued verifies that cancellation does not
+// wait for a slow legacy call, even when the POST queue is full.
+func TestGetBlockCountWithContextQueued(t *testing.T) {
+	for _, full := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fullQueue=%v", full), func(t *testing.T) {
+			t.Parallel()
+
+			started := make(chan struct{}, 1)
+			release := make(chan struct{})
+			server := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, _ *http.Request) {
+					select {
+					case started <- struct{}{}:
+					default:
+					}
+					<-release
+					fmt.Fprint(w, `{"result":7,"error":null,"id":1}`)
+				},
+			))
+			defer server.Close()
+			client := newTestHTTPClient(t, server)
+			defer func() {
+				client.Shutdown()
+				close(release)
+				client.WaitForShutdown()
+			}()
+
+			legacy := client.GetBlockCountAsync()
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("legacy request did not start")
+			}
+			if full {
+				for i := 0; i < cap(client.sendPostChan); i++ {
+					client.GetBlockCountAsync()
+				}
+			}
+
+			ctx, cancel := context.WithTimeout(
+				context.Background(), 50*time.Millisecond,
+			)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				_, err := client.GetBlockCountWithContext(ctx)
+				done <- err
+			}()
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+			case <-time.After(2 * time.Second):
+				t.Fatal("queued call did not honour its deadline")
+			}
+			select {
+			case <-legacy:
+				t.Fatal("legacy request finished before release")
+			default:
+			}
+		})
+	}
 }
 
 // TestGetBlockCountBackwardsCompatible verifies that the original
