@@ -147,11 +147,8 @@ func (po *POutput) deserialize(r io.Reader) error {
 
 		default:
 			// A fall through case for any proprietary types.
-			keyCodeAndData := append(
-				[]byte{byte(keyCode)}, keyData...,
-			)
 			newUnknown := &Unknown{
-				Key:   keyCodeAndData,
+				Key:   unknownKey(keyCode, keyData),
 				Value: value,
 			}
 

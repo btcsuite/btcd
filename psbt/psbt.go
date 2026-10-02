@@ -270,7 +270,9 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 			// Duplicate keys are not allowed
 			for _, x := range xPubSlice {
-				if bytes.Equal(x.ExtendedKey, keyData) {
+				if bytes.Equal(
+					x.ExtendedKey, xPub.ExtendedKey,
+				) {
 					return nil, ErrDuplicateKey
 				}
 			}
@@ -278,11 +280,8 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			xPubSlice = append(xPubSlice, *xPub)
 
 		default:
-			keyintanddata := []byte{byte(keyint)}
-			keyintanddata = append(keyintanddata, keydata...)
-
 			newUnknown := &Unknown{
-				Key:   keyintanddata,
+				Key:   unknownKey(keyint, keydata),
 				Value: value,
 			}
 			unknownSlice = append(unknownSlice, newUnknown)

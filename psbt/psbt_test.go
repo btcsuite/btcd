@@ -1852,3 +1852,72 @@ func TestUnknowns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, packetWithUnknowns, encoded)
 }
+
+// TestDuplicateXPubRejected checks that a packet with two global XPub
+// entries for the same extended key is rejected when parsed.
+func TestDuplicateXPubRejected(t *testing.T) {
+	xpub, err := hex.DecodeString(
+		"0488b21e000000000000000000873dff81c02f525623fd1fe516" +
+			"7eac3a55a049de3d314bb42ee227ffed37d5080339a360133015" +
+			"97daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2",
+	)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(1000, []byte{txscript.OP_TRUE}))
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	x := XPub{ExtendedKey: xpub, MasterKeyFingerprint: 1}
+	packet.XPubs = []XPub{x, x}
+
+	var buf bytes.Buffer
+	require.NoError(t, packet.Serialize(&buf))
+
+	_, err = NewFromRawBytes(&buf, false)
+	require.ErrorIs(t, err, ErrDuplicateKey)
+}
+
+// TestUnknownMultiByteKeyTypeRoundTrip checks that an unknown input field
+// whose key type needs a multi-byte compact size keeps that key type when the
+// packet is serialized again, instead of being re-read as a known field.
+func TestUnknownMultiByteKeyTypeRoundTrip(t *testing.T) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(1000, []byte{txscript.OP_TRUE}))
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, packet.Serialize(&buf))
+	raw := buf.Bytes()
+
+	// The input map is empty, so its separator is the second to last
+	// byte, right before the separator of the empty output map. Insert
+	// an input field with key type 0x0103 (compact size fd 03 01) and a
+	// four byte value. Truncated to one byte, the key type would read as
+	// PSBT_IN_SIGHASH_TYPE (0x03).
+	field := []byte{0x03, 0xfd, 0x03, 0x01, 0x04, 0x01, 0x00, 0x00, 0x00}
+	crafted := append([]byte{}, raw[:len(raw)-2]...)
+	crafted = append(crafted, field...)
+	crafted = append(crafted, raw[len(raw)-2:]...)
+
+	parsed, err := NewFromRawBytes(bytes.NewReader(crafted), false)
+	require.NoError(t, err)
+	require.Len(t, parsed.Inputs[0].Unknowns, 1)
+	require.Equal(
+		t, []byte{0xfd, 0x03, 0x01}, parsed.Inputs[0].Unknowns[0].Key,
+	)
+
+	var out bytes.Buffer
+	require.NoError(t, parsed.Serialize(&out))
+	require.Equal(t, crafted, out.Bytes())
+
+	reparsed, err := NewFromRawBytes(&out, false)
+	require.NoError(t, err)
+	require.Zero(t, reparsed.Inputs[0].SighashType)
+	require.Len(t, reparsed.Inputs[0].Unknowns, 1)
+}
