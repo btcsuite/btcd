@@ -2,10 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"testing"
 
+	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
@@ -665,4 +669,57 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	results, err = handleGetTxSpendingPrevOut(s, cmd, closeChan)
 	require.NoError(err)
 	require.Equal(expectedResults, results)
+}
+
+// TestHandleVerifyMessageHeaderByte checks that verifymessage treats the
+// signature header byte the way Bitcoin Core does: only the recovery ID and
+// the compressed flag are taken from it, so headers outside 27-34 (such as
+// the BIP 137 ones) still verify, while a header that flips the compressed
+// flag does not.
+func TestHandleVerifyMessageHeaderByte(t *testing.T) {
+	t.Parallel()
+
+	params := &chaincfg.RegressionNetParams
+	s := &rpcServer{cfg: rpcserverConfig{ChainParams: params}}
+
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+	pubKeyHash := address.Hash160(privKey.PubKey().SerializeCompressed())
+	addr, err := address.NewAddressPubKeyHash(pubKeyHash, params)
+	require.NoError(t, err)
+
+	const msg = "header byte test"
+	var buf bytes.Buffer
+	require.NoError(t, wire.WriteVarString(&buf, 0, messageSignatureHeader))
+	require.NoError(t, wire.WriteVarString(&buf, 0, msg))
+	sig := ecdsa.SignCompact(
+		privKey, chainhash.DoubleHashB(buf.Bytes()), true,
+	)
+
+	// The signature is for a compressed key, so its header is 31-34.
+	recID := sig[0] - 31
+
+	verify := func(header byte) bool {
+		t.Helper()
+
+		modified := append([]byte(nil), sig...)
+		modified[0] = header
+		cmd := btcjson.NewVerifyMessageCmd(
+			addr.EncodeAddress(),
+			base64.StdEncoding.EncodeToString(modified), msg,
+		)
+		result, err := handleVerifyMessage(s, cmd, nil)
+		require.NoError(t, err)
+
+		return result.(bool)
+	}
+
+	for header := 0; header < 256; header++ {
+		want := (header-27)&7 == int(recID)+4
+		require.Equalf(t, want, verify(byte(header)), "header %d",
+			header)
+	}
+
+	// The BIP 137 P2WPKH header for this signature.
+	require.True(t, verify(39+recID))
 }
