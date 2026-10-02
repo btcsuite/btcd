@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/require"
@@ -111,6 +112,115 @@ func TestSigNetPowLimit(t *testing.T) {
 // network magic.
 func TestSigNetMagic(t *testing.T) {
 	require.Equal(t, wire.SigNet, SigNetParams.Net)
+}
+
+// TestCustomSignetParamsWithBlockTime checks that custom block intervals are
+// validated and that other signet parameters retain their existing values.
+func TestCustomSignetParamsWithBlockTime(t *testing.T) {
+	t.Parallel()
+
+	challenge := []byte{0x51}
+	seeds := []DNSSeed{{Host: "seed.example", HasFiltering: true}}
+	legacy := CustomSignetParams(challenge, seeds)
+
+	tests := []struct {
+		name     string
+		interval time.Duration
+		wantErr  error
+	}{
+		{
+			name:    "zero",
+			wantErr: ErrInvalidSignetBlockTime,
+		},
+		{
+			name:     "negative",
+			interval: -time.Second,
+			wantErr:  ErrInvalidSignetBlockTime,
+		},
+		{
+			name:     "subsecond",
+			interval: 500 * time.Millisecond,
+			wantErr:  ErrInvalidSignetBlockTime,
+		},
+		{
+			name:     "fractional seconds",
+			interval: 1500 * time.Millisecond,
+			wantErr:  ErrInvalidSignetBlockTime,
+		},
+		{
+			name:     "above timespan",
+			interval: signetTargetTimespan + time.Second,
+			wantErr:  ErrInvalidSignetBlockTime,
+		},
+		{
+			name:     "one second",
+			interval: time.Second,
+		},
+		{
+			name:     "mutinynet",
+			interval: 30 * time.Second,
+		},
+		{
+			name:     "default interval",
+			interval: 10 * time.Minute,
+		},
+		{
+			name:     "nondivisible timespan",
+			interval: 11 * time.Second,
+		},
+		{
+			name:     "equal to timespan",
+			interval: signetTargetTimespan,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			params, err := CustomSignetParamsWithBlockTime(
+				challenge, seeds, tc.interval,
+			)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				require.Equal(t, Params{}, params)
+				return
+			}
+			require.NoError(t, err)
+
+			// Changing the interval must only affect the interval
+			// itself and the value derived from it.
+			expected := legacy
+			expected.TargetTimePerBlock = tc.interval
+			expected.MinDiffReductionTime = tc.interval * 2
+			require.Equal(t, expected, params)
+		})
+	}
+}
+
+// TestCustomSignetParamsEmptyChallenge makes sure that a custom signet cannot
+// be constructed without a block challenge script.
+func TestCustomSignetParamsEmptyChallenge(t *testing.T) {
+	t.Parallel()
+
+	_, err := CustomSignetParamsWithBlockTime(
+		nil, DefaultSignetDNSSeeds, 30*time.Second,
+	)
+	require.ErrorIs(t, err, ErrEmptySignetChallenge)
+}
+
+// TestCustomSignetParamsDefaults makes sure that the default signet parameters
+// are reproduced when the default challenge, seeds and 10-minute interval are
+// passed to the validating constructor.
+func TestCustomSignetParamsDefaults(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, 10*time.Minute, SigNetParams.TargetTimePerBlock)
+
+	params, err := CustomSignetParamsWithBlockTime(
+		DefaultSignetChallenge, DefaultSignetDNSSeeds, 10*time.Minute,
+	)
+	require.NoError(t, err)
+	require.Equal(t, SigNetParams, params)
 }
 
 // compactToBig is a copy of the blockchain.CompactToBig function. We copy it

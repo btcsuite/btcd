@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -65,6 +66,12 @@ var (
 		{"2a01:7c8:d005:390::5", false},
 		{"v7ajjeirttkbnt32wpy3c6w3emwnfr3fkla7hpxcfokr3ysd3kqtzmqd.onion:38333", false},
 	}
+)
+
+const (
+	// signetTargetTimespan is the fixed difficulty retarget timespan for
+	// signet.  It is 14 days, matching the main network.
+	signetTargetTimespan = 14 * 24 * time.Hour
 )
 
 // Checkpoint identifies a known good point in the block chain.  Using
@@ -991,8 +998,50 @@ var SigNetParams = CustomSignetParams(
 
 // CustomSignetParams creates network parameters for a custom signet network
 // from a challenge. The challenge is the binary compiled version of the block
-// challenge script.
+// challenge script. The target block interval is 10 minutes. Use
+// CustomSignetParamsWithBlockTime to configure a different interval.
 func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
+	return customSignetParams(challenge, dnsSeeds, 10*time.Minute)
+}
+
+// CustomSignetParamsWithBlockTime creates network parameters for a custom
+// signet with the given challenge, DNS seeds, and target block interval. The
+// interval must be positive, a whole number of seconds, and no greater than
+// signet's fixed 14-day target timespan. The challenge is the binary compiled
+// version of the block challenge script and must not be empty.
+func CustomSignetParamsWithBlockTime(challenge []byte, dnsSeeds []DNSSeed,
+	blockTime time.Duration) (Params, error) {
+
+	if len(challenge) == 0 {
+		return Params{}, ErrEmptySignetChallenge
+	}
+
+	if blockTime < time.Second {
+		return Params{}, fmt.Errorf("%w: %v is below one second",
+			ErrInvalidSignetBlockTime, blockTime)
+	}
+
+	// Consumers derive the retarget interval from this value in whole
+	// seconds, so reject fractional intervals that would otherwise be
+	// truncated inconsistently.
+	if blockTime%time.Second != 0 {
+		return Params{}, fmt.Errorf("%w: %v is not whole seconds",
+			ErrInvalidSignetBlockTime, blockTime)
+	}
+
+	if blockTime > signetTargetTimespan {
+		return Params{}, fmt.Errorf("%w: %v exceeds timespan %v",
+			ErrInvalidSignetBlockTime, blockTime,
+			signetTargetTimespan)
+	}
+
+	return customSignetParams(challenge, dnsSeeds, blockTime), nil
+}
+
+// customSignetParams constructs signet parameters with the given interval.
+func customSignetParams(challenge []byte, dnsSeeds []DNSSeed,
+	blockTime time.Duration) Params {
+
 	// The message start is defined as the first four bytes of the sha256d
 	// of the challenge script, as a single push (i.e. prefixed with the
 	// challenge script length).
@@ -1020,11 +1069,11 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 		BIP0066Height:            1,
 		CoinbaseMaturity:         100,
 		SubsidyReductionInterval: 210000,
-		TargetTimespan:           time.Hour * 24 * 14, // 14 days
-		TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-		RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+		TargetTimespan:           signetTargetTimespan,
+		TargetTimePerBlock:       blockTime,
+		RetargetAdjustmentFactor: 4, // 25% less, 400% more
 		ReduceMinDifficulty:      false,
-		MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
+		MinDiffReductionTime:     blockTime * 2,
 		GenerateSupported:        false,
 
 		// Checkpoints ordered from oldest to newest.
@@ -1134,6 +1183,15 @@ var (
 	// ErrInvalidHDKeyID describes an error where the provided hierarchical
 	// deterministic version bytes, or hd key id, is malformed.
 	ErrInvalidHDKeyID = errors.New("invalid hd extended key version bytes")
+
+	// ErrEmptySignetChallenge describes an error where custom signet
+	// parameters were requested without a block challenge script.
+	ErrEmptySignetChallenge = errors.New("empty signet challenge")
+
+	// ErrInvalidSignetBlockTime describes an error where the target block
+	// interval for a custom signet is not a positive whole number of
+	// seconds no greater than the signet target timespan.
+	ErrInvalidSignetBlockTime = errors.New("invalid signet block interval")
 )
 
 var (
