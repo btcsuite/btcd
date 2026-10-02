@@ -117,13 +117,12 @@ func TestSendCmdWithContextRetryRespectsCancel(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err := client.GetBlockCountWithContext(ctx)
+	future := client.SendCmdWithContext(ctx, btcjson.NewGetBlockCountCmd())
+	_, err := FutureGetBlockCountResult(future).Receive()
 	elapsed := time.Since(start)
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	client.Shutdown()
-	client.WaitForShutdown()
 	require.Equal(t, 1, attempts)
 	require.Less(
 		t, elapsed, 2*time.Second,
