@@ -369,11 +369,10 @@ func (pi *PInput) deserialize(r io.Reader) error {
 				Value: value,
 			}
 
-			// Duplicate key+keyData are not allowed.
+			// Duplicate key+keyData are not allowed, whatever
+			// the value.
 			for _, x := range pi.Unknowns {
-				if bytes.Equal(x.Key, newUnknown.Key) &&
-					bytes.Equal(x.Value, newUnknown.Value) {
-
+				if bytes.Equal(x.Key, newUnknown.Key) {
 					return ErrDuplicateKey
 				}
 			}

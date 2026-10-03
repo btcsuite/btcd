@@ -1993,3 +1993,50 @@ func TestMultiByteUnsignedTxKeyTypeRejected(t *testing.T) {
 	_, err = NewFromRawBytes(bytes.NewReader(crafted), false)
 	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
 }
+
+// TestDuplicateUnknownKeysRejected checks that an unknown key appearing twice
+// in the same map is rejected, in the global, input and output maps, even
+// when the two values differ. BIP 174 forbids duplicate keys in any map.
+func TestDuplicateUnknownKeysRejected(t *testing.T) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(1000, []byte{txscript.OP_TRUE}))
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, packet.Serialize(&buf))
+	raw := buf.Bytes()
+
+	// The global, input and output separators are the last three bytes,
+	// so inserting before raw[len(raw)-n] targets map 3-n.
+	first := []byte{0x03, 0xfd, 0x03, 0x01, 0x04, 0x01, 0x00, 0x00, 0x00}
+	second := []byte{0x03, 0xfd, 0x03, 0x01, 0x04, 0x02, 0x00, 0x00, 0x00}
+
+	tests := []struct {
+		name   string
+		offset int
+		fields [][]byte
+	}{
+		{"global same value", 3, [][]byte{first, first}},
+		{"global different value", 3, [][]byte{first, second}},
+		{"input different value", 2, [][]byte{first, second}},
+		{"output different value", 1, [][]byte{first, second}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pos := len(raw) - tc.offset
+			crafted := append([]byte{}, raw[:pos]...)
+			for _, f := range tc.fields {
+				crafted = append(crafted, f...)
+			}
+			crafted = append(crafted, raw[pos:]...)
+
+			_, err := NewFromRawBytes(
+				bytes.NewReader(crafted), false,
+			)
+			require.ErrorIs(t, err, ErrDuplicateKey)
+		})
+	}
+}

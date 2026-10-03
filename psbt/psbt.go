@@ -286,6 +286,15 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 				Key:   unknownKey(keyint, keydata),
 				Value: value,
 			}
+
+			// Duplicate key+keyData are not allowed, whatever
+			// the value.
+			for _, x := range unknownSlice {
+				if bytes.Equal(x.Key, newUnknown.Key) {
+					return nil, ErrDuplicateKey
+				}
+			}
+
 			unknownSlice = append(unknownSlice, newUnknown)
 		}
 	}
