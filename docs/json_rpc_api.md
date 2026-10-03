@@ -27,7 +27,7 @@
 
 ### 1. Overview
 
-btcd provides a [JSON-RPC](http://json-rpc.org/wiki/specification) API that is
+btcd provides a [JSON-RPC](https://www.jsonrpc.org/specification) API that is
 fully compatible with the original bitcoind/bitcoin-qt.  There are a few key
 differences between btcd and bitcoind as far as how RPCs are serviced:
 * Unlike bitcoind that has the wallet and chain intermingled in the same process
