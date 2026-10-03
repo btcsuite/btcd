@@ -1921,3 +1921,75 @@ func TestUnknownMultiByteKeyTypeRoundTrip(t *testing.T) {
 	require.Zero(t, reparsed.Inputs[0].SighashType)
 	require.Len(t, reparsed.Inputs[0].Unknowns, 1)
 }
+
+// TestUnknownMultiByteGlobalKeyType checks that a global field whose key type
+// needs a multi-byte compact size is not dispatched as a known global type
+// after the key type is truncated to one byte.
+func TestUnknownMultiByteGlobalKeyType(t *testing.T) {
+	xpub, err := hex.DecodeString(
+		"0488b21e000000000000000000873dff81c02f525623fd1fe516" +
+			"7eac3a55a049de3d314bb42ee227ffed37d5080339a360133015" +
+			"97daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2",
+	)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(1000, []byte{txscript.OP_TRUE}))
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, packet.Serialize(&buf))
+	raw := buf.Bytes()
+
+	// The global separator is the third to last byte, before the
+	// separators of the empty input and output maps. Insert a global
+	// field with key type 0x0101 (compact size fd 01 01) followed by a
+	// well-formed xpub as key data. Truncated to one byte, the key type
+	// would read as PSBT_GLOBAL_XPUB (0x01).
+	key := append([]byte{0xfd, 0x01, 0x01}, xpub...)
+	field := append([]byte{byte(len(key))}, key...)
+	field = append(field, 0x04, 0xde, 0xad, 0xbe, 0xef)
+	crafted := append([]byte{}, raw[:len(raw)-3]...)
+	crafted = append(crafted, field...)
+	crafted = append(crafted, raw[len(raw)-3:]...)
+
+	parsed, err := NewFromRawBytes(bytes.NewReader(crafted), false)
+	require.NoError(t, err)
+	require.Empty(t, parsed.XPubs)
+	require.Len(t, parsed.Unknowns, 1)
+	require.Equal(t, key, parsed.Unknowns[0].Key)
+
+	var out bytes.Buffer
+	require.NoError(t, parsed.Serialize(&out))
+	require.Equal(t, crafted, out.Bytes())
+}
+
+// TestMultiByteUnsignedTxKeyTypeRejected checks that the first global field
+// is only accepted as the unsigned transaction when its key type is exactly
+// PSBT_GLOBAL_UNSIGNED_TX, not a multi-byte key type that truncates to it.
+func TestMultiByteUnsignedTxKeyTypeRejected(t *testing.T) {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{}, nil, nil))
+	tx.AddTxOut(wire.NewTxOut(1000, []byte{txscript.OP_TRUE}))
+
+	packet, err := NewFromUnsignedTx(tx)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, packet.Serialize(&buf))
+	raw := buf.Bytes()
+
+	// Replace the key of the unsigned transaction field (01 00, right
+	// after the five magic bytes) with key type 0x0100 (compact size
+	// fd 00 01), which truncates to PSBT_GLOBAL_UNSIGNED_TX (0x00).
+	require.Equal(t, []byte{0x01, 0x00}, raw[5:7])
+	crafted := append([]byte{}, raw[:5]...)
+	crafted = append(crafted, 0x03, 0xfd, 0x00, 0x01)
+	crafted = append(crafted, raw[7:]...)
+
+	_, err = NewFromRawBytes(bytes.NewReader(crafted), false)
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+}

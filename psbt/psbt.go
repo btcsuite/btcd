@@ -217,7 +217,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if GlobalType(keyCode) != UnsignedTxType || keyData != nil {
+	if keyCode != int(UnsignedTxType) || keyData != nil {
 		return nil, ErrInvalidPsbtFormat
 	}
 
@@ -261,8 +261,10 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			return nil, err
 		}
 
-		switch GlobalType(keyint) {
-		case XPubType:
+		// GlobalType is a uint8, so compare the key type as an int to
+		// keep multi-byte key types from truncating into a known type.
+		switch {
+		case keyint == int(XPubType):
 			xPub, err := ReadXPub(keydata, value)
 			if err != nil {
 				return nil, err
