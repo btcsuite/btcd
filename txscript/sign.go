@@ -6,6 +6,7 @@ package txscript
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -15,13 +16,37 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
+// checkSigHashSingle returns an error if hashType is SigHashSingle and tx has
+// no output at index idx. A signature for such an input commits to no output
+// at all, as legacy inputs sign the constant hash one and segwit v0 inputs
+// zero out hashOutputs. It would stay valid however the outputs are changed
+// while the matching output remains absent, letting anyone holding it
+// redirect the funds, so it must not be produced.
+func checkSigHashSingle(tx *wire.MsgTx, idx int, hashType SigHashType) error {
+	if hashType&sigHashMask != SigHashSingle || idx < len(tx.TxOut) {
+		return nil
+	}
+
+	str := fmt.Sprintf("attempt to sign single input at index %d >= %d "+
+		"outputs", idx, len(tx.TxOut))
+
+	return scriptError(ErrInvalidSigHashSingleIndex, str)
+}
+
 // RawTxInWitnessSignature returns the serialized ECDA signature for the input
 // idx of the given transaction, with the hashType appended to it. This
 // function is identical to RawTxInSignature, however the signature generated
 // signs a new sighash digest defined in BIP0143.
+//
+// An ErrInvalidSigHashSingleIndex error is returned if hashType is
+// SigHashSingle and the transaction has no output at index idx.
 func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 	amt int64, subScript []byte, hashType SigHashType,
 	key *btcec.PrivateKey) ([]byte, error) {
+
+	if err := checkSigHashSingle(tx, idx, hashType); err != nil {
+		return nil, err
+	}
 
 	hash, err := calcWitnessSignatureHashRaw(subScript, sigHashes, hashType, tx,
 		idx, amt)
@@ -173,8 +198,15 @@ func RawTxInTapscriptSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of
 // the given transaction, with hashType appended to it.
+//
+// An ErrInvalidSigHashSingleIndex error is returned if hashType is
+// SigHashSingle and the transaction has no output at index idx.
 func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
 	hashType SigHashType, key *btcec.PrivateKey) ([]byte, error) {
+
+	if err := checkSigHashSingle(tx, idx, hashType); err != nil {
+		return nil, err
+	}
 
 	hash, err := CalcSignatureHash(subScript, hashType, tx, idx)
 	if err != nil {
@@ -550,6 +582,12 @@ func (sc ScriptClosure) GetScript(address address.Address) ([]byte, error) {
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependent manner with the newly generated.
 // signature script.
+//
+// For multisig scripts, keys that are missing or fail to sign are skipped, so
+// an incomplete script can be returned with a nil error. This includes the
+// case where hashType is SigHashSingle and tx has no output at index idx,
+// which pay-to-pubkey and pay-to-pubkey-hash scripts report as
+// ErrInvalidSigHashSingleIndex.
 //
 // NOTE: This function is only valid for version 0 scripts.  Since the function
 // does not accept a script version, the results are undefined for other script
