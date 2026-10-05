@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"runtime"
 	"testing"
 
 	"github.com/btcsuite/btcd/chainhash/v2"
@@ -29,13 +30,14 @@ func countPayload(t *testing.T, prefix []byte, count uint64) []byte {
 }
 
 // TestTruncatedVectorDecodeBudget ensures a legal maximum element count cannot
-// reserve the corresponding maximum slice when no elements follow it.
+// reserve the corresponding maximum slice when no elements follow it.  Each
+// decode must fail on the truncated payload while having reserved no element
+// storage at all.
 func TestTruncatedVectorDecodeBudget(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload []byte
 		decode  func(io.Reader) (int, error)
-		maxCap  int
 	}{
 		{
 			name:    "inventory",
@@ -45,7 +47,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.InvList), err
 			},
-			maxCap: 0,
 		},
 		{
 			name:    "getdata",
@@ -55,7 +56,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.InvList), err
 			},
-			maxCap: 0,
 		},
 		{
 			name:    "notfound",
@@ -65,7 +65,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.InvList), err
 			},
-			maxCap: 0,
 		},
 		{
 			name:    "addresses",
@@ -75,7 +74,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.AddrList), err
 			},
-			maxCap: 0,
 		},
 		{
 			name:    "addresses v2",
@@ -85,7 +83,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.AddrList), err
 			},
-			maxCap: 0,
 		},
 		{
 			name:    "headers",
@@ -95,7 +92,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.Headers), err
 			},
-			maxCap: 0,
 		},
 		{
 			name: "getblocks locators",
@@ -107,7 +103,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.BlockLocatorHashes), err
 			},
-			maxCap: 0,
 		},
 		{
 			name: "getheaders locators",
@@ -119,7 +114,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.BlockLocatorHashes), err
 			},
-			maxCap: 0,
 		},
 		{
 			name: "compact filter headers",
@@ -131,7 +125,6 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.FilterHashes), err
 			},
-			maxCap: 0,
 		},
 		{
 			name: "compact filter checkpoints",
@@ -143,20 +136,17 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.FilterHeaders), err
 			},
-			maxCap: 0,
 		},
 		{
 			name: "merkle block hashes",
 			payload: countPayload(
-				t, make([]byte, MaxBlockHeaderPayload+4),
-				maxTxPerBlock,
+				t, make([]byte, MaxBlockHeaderPayload+4), maxTxPerBlock,
 			),
 			decode: func(r io.Reader) (int, error) {
 				var msg MsgMerkleBlock
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.Hashes), err
 			},
-			maxCap: 0,
 		},
 		{
 			name: "block transactions",
@@ -168,7 +158,25 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 				err := msg.BtcDecode(r, ProtocolVersion, BaseEncoding)
 				return cap(msg.Transactions), err
 			},
-			maxCap: 0,
+		},
+		{
+			name: "block transaction locations",
+			payload: countPayload(
+				t, make([]byte, MaxBlockHeaderPayload), maxTxPerBlock,
+			),
+			decode: func(r io.Reader) (int, error) {
+				// DeserializeTxLoc takes a *bytes.Buffer rather
+				// than a generic io.Reader, so copy the payload
+				// into one.  The copy is made by the test, not
+				// the decode being measured.
+				data, readErr := io.ReadAll(r)
+				if readErr != nil {
+					return 0, readErr
+				}
+				var msg MsgBlock
+				_, err := msg.DeserializeTxLoc(bytes.NewBuffer(data))
+				return cap(msg.Transactions), err
+			},
 		},
 	}
 
@@ -178,9 +186,9 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected a truncated payload error")
 			}
-			if capacity > test.maxCap {
-				t.Fatalf("decode reserved %d elements, want at most %d",
-					capacity, test.maxCap)
+			if capacity != 0 {
+				t.Fatalf("decode reserved %d elements, want 0",
+					capacity)
 			}
 		})
 	}
@@ -303,6 +311,38 @@ func TestTruncatedVariableBytesBudget(t *testing.T) {
 		t.Fatalf("direct read reserved %d bytes, want at most %d", capacity,
 			defaultReadBufferSize)
 	}
+
+	// A read that claims the maximum but delivers progressively more
+	// bytes must reserve memory proportional to what was delivered, not
+	// to what was claimed: each truncated read hands back only the bytes
+	// that actually arrived, staged in bounded chunks.
+	for _, delivered := range []int{
+		1, defaultReadBufferSize, 3*defaultReadBufferSize + 7,
+	} {
+		result, err := readBytes(
+			&readSizeRecorder{reader: bytes.NewReader(
+				make([]byte, delivered),
+			)},
+			MaxMessagePayload,
+		)
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("delivered %d bytes: unexpected error: got %v, "+
+				"want %v", delivered, err, io.ErrUnexpectedEOF)
+		}
+		if len(result) != delivered {
+			t.Fatalf("delivered %d bytes: read returned %d bytes, "+
+				"want %d", delivered, len(result), delivered)
+		}
+
+		// The staged chunks hold the delivered bytes in geometrically
+		// sized pieces, so the total reservation may exceed the
+		// delivered length by at most one final chunk.
+		if capacity := cap(result); capacity > delivered+defaultReadBufferSize {
+			t.Fatalf("delivered %d bytes: read reserved %d bytes, "+
+				"want at most %d", delivered, capacity,
+				delivered+defaultReadBufferSize)
+		}
+	}
 }
 
 // TestCompleteStreamingBytesCapacity ensures a complete opaque read returns an
@@ -345,9 +385,22 @@ func TestStreamingBytesPreservesBoundaryError(t *testing.T) {
 	}
 }
 
+// readSizeRecorder wraps a reader so decoders cannot measure the number of
+// bytes it has remaining, which forces every speculative-read guard to take
+// its streaming path.  It also records the largest single read the caller
+// requested, so a decode that reserved or demanded a huge buffer up front is
+// detectable as an oversized request rather than only as an allocation.
 type readSizeRecorder struct {
 	reader io.Reader
 	max    int
+}
+
+func (r *readSizeRecorder) Read(p []byte) (int, error) {
+	if len(p) > r.max {
+		r.max = len(p)
+	}
+
+	return r.reader.Read(p)
 }
 
 type boundaryErrorReader struct {
@@ -378,14 +431,6 @@ func (r *inflatedLenReader) Len() int {
 	return r.length
 }
 
-func (r *readSizeRecorder) Read(p []byte) (int, error) {
-	if len(p) > r.max {
-		r.max = len(p)
-	}
-
-	return r.reader.Read(p)
-}
-
 // TestTruncatedMessagePayloadBudget ensures the v1 frame reader does not
 // reserve or request the full payload after receiving only its header.
 func TestTruncatedMessagePayloadBudget(t *testing.T) {
@@ -400,6 +445,32 @@ func TestTruncatedMessagePayloadBudget(t *testing.T) {
 	if reader.max > defaultReadBufferSize {
 		t.Fatalf("payload read requested %d bytes, want at most %d",
 			reader.max, defaultReadBufferSize)
+	}
+
+	// The header claims the protocol maximum payload, so a decoder that
+	// trusted the claim would reserve tens of megabytes before any
+	// payload bytes arrived.  Measure the total bytes allocated while
+	// reading the truncated message and require the reservation to stay
+	// far below the claimed payload.
+	runs := 100
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	for i := 0; i < runs; i++ {
+		_, _, _, err := ReadMessageN(
+			&readSizeRecorder{reader: bytes.NewReader(header)},
+			ProtocolVersion, MainNet,
+		)
+		if err == nil {
+			t.Fatal("expected a truncated payload error")
+		}
+	}
+	runtime.ReadMemStats(&after)
+	totalAlloc := after.TotalAlloc - before.TotalAlloc
+	if budget := uint64(runs) * (1 << 20); totalAlloc > budget {
+		t.Fatalf("truncated header read allocated %d bytes across %d "+
+			"runs, want at most %d (the header claims a %d byte "+
+			"payload)", totalAlloc, runs, budget,
+			MaxProtocolMessageLength)
 	}
 
 	payload := append(makeHeader(MainNet, CmdPing, 8, 0), 0x01)
@@ -449,6 +520,9 @@ func TestStreamingTxDecodeBudget(t *testing.T) {
 		t.Fatalf("unable to encode transaction: %v", err)
 	}
 
+	// The readSizeRecorder hides the reader's remaining length, which is
+	// what forces the decode to grow its element storage instead of
+	// preallocating the full count the way a buffered reader would.
 	reader := &readSizeRecorder{
 		reader: bytes.NewReader(encoded.Bytes()),
 	}
@@ -457,6 +531,15 @@ func TestStreamingTxDecodeBudget(t *testing.T) {
 		reader, ProtocolVersion, WitnessEncoding,
 	); err != nil {
 		t.Fatalf("unable to decode transaction: %v", err)
+	}
+
+	if len(decoded.TxIn) != elementCount {
+		t.Fatalf("decoded %d inputs, want %d", len(decoded.TxIn),
+			elementCount)
+	}
+	if cap(decoded.TxIn) > 2*elementCount {
+		t.Fatalf("streaming decode reserved %d input slots, want at "+
+			"most %d", cap(decoded.TxIn), 2*elementCount)
 	}
 
 	var reencoded bytes.Buffer
@@ -489,6 +572,9 @@ func TestStreamingCFCheckptDecodeBudget(t *testing.T) {
 		t.Fatalf("unable to encode checkpoint: %v", err)
 	}
 
+	// As above, the recorder hides the remaining length so the checkpoint
+	// hash vector must grow as hashes arrive rather than being
+	// preallocated from the claimed count.
 	reader := &readSizeRecorder{
 		reader: bytes.NewReader(encoded.Bytes()),
 	}
@@ -497,6 +583,15 @@ func TestStreamingCFCheckptDecodeBudget(t *testing.T) {
 		reader, ProtocolVersion, BaseEncoding,
 	); err != nil {
 		t.Fatalf("unable to decode checkpoint: %v", err)
+	}
+
+	if len(decoded.FilterHeaders) != headerCount {
+		t.Fatalf("decoded %d checkpoint headers, want %d",
+			len(decoded.FilterHeaders), headerCount)
+	}
+	if cap := cap(decoded.FilterHeaders); cap > 2*headerCount {
+		t.Fatalf("streaming decode reserved %d checkpoint slots, "+
+			"want at most %d", cap, 2*headerCount)
 	}
 
 	var reencoded bytes.Buffer
