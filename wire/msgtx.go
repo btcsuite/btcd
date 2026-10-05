@@ -963,11 +963,7 @@ func NewMsgTx(version int32) *MsgTx {
 
 // readOutPointBuf reads the next sequence of bytes from r as an OutPoint.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readOutPointBuf(r io.Reader, pver uint32, version int32, op *OutPoint,
 	buf []byte) error {
 
@@ -997,11 +993,7 @@ func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 // writeOutPointBuf encodes op to the bitcoin protocol encoding for an OutPoint
 // to w.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 	buf []byte) error {
 
@@ -1025,11 +1017,7 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 // parameter is only used for the error message so it provides more context in
 // the error.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readScriptBuf(r io.Reader, pver uint32, buf []byte, ar *scriptArena,
 	fieldName string) ([]byte, error) {
 
@@ -1069,11 +1057,7 @@ func readScriptBuf(r io.Reader, pver uint32, buf []byte, ar *scriptArena,
 // readTxInBuf reads the next sequence of bytes from r as a transaction input
 // (TxIn).
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 	buf []byte, ar *scriptArena) error {
 
@@ -1099,9 +1083,8 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 }
 
 // writeTxInBuf encodes ti to the bitcoin protocol encoding for a transaction
-// input (TxIn) to w. If b is non-nil, the provided buffer will be used for
-// serializing small values. Otherwise a buffer will be drawn from the
-// binarySerializer's pool and return when the method finishes.
+// input (TxIn) to w.  The buf parameter is the scratch buffer used for
+// serializing small values.
 func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
 	buf []byte) error {
 
@@ -1146,9 +1129,8 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 }
 
 // readTxOutBuf reads the next sequence of bytes from r as a transaction output
-// (TxOut). If b is non-nil, the provided buffer will be used for serializing
-// small values. Otherwise a buffer will be drawn from the binarySerializer's
-// pool and return when the method finishes.
+// (TxOut).  The buf parameter is the scratch buffer used for serializing
+// small values.
 func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	buf []byte, ar *scriptArena) error {
 
@@ -1178,9 +1160,8 @@ func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 }
 
 // WriteTxOutBuf encodes to into the bitcoin protocol encoding for a transaction
-// output (TxOut) to w. If b is non-nil, the provided buffer will be used for
-// serializing small values. Otherwise a buffer will be drawn from the
-// binarySerializer's pool and return when the method finishes.
+// output (TxOut) to w.  The buf parameter is the scratch buffer used for
+// serializing small values.
 //
 // NOTE: This function is exported in order to allow txscript to compute the
 // new sighashes for witness transactions (BIP0143).
@@ -1197,9 +1178,8 @@ func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
 }
 
 // writeTxWitnessBuf encodes the bitcoin protocol encoding for a transaction
-// input's witness into to w. If b is non-nil, the provided buffer will be used
-// for serializing small values. Otherwise a buffer will be drawn from the
-// binarySerializer's pool and return when the method finishes.
+// input's witness into to w.  The buf parameter is the scratch buffer used
+// for serializing small values.
 func writeTxWitnessBuf(w io.Writer, pver uint32, version int32, wit [][]byte,
 	buf []byte) error {
 

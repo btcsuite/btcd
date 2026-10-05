@@ -20,13 +20,17 @@ func FuzzTxDecode(f *testing.F) {
 	if err := blockOne.Transactions[0].Serialize(&seed); err != nil {
 		f.Fatal(err)
 	}
-	f.Add(seed.Bytes())
+	f.Add(bytes.Clone(seed.Bytes()))
 
 	seed.Reset()
 	if err := multiTx.Serialize(&seed); err != nil {
 		f.Fatal(err)
 	}
-	f.Add(seed.Bytes())
+	// The seed must be cloned rather than added directly: f.Add keeps a
+	// reference to the slice it is given, and reusing the buffer below
+	// would overwrite the coinbase seed before the corpus entry ever
+	// runs.
+	f.Add(bytes.Clone(seed.Bytes()))
 
 	f.Add(multiWitnessTxEncoded)
 
@@ -74,7 +78,7 @@ func FuzzBlockDecode(f *testing.F) {
 	if err := blockOne.Serialize(&seed); err != nil {
 		f.Fatal(err)
 	}
-	f.Add(seed.Bytes())
+	f.Add(bytes.Clone(seed.Bytes()))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var block MsgBlock

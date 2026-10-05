@@ -770,11 +770,7 @@ func ReadVarString(r io.Reader, pver uint32) (string, error) {
 // maximum block payload size since it helps protect against memory exhaustion
 // attacks and forced panics through malformed messages.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readVarStringBuf(r io.Reader, pver uint32, buf []byte) (string, error) {
 	count, err := ReadVarIntBuf(r, pver, buf)
 	if err != nil {
@@ -812,11 +808,7 @@ func WriteVarString(w io.Writer, pver uint32, str string) error {
 // the length of the string followed by the bytes that represent the string
 // itself.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeVarStringBuf(w io.Writer, pver uint32, str string, buf []byte) error {
 	err := WriteVarIntBuf(w, pver, uint64(len(str)), buf)
 	if err != nil {
@@ -850,9 +842,9 @@ func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 // passed maxAllowed parameter which helps protect against memory exhaustion
 // attacks and forced panics through malformed messages.  The fieldName
 // parameter is only used for the error message so it provides more context in
-// the error. If b is non-nil, the provided buffer will be used for serializing
-// small values. Otherwise a buffer will be drawn from the binarySerializer's
-// pool and return when the method finishes.
+// the error.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func ReadVarBytesBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32,
 	fieldName string) ([]byte, error) {
 

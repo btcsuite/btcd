@@ -130,6 +130,9 @@ func BenchmarkTruncatedDecodeBudget(b *testing.B) {
 	})
 
 	b.Run("merkle_hashes", func(b *testing.B) {
+		// The 80-byte block header followed by the 4-byte total transaction
+		// count are read by MsgMerkleBlock.BtcDecode before the hash count
+		// varint.
 		payload := benchmarkCountPayload(
 			b, make([]byte, MaxBlockHeaderPayload+4), maxTxPerBlock,
 		)
@@ -201,6 +204,8 @@ func BenchmarkTruncatedDecodeBudget(b *testing.B) {
 	})
 
 	b.Run("streaming_filter_checkpoints", func(b *testing.B) {
+		// The 1-byte filter type followed by the 32-byte stop hash are read
+		// by MsgCFCheckpt.BtcDecode before the filter header count varint.
 		payload := benchmarkCountPayload(
 			b, make([]byte, 33), maxCFHeadersLen,
 		)
