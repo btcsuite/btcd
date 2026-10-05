@@ -107,7 +107,7 @@ func (msg *MsgBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) er
 	// transaction's btcDecode rewinds it, which is safe because the
 	// scripts are copied into their final exactly-sized buffer before the
 	// next transaction is decoded.
-	ar := borrowScriptArena(blockScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	msg.Transactions = make([]*MsgTx, 0, txCount)
@@ -188,7 +188,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, error) {
 		return nil, err
 	}
 
-	ar := borrowScriptArena(blockScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	// Deserialize each transaction while keeping track of its location

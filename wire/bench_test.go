@@ -445,7 +445,7 @@ func BenchmarkReadTxOut(b *testing.B) {
 func BenchmarkReadTxOutBuf(b *testing.B) {
 	b.ReportAllocs()
 
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	buffer := binarySerializer.Borrow()
 	buf := []byte{
 		0x00, 0xf2, 0x05, 0x2a, 0x01, 0x00, 0x00, 0x00, // Transaction amount
@@ -502,7 +502,7 @@ func BenchmarkWriteTxOutBuf(b *testing.B) {
 func BenchmarkReadTxIn(b *testing.B) {
 	b.ReportAllocs()
 
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	buffer := binarySerializer.Borrow()
 	buf := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

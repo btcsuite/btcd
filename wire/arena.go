@@ -47,17 +47,6 @@ const (
 	// passing the arena capacity check can be satisfied by one chunk;
 	// the compile-time assertion below enforces the coupling.
 	maxScriptChunkSize = 1 << 22
-
-	// txScriptChunkClass is the chunk size class used as the starting
-	// point when decoding standalone transactions.  See
-	// scriptChunkClasses.
-	txScriptChunkClass = 0
-
-	// blockScriptChunkClass is the chunk size class used as the starting
-	// point when decoding full blocks. The arena is rewound between each
-	// transaction, so blocks have the same initial requirement as standalone
-	// transactions and grow only when an individual transaction requires it.
-	blockScriptChunkClass = txScriptChunkClass
 )
 
 // scriptChunkClasses defines the ladder of chunk sizes that back script
@@ -150,9 +139,13 @@ var scriptChunkPools = func() [len(scriptChunkClasses)]*chunkClassPool {
 	return pools
 }()
 
-// putScriptChunk returns a chunk to the pool for its size class.  Chunks are
-// only ever created by the class pools, so their lengths always match a class
-// size exactly; anything else indicates internal corruption.
+// putScriptChunk returns a chunk to the pool for its size class.  Chunks
+// are only ever created by the class pools, so their lengths always match a
+// class size exactly.  A chunk whose size matches no class can only mean
+// internal corruption, and reusing it would hand some future allocation a
+// buffer too small for the capacity it was granted, so a slice bounds check
+// would panic deep inside a decode.  Failing loudly here instead pinpoints
+// the corruption at the source.
 func putScriptChunk(chunk *[]byte) {
 	for i, size := range scriptChunkClasses {
 		if len(*chunk) == size {
@@ -193,10 +186,6 @@ type scriptArena struct {
 	// decode limit previously enforced by the fixed slab size.
 	used int
 
-	// class is the size class index the next chunk will be drawn from
-	// (at minimum) when the current chunk is exhausted.
-	class int
-
 	// dead marks an arena that has been released. A dead arena rejects all
 	// allocations and ignores rewinds until the arena is borrowed again.
 	// Arenas have a single lexical owner and references must not be retained
@@ -212,19 +201,15 @@ var scriptArenaPool = sync.Pool{
 	},
 }
 
-// borrowScriptArena returns an arena that will serve its first allocation
-// from a chunk of the given starting size class.  The startClass must be a
-// valid index into scriptChunkClasses; all callers pass one of the
-// *ScriptChunkClass constants.  Chunks are borrowed lazily, so an arena
-// that never allocates never touches the chunk pools.  The returned arena
-// must be handed back via release.
+// borrowScriptArena returns an arena ready to stage script data.  Chunks
+// are borrowed lazily, so an arena that never allocates never touches the
+// chunk pools.  The returned arena must be handed back via release.
 //
 // Forgetting to call release is safe in the memory sense: the chunks are
 // ordinary garbage collected slices, so an abandoned arena is simply
 // reclaimed by the GC and only the pooling benefit is lost.
-func borrowScriptArena(startClass int) *scriptArena {
+func borrowScriptArena() *scriptArena {
 	a := scriptArenaPool.Get().(*scriptArena)
-	a.class = startClass
 	a.used = 0
 	a.dead = false
 	return a
@@ -243,9 +228,12 @@ func (a *scriptArena) remaining() int {
 // path fills every allocation with io.ReadFull).
 //
 // alloc fails with errScriptArenaFull once the total bytes handed out since
-// the last rewind would exceed scriptArenaMaxAlloc.
+// the last rewind would exceed scriptArenaMaxAlloc, and for any negative
+// size.  The decode path never passes a negative size, but rejecting one
+// here keeps alloc total on any input rather than panicking on the slice
+// bounds below, which the remaining-budget check alone does not catch.
 func (a *scriptArena) alloc(n int) ([]byte, error) {
-	if n > a.remaining() {
+	if n < 0 || n > a.remaining() {
 		return nil, errScriptArenaFull
 	}
 	if n > len(a.cur)-a.off {
@@ -275,24 +263,22 @@ func (a *scriptArena) allocSlow(n int) ([]byte, error) {
 }
 
 // grow borrows a new chunk large enough to hold n bytes and makes it the
-// current chunk.  The new chunk comes from the next size class in the ladder
-// so repeated growth converges to the largest class in a constant number of
-// steps.  Any request is satisfiable because callers bound n by the arena
-// capacity, which equals the largest class size.
+// current chunk.  The chunk comes from the smallest size class that
+// holds both n and one more byte than the current chunk, so consecutive
+// growths walk up the ladder and converge to the largest class in a
+// constant number of steps without any per-arena class bookkeeping.  Any
+// request is satisfiable because callers bound n by the arena capacity,
+// which equals the largest class size.
 func (a *scriptArena) grow(n int) {
-	class := a.class
-	if class >= len(scriptChunkClasses) {
-		class = len(scriptChunkClasses) - 1
-	}
-	for class < len(scriptChunkClasses)-1 && scriptChunkClasses[class] < n {
-		class++
+	sizeClass := 0
+	for scriptChunkClasses[sizeClass] < max(n, len(a.cur)+1) {
+		sizeClass++
 	}
 
-	chunk := scriptChunkPools[class].get()
+	chunk := scriptChunkPools[sizeClass].get()
 	a.chunks = append(a.chunks, chunk)
 	a.cur = *chunk
 	a.off = 0
-	a.class = class + 1
 }
 
 // rewind resets the arena so previously allocated memory is reused from the
@@ -347,15 +333,8 @@ func (a *scriptArena) rewindSlow() {
 
 	a.chunks = append(a.chunks[:0], keep)
 	a.cur = *keep
-
-	// The next grow should pick up where the retained chunk's class
-	// leaves off.
-	for i, size := range scriptChunkClasses {
-		if size == len(*keep) {
-			a.class = i + 1
-			break
-		}
-	}
+	// Nothing else to do: grow derives the next class from the retained
+	// chunk's size, so there is no class cursor to reposition.
 }
 
 // release returns every chunk to its class pool and recycles the arena
@@ -377,7 +356,6 @@ func (a *scriptArena) release() {
 	a.chunks = a.chunks[:0]
 	a.cur = nil
 	a.off = 0
-	a.class = 0
 
 	// Poison the capacity so any alloc through a stale reference fails
 	// with errScriptArenaFull rather than succeeding against recycled

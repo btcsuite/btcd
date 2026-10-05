@@ -117,7 +117,7 @@ func TestScriptArenaPropertyTxRoundTrip(t *testing.T) {
 		var wireBuf bytes.Buffer
 		require.NoError(rt, tx.Serialize(&wireBuf))
 
-		ar := borrowScriptArena(txScriptChunkClass)
+		ar := borrowScriptArena()
 		defer ar.release()
 
 		buf := binarySerializer.Borrow()
@@ -181,11 +181,7 @@ func TestScriptArenaPropertyBlockRoundTrip(t *testing.T) {
 // accounting and that live allocations never alias one another.
 func TestScriptArenaPropertyAllocator(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
-		startClass := rapid.IntRange(
-			0, len(scriptChunkClasses)-1,
-		).Draw(rt, "startClass")
-
-		ar := borrowScriptArena(startClass)
+		ar := borrowScriptArena()
 		defer ar.release()
 
 		type allocation struct {
@@ -245,8 +241,8 @@ func TestScriptArenaPropertyAllocator(t *testing.T) {
 // TestReadTxOutOwnedScript ensures the script returned by the exported
 // ReadTxOut has an exact-sized backing allocation owned by the output.
 func TestReadTxOutOwnedScript(t *testing.T) {
-	class := txScriptChunkClass
-	size := scriptChunkClasses[class]
+	const sizeClass = 0
+	size := scriptChunkClasses[sizeClass]
 	testPool := &chunkClassPool{
 		fixed: make(chan *[]byte, 1),
 		pool: sync.Pool{
@@ -257,10 +253,10 @@ func TestReadTxOutOwnedScript(t *testing.T) {
 		},
 	}
 
-	origPool := scriptChunkPools[class]
-	scriptChunkPools[class] = testPool
+	origPool := scriptChunkPools[sizeClass]
+	scriptChunkPools[sizeClass] = testPool
 	t.Cleanup(func() {
-		scriptChunkPools[class] = origPool
+		scriptChunkPools[sizeClass] = origPool
 	})
 
 	orig := blockOne.Transactions[0].TxOut[0]
@@ -286,7 +282,7 @@ func TestReadTxOutOwnedScript(t *testing.T) {
 // ownership interval: double release is a no-op, and a released arena refuses
 // to allocate even after a rewind.
 func TestScriptArenaReleaseSafety(t *testing.T) {
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	_, err := ar.alloc(128)
 	require.NoError(t, err)
 
@@ -306,7 +302,7 @@ func TestScriptArenaReleaseSafety(t *testing.T) {
 	ar.release()
 
 	// A fresh borrow resets the poisoned state.
-	fresh := borrowScriptArena(txScriptChunkClass)
+	fresh := borrowScriptArena()
 	defer fresh.release()
 	s, err := fresh.alloc(32)
 	require.NoError(t, err)

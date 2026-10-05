@@ -18,7 +18,7 @@ import (
 // capacity clamped to length, and no overlap between consecutive
 // allocations.
 func TestScriptArenaAlloc(t *testing.T) {
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	sizes := []int{0, 1, 25, 512, 1000, 33}
@@ -51,7 +51,7 @@ func TestScriptArenaAlloc(t *testing.T) {
 // ladder as demand grows and that a single allocation larger than the next
 // class skips ahead to a class that fits it.
 func TestScriptArenaGrowth(t *testing.T) {
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	// The first allocation draws the starting class.
@@ -77,10 +77,27 @@ func TestScriptArenaGrowth(t *testing.T) {
 	)
 }
 
+// TestScriptArenaAllocNegativeSize ensures a negative allocation size is
+// rejected with errScriptArenaFull.  The decode path never passes one, but
+// a caller that did would otherwise panic on slice bounds since the
+// capacity check only compares against the remaining budget.
+func TestScriptArenaAllocNegativeSize(t *testing.T) {
+	ar := borrowScriptArena()
+	defer ar.release()
+
+	for _, size := range []int{-1, -58, -(8 << 20)} {
+		_, err := ar.alloc(size)
+		require.ErrorIs(t, err, errScriptArenaFull, "size %d", size)
+	}
+
+	// Rejected allocations must not consume any of the budget.
+	require.Equal(t, scriptArenaMaxAlloc, ar.remaining())
+}
+
 // TestScriptArenaCapacity ensures the arena enforces the per-transaction
 // staging limit that the fixed slab previously provided.
 func TestScriptArenaCapacity(t *testing.T) {
-	ar := borrowScriptArena(blockScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	// Fill the arena right up to its capacity.
@@ -107,7 +124,7 @@ func TestScriptArenaCapacity(t *testing.T) {
 // TestScriptArenaRewind ensures rewinding recycles the memory of the largest
 // chunk in place and returns the smaller warm-up chunks to their pools.
 func TestScriptArenaRewind(t *testing.T) {
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	// Grow through two classes.
@@ -125,7 +142,10 @@ func TestScriptArenaRewind(t *testing.T) {
 	require.Len(t, ar.chunks, 1)
 	s, err := ar.alloc(8)
 	require.NoError(t, err)
-	require.Equal(t, &largest[0], &s[0])
+
+	// The allocation must be served from the retained chunk itself, not
+	// from a copy that merely holds equal bytes.
+	require.Same(t, &largest[0], &s[0])
 }
 
 // TestBlockArenaTransactionReuse ensures block staging depends on the largest
@@ -182,9 +202,11 @@ func TestBlockArenaTransactionReuse(t *testing.T) {
 			require.NoError(t, decoded.Serialize(&roundTrip))
 			require.Equal(t, encoded.Bytes(), roundTrip.Bytes())
 
+			// The whole block must be staged by a single smallest-class
+			// chunk: one borrow serves every transaction.
 			for i, count := range allocated {
 				want := 0
-				if i == txScriptChunkClass {
+				if i == 0 {
 					want = 1
 				}
 				require.Equal(t, want, count, "class %d", i)
@@ -284,8 +306,7 @@ func TestScriptArenaRandomizedAllocations(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 
 	for round := 0; round < 50; round++ {
-		startClass := rng.Intn(len(scriptChunkClasses))
-		ar := borrowScriptArena(startClass)
+		ar := borrowScriptArena()
 
 		for rewinds := 0; rewinds < 4; rewinds++ {
 			var live [][]byte

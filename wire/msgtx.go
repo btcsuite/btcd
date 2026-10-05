@@ -418,7 +418,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	err := msg.btcDecode(r, pver, enc, buf, ar)
@@ -1127,7 +1127,7 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
-	ar := borrowScriptArena(txScriptChunkClass)
+	ar := borrowScriptArena()
 	defer ar.release()
 
 	err := readTxOutBuf(r, pver, version, to, buf, ar)

@@ -148,13 +148,17 @@ func BenchmarkTruncatedDecodeBudget(b *testing.B) {
 	})
 
 	b.Run("transaction_inputs", func(b *testing.B) {
+		// The 4-byte transaction version is read by MsgTx.BtcDecode before
+		// the input count varint.
 		payload := benchmarkCountPayload(
 			b, make([]byte, 4), maxTxInPerMessage,
 		)
 
-		// Prewarm the script arena so the comparison isolates the count-sized
-		// transaction input allocation changed by this patch.
-		ar := borrowScriptArena(txScriptChunkClass)
+		// Prewarm the script arena so the borrow and release pair populates
+		// the chunk pool, and the benchmark measures only the count-sized
+		// transaction input allocation made while decoding rather than the
+		// one-time chunk creation.
+		ar := borrowScriptArena()
 		ar.release()
 
 		b.ReportAllocs()
@@ -171,11 +175,13 @@ func BenchmarkTruncatedDecodeBudget(b *testing.B) {
 	})
 
 	b.Run("streaming_transaction_inputs", func(b *testing.B) {
+		// The 4-byte transaction version is read by MsgTx.BtcDecode before
+		// the input count varint.
 		payload := benchmarkCountPayload(
 			b, make([]byte, 4), maxTxInPerMessage,
 		)
 
-		ar := borrowScriptArena(txScriptChunkClass)
+		ar := borrowScriptArena()
 		ar.release()
 
 		b.ReportAllocs()
