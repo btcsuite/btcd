@@ -1,0 +1,137 @@
+[
+  {
+    "name": "single",
+    "descriptor": "wpkh(xpub6BzikmgQmvoYG3ShFhXU1LFKaUeU832dHoYL6ka9JpCqKXr7PTHQHaoSMbGU36CZNcoryVPsFBjt9aYyCQHtYi6BQTo6VfRv9xVRuSNNteB/*)",
+    "hasChecksum": false,
+    "checksum": "#97qc8vss",
+    "numMultipath": 1,
+    "addresses": [
+      {
+        "network": "mainnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bc1qaz3jjsgpe29v5yzrvd58hsjgx5a9msujsgmyte"
+      },
+      {
+        "network": "mainnet",
+        "multipathIndex": 1,
+        "derivationIndex": 0,
+        "expectErr": "multipath index out of bounds"
+      }
+    ]
+  },
+  {
+    "name": "Leeloo Dallas multipath",
+    "descriptor": "wpkh(xpub6BzikmgQmvoYG3ShFhXU1LFKaUeU832dHoYL6ka9JpCqKXr7PTHQHaoSMbGU36CZNcoryVPsFBjt9aYyCQHtYi6BQTo6VfRv9xVRuSNNteB/<0;1>/*)",
+    "hasChecksum": false,
+    "checksum": "#w3nj0e22",
+    "numMultipath": 2,
+    "addresses": [
+      {
+        "network": "mainnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bc1qrdu5f9wfw3ppxmejnqe6rexd7fqkujnpzar5es"
+      },
+      {
+        "network": "mainnet",
+        "multipathIndex": 0,
+        "derivationIndex": 10,
+        "address": "bc1qsmp7eq2jt00llmsqmtatwavkjkdmrrz9klgd5g"
+      },
+      {
+        "network": "mainnet",
+        "multipathIndex": 1,
+        "derivationIndex": 0,
+        "address": "bc1qlh4ln6vjdkz89um8gtzfmpf6wnt56lwy4u466g"
+      },
+      {
+        "network": "mainnet",
+        "multipathIndex": 1,
+        "derivationIndex": 10,
+        "address": "bc1qpnmw93dscgt9m6shjq0v83z02tcljf8yfc9j7l"
+      }
+    ]
+  },
+  {
+    "name": "networks wpkh",
+    "descriptor": "wpkh(xpub6BzikmgQmvoYG3ShFhXU1LFKaUeU832dHoYL6ka9JpCqKXr7PTHQHaoSMbGU36CZNcoryVPsFBjt9aYyCQHtYi6BQTo6VfRv9xVRuSNNteB/<0;1>/*)",
+    "hasChecksum": false,
+    "checksum": "#w3nj0e22",
+    "numMultipath": 2,
+    "addresses": [
+      {
+        "network": "mainnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bc1qrdu5f9wfw3ppxmejnqe6rexd7fqkujnpzar5es"
+      },
+      {
+        "network": "testnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "tb1qrdu5f9wfw3ppxmejnqe6rexd7fqkujnpgmc8zr"
+      },
+      {
+        "network": "regtest",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bcrt1qrdu5f9wfw3ppxmejnqe6rexd7fqkujnp2jp242"
+      }
+    ]
+  },
+  {
+    "name": "networks tr",
+    "descriptor": "tr(xpub6BzikmgQmvoYG3ShFhXU1LFKaUeU832dHoYL6ka9JpCqKXr7PTHQHaoSMbGU36CZNcoryVPsFBjt9aYyCQHtYi6BQTo6VfRv9xVRuSNNteB/<0;1>/*)",
+    "hasChecksum": false,
+    "checksum": "#rq20sev9",
+    "numMultipath": 2,
+    "addresses": [
+      {
+        "network": "mainnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bc1puc00mgvj7hh25y8uhpux7gudjp9a986awgtemtxdfx6kcv4dkl5qt275jk"
+      },
+      {
+        "network": "testnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "tb1puc00mgvj7hh25y8uhpux7gudjp9a986awgtemtxdfx6kcv4dkl5quzgmge"
+      },
+      {
+        "network": "regtest",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bcrt1puc00mgvj7hh25y8uhpux7gudjp9a986awgtemtxdfx6kcv4dkl5q3mzaar"
+      }
+    ]
+  },
+  {
+    "name": "invalid checksum",
+    "descriptor": "tr([e81a5744/48'/0'/0'/2']xpub6Duv8Gj9gZeA3sUo5nUMPEv6FZ81GHn3feyaUej5KqcjPKsYLww4xBX4MmYZUPX5NqzaVJWYdYZwGLECtgQruG4FkZMh566RkfUT2pbzsEg/<0;1>/*,and_v(v:pk([3c157b79/48'/0'/0'/2']xpub6DdSN9RNZi3eDjhZWA8PJ5mSuWgfmPdBduXWzSP91Y3GxKWNwkjyc5mF9FcpTFymUh9C4Bar45b6rWv6Y5kSbi9yJDjuJUDzQSWUh3ijzXP/<0;1>/*),older(65535)))#lg9nqqha",
+    "hasChecksum": true,
+    "expectErr": "checksum"
+  },
+  {
+    "name": "tapminiscript",
+    "descriptor": "tr([e81a5744/48'/0'/0'/2']xpub6Duv8Gj9gZeA3sUo5nUMPEv6FZ81GHn3feyaUej5KqcjPKsYLww4xBX4MmYZUPX5NqzaVJWYdYZwGLECtgQruG4FkZMh566RkfUT2pbzsEg/<0;1>/*,and_v(v:pk([3c157b79/48'/0'/0'/2']xpub6DdSN9RNZi3eDjhZWA8PJ5mSuWgfmPdBduXWzSP91Y3GxKWNwkjyc5mF9FcpTFymUh9C4Bar45b6rWv6Y5kSbi9yJDjuJUDzQSWUh3ijzXP/<0;1>/*),older(65535)))#lg9nqqhr",
+    "hasChecksum": true,
+    "checksum": "#lg9nqqhr",
+    "numMultipath": 2,
+    "addresses": [
+      {
+        "network": "mainnet",
+        "multipathIndex": 0,
+        "derivationIndex": 0,
+        "address": "bc1pfujezshxnw0jw2m9fn6hz0xr3ljjpjd30gtpqyymgxqquk8rr95qk986dz"
+      },
+      {
+        "network": "mainnet",
+        "multipathIndex": 1,
+        "derivationIndex": 0,
+        "address": "bc1ptd9ngyt09kxtt8mkf832vhxdrn0xhccwp9jv6mz6vv4wqfc8dxjql2y0fn"
+      }
+    ]
+  }
+]
