@@ -18,6 +18,6 @@ require go.yaml.in/yaml/v3 v3.0.5 // indirect
 
 require (
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1
 	golang.org/x/sys v0.48.0 // indirect
 )
