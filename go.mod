@@ -22,9 +22,9 @@ require (
 	github.com/jrick/logrotate v1.1.2
 	github.com/stretchr/testify v1.12.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
-	golang.org/x/crypto v0.40.0
-	golang.org/x/sys v0.35.0
-	golang.org/x/time v0.15.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/sys v0.48.0
+	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.2.0
 )
 

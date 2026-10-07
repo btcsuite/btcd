@@ -18,6 +18,6 @@ require (
 require (
 	github.com/btcsuite/btclog v1.0.0 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )
