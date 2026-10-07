@@ -1,6 +1,6 @@
 module github.com/btcsuite/btcd/v2transport
 
-go 1.25
+go 1.26.9
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.4.0
