@@ -17,7 +17,7 @@ RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -v -o /out/ . ./cmd/...
 ###########################
 # Build docker image stage
 ###########################
-FROM alpine:3.15
+FROM alpine:3.24
 COPY --from=build /out/ /bin/
 # 8333  Mainnet Bitcoin peer-to-peer port
 # 8334  Mainet RPC port
