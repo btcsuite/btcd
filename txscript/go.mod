@@ -10,14 +10,14 @@ require (
 	github.com/btcsuite/btcd/wire/v2 v2.0.0
 	github.com/btcsuite/btclog v1.0.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.40.0
 )
+
+require go.yaml.in/yaml/v3 v3.0.5 // indirect
 
 require (
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

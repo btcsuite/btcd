@@ -20,7 +20,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jrick/logrotate v1.1.2
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.12.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
 	golang.org/x/crypto v0.40.0
 	golang.org/x/sys v0.35.0
@@ -35,9 +35,8 @@ require (
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/kcalvinalvin/anet v0.0.0-20251112173137-d8ddc1f6dbee // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
 
 // The retract statements below fixes an accidental push of the tags of a btcd
