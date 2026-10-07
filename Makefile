@@ -161,6 +161,11 @@ tidy-module:
 	echo "Running 'go mod tidy' for all modules"
 	scripts/tidy_modules.sh
 
+#? check-go-versions: Check that Go versions follow the policy in README.md
+check-go-versions:
+	@$(call print, "Checking Go versions.")
+	scripts/check_go_versions.sh
+
 .PHONY: all \
 	default \
 	build \
@@ -171,7 +176,8 @@ tidy-module:
 	fmt \
 	lint \
 	clean \
-	tidy-module
+	tidy-module \
+	check-go-versions
 
 #? help: Get more info on make commands
 help: Makefile
