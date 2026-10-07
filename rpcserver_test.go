@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/mempool/mempooltest"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -171,7 +172,7 @@ func TestHandleGetBlockCopiesTransactionBytes(t *testing.T) {
 func TestHandleSendRawTransactionRejectsTrailingBytes(t *testing.T) {
 	t.Parallel()
 
-	mm := &mempool.MockTxMempool{}
+	mm := &mempooltest.MockTxMempool{}
 	mm.On(
 		"ProcessTransaction", mock.Anything, false, false, mempool.Tag(0),
 	).Return(nil, errors.New("mempool should not be reached")).Maybe()
@@ -286,7 +287,7 @@ func TestHandleTestMempoolAcceptMixedResults(t *testing.T) {
 	require := require.New(t)
 
 	// Create a mock mempool.
-	mm := &mempool.MockTxMempool{}
+	mm := &mempooltest.MockTxMempool{}
 
 	// Create a testing server with the mock mempool.
 	s := &rpcServer{cfg: rpcserverConfig{
@@ -465,7 +466,7 @@ func TestHandleTestMempoolAcceptFees(t *testing.T) {
 	t.Parallel()
 
 	// Create a mock mempool.
-	mm := &mempool.MockTxMempool{}
+	mm := &mempooltest.MockTxMempool{}
 
 	// Create a testing server with the mock mempool.
 	s := &rpcServer{cfg: rpcserverConfig{
@@ -592,7 +593,7 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	require := require.New(t)
 
 	// Create a mock mempool.
-	mm := &mempool.MockTxMempool{}
+	mm := &mempooltest.MockTxMempool{}
 	defer mm.AssertExpectations(t)
 
 	// Create a testing server with the mock mempool.
