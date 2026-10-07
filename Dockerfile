@@ -6,7 +6,7 @@
 #
 # You can use the following command to build an arm64v8 container:
 #
-# docker build . -t yourregistry/btcd --build-arg ARCH=arm64v8
+# docker build . -t yourregistry/btcd --platform linux/arm64 --build-arg ARCH=arm64v8
 #
 # For more information how to use this docker image visit:
 # https://github.com/btcsuite/btcd/tree/master/docs
@@ -21,7 +21,9 @@ ARG ARCH=amd64
 # https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md
 # ➜  ~ crane digest golang:1.27.2-alpine3.24
 # sha256:85dc1069ac644ea3c527b177303a406eb3358192816cd7f9e5848eb658851673
-FROM golang@sha256:85dc1069ac644ea3c527b177303a406eb3358192816cd7f9e5848eb658851673 AS build-container
+# Build on the host platform and cross-compile for ARCH, so no emulation is
+# needed for other architectures.
+FROM --platform=$BUILDPLATFORM golang@sha256:85dc1069ac644ea3c527b177303a406eb3358192816cd7f9e5848eb658851673 AS build-container
 
 ARG ARCH
 
@@ -32,11 +34,11 @@ RUN set -ex \
   && if [ "${ARCH}" = "arm32v7" ]; then export GOARCH=arm; fi \
   && if [ "${ARCH}" = "arm64v8" ]; then export GOARCH=arm64; fi \
   && echo "Compiling for $GOARCH" \
-  && go install -v . ./cmd/...
+  && go build -v -o /out/ . ./cmd/...
 
 FROM $ARCH/alpine:3.21
 
-COPY --from=build-container /go/bin /bin
+COPY --from=build-container /out/ /bin/
 
 VOLUME ["/root/.btcd"]
 

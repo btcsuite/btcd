@@ -10,14 +10,15 @@ ADD . /app
 WORKDIR /app
 # Arguments required to build binaries targetting the correct OS and CPU architectures
 ARG TARGETOS TARGETARCH
-# Actually building the binaries
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go install -v . ./cmd/...
+# Build into a flat directory. When cross-compiling, go install would put the
+# binaries into a per-platform subdirectory such as /go/bin/linux_arm64.
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -v -o /out/ . ./cmd/...
 
 ###########################
 # Build docker image stage
 ###########################
 FROM alpine:3.15
-COPY --from=build /go/bin /bin
+COPY --from=build /out/ /bin/
 # 8333  Mainnet Bitcoin peer-to-peer port
 # 8334  Mainet RPC port
 EXPOSE 8333 8334
