@@ -581,7 +581,7 @@ func TestCalcScriptInfo(t *testing.T) {
 
 		if *si != test.scriptInfo {
 			t.Errorf("%s: scriptinfo doesn't match expected. "+
-				"got: %q expected %q", test.name, *si,
+				"got: %+v expected %+v", test.name, *si,
 				test.scriptInfo)
 			continue
 		}
