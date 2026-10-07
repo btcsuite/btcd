@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/btcsuite/winsvc/eventlog"
-	"github.com/btcsuite/winsvc/mgr"
-	"github.com/btcsuite/winsvc/svc"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/eventlog"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 const (
@@ -48,7 +48,7 @@ func logServiceStartOfDay(srvr *server) {
 // updates and launching btcdMain.
 type btcdService struct{}
 
-// Execute is the main entry point the winsvc package calls when receiving
+// Execute is the main entry point the svc package calls when receiving
 // information from the Windows service control manager.  It launches the
 // long-running btcdMain (which is the real meat of btcd), handles service
 // change requests, and notifies the service control manager of changes.
@@ -141,10 +141,12 @@ func installService() error {
 		return fmt.Errorf("service %s already exists", svcName)
 	}
 
-	// Install the service.
+	// Install the service.  The zero ErrorControl is ErrorIgnore, so set
+	// ErrorNormal to have Windows log a failure to start at boot.
 	service, err = serviceManager.CreateService(svcName, exePath, mgr.Config{
-		DisplayName: svcDisplayName,
-		Description: svcDesc,
+		DisplayName:  svcDisplayName,
+		Description:  svcDesc,
+		ErrorControl: mgr.ErrorNormal,
 	})
 	if err != nil {
 		return err
@@ -197,7 +199,7 @@ func startService() error {
 	}
 	defer service.Close()
 
-	err = service.Start(os.Args)
+	err = service.Start(os.Args...)
 	if err != nil {
 		return fmt.Errorf("could not start service: %v", err)
 	}
