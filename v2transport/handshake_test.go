@@ -61,12 +61,12 @@ func newBufferedReadWriterPair() (*bufferedReadWriter, *bufferedReadWriter) {
 	rightToLeft := make(chan []byte, 32)
 
 	return &bufferedReadWriter{
-			recv: rightToLeft,
-			send: leftToRight,
-		}, &bufferedReadWriter{
-			recv: leftToRight,
-			send: rightToLeft,
-		}
+		recv: rightToLeft,
+		send: leftToRight,
+	}, &bufferedReadWriter{
+		recv: leftToRight,
+		send: rightToLeft,
+	}
 }
 
 func (rw *bufferedReadWriter) Read(p []byte) (int, error) {
