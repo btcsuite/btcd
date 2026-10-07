@@ -1,4 +1,6 @@
-package mempool
+// Package mempooltest provides test helpers for code that uses the mempool
+// package.
+package mempooltest
 
 import (
 	"time"
@@ -6,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/mock"
 )
@@ -16,7 +19,7 @@ type MockTxMempool struct {
 }
 
 // Ensure the MockTxMempool implements the TxMemPool interface.
-var _ TxMempool = (*MockTxMempool)(nil)
+var _ mempool.TxMempool = (*MockTxMempool)(nil)
 
 // LastUpdated returns the last time a transaction was added to or removed from
 // the source pool.
@@ -26,9 +29,9 @@ func (m *MockTxMempool) LastUpdated() time.Time {
 }
 
 // TxDescs returns a slice of descriptors for all the transactions in the pool.
-func (m *MockTxMempool) TxDescs() []*TxDesc {
+func (m *MockTxMempool) TxDescs() []*mempool.TxDesc {
 	args := m.Called()
-	return args.Get(0).([]*TxDesc)
+	return args.Get(0).([]*mempool.TxDesc)
 }
 
 // RawMempoolVerbose returns all the entries in the mempool as a fully
@@ -74,7 +77,7 @@ func (m *MockTxMempool) HaveTransaction(hash *chainhash.Hash) bool {
 // such as rejecting duplicate transactions, ensuring transactions follow all
 // rules, orphan transaction handling, and insertion into the memory pool.
 func (m *MockTxMempool) ProcessTransaction(tx *btcutil.Tx, allowOrphan,
-	rateLimit bool, tag Tag) ([]*TxDesc, error) {
+	rateLimit bool, tag mempool.Tag) ([]*mempool.TxDesc, error) {
 
 	args := m.Called(tx, allowOrphan, rateLimit, tag)
 
@@ -82,7 +85,7 @@ func (m *MockTxMempool) ProcessTransaction(tx *btcutil.Tx, allowOrphan,
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).([]*TxDesc), args.Error(1)
+	return args.Get(0).([]*mempool.TxDesc), args.Error(1)
 }
 
 // RemoveTransaction removes the passed transaction from the mempool.  When the
@@ -100,7 +103,7 @@ func (m *MockTxMempool) RemoveTransaction(tx *btcutil.Tx,
 // transaction can be accepted to the mempool. If not, the specific error is
 // returned and the caller needs to take actions based on it.
 func (m *MockTxMempool) CheckMempoolAcceptance(
-	tx *btcutil.Tx) (*MempoolAcceptResult, error) {
+	tx *btcutil.Tx) (*mempool.MempoolAcceptResult, error) {
 
 	args := m.Called(tx)
 
@@ -108,7 +111,7 @@ func (m *MockTxMempool) CheckMempoolAcceptance(
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*MempoolAcceptResult), args.Error(1)
+	return args.Get(0).(*mempool.MempoolAcceptResult), args.Error(1)
 }
 
 // CheckSpend checks whether the passed outpoint is already spent by a
