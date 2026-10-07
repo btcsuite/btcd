@@ -13,8 +13,8 @@ endif
 LINT_BIN := $(GO_BIN)/golangci-lint
 GOIMPORTS_BIN := $(GO_BIN)/goimports
 
-LINT_COMMIT := v2.1.6
-GOIMPORTS_COMMIT := a24facf9e5586c95743d2f4ad15d148c7a8cf00b
+LINT_COMMIT := v2.14.0
+GOIMPORTS_COMMIT := v0.51.0
 
 GOBUILD := go build -v
 GOINSTALL := go install -v 
