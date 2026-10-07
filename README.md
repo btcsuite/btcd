@@ -50,7 +50,9 @@ their branch:
   language version, is Go 1.26.9.
 
 Both are bumped when Go publishes a point release, and both move up a branch
-when a new major version of Go is released.
+when a new major version of Go is released. A weekly CI job checks this against
+the releases listed on go.dev; `make check-go-versions` runs the same check
+locally.
 
 ## Installation
 
