@@ -160,3 +160,27 @@ jobs:
 
       - name: Test
         run: make unit
+
+  # Builds and tests with the minimum Go version from go.mod, so code that
+  # needs a newer Go than go.mod promises fails here (see the Go version policy
+  # in README.md).
+  test-min-go:
+    name: Minimum Go version
+    runs-on: ubuntu-latest
+    env:
+      # Fail rather than switch to a newer Go if a go.mod asks for one.
+      GOTOOLCHAIN: local
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make unit
