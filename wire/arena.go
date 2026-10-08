@@ -15,8 +15,9 @@ import (
 // scripts are copied into a single exactly-sized allocation before the arena
 // is reused.  A successful decode therefore leaves no arena-backed scripts
 // in the transaction.  A failed decode may leave staged scripts in the
-// partially populated transaction, which the caller must discard.  This
-// ownership contract makes arena reuse safe without reference counting.
+// partially populated transaction; those scripts must not be accessed after
+// the call returns.  This ownership contract makes arena reuse safe without
+// reference counting.
 //
 // The arena replaces the previous fixed 4 MiB script slab.  The slab approach
 // suffered from memory amplification: decoding even a tiny transaction pinned
