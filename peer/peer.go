@@ -22,11 +22,11 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/btcsuite/btcd/v2transport"
 	"github.com/btcsuite/btcd/wire/v2"
-	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/lru"
+	"github.com/decred/dcrd/container/lru"
 )
 
 const (
@@ -85,7 +85,7 @@ var (
 
 	// sentNonces houses the unique nonces that are generated when pushing
 	// version messages that are used to detect self connections.
-	sentNonces = lru.NewCache(50)
+	sentNonces = lru.NewSet[uint64](50)
 )
 
 // MessageListeners defines callback function pointers to invoke with message
@@ -478,7 +478,7 @@ type Peer struct {
 
 	wireEncoding wire.MessageEncoding
 
-	knownInventory     lru.Cache
+	knownInventory     *lru.Set[wire.InvVect]
 	prevGetBlocksMtx   sync.Mutex
 	prevGetBlocksBegin *chainhash.Hash
 	prevGetBlocksStop  *chainhash.Hash
@@ -549,7 +549,16 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 //
 // This function is safe for concurrent access.
 func (p *Peer) AddKnownInventory(invVect *wire.InvVect) {
-	p.knownInventory.Add(invVect)
+	p.knownInventory.Put(*invVect)
+}
+
+// knowsInventory returns whether the peer is known to have the passed
+// inventory.  Inventory is matched by value, since the same inventory arrives
+// in different messages.
+//
+// This function is safe for concurrent access.
+func (p *Peer) knowsInventory(invVect *wire.InvVect) bool {
+	return p.knownInventory.Contains(*invVect)
 }
 
 // StatsSnapshot returns a snapshot of the current peer flags and statistics.
@@ -1767,7 +1776,7 @@ out:
 
 				// Don't send inventory that became known after
 				// the initial check.
-				if p.knownInventory.Contains(iv) {
+				if p.knowsInventory(iv) {
 					continue
 				}
 
@@ -1973,7 +1982,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 func (p *Peer) QueueInventory(invVect *wire.InvVect) {
 	// Don't add the inventory to the send queue if the peer is already
 	// known to have it.
-	if p.knownInventory.Contains(invVect) {
+	if p.knowsInventory(invVect) {
 		return
 	}
 
@@ -2189,7 +2198,7 @@ func (p *Peer) localVersionMsg() (*wire.MsgVersion, error) {
 	// detected.  This is accomplished by adding it to a size-limited map of
 	// recently seen nonces.
 	nonce := uint64(rand.Int63())
-	sentNonces.Add(nonce)
+	sentNonces.Put(nonce)
 
 	// Version message.
 	msg := wire.NewMsgVersion(ourNA, theirNA, nonce, blockNum)
@@ -2558,7 +2567,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	p := Peer{
 		inbound:         inbound,
 		wireEncoding:    wire.BaseEncoding,
-		knownInventory:  lru.NewCache(maxKnownInventory),
+		knownInventory:  lru.NewSet[wire.InvVect](maxKnownInventory),
 		stallControl:    make(chan stallControlMsg, 1), // nonblocking sync
 		outputQueue:     make(chan outMsg, outputBufferSize),
 		sendQueue:       make(chan outMsg, 1),   // nonblocking sync

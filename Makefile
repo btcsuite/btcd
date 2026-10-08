@@ -13,8 +13,8 @@ endif
 LINT_BIN := $(GO_BIN)/golangci-lint
 GOIMPORTS_BIN := $(GO_BIN)/goimports
 
-LINT_COMMIT := v2.1.6
-GOIMPORTS_COMMIT := a24facf9e5586c95743d2f4ad15d148c7a8cf00b
+LINT_COMMIT := v2.14.0
+GOIMPORTS_COMMIT := v0.51.0
 
 GOBUILD := go build -v
 GOINSTALL := go install -v 
@@ -104,6 +104,7 @@ unit:
 	cd txscript && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd psbt && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd wire && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd v2transport && $(GOTEST_DEV) ./... -test.timeout=20m
 
 #? unit-cover: Run unit coverage tests
 unit-cover:
@@ -120,6 +121,7 @@ unit-cover:
 	cd txscript && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd psbt && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd wire && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd v2transport && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 
 #? unit-race: Run unit race tests
 unit-race:
@@ -133,6 +135,7 @@ unit-race:
 	cd txscript && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd wire && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd v2transport && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 
 # =========
 # UTILITIES
@@ -161,6 +164,11 @@ tidy-module:
 	echo "Running 'go mod tidy' for all modules"
 	scripts/tidy_modules.sh
 
+#? check-go-versions: Check that Go versions follow the policy in README.md
+check-go-versions:
+	@$(call print, "Checking Go versions.")
+	scripts/check_go_versions.sh
+
 .PHONY: all \
 	default \
 	build \
@@ -171,7 +179,8 @@ tidy-module:
 	fmt \
 	lint \
 	clean \
-	tidy-module
+	tidy-module \
+	check-go-versions
 
 #? help: Get more info on make commands
 help: Makefile

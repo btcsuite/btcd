@@ -6,7 +6,7 @@ env:
   GOCACHE: /home/runner/work/go/pkg/build
   GOPATH: /home/runner/work/go
   GOBIN: /home/runner/work/go/bin
-  GO_VERSION: 1.26.3
+  GO_VERSION: 1.27.2
 
 jobs:
   build:
@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build
         run: make build
@@ -37,12 +37,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Test
         run: make unit-cover
@@ -125,6 +125,15 @@ jobs:
           format: 'golang'
           parallel: true
 
+      - name: Send v2transport coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          file: v2transport/coverage.txt
+          flag-name: v2transport
+          format: 'golang'
+          parallel: true
+
       - name: Notify coveralls all reports sent
         uses: coverallsapp/github-action@v2
         continue-on-error: true
@@ -136,12 +145,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Test
         run: make unit-race
@@ -151,12 +160,63 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
+      - name: Test
+        run: make unit
+
+  # Builds and tests with the minimum Go version from go.mod, so code that
+  # needs a newer Go than go.mod promises fails here (see the Go version policy
+  # in README.md).
+  test-min-go:
+    name: Minimum Go version
+    runs-on: ubuntu-latest
+    env:
+      # Fail rather than switch to a newer Go if a go.mod asks for one.
+      GOTOOLCHAIN: local
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make unit
+
+  # The go.mod files require the published versions of the other modules in
+  # this repo. This job builds and tests all modules against each other's
+  # in-tree code instead, so a change to a sub-module is checked against the
+  # code that uses it before the sub-module is tagged.
+  test-workspace:
+    name: In-tree modules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Create workspace
+        run: |
+          find . -mindepth 2 -name go.mod -printf '%h\n' | sort |
+            xargs go work init .
+
+      # Even in a workspace, ./... from the root doesn't reach the nested
+      # modules. make unit tests each module from its own directory, which
+      # also builds all of their packages.
       - name: Test
         run: make unit

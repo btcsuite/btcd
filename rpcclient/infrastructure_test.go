@@ -1,6 +1,7 @@
 package rpcclient
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -10,8 +11,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -767,4 +770,122 @@ func TestHTTPURLWiring(t *testing.T) {
 	defer c.Shutdown()
 
 	require.Equal(t, "http://localhost:8332", c.httpURL)
+}
+
+// TestShouldLogReadError checks which websocket read errors are logged: a
+// normal close by the server or a shutdown of the client is not an error worth
+// logging, while a dropped connection or any other failure is.
+func TestShouldLogReadError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "EOF",
+			err:  io.EOF,
+			want: false,
+		},
+		{
+			name: "normal close",
+			err: &websocket.CloseError{
+				Code: websocket.CloseNormalClosure,
+			},
+			want: false,
+		},
+		{
+			name: "going away",
+			err: &websocket.CloseError{
+				Code: websocket.CloseGoingAway,
+			},
+			want: false,
+		},
+		{
+			name: "connection dropped",
+			err: &websocket.CloseError{
+				Code: websocket.CloseAbnormalClosure,
+				Text: io.ErrUnexpectedEOF.Error(),
+			},
+			want: true,
+		},
+		{
+			name: "other error",
+			err:  errors.New("read failed"),
+			want: true,
+		},
+	}
+
+	for _, test := range tests {
+		c := &Client{shutdown: make(chan struct{})}
+		require.Equal(t, test.want, c.shouldLogReadError(test.err),
+			test.name)
+
+		// Nothing is logged once the client is shutting down.
+		close(c.shutdown)
+		require.False(t, c.shouldLogReadError(test.err), test.name)
+	}
+}
+
+// dialStalledServer dials a websocket over an in-memory connection to a server
+// that runs serve on its end, and returns the dial error. It must be called in
+// a synctest bubble, where a dial that never returns makes the bubble deadlock
+// and fails the test.
+func dialStalledServer(t *testing.T, serve func(net.Conn)) error {
+	t.Helper()
+
+	server, client := net.Pipe()
+	go func() {
+		defer server.Close()
+
+		serve(server)
+	}()
+
+	_, err := dial(&ConnConfig{
+		Host:       "127.0.0.1:8334",
+		Endpoint:   "ws",
+		User:       "user",
+		Pass:       "pass",
+		DisableTLS: true,
+		netDialContext: func(context.Context, string, string) (net.Conn,
+			error) {
+
+			return client, nil
+		},
+	})
+
+	return err
+}
+
+// TestDialHandshakeTimeout checks that dialing a websocket gives up after the
+// timeout when the server never answers the opening handshake.
+func TestDialHandshakeTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		start := time.Now()
+		err := dialStalledServer(t, func(conn net.Conn) {
+			_, _ = io.Copy(io.Discard, conn)
+		})
+		require.Error(t, err)
+		require.Equal(t, defaultHTTPTimeout, time.Since(start))
+	})
+}
+
+// TestDialStalledErrorBody checks that a failed handshake still returns the
+// authentication error after the timeout when the body of the error response
+// never arrives.
+func TestDialStalledErrorBody(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		start := time.Now()
+		err := dialStalledServer(t, func(conn net.Conn) {
+			// Read the request, then promise a body that never
+			// arrives.
+			_, _ = http.ReadRequest(bufio.NewReader(conn))
+			_, _ = io.WriteString(conn, "HTTP/1.1 401 Unauthorized"+
+				"\r\nContent-Length: 2048\r\n\r\n")
+			_, _ = io.Copy(io.Discard, conn)
+		})
+		require.ErrorIs(t, err, ErrInvalidAuth)
+		require.Equal(t, defaultHTTPTimeout, time.Since(start))
+	})
 }

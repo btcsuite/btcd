@@ -41,7 +41,7 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
-	"github.com/btcsuite/websocket"
+	"github.com/gorilla/websocket"
 )
 
 // API version constants
