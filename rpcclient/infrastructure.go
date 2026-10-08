@@ -1343,6 +1343,12 @@ type ConnConfig struct {
 	// Authorization header for RPC requests. Caller-provided Authorization
 	// values in ExtraHeaders are still sent.
 	DisableAuth bool
+
+	// netDialContext, if set, opens the network connection of a websocket
+	// instead of the default dialer. Tests use it to connect over in-memory
+	// pipes.
+	netDialContext func(ctx context.Context, network,
+		addr string) (net.Conn, error)
 }
 
 // getAuth returns the username and passphrase that will actually be used for
@@ -1470,7 +1476,13 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 
 	// Create a websocket dialer that will be used to make the connection.
 	// It is modified by the proxy setting below as needed.
-	dialer := websocket.Dialer{TLSClientConfig: tlsConfig}
+	// The handshake timeout keeps a server that stalls the handshake from
+	// hanging the dial.
+	dialer := websocket.Dialer{
+		NetDialContext:   config.netDialContext,
+		TLSClientConfig:  tlsConfig,
+		HandshakeTimeout: defaultHTTPTimeout,
+	}
 
 	// Setup the proxy if one is configured.
 	if config.Proxy != "" {
