@@ -28,7 +28,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/v2"
-	"github.com/btcsuite/go-socks/socks"
+	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/gorilla/websocket"
 )
 
@@ -1491,7 +1491,7 @@ func dial(config *ConnConfig) (*websocket.Conn, error) {
 			Username: config.ProxyUser,
 			Password: config.ProxyPass,
 		}
-		dialer.NetDial = proxy.Dial
+		dialer.NetDialContext = proxy.DialContext
 	}
 
 	// Configure generated basic access authorization. Caller-provided

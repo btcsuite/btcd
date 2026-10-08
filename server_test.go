@@ -11,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/internal/inbound"
+	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btclog"
 	"github.com/stretchr/testify/assert"
@@ -195,6 +196,31 @@ func TestInboundPeerReservation(t *testing.T) {
 			))
 		})
 	}
+}
+
+// TestIsWhitelistedProxiedAddr checks that a peer reached through a proxy is
+// whitelisted by its own address rather than the proxy's, so whitelisting a
+// local Tor proxy's address doesn't whitelist every peer reached through it.
+// Connections made through the proxy report the peer as their remote address,
+// which is what outboundPeerConnected passes to isWhitelisted.
+func TestIsWhitelistedProxiedAddr(t *testing.T) {
+	originalCfg := cfg
+	t.Cleanup(func() {
+		cfg = originalCfg
+	})
+
+	_, loopback, err := net.ParseCIDR("127.0.0.0/8")
+	require.NoError(t, err)
+	_, peers, err := net.ParseCIDR("192.0.2.0/24")
+	require.NoError(t, err)
+
+	addr := &socks.ProxiedAddr{Net: "tcp", Host: "192.0.2.1", Port: 8333}
+
+	cfg = &config{whitelists: []*net.IPNet{loopback}}
+	require.False(t, isWhitelisted(addr))
+
+	cfg = &config{whitelists: []*net.IPNet{peers}}
+	require.True(t, isWhitelisted(addr))
 }
 
 // TestInboundPeerAdmissionSourceLimits verifies that loopback and whitelisted
