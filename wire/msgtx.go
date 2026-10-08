@@ -414,9 +414,9 @@ func (msg *MsgTx) Copy() *MsgTx {
 // This is part of the Message interface implementation.
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
-// If decoding fails, the receiver may be partially populated and its script
-// slices may reference recycled memory.  The receiver's contents must not be
-// used unless a subsequent decode succeeds.
+// If decoding fails, TxIn and TxOut are cleared.  Other fields may be partially
+// populated, so the receiver's contents must not be used unless a subsequent
+// decode succeeds.
 func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
@@ -425,6 +425,11 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 	defer ar.release()
 
 	err := msg.btcDecode(r, pver, enc, buf, ar)
+	if err != nil {
+		// Drop staged scripts before their arena is returned to the pool.
+		msg.TxIn = nil
+		msg.TxOut = nil
+	}
 	return err
 }
 

@@ -14,9 +14,9 @@ import (
 // decoded from the wire.  Once a transaction is fully decoded, all of its
 // scripts are copied into a single exactly-sized allocation before the arena
 // is reused.  A successful decode therefore leaves no arena-backed scripts
-// in the transaction.  A failed decode may leave staged scripts in the
-// partially populated transaction; those scripts must not be accessed after
-// the call returns.  This ownership contract makes arena reuse safe without
+// in the transaction.  A failed public transaction decode clears its inputs
+// and outputs before releasing the arena, while block decoding discards the
+// failed transaction.  This ownership contract makes arena reuse safe without
 // reference counting.
 //
 // The arena replaces the previous fixed 4 MiB script slab.  The slab approach

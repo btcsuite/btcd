@@ -402,6 +402,52 @@ func TestTxWire(t *testing.T) {
 	}
 }
 
+// TestTxDecodeErrorClearsScripts checks that failed public decodes drop all
+// script references and allow a later successful decode into the same receiver.
+func TestTxDecodeErrorClearsScripts(t *testing.T) {
+	for _, enc := range []MessageEncoding{BaseEncoding, WitnessEncoding} {
+		for _, buffered := range []bool{false, true} {
+			name := fmt.Sprintf("encoding=%d/buffered=%t", enc, buffered)
+			t.Run(name, func(t *testing.T) {
+				tx := NewMsgTx(2)
+				var witness TxWitness
+				if enc == WitnessEncoding {
+					witness = TxWitness{{0x01, 0x02}, {0x03}}
+				}
+				tx.AddTxIn(NewTxIn(
+					&OutPoint{}, []byte{0x04, 0x05}, witness,
+				))
+				tx.AddTxOut(NewTxOut(1, []byte{0x06, 0x07}))
+				tx.LockTime = 123
+
+				var serialized bytes.Buffer
+				require.NoError(t, tx.BtcEncode(&serialized, 0, enc))
+				data := serialized.Bytes()
+				reader := func(data []byte) io.Reader {
+					r := bytes.NewReader(data)
+					if buffered {
+						return r
+					}
+					return struct{ io.Reader }{r}
+				}
+
+				// Include early errors on a populated receiver as well
+				// as errors after scripts and witnesses have been staged.
+				for end := 0; end < len(data); end++ {
+					decoded := tx.Copy()
+					err := decoded.BtcDecode(reader(data[:end]), 0, enc)
+					require.Error(t, err, "prefix length %d", end)
+					require.Nil(t, decoded.TxIn, "prefix length %d", end)
+					require.Nil(t, decoded.TxOut, "prefix length %d", end)
+
+					require.NoError(t, decoded.BtcDecode(reader(data), 0, enc))
+					require.Equal(t, tx, decoded)
+				}
+			})
+		}
+	}
+}
+
 // TestTxWireErrors performs negative tests against wire encode and decode
 // of MsgTx to confirm error paths work correctly.
 func TestTxWireErrors(t *testing.T) {

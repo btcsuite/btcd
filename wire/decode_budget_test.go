@@ -196,12 +196,25 @@ func TestTruncatedVectorDecodeBudget(t *testing.T) {
 
 // TestTruncatedTxDecodeBudget covers each count-driven transaction slice.
 func TestTruncatedTxDecodeBudget(t *testing.T) {
+	// Inspect the internal decoder before BtcDecode clears failed results,
+	// so public error cleanup cannot hide an oversized reservation.
+	decode := func(t *testing.T, payload []byte) (*MsgTx, error) {
+		t.Helper()
+		ar := borrowScriptArena()
+		t.Cleanup(ar.release)
+		buf := binarySerializer.Borrow()
+		t.Cleanup(func() { binarySerializer.Return(buf) })
+		msg := new(MsgTx)
+		err := msg.btcDecode(
+			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
+			buf, ar,
+		)
+		return msg, err
+	}
+
 	t.Run("inputs", func(t *testing.T) {
 		payload := countPayload(t, make([]byte, 4), maxTxInPerMessage)
-		var msg MsgTx
-		err := msg.BtcDecode(
-			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
-		)
+		msg, err := decode(t, payload)
 		if err == nil {
 			t.Fatal("expected a truncated input error")
 		}
@@ -216,10 +229,7 @@ func TestTruncatedTxDecodeBudget(t *testing.T) {
 
 	t.Run("outputs", func(t *testing.T) {
 		payload := countPayload(t, inputPrefix, maxTxOutPerMessage)
-		var msg MsgTx
-		err := msg.BtcDecode(
-			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
-		)
+		msg, err := decode(t, payload)
 		if err == nil {
 			t.Fatal("expected a truncated output error")
 		}
@@ -237,10 +247,7 @@ func TestTruncatedTxDecodeBudget(t *testing.T) {
 			t, witnessPrefix, maxWitnessItemsPerInput,
 		)
 
-		var msg MsgTx
-		err := msg.BtcDecode(
-			bytes.NewReader(payload), ProtocolVersion, WitnessEncoding,
-		)
+		msg, err := decode(t, payload)
 		if err == nil {
 			t.Fatal("expected a truncated witness error")
 		}
