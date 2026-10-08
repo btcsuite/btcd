@@ -13,7 +13,7 @@ require (
 	github.com/btcsuite/btcd/wire/v2 v2.0.1
 	github.com/btcsuite/btclog v1.0.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/decred/dcrd/lru v1.1.3
+	github.com/decred/dcrd/container/lru v1.0.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jrick/logrotate v1.1.2

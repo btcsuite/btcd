@@ -1,7 +1,7 @@
 package peer
 
 import (
-	"github.com/decred/dcrd/lru"
+	"github.com/decred/dcrd/container/lru"
 )
 
 const (
@@ -14,7 +14,7 @@ const (
 // with the v1 P2P protocol on their next connection, typically after a v2
 // handshake failure.
 type P2PDowngrader struct {
-	cache lru.Cache
+	cache *lru.Set[string]
 }
 
 // NewP2PDowngrader returns a new P2PDowngrader instance.
@@ -24,14 +24,14 @@ func NewP2PDowngrader(cacheSize uint) *P2PDowngrader {
 		cacheSize = defaultDowngradeCacheSize
 	}
 	return &P2PDowngrader{
-		cache: lru.NewCache(cacheSize),
+		cache: lru.NewSet[string](uint32(cacheSize)),
 	}
 }
 
 // MarkForDowngrade flags an address so that the next outbound connection
 // attempt to it will use the v1 P2P protocol.
 func (pd *P2PDowngrader) MarkForDowngrade(addr string) {
-	pd.cache.Add(addr)
+	pd.cache.Put(addr)
 
 	log.Debugf("P2PDowngrader: Marked %s for v1 downgrade", addr)
 }
