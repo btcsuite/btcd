@@ -104,6 +104,7 @@ unit:
 	cd txscript && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd psbt && $(GOTEST_DEV) ./... -test.timeout=20m
 	cd wire && $(GOTEST_DEV) ./... -test.timeout=20m
+	cd v2transport && $(GOTEST_DEV) ./... -test.timeout=20m
 
 #? unit-cover: Run unit coverage tests
 unit-cover:
@@ -120,6 +121,7 @@ unit-cover:
 	cd txscript && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd psbt && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 	cd wire && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
+	cd v2transport && $(GOTEST) $(COVER_FLAGS) ./... && sed -i.bak 's/v2\///g' coverage.txt
 
 #? unit-race: Run unit race tests
 unit-race:
@@ -133,6 +135,7 @@ unit-race:
 	cd txscript && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd psbt && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 	cd wire && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
+	cd v2transport && env CGO_ENABLED=1 GORACE="history_size=7 halt_on_errors=1" $(GOTEST) -race -test.timeout=20m ./...
 
 # =========
 # UTILITIES

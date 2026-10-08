@@ -125,6 +125,15 @@ jobs:
           format: 'golang'
           parallel: true
 
+      - name: Send v2transport coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          file: v2transport/coverage.txt
+          flag-name: v2transport
+          format: 'golang'
+          parallel: true
+
       - name: Notify coveralls all reports sent
         uses: coverallsapp/github-action@v2
         continue-on-error: true
