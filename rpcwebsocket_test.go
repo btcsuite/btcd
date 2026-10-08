@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -278,5 +279,165 @@ func TestWebsocketNormalCloseNotLogged(t *testing.T) {
 		log := rpcLogFor(conn)
 		require.Contains(t, log, "Disconnected websocket client")
 		require.NotContains(t, log, "Websocket receive error")
+	})
+}
+
+// authenticateRequest returns an authenticate command with the credentials of
+// the websocket test server.
+func authenticateRequest(jsonrpc string) string {
+	return fmt.Sprintf(`{"jsonrpc":%q,"id":1,"method":"authenticate",`+
+		`"params":[%q,%q]}`, jsonrpc, testWSUser, testWSPass)
+}
+
+// malformedRequest returns a request without a method whose ID is a string of
+// idSize bytes. The server answers it with an error that echoes the ID.
+func malformedRequest(idSize int) string {
+	return fmt.Sprintf(`{"jsonrpc":"1.0","id":"%s","params":[]}`,
+		strings.Repeat("a", idSize))
+}
+
+// send writes msg to conn as a text message.
+func send(t *testing.T, conn *websocket.Conn, msg string) {
+	t.Helper()
+
+	err := conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	require.NoError(t, err)
+}
+
+// readReply reads the next message from conn.
+func readReply(t *testing.T, conn *websocket.Conn) string {
+	t.Helper()
+
+	_, msg, err := conn.ReadMessage()
+	require.NoError(t, err)
+
+	return string(msg)
+}
+
+// requireClosed checks that the server closes the connection without sending
+// anything.
+func requireClosed(t *testing.T, s *testWebsocketServer,
+	conn *websocket.Conn) {
+
+	t.Helper()
+
+	s.waitDone()
+
+	_, msg, err := conn.ReadMessage()
+	require.Error(t, err, "unexpected message %q", msg)
+}
+
+// TestWebsocketUnauthenticatedReadLimit checks that a client that hasn't
+// authenticated can't send a message bigger than the unauthenticated limit.
+func TestWebsocketUnauthenticatedReadLimit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := newTestWebsocketServer(t, false)
+		conn := s.dial(t)
+
+		// The server stops reading once the message exceeds the limit
+		// and closes the connection, so sending it fails midway.
+		msg := malformedRequest(websocketReadLimitUnauthenticated)
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		requireClosed(t, s, conn)
+		require.Contains(t, rpcLogFor(conn), "read limit exceeded")
+	})
+}
+
+// TestWebsocketUnauthenticatedMalformedRequest checks that a client that
+// hasn't authenticated is disconnected without a reply when it sends a
+// request without a method, so it can't make the server queue replies.
+func TestWebsocketUnauthenticatedMalformedRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+	}{
+		{
+			name: "single",
+			msg:  `{"jsonrpc":"1.0","id":1}`,
+		},
+		{
+			name: "batch",
+			msg:  `[{"jsonrpc":"2.0","id":1}]`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				s := newTestWebsocketServer(t, false)
+				conn := s.dial(t)
+
+				send(t, conn, test.msg)
+				requireClosed(t, s, conn)
+			})
+		})
+	}
+}
+
+// TestWebsocketAuthTimeout checks that a client that doesn't authenticate is
+// disconnected once the authentication timeout expires.
+func TestWebsocketAuthTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := newTestWebsocketServer(t, false)
+		conn := s.dial(t)
+
+		start := time.Now()
+		requireClosed(t, s, conn)
+		require.Equal(t, websocketAuthTimeout, time.Since(start))
+	})
+}
+
+// TestWebsocketAuthenticate checks that a client that authenticates with the
+// authenticate command, alone or in a batch, stays connected past the
+// authentication timeout and may then send messages bigger than the
+// unauthenticated limit.
+func TestWebsocketAuthenticate(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+	}{
+		{
+			name: "single",
+			msg:  authenticateRequest("1.0"),
+		},
+		{
+			name: "batch",
+			msg:  "[" + authenticateRequest("2.0") + "]",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				s := newTestWebsocketServer(t, false)
+				conn := s.dial(t)
+
+				send(t, conn, test.msg)
+				reply := readReply(t, conn)
+				require.NotContains(t, reply, `"code"`)
+
+				time.Sleep(2 * websocketAuthTimeout)
+				send(t, conn, malformedRequest(1<<20))
+				reply = readReply(t, conn)
+				require.Contains(
+					t, reply, "Invalid request: malformed",
+				)
+			})
+		})
+	}
+}
+
+// TestWebsocketHTTPAuthenticated checks that a client that authenticated
+// during the HTTP upgrade has no authentication timeout and may send messages
+// bigger than the unauthenticated limit right away.
+func TestWebsocketHTTPAuthenticated(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := newTestWebsocketServer(t, true)
+		conn := s.dial(t)
+
+		time.Sleep(2 * websocketAuthTimeout)
+		send(t, conn, malformedRequest(1<<20))
+		reply := readReply(t, conn)
+		require.Contains(t, reply, "Invalid request: malformed")
 	})
 }

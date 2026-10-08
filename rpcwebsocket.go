@@ -40,6 +40,18 @@ const (
 	// handler since notifications have their own queuing mechanism
 	// independent of the send channel buffer.
 	websocketSendBufferSize = 50
+
+	// websocketReadLimitUnauthenticated is the maximum size of a message
+	// read from a websocket client that hasn't authenticated yet.  It only
+	// has to fit an authenticate request.  Authenticated clients have no
+	// limit, like HTTP POST requests, since some requests, such as a rescan
+	// for a large wallet, can be of any size.
+	websocketReadLimitUnauthenticated = 64 * 1024
+
+	// websocketAuthTimeout is how long a websocket client that didn't
+	// authenticate during the HTTP upgrade has to send the authenticate
+	// command before it is disconnected.
+	websocketAuthTimeout = time.Second * rpcAuthTimeoutSeconds
 )
 
 type semaphore chan struct{}
@@ -1225,6 +1237,11 @@ type wsClient struct {
 	// false means its access is only to the limited set of RPC calls.
 	isAdmin bool
 
+	// authTimer disconnects a client that didn't authenticate during the
+	// HTTP upgrade unless it authenticates in time.  It is nil for clients
+	// that were authenticated from the start.
+	authTimer *time.Timer
+
 	// sessionID is a random ID generated for each client when connected.
 	// These IDs may be queried by a client using the session RPC.  A change
 	// to the session ID indicates that the client reconnected.
@@ -1318,6 +1335,11 @@ out:
 			}
 
 			if req.Method == "" || req.Params == nil {
+				// Only process requests from authenticated clients
+				if !c.authenticated {
+					break out
+				}
+
 				jsonErr := &btcjson.RPCError{
 					Code:    btcjson.ErrRPCInvalidRequest.Code,
 					Message: "Invalid request: malformed",
@@ -1383,8 +1405,7 @@ out:
 					rpcsLog.Warnf("Auth failure.")
 					break out
 				}
-				c.authenticated = true
-				c.isAdmin = cmp == 1
+				c.markAuthenticated(cmp == 1)
 
 				// Marshal and send response.
 				reply, err = createMarshalledReply(cmd.jsonrpc, cmd.id, nil, nil)
@@ -1549,6 +1570,11 @@ out:
 						}
 
 						if req.Method == "" || req.Params == nil {
+							// Only process requests from authenticated clients
+							if !c.authenticated {
+								break out
+							}
+
 							jsonErr := &btcjson.RPCError{
 								Code:    btcjson.ErrRPCInvalidRequest.Code,
 								Message: "Invalid request: malformed",
@@ -1621,8 +1647,7 @@ out:
 								break out
 							}
 
-							c.authenticated = true
-							c.isAdmin = cmp == 1
+							c.markAuthenticated(cmp == 1)
 
 							// Marshal and send response.
 							reply, err = createMarshalledReply(cmd.jsonrpc, cmd.id, nil, nil)
@@ -1719,9 +1744,26 @@ out:
 	}
 
 	// Ensure the connection is closed.
+	if c.authTimer != nil {
+		c.authTimer.Stop()
+	}
 	c.Disconnect()
 	c.wg.Done()
 	rpcsLog.Tracef("Websocket client input handler done for %s", c.addr)
+}
+
+// markAuthenticated records that the client authenticated with the
+// authenticate command: it lifts the read limit for unauthenticated clients
+// and stops the authentication timer.  It must only be called from inHandler.
+func (c *wsClient) markAuthenticated(isAdmin bool) {
+	c.authenticated = true
+	c.isAdmin = isAdmin
+
+	// A read limit of 0 is no limit, the default of a connection.
+	c.conn.SetReadLimit(0)
+	if c.authTimer != nil {
+		c.authTimer.Stop()
+	}
 }
 
 // serviceRequest services a parsed RPC request by looking up and executing the
@@ -1935,6 +1977,14 @@ func (c *wsClient) Disconnect() {
 func (c *wsClient) Start() {
 	rpcsLog.Tracef("Starting websocket client %s", c.addr)
 
+	// A client that didn't authenticate during the HTTP upgrade must send
+	// the authenticate command in time.  The timer closes the connection,
+	// which also unblocks the client's goroutines if they are stuck
+	// writing to a client that doesn't read; a read deadline wouldn't.
+	if !c.authenticated {
+		c.authTimer = time.AfterFunc(websocketAuthTimeout, c.Disconnect)
+	}
+
 	// Start processing input and output.
 	c.wg.Add(3)
 	go c.inHandler()
@@ -1976,6 +2026,12 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 		sendChan:          make(chan wsResponse, websocketSendBufferSize),
 		quit:              make(chan struct{}),
 	}
+
+	// Until a client authenticates, it may only send small messages.
+	if !authenticated {
+		conn.SetReadLimit(websocketReadLimitUnauthenticated)
+	}
+
 	return client, nil
 }
 
