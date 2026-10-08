@@ -52,6 +52,13 @@ const (
 	// authenticate during the HTTP upgrade has to send the authenticate
 	// command before it is disconnected.
 	websocketAuthTimeout = time.Second * rpcAuthTimeoutSeconds
+
+	// websocketWriteTimeout is how long writing a single message to a
+	// websocket client may take before the client is disconnected.  It's
+	// generous so that a slow link can still receive a large reply, such as
+	// a verbose getrawmempool result, while a client that stops reading is
+	// eventually dropped.
+	websocketWriteTimeout = 5 * time.Minute
 )
 
 type semaphore chan struct{}
@@ -1876,6 +1883,11 @@ out:
 		// closed.
 		select {
 		case r := <-c.sendChan:
+			// Setting the deadline only records it for the write
+			// below, so it can't fail.
+			_ = c.conn.SetWriteDeadline(
+				time.Now().Add(websocketWriteTimeout),
+			)
 			err := c.conn.WriteMessage(websocket.TextMessage, r.msg)
 			if err != nil {
 				c.Disconnect()
