@@ -12,10 +12,11 @@ import (
 // This file implements a small bump allocator ("script arena") used to stage
 // variable-length scripts and witness items while a transaction is being
 // decoded from the wire.  Once a transaction is fully decoded, all of its
-// scripts are copied into a single exactly-sized allocation and the arena
-// memory becomes dead, so the arena is strictly transient: no arena memory
-// ever escapes a decode call.  That property is what makes reuse safe without
-// any reference counting.
+// scripts are copied into a single exactly-sized allocation before the arena
+// is reused.  A successful decode therefore leaves no arena-backed scripts
+// in the transaction.  A failed decode may leave staged scripts in the
+// partially populated transaction, which the caller must discard.  This
+// ownership contract makes arena reuse safe without reference counting.
 //
 // The arena replaces the previous fixed 4 MiB script slab.  The slab approach
 // suffered from memory amplification: decoding even a tiny transaction pinned
