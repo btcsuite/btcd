@@ -994,7 +994,8 @@ func (c *Client) TestMempoolAcceptAsync(txns []*wire.MsgTx,
 		// NOTE: must be performed after buf.Bytes is copied above.
 		//
 		// TODO(yy): remove it once the above TODO is addressed.
-		if err := tx.Deserialize(buf); err != nil {
+		var decoded wire.MsgTx
+		if err := decoded.Deserialize(buf); err != nil {
 			err = fmt.Errorf("%w: %v", ErrInvalidParam, err)
 			return newFutureError(err)
 		}
