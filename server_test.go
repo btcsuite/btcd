@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/peer"
+	"github.com/btcsuite/btclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,6 +21,14 @@ func TestMain(m *testing.M) {
 	// logRotator must be non-nil or any log write (e.g. from
 	// OnVerAck's double-call guard) panics via logWriter.Write.
 	initLogRotator(filepath.Join(os.TempDir(), "btcd-server-test.log"))
+
+	// Also send what the RPC server logs to testRPCLog for the websocket
+	// tests. This must happen before any test runs: server goroutines read
+	// rpcsLog without synchronization, even after their client shut down.
+	rpcsLog = btclog.NewBackend(
+		io.MultiWriter(logWriter{}, testRPCLog),
+	).Logger("RPCS")
+
 	os.Exit(m.Run())
 }
 

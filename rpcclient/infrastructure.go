@@ -29,7 +29,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/go-socks/socks"
-	"github.com/btcsuite/websocket"
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -464,8 +464,14 @@ func (c *Client) shouldLogReadError(err error) bool {
 	default:
 	}
 
-	// No logging when the connection has been disconnected.
+	// No logging when the connection has been disconnected, including when
+	// the server closed it normally with a close frame.
 	if err == io.EOF {
+		return false
+	}
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure,
+		websocket.CloseGoingAway) {
+
 		return false
 	}
 	if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
