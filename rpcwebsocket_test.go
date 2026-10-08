@@ -441,3 +441,19 @@ func TestWebsocketHTTPAuthenticated(t *testing.T) {
 		require.Contains(t, reply, "Invalid request: malformed")
 	})
 }
+
+// TestWebsocketWriteTimeout checks that an authenticated client that stops
+// reading is disconnected once a write to it times out.
+func TestWebsocketWriteTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := newTestWebsocketServer(t, true)
+		conn := s.dial(t)
+
+		// The client never reads the reply, so writing it blocks until
+		// the write times out.
+		start := time.Now()
+		send(t, conn, malformedRequest(1))
+		s.waitDone()
+		require.Equal(t, websocketWriteTimeout, time.Since(start))
+	})
+}
