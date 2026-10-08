@@ -39,7 +39,7 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
-	"github.com/decred/dcrd/lru"
+	"github.com/decred/dcrd/container/lru"
 )
 
 const (
@@ -342,7 +342,7 @@ type serverPeer struct {
 	isWhitelisted  bool
 	filter         *bloom.Filter
 	addressesMtx   sync.RWMutex
-	knownAddresses lru.Cache
+	knownAddresses *lru.Set[string]
 	banScore       connmgr.DynamicBanScore
 	quit           chan struct{}
 
@@ -376,7 +376,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		server:         s,
 		persistent:     isPersistent,
 		filter:         bloom.LoadFilter(nil),
-		knownAddresses: lru.NewCache(5000),
+		knownAddresses: lru.NewSet[string](5000),
 		quit:           make(chan struct{}),
 		verAckCh:       make(chan struct{}),
 		txProcessed:    make(chan struct{}, 1),
@@ -405,7 +405,7 @@ func (sp *serverPeer) newestBlock() (*chainhash.Hash, int32, error) {
 func (sp *serverPeer) addKnownAddresses(addresses []*wire.NetAddressV2) {
 	sp.addressesMtx.Lock()
 	for _, na := range addresses {
-		sp.knownAddresses.Add(addrmgr.NetAddressKey(na))
+		sp.knownAddresses.Put(addrmgr.NetAddressKey(na))
 	}
 	sp.addressesMtx.Unlock()
 }
