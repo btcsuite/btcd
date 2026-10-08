@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -767,4 +768,60 @@ func TestHTTPURLWiring(t *testing.T) {
 	defer c.Shutdown()
 
 	require.Equal(t, "http://localhost:8332", c.httpURL)
+}
+
+// TestShouldLogReadError checks which websocket read errors are logged: a
+// normal close by the server or a shutdown of the client is not an error worth
+// logging, while a dropped connection or any other failure is.
+func TestShouldLogReadError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "EOF",
+			err:  io.EOF,
+			want: false,
+		},
+		{
+			name: "normal close",
+			err: &websocket.CloseError{
+				Code: websocket.CloseNormalClosure,
+			},
+			want: false,
+		},
+		{
+			name: "going away",
+			err: &websocket.CloseError{
+				Code: websocket.CloseGoingAway,
+			},
+			want: false,
+		},
+		{
+			name: "connection dropped",
+			err: &websocket.CloseError{
+				Code: websocket.CloseAbnormalClosure,
+				Text: io.ErrUnexpectedEOF.Error(),
+			},
+			want: true,
+		},
+		{
+			name: "other error",
+			err:  errors.New("read failed"),
+			want: true,
+		},
+	}
+
+	for _, test := range tests {
+		c := &Client{shutdown: make(chan struct{})}
+		require.Equal(t, test.want, c.shouldLogReadError(test.err),
+			test.name)
+
+		// Nothing is logged once the client is shutting down.
+		close(c.shutdown)
+		require.False(t, c.shouldLogReadError(test.err), test.name)
+	}
 }

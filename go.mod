@@ -13,7 +13,6 @@ require (
 	github.com/btcsuite/btcd/wire/v2 v2.0.1
 	github.com/btcsuite/btclog v1.0.0
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
-	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
 	github.com/davecgh/go-spew v1.1.1
 	github.com/decred/dcrd/lru v1.1.3
 	github.com/gorilla/websocket v1.5.3

@@ -29,7 +29,7 @@ import (
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
-	"github.com/btcsuite/websocket"
+	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -1257,6 +1257,13 @@ type wsClient struct {
 	wg                sync.WaitGroup
 }
 
+// isNormalWebsocketClose returns whether err is the error a websocket read
+// returns when the peer closes the connection normally with a close frame.
+func isNormalWebsocketClose(err error) bool {
+	return websocket.IsCloseError(err, websocket.CloseNormalClosure,
+		websocket.CloseGoingAway)
+}
+
 // inHandler handles all incoming messages for the websocket connection.  It
 // must be run as a goroutine.
 func (c *wsClient) inHandler() {
@@ -1273,7 +1280,7 @@ out:
 		_, msg, err := c.conn.ReadMessage()
 		if err != nil {
 			// Log the error if it's not due to disconnecting.
-			if err != io.EOF {
+			if err != io.EOF && !isNormalWebsocketClose(err) {
 				rpcsLog.Errorf("Websocket receive error from "+
 					"%s: %v", c.addr, err)
 			}
