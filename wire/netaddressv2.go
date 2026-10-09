@@ -14,6 +14,11 @@ import (
 )
 
 const (
+	// minNetAddressV2Payload is the minimum number of bytes needed to
+	// encode an address. An unknown network can carry an empty address, but
+	// still includes the timestamp, services, network ID, length, and port.
+	minNetAddressV2Payload = 9
+
 	// maxAddrV2Size is the maximum size an address may be in the addrv2
 	// message.
 	maxAddrV2Size = 512

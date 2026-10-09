@@ -69,6 +69,11 @@ func (msg *MsgAddr) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) err
 			"[count %v, max %v]", count, MaxAddrPerMsg)
 		return messageError("MsgAddr.BtcDecode", str)
 	}
+	if err := validateElementCount(
+		r, count, minNetAddressPayload,
+	); err != nil {
+		return err
+	}
 
 	addrList := make([]NetAddress, count)
 	msg.AddrList = make([]*NetAddress, 0, count)

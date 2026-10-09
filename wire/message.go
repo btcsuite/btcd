@@ -672,10 +672,10 @@ func readMessageWithEncodingNInternal(r io.Reader, pver uint32,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
-	// Read payload.
-	payload := make([]byte, hdr.length)
-	n, err := io.ReadFull(r, payload)
-	totalBytes += n
+	// Read the payload as bytes arrive so a header cannot reserve the full
+	// claimed length on its own.
+	payload, err := readBytes(r, uint64(hdr.length))
+	totalBytes += len(payload)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}

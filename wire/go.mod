@@ -7,6 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.40.0
+	pgregory.net/rapid v1.3.0
 )
 
 require (

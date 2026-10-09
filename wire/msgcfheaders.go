@@ -80,6 +80,11 @@ func (msg *MsgCFHeaders) BtcDecode(r io.Reader, pver uint32, _ MessageEncoding) 
 			MaxBlockHeadersPerMsg)
 		return messageError("MsgCFHeaders.BtcDecode", str)
 	}
+	if err := validateElementCount(
+		r, count, chainhash.HashSize,
+	); err != nil {
+		return err
+	}
 
 	// Create a contiguous slice of hashes to deserialize into in order to
 	// reduce the number of allocations.
