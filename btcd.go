@@ -257,6 +257,10 @@ func btcdMain(serverChan chan<- *server) error {
 	// creating rpc cert and key files if they don't exist.
 	unveilx(cfg.RPCKey, "rwc")
 	unveilx(cfg.RPCCert, "rwc")
+	if !cfg.DisableListen && len(cfg.WebTransportListen) > 0 {
+		unveilx(cfg.WebTransportKey, "r")
+		unveilx(cfg.WebTransportCert, "r")
+	}
 	unveilx(cfg.DataDir, "rwc")
 
 	// drop unveil and tty
