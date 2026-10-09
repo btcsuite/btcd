@@ -6,7 +6,9 @@ package btcec
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
+	"testing/quick"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -290,5 +292,63 @@ func TestIsCompressed(t *testing.T) {
 				"got %v, want %v", test.name, test.key,
 				isCompressed, wantCompressed)
 		}
+	}
+}
+
+// TestCopyPublicKeyProperties tests that the CopyPublicKey function deep
+// copies the original public key and that the copy is equal to the original.
+func TestCopyPublicKeyProperties(t *testing.T) {
+	f := func(x, y [32]byte) bool {
+		// Convert byte slices to FieldVals.
+		xf := new(FieldVal)
+		yf := new(FieldVal)
+		if overflow := xf.SetByteSlice(x[:]); overflow {
+			// Only check the function for valid coordinates.
+			return true
+		}
+
+		if overflow := xf.SetByteSlice(y[:]); overflow {
+			// Only check the function for valid coordinates.
+			return true
+		}
+
+		// Create an original public key.
+		original := NewPublicKey(xf, yf)
+		if original == nil {
+			// Skip invalid inputs.
+			return true
+		}
+
+		// Make a copy of the original public key.
+		copied := CopyPublicKey(original)
+		if copied == nil {
+			// copy should succeed if original was valid.
+			return false
+		}
+
+		// The copy should not be the same instance.
+		if original == copied {
+			return false
+		}
+
+		// The copy should be equal to the original
+		// First check the serialized forms.
+		originalBytes := original.SerializeCompressed()
+		copiedBytes := copied.SerializeCompressed()
+		if !bytes.Equal(originalBytes, copiedBytes) {
+			return false
+		}
+
+		return original.IsEqual(copied)
+	}
+
+	// Create a deterministic random source using a fixed seed.
+	rng := rand.New(rand.NewSource(42))
+	config := &quick.Config{
+		Rand: rng,
+	}
+
+	if err := quick.Check(f, config); err != nil {
+		t.Error(err)
 	}
 }
