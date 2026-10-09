@@ -114,18 +114,30 @@ func (o *observedTransaction) Serialize(w io.Writer) {
 	binary.Write(w, binary.BigEndian, o.mined)
 }
 
+// deserializeObservedTransaction reads a single observed transaction, as
+// written by Serialize, from the passed reader. An error is returned if the
+// reader is exhausted before all fields have been read, as silently
+// continuing would leave the missing fields at their zero value.
 func deserializeObservedTransaction(r io.Reader) (*observedTransaction, error) {
 	ot := observedTransaction{}
 
 	// The first 32 bytes should be a hash.
-	binary.Read(r, binary.BigEndian, &ot.hash)
+	if err := binary.Read(r, binary.BigEndian, &ot.hash); err != nil {
+		return nil, fmt.Errorf("reading transaction hash: %w", err)
+	}
 
 	// The next 8 are SatoshiPerByte
-	binary.Read(r, binary.BigEndian, &ot.feeRate)
+	if err := binary.Read(r, binary.BigEndian, &ot.feeRate); err != nil {
+		return nil, fmt.Errorf("reading transaction fee rate: %w", err)
+	}
 
 	// And next there are two uint32's.
-	binary.Read(r, binary.BigEndian, &ot.observed)
-	binary.Read(r, binary.BigEndian, &ot.mined)
+	if err := binary.Read(r, binary.BigEndian, &ot.observed); err != nil {
+		return nil, fmt.Errorf("reading transaction observed height: %w", err)
+	}
+	if err := binary.Read(r, binary.BigEndian, &ot.mined); err != nil {
+		return nil, fmt.Errorf("reading transaction mined height: %w", err)
+	}
 
 	return &ot, nil
 }
@@ -590,18 +602,34 @@ func (ef *FeeEstimator) EstimateFee(numBlocks uint32) (BtcPerKilobyte, error) {
 const estimateFeeSaveVersion = 1
 
 func deserializeRegisteredBlock(r io.Reader, txs map[uint32]*observedTransaction) (*registeredBlock, error) {
-	var lenTransactions uint32
-
 	rb := &registeredBlock{}
-	binary.Read(r, binary.BigEndian, &rb.hash)
-	binary.Read(r, binary.BigEndian, &lenTransactions)
+	if err := binary.Read(r, binary.BigEndian, &rb.hash); err != nil {
+		return nil, fmt.Errorf("reading block hash: %w", err)
+	}
+
+	var lenTransactions uint32
+	err := binary.Read(r, binary.BigEndian, &lenTransactions)
+	if err != nil {
+		return nil, fmt.Errorf("reading dropped transaction count: %w", err)
+	}
 
 	rb.transactions = make([]*observedTransaction, lenTransactions)
 
 	for i := uint32(0); i < lenTransactions; i++ {
 		var index uint32
-		binary.Read(r, binary.BigEndian, &index)
-		rb.transactions[i] = txs[index]
+		err := binary.Read(r, binary.BigEndian, &index)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"reading dropped transaction reference %d: %w", i, err)
+		}
+
+		ot, exists := txs[index]
+		if !exists {
+			return nil, fmt.Errorf(
+				"invalid dropped transaction reference %d", index)
+		}
+
+		rb.transactions[i] = ot
 	}
 
 	return rb, nil
@@ -693,7 +721,7 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 	var version uint32
 	err := binary.Read(r, binary.BigEndian, &version)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading version: %w", err)
 	}
 	if version != estimateFeeSaveVersion {
 		return nil, fmt.Errorf("Incorrect version: expected %d found %d", estimateFeeSaveVersion, version)
@@ -703,23 +731,46 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 		observed: make(map[chainhash.Hash]*observedTransaction),
 	}
 
-	// Read basic parameters.
-	binary.Read(r, binary.BigEndian, &ef.maxRollback)
-	binary.Read(r, binary.BigEndian, &ef.binSize)
-	binary.Read(r, binary.BigEndian, &ef.maxReplacements)
-	binary.Read(r, binary.BigEndian, &ef.minRegisteredBlocks)
-	binary.Read(r, binary.BigEndian, &ef.lastKnownHeight)
-	binary.Read(r, binary.BigEndian, &ef.numBlocksRegistered)
+	// Read basic parameters. The errors cannot be ignored here: a partially
+	// read state leaves the remaining fields at their zero value, which
+	// silently produces a bogus fee estimator instead of an error.
+	if err := binary.Read(r, binary.BigEndian, &ef.maxRollback); err != nil {
+		return nil, fmt.Errorf("reading max rollback: %w", err)
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &ef.binSize); err != nil {
+		return nil, fmt.Errorf("reading bin size: %w", err)
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &ef.maxReplacements); err != nil {
+		return nil, fmt.Errorf("reading max replacements: %w", err)
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &ef.minRegisteredBlocks); err != nil {
+		return nil, fmt.Errorf("reading min registered blocks: %w", err)
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &ef.lastKnownHeight); err != nil {
+		return nil, fmt.Errorf("reading last known height: %w", err)
+	}
+
+	if err := binary.Read(r, binary.BigEndian, &ef.numBlocksRegistered); err != nil {
+		return nil, fmt.Errorf("reading registered block count: %w", err)
+	}
 
 	// Read transactions.
 	var numObserved uint32
 	observed := make(map[uint32]*observedTransaction)
-	binary.Read(r, binary.BigEndian, &numObserved)
+	if err := binary.Read(r, binary.BigEndian, &numObserved); err != nil {
+		return nil, fmt.Errorf("reading observed transaction count: %w", err)
+	}
+
 	for i := uint32(0); i < numObserved; i++ {
 		ot, err := deserializeObservedTransaction(r)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("reading observed transaction %d: %w", i, err)
 		}
+
 		observed[i] = ot
 		ef.observed[ot.hash] = ot
 	}
@@ -727,31 +778,47 @@ func RestoreFeeEstimator(data FeeEstimatorState) (*FeeEstimator, error) {
 	// Read bins.
 	for i := 0; i < estimateFeeDepth; i++ {
 		var numTransactions uint32
-		binary.Read(r, binary.BigEndian, &numTransactions)
+		if err := binary.Read(r, binary.BigEndian, &numTransactions); err != nil {
+			return nil, fmt.Errorf(
+				"reading bin %d transaction count: %w", i, err)
+		}
+
 		bin := make([]*observedTransaction, numTransactions)
 		for j := uint32(0); j < numTransactions; j++ {
 			var index uint32
-			binary.Read(r, binary.BigEndian, &index)
+			if err := binary.Read(r, binary.BigEndian, &index); err != nil {
+				return nil, fmt.Errorf(
+					"reading bin %d transaction reference %d: %w", i, j, err)
+			}
 
 			var exists bool
 			bin[j], exists = observed[index]
 			if !exists {
-				return nil, fmt.Errorf("Invalid transaction reference %d", index)
+				return nil, fmt.Errorf(
+					"invalid bin %d transaction reference %d", i, index)
 			}
 		}
+
 		ef.bin[i] = bin
 	}
 
 	// Read dropped transactions.
 	var numDropped uint32
-	binary.Read(r, binary.BigEndian, &numDropped)
+	if err := binary.Read(r, binary.BigEndian, &numDropped); err != nil {
+		return nil, fmt.Errorf("reading dropped block count: %w", err)
+	}
+
 	ef.dropped = make([]*registeredBlock, numDropped)
 	for i := uint32(0); i < numDropped; i++ {
 		var err error
 		ef.dropped[int(i)], err = deserializeRegisteredBlock(r, observed)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("reading dropped block %d: %w", i, err)
 		}
+	}
+
+	if r.Len() != 0 {
+		return nil, fmt.Errorf("unexpected trailing data: %d bytes", r.Len())
 	}
 
 	return ef, nil

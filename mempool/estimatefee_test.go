@@ -6,7 +6,9 @@ package mempool
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
@@ -420,5 +422,112 @@ func TestDatabase(t *testing.T) {
 	for round := 1; round <= rounds; round++ {
 		eft.rollback()
 		eft.checkSaveAndRestore(estimateHistory[len(estimateHistory)-round-1])
+	}
+}
+
+// populatedFeeEstimator returns a fee estimator with a non-trivial state: it
+// has observed transactions, non-empty bins and dropped transactions for at
+// least one registered block. Every section of the serialized format is
+// therefore exercised by the restore path.
+func populatedFeeEstimator(t *testing.T) *FeeEstimator {
+	t.Helper()
+
+	eft := estimateFeeTester{
+		ef: newTestFeeEstimator(2, 1, 2),
+		t:  t,
+	}
+
+	txs := make([]*TxDesc, 0, 8)
+	for i := 0; i < 8; i++ {
+		tx := eft.testTx(btcutil.Amount(1000 * (i + 1)))
+		eft.ef.ObserveTransaction(tx)
+		txs = append(txs, tx)
+	}
+
+	// Mine one transaction per block. The bin size above is small enough
+	// for the bins to fill up, which makes later blocks drop transactions
+	// from them. Those dropped transactions end up in the registered block
+	// section of the serialized state.
+	for i := range txs {
+		eft.newBlock([]*wire.MsgTx{txs[i].Tx.MsgTx()})
+	}
+
+	return eft.ef
+}
+
+// TestRestoreFeeEstimatorTruncatedState ensures that any prefix of a valid fee
+// estimator state is rejected. Before the read errors on the deserialization
+// path were propagated, a truncated state was silently accepted and all the
+// fields that could not be read were left at their zero value.
+func TestRestoreFeeEstimatorTruncatedState(t *testing.T) {
+	save := populatedFeeEstimator(t).Save()
+
+	if len(save) == 0 {
+		t.Fatal("serialized fee estimator state is empty")
+	}
+
+	for i := 0; i < len(save); i++ {
+		_, err := RestoreFeeEstimator(save[:i])
+		if err == nil {
+			t.Fatalf("expected error for state truncated to %d "+
+				"of %d bytes, got nil", i, len(save))
+		}
+		if !strings.Contains(err.Error(), "reading") {
+			t.Errorf("truncation at %d returned unhelpful error: %v", i, err)
+		}
+	}
+}
+
+// TestRestoreFeeEstimatorTrailingData ensures that the restore path rejects
+// data that follows an otherwise valid serialized state.
+func TestRestoreFeeEstimatorTrailingData(t *testing.T) {
+	save := populatedFeeEstimator(t).Save()
+	data := append(append(FeeEstimatorState{}, save...), 0, 0, 0, 0)
+
+	_, err := RestoreFeeEstimator(data)
+	if err == nil {
+		t.Fatal("expected error for trailing data")
+	}
+	if !strings.Contains(err.Error(), "unexpected trailing data") {
+		t.Fatalf("expected trailing data error, got %v", err)
+	}
+}
+
+// TestRestoreFeeEstimatorUnknownReference ensures that a state referring to a
+// transaction that was never observed is rejected. Without this check a nil
+// reference was stored in the list of dropped transactions, which then panics
+// when the registered block it belongs to is rolled back.
+func TestRestoreFeeEstimatorUnknownReference(t *testing.T) {
+	w := bytes.NewBuffer(make([]byte, 0))
+
+	binary.Write(w, binary.BigEndian, uint32(estimateFeeSaveVersion))
+
+	// The basic parameters: maxRollback, binSize, maxReplacements,
+	// minRegisteredBlocks, lastKnownHeight and numBlocksRegistered are all
+	// of the same size, so writing six zero words covers them.
+	for i := 0; i < 6; i++ {
+		binary.Write(w, binary.BigEndian, uint32(0))
+	}
+
+	// Write no observed transactions followed by the empty bins.
+	binary.Write(w, binary.BigEndian, uint32(0))
+	for i := 0; i < estimateFeeDepth; i++ {
+		binary.Write(w, binary.BigEndian, uint32(0))
+	}
+
+	// Write a single registered block that claims to hold one dropped
+	// transaction. Since there are no observed transactions to refer to,
+	// the reference below cannot be resolved.
+	binary.Write(w, binary.BigEndian, uint32(1))
+	binary.Write(w, binary.BigEndian, chainhash.Hash{})
+	binary.Write(w, binary.BigEndian, uint32(1))
+	binary.Write(w, binary.BigEndian, uint32(0))
+
+	_, err := RestoreFeeEstimator(w.Bytes())
+	if err == nil {
+		t.Fatal("expected error for unknown transaction reference")
+	}
+	if !strings.Contains(err.Error(), "invalid dropped transaction reference") {
+		t.Fatalf("expected invalid dropped transaction reference error, got %v", err)
 	}
 }
