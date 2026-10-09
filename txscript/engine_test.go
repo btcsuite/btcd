@@ -562,3 +562,101 @@ func TestCodeSepUnexecutedBranch(t *testing.T) {
 		})
 	}
 }
+
+// TestNullFailUnparsableSig ensures that, under StandardVerifyFlags, CHECKSIG
+// fails with ErrNullFail when the signature or public key passes the encoding
+// checks but cannot be parsed, in both base and segwit v0 scripts.
+func TestNullFailUnparsableSig(t *testing.T) {
+	t.Parallel()
+
+	const (
+		pubKey = "038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca1" +
+			"0646e23fd5f51508"
+
+		// x = 5 is not the x coordinate of any secp256k1 point.
+		offCurve = "0200000000000000000000000000000000" +
+			"00000000000000000000000000000005"
+
+		// R = 1 and S = 1 with SIGHASH_ALL.
+		sigR1 = "300602010102010101"
+	)
+
+	tests := []struct {
+		name   string
+		sig    string
+		pubKey string
+	}{{
+		// Control: parses, then fails verification.
+		name:   "R = 1",
+		sig:    sigR1,
+		pubKey: pubKey,
+	}, {
+		name: "R = n",
+		sig: "3026022100ffffffffffffffffffffffffffffff" +
+			"febaaedce6af48a03bbfd25e8cd036414102010101",
+		pubKey: pubKey,
+	}, {
+		name:   "R = 0",
+		sig:    "300602010002010101",
+		pubKey: pubKey,
+	}, {
+		name:   "off-curve pubkey",
+		sig:    sigR1,
+		pubKey: offCurve,
+	}}
+
+	for _, test := range tests {
+		sig := hexToBytes(test.sig)
+		pubKey := hexToBytes(test.pubKey)
+		t.Run(test.name, func(t *testing.T) {
+			runNullFail(t, sig, pubKey, false)
+		})
+		t.Run(test.name+" p2wsh", func(t *testing.T) {
+			runNullFail(t, sig, pubKey, true)
+		})
+	}
+}
+
+// runNullFail spends <pubKey> CHECKSIG NOT with sig, as a bare script or as
+// P2WSH, and checks that execution fails with ErrNullFail.
+func runNullFail(t *testing.T, sig, pubKey []byte, segwit bool) {
+	t.Helper()
+
+	script, err := NewScriptBuilder().AddData(pubKey).
+		AddOp(OP_CHECKSIG).AddOp(OP_NOT).Script()
+	if err != nil {
+		t.Fatalf("failed to build script: %v", err)
+	}
+
+	var tx *wire.MsgTx
+	pkScript := script
+	if segwit {
+		hash := sha256.Sum256(script)
+		pkScript, err = NewScriptBuilder().AddOp(OP_0).
+			AddData(hash[:]).Script()
+		if err != nil {
+			t.Fatalf("failed to build p2wsh script: %v", err)
+		}
+		witness := wire.TxWitness{sig, script}
+		tx = createSpendingTx(witness, nil, pkScript, 0)
+	} else {
+		sigScript, err := NewScriptBuilder().AddData(sig).Script()
+		if err != nil {
+			t.Fatalf("failed to build sig script: %v", err)
+		}
+		tx = createSpendingTx(nil, sigScript, pkScript, 0)
+	}
+
+	prevOuts := NewCannedPrevOutputFetcher(pkScript, 0)
+	vm, err := NewEngine(
+		pkScript, tx, 0, StandardVerifyFlags, nil, nil, 0, prevOuts,
+	)
+	if err != nil {
+		t.Fatalf("failed to create engine: %v", err)
+	}
+
+	err = vm.Execute()
+	if !IsErrorCode(err, ErrNullFail) {
+		t.Fatalf("got %v, want ErrNullFail", err)
+	}
+}

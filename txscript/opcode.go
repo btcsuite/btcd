@@ -2014,6 +2014,13 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 				return err
 			}
 
+			// The signature or public key failed to parse, so the
+			// check fails with a non-empty signature.
+			if vm.hasFlag(ScriptVerifyNullFail) {
+				str := "signature not empty on failed checksig"
+				return scriptError(ErrNullFail, str)
+			}
+
 			vm.dstack.PushBool(false)
 			return nil
 		}
@@ -2028,6 +2035,13 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 			var scriptErr Error
 			if errors.As(err, &scriptErr) {
 				return err
+			}
+
+			// The signature or public key failed to parse, so the
+			// check fails with a non-empty signature.
+			if vm.hasFlag(ScriptVerifyNullFail) {
+				str := "signature not empty on failed checksig"
+				return scriptError(ErrNullFail, str)
 			}
 
 			vm.dstack.PushBool(false)
