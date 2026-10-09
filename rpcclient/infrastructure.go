@@ -112,6 +112,7 @@ type jsonRequest struct {
 	cmd            interface{}
 	marshalledJSON []byte
 	responseChan   chan *Response
+	ctx            context.Context
 }
 
 // Client represents a Bitcoin RPC client which allows easy access to the
@@ -779,6 +780,27 @@ func (c *Client) handleSendPostMessage(ctx context.Context, jReq *jsonRequest) {
 	c.sendPostRequestAndRespond(ctx, jReq, sendPostRequestTries)
 }
 
+// postRequestContext returns a context that is cancelled when either the
+// client-level POST handler context or the caller-provided request context is
+// cancelled.
+func postRequestContext(clientCtx, requestCtx context.Context) (
+	context.Context, func(),
+) {
+	if requestCtx == nil {
+		return clientCtx, func() {}
+	}
+
+	mergedCtx, cancel := context.WithCancelCause(requestCtx)
+	stopClientCancel := context.AfterFunc(clientCtx, func() {
+		cancel(context.Cause(clientCtx))
+	})
+
+	return mergedCtx, func() {
+		stopClientCancel()
+		cancel(nil)
+	}
+}
+
 // sendPostRequestWithRetry performs HTTP POST retries and decodes the response
 // result. It returns the raw transport error so callers can decide how to map
 // shutdown-driven cancellation.
@@ -793,13 +815,16 @@ func sendPostRequestWithRetry(ctx context.Context, jReq *jsonRequest,
 		err          error
 	)
 
+	reqCtx, releaseReqCtx := postRequestContext(ctx, jReq.ctx)
+	defer releaseReqCtx()
+
 retryloop:
 	for i := 0; i < tries; i++ {
 		var httpReq *http.Request
 
 		bodyReader := bytes.NewReader(jReq.marshalledJSON)
 		httpReq, err = http.NewRequestWithContext(
-			ctx, "POST", httpURL, bodyReader,
+			reqCtx, "POST", httpURL, bodyReader,
 		)
 		if err != nil {
 			return nil, err
@@ -826,6 +851,12 @@ retryloop:
 			break
 		}
 
+		// If the context was cancelled, bail out immediately
+		// instead of retrying.
+		if reqCtx.Err() != nil {
+			return nil, reqCtx.Err()
+		}
+
 		// Save the last error for the case where we backoff further,
 		// retry and get an invalid response but no error. If this
 		// happens the saved last error will be used to enrich the error
@@ -844,9 +875,10 @@ retryloop:
 		select {
 		case <-time.After(backoff):
 
-		case <-ctx.Done():
-			// Stop retrying as soon as shutdown cancels the request context.
-			err = ctx.Err()
+		case <-reqCtx.Done():
+			// Stop retrying as soon as shutdown or the caller's
+			// request context cancels the request context.
+			err = reqCtx.Err()
 			break retryloop
 		}
 	}
@@ -973,11 +1005,22 @@ func (c *Client) sendPostRequest(jReq *jsonRequest) {
 	default:
 	}
 
-	// Normal path: either enqueue, or fail if shutdown closes in the race
-	// window after the guard above.
+	ctx := jReq.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		jReq.responseChan <- &Response{err: err}
+		return
+	}
+
+	// Normal path: enqueue, or fail on shutdown or caller cancellation.
 	select {
 	case c.sendPostChan <- jReq:
 		log.Tracef("Sent command [%s] with id %d", jReq.method, jReq.id)
+
+	case <-ctx.Done():
+		jReq.responseChan <- &Response{err: ctx.Err()}
 
 	case <-c.shutdown:
 		jReq.responseChan <- &Response{
@@ -1056,10 +1099,22 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) SendCmd(cmd interface{}) chan *Response {
+	return c.SendCmdWithContext(context.Background(), cmd)
+}
+
+// SendCmdWithContext sends the passed command with the given context.
+// The context cancels enqueueing and the underlying HTTP request in
+// HTTP POST mode. In websocket and batch modes the context is currently
+// ignored. The returned channel delivers the response. Waiting on that
+// channel does not observe cancellation while the request is queued.
+func (c *Client) SendCmdWithContext(ctx context.Context,
+	cmd interface{}) chan *Response {
+
 	rpcVersion := btcjson.RpcVersion1
 	if c.batch {
 		rpcVersion = btcjson.RpcVersion2
 	}
+
 	// Get the method associated with the command.
 	method, err := btcjson.CmdMethod(cmd)
 	if err != nil {
@@ -1081,6 +1136,7 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 		cmd:            cmd,
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
+		ctx:            ctx,
 	}
 
 	c.sendRequest(jReq)

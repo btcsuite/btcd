@@ -7,6 +7,7 @@ package rpcclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -261,7 +262,21 @@ type FutureGetBlockCountResult chan *Response
 // Receive waits for the Response promised by the future and returns the height
 // of the most-work fully-validated chain. The genesis block has height 0.
 func (r FutureGetBlockCountResult) Receive() (int64, error) {
-	res, err := ReceiveFuture(r)
+	return r.receiveWithContext(context.Background())
+}
+
+func (r FutureGetBlockCountResult) receiveWithContext(
+	ctx context.Context,
+) (int64, error) {
+
+	var response *Response
+	select {
+	case response = <-r:
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+
+	res, err := response.result, response.err
 	if err != nil {
 		return 0, err
 	}
@@ -289,6 +304,24 @@ func (c *Client) GetBlockCountAsync() FutureGetBlockCountResult {
 // The genesis block has height 0.
 func (c *Client) GetBlockCount() (int64, error) {
 	return c.GetBlockCountAsync().Receive()
+}
+
+// GetBlockCountWithContext is the context-aware variant of
+// GetBlockCount. The provided context controls the lifetime of the
+// call, including time spent queued, in HTTP POST mode. The context is
+// ignored in websocket and batch modes. A nil context uses Background.
+func (c *Client) GetBlockCountWithContext(
+	ctx context.Context,
+) (int64, error) {
+
+	if ctx == nil || !c.config.HTTPPostMode || c.batch {
+		ctx = context.Background()
+	}
+
+	cmd := btcjson.NewGetBlockCountCmd()
+	return FutureGetBlockCountResult(
+		c.SendCmdWithContext(ctx, cmd),
+	).receiveWithContext(ctx)
 }
 
 // FutureGetChainTxStatsResult is a future promise to deliver the result of a
