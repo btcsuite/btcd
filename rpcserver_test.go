@@ -666,3 +666,61 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	require.NoError(err)
 	require.Equal(expectedResults, results)
 }
+
+// TestHandleValidateAddress checks that validateaddress accepts address
+// encodings only, and rejects a hex-encoded public key as bitcoind does.
+func TestHandleValidateAddress(t *testing.T) {
+	t.Parallel()
+
+	const (
+		x = "79be667ef9dcbbac55a06295ce870b07" +
+			"029bfcdb2dce28d959f2815b16f81798"
+		y = "483ada7726a3c4655da4fbfc0e1108a8" +
+			"fd17b448a68554199c47d08ffb10d4b8"
+
+		compressed   = "02" + x
+		uncompressed = "04" + x + y
+	)
+
+	tests := []struct {
+		name    string
+		addr    string
+		isValid bool
+	}{{
+		name:    "p2pkh",
+		addr:    "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH",
+		isValid: true,
+	}, {
+		name:    "p2wpkh",
+		addr:    "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+		isValid: true,
+	}, {
+		name:    "compressed pubkey hex",
+		addr:    compressed,
+		isValid: false,
+	}, {
+		name:    "uncompressed pubkey hex",
+		addr:    uncompressed,
+		isValid: false,
+	}}
+
+	s := &rpcServer{cfg: rpcserverConfig{
+		ChainParams: &chaincfg.MainNetParams,
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cmd := btcjson.NewValidateAddressCmd(test.addr)
+			res, err := handleValidateAddress(
+				s, cmd, make(chan struct{}),
+			)
+			require.NoError(t, err)
+
+			result, ok := res.(btcjson.ValidateAddressChainResult)
+			require.True(t, ok)
+			require.Equal(t, test.isValid, result.IsValid)
+			if !test.isValid {
+				require.Empty(t, result.Address)
+			}
+		})
+	}
+}
