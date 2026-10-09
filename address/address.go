@@ -157,6 +157,17 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 		if chaincfg.IsBech32SegwitPrefix(prefix) {
 			witnessVer, witnessProg, err := decodeSegWitAddress(addr)
 			if err != nil {
+				// The string may be a base58 address that
+				// happens to start with the prefix, such as a
+				// simnet "Sb1..." address. If it is not, the
+				// bech32 error is the more useful one.
+				a, b58Err := decodeBase58Address(
+					addr, defaultNet,
+				)
+				if b58Err == nil {
+					return a, nil
+				}
+
 				return nil, err
 			}
 
@@ -196,6 +207,14 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 			}
 		}
 	}
+
+	return decodeBase58Address(addr, defaultNet)
+}
+
+// decodeBase58Address decodes a hex encoded public key or a base58 encoded
+// P2PKH or P2SH address.
+func decodeBase58Address(addr string, defaultNet *chaincfg.Params) (Address,
+	error) {
 
 	// Serialized public keys are either 65 bytes (130 hex chars) if
 	// uncompressed/hybrid or 33 bytes (66 hex chars) if compressed.
