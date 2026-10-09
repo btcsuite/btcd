@@ -134,6 +134,11 @@ type signOptions struct {
 	// 86 style, where we don't expect an actual tweak and instead just
 	// commit to the public key itself.
 	bip86Tweak bool
+
+	// nestedCoeffs holds nested nonce coefficients for nested MuSig2
+	// signing. Maps TreeDepth -> b_d for each nesting level > 0 along
+	// the signer's path.
+	nestedCoeffs map[TreeDepth]*btcec.ModNScalar
 }
 
 // defaultSignOptions returns the default set of signing operations.
@@ -195,15 +200,25 @@ func WithBip86SignTweak() SignOption {
 	}
 }
 
-// computeSigningNonce calculates the final nonce used for signing. This will
-// be the R value used in the final signature.
-func computeSigningNonce(combinedNonce [PubNonceSize]byte,
-	combinedKey *btcec.PublicKey, msg [32]byte) (
-	*btcec.JacobianPoint, *btcec.ModNScalar, error) {
+// WithNestedCoeffs provides nested nonce coefficients for signing in a nested
+// MuSig2 tree. Maps TreeDepth -> b_d for each nesting level > 0 along the
+// signer's path. These are obtained from each intermediate Aggregator's
+// NonceCoeff() method.
+func WithNestedCoeffs(
+	coeffs map[TreeDepth]*btcec.ModNScalar) SignOption {
 
-	// Next we'll compute the value b, that blinds our second public
-	// nonce:
-	//  * b = h(tag=NonceBlindTag, combinedNonce || combinedKey || m).
+	return func(o *signOptions) {
+		o.nestedCoeffs = coeffs
+	}
+}
+
+// ComputeNonceBlinder computes the nonce blinding factor b used in the MuSig2
+// protocol. The value is computed as:
+//
+//	b = h(tag=NonceBlindTag, combinedNonce || combinedKey || m)
+func ComputeNonceBlinder(combinedNonce [PubNonceSize]byte,
+	combinedKey *btcec.PublicKey, msg [32]byte) *btcec.ModNScalar {
+
 	var (
 		nonceMsgBuf  bytes.Buffer
 		nonceBlinder btcec.ModNScalar
@@ -215,6 +230,20 @@ func computeSigningNonce(combinedNonce [PubNonceSize]byte,
 		NonceBlindTag, nonceMsgBuf.Bytes(),
 	)
 	nonceBlinder.SetByteSlice(nonceBlindHash[:])
+
+	return &nonceBlinder
+}
+
+// computeSigningNonce calculates the final nonce used for signing. This will
+// be the R value used in the final signature.
+func computeSigningNonce(combinedNonce [PubNonceSize]byte,
+	combinedKey *btcec.PublicKey, msg [32]byte) (
+	*btcec.JacobianPoint, *btcec.ModNScalar, error) {
+
+	// First, we'll compute the value b, that blinds our second public
+	// nonce:
+	//  * b = h(tag=NonceBlindTag, combinedNonce || combinedKey || m).
+	nonceBlinder := ComputeNonceBlinder(combinedNonce, combinedKey, msg)
 
 	// Next, we'll parse the public nonces into R1 and R2.
 	r1J, err := btcec.ParseJacobian(
@@ -234,7 +263,7 @@ func computeSigningNonce(combinedNonce [PubNonceSize]byte,
 	// nonces, using the blinding factor to tweak the second nonce:
 	//  * R = R_1 + b*R_2
 	var nonce btcec.JacobianPoint
-	btcec.ScalarMultNonConst(&nonceBlinder, &r2J, &r2J)
+	btcec.ScalarMultNonConst(nonceBlinder, &r2J, &r2J)
 	btcec.AddNonConst(&r1J, &r2J, &nonce)
 
 	// If the combined nonce is the point at infinity, we'll use the
@@ -244,7 +273,7 @@ func computeSigningNonce(combinedNonce [PubNonceSize]byte,
 		G.AsJacobian(&nonce)
 	}
 
-	return &nonce, &nonceBlinder, nil
+	return &nonce, nonceBlinder, nil
 }
 
 // Sign generates a musig2 partial signature given the passed key set, secret
