@@ -3691,8 +3691,9 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 		result.IsWitness = btcjson.Bool(false)
 
 	case *address.AddressPubKey:
-		result.IsScript = btcjson.Bool(false)
-		result.IsWitness = btcjson.Bool(false)
+		// DecodeAddress also accepts a hex-encoded public key, which is
+		// not an address encoding, so it is reported as invalid.
+		return result, nil
 
 	case *address.AddressWitnessPubKeyHash:
 		result.IsScript = btcjson.Bool(false)
