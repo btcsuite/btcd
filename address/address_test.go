@@ -127,8 +127,40 @@ func TestAddresses(t *testing.T) {
 			},
 			net: &chaincfg.TestNet3Params,
 		},
+		{
+			// The text before the last '1' is "Sb", which matches
+			// the simnet bech32 prefix "sb" when case is ignored.
+			name:    "simnet p2pkh with bech32-like prefix",
+			addr:    "Sb1Hqfcey8tHkBYvpjQ8Nch2zsREaHcgjD",
+			encoded: "Sb1Hqfcey8tHkBYvpjQ8Nch2zsREaHcgjD",
+			valid:   true,
+			result: address.TstAddressPubKeyHash(
+				[ripemd160.Size]byte{
+					0x96, 0x68, 0xb8, 0x3c, 0x44,
+					0x11, 0x56, 0x8a, 0xbf, 0x92,
+					0xba, 0x7d, 0x8b, 0x84, 0x80,
+					0xe2, 0xa0, 0xc0, 0x10, 0x23},
+				chaincfg.SimNetParams.PubKeyHashAddrID),
+			f: func() (address.Address, error) {
+				pkHash := []byte{
+					0x96, 0x68, 0xb8, 0x3c, 0x44,
+					0x11, 0x56, 0x8a, 0xbf, 0x92,
+					0xba, 0x7d, 0x8b, 0x84, 0x80,
+					0xe2, 0xa0, 0xc0, 0x10, 0x23}
+				return address.NewAddressPubKeyHash(
+					pkHash, &chaincfg.SimNetParams,
+				)
+			},
+			net: &chaincfg.SimNetParams,
+		},
 
 		// Negative P2PKH tests.
+		{
+			name:  "simnet p2pkh with bech32-like prefix, mainnet",
+			addr:  "Sb1Hqfcey8tHkBYvpjQ8Nch2zsREaHcgjD",
+			valid: false,
+			net:   &chaincfg.MainNetParams,
+		},
 		{
 			name:  "p2pkh wrong hash length",
 			addr:  "",
