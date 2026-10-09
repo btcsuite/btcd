@@ -13,8 +13,10 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/address/v2/bech32"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -893,4 +895,31 @@ func TestAddresses(t *testing.T) {
 			return
 		}
 	}
+}
+
+// TestDecodeAddressBase58Fallback tests that DecodeAddress decodes a base58
+// address whose text before the last '1' is a bech32 prefix, and that it
+// returns the bech32 error when base58 decoding fails too.
+func TestDecodeAddressBase58Fallback(t *testing.T) {
+	// The text before the last '1' is "Sb", which matches the simnet
+	// bech32 prefix "sb" when case is ignored.
+	const addrStr = "Sb1Hqfcey8tHkBYvpjQ8Nch2zsREaHcgjD"
+	wantHash := [ripemd160.Size]byte{
+		0x96, 0x68, 0xb8, 0x3c, 0x44, 0x11, 0x56, 0x8a, 0xbf, 0x92,
+		0xba, 0x7d, 0x8b, 0x84, 0x80, 0xe2, 0xa0, 0xc0, 0x10, 0x23,
+	}
+
+	decoded, err := address.DecodeAddress(addrStr, &chaincfg.SimNetParams)
+	require.NoError(t, err)
+
+	p2pkh, ok := decoded.(*address.AddressPubKeyHash)
+	require.True(t, ok, "expected *AddressPubKeyHash, got %T", decoded)
+	require.Equal(t, wantHash, *p2pkh.Hash160())
+	require.True(t, p2pkh.IsForNet(&chaincfg.SimNetParams))
+	require.Equal(t, addrStr, p2pkh.EncodeAddress())
+
+	// The version byte is not a mainnet one, so base58 decoding fails
+	// and the bech32 error is returned.
+	_, err = address.DecodeAddress(addrStr, &chaincfg.MainNetParams)
+	require.ErrorAs(t, err, &bech32.ErrMixedCase{})
 }
