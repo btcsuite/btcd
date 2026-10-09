@@ -95,6 +95,25 @@ func minUint32(a, b uint32) uint32 {
 	return b
 }
 
+// validateSigNetBlockTime makes sure a custom signet block interval is only
+// used together with the signet network and a custom challenge, mirroring the
+// -signetblocktime option of the signet implementations that support it. The
+// interval itself is validated by chaincfg when the parameters are built.
+func validateSigNetBlockTime(sigNet bool, challenge string,
+	blockTime time.Duration) error {
+
+	if blockTime == 0 {
+		return nil
+	}
+
+	if !sigNet || challenge == "" {
+		return errors.New("signetblocktime requires --signet and " +
+			"--signetchallenge")
+	}
+
+	return nil
+}
+
 // validateMaxPeers ensures btcd has a positive total peer budget.
 func validateMaxPeers(maxPeers int) error {
 	if maxPeers <= 0 {
@@ -181,6 +200,7 @@ type config struct {
 	SigNet               bool          `long:"signet" description:"Use the signet test network"`
 	SigNetChallenge      string        `long:"signetchallenge" description:"Connect to a custom signet network defined by this challenge instead of using the global default signet test network -- Can be specified multiple times"`
 	SigNetSeedNode       []string      `long:"signetseednode" description:"Specify a seed node for the signet network instead of using the global default signet network seed nodes"`
+	SigNetBlockTime      time.Duration `long:"signetblocktime" description:"Target block interval of the custom signet network defined by signetchallenge, e.g. 30s. Must match the interval the signet's nodes were started with (-signetblocktime)"`
 	TestNet3             bool          `long:"testnet" description:"Use the test network (version 3)"`
 	TestNet4             bool          `long:"testnet4" description:"Use the test network (version 4)"`
 	TorIsolation         bool          `long:"torisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
@@ -575,6 +595,15 @@ func loadConfig() (*config, []string, error) {
 		activeNetParams = &simNetParams
 		cfg.DisableDNSSeed = true
 	}
+	err = validateSigNetBlockTime(
+		cfg.SigNet, cfg.SigNetChallenge, cfg.SigNetBlockTime,
+	)
+	if err != nil {
+		err := fmt.Errorf("%s: %w", funcName, err)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
 	if cfg.SigNet {
 		numNets++
 		activeNetParams = &sigNetParams
@@ -612,6 +641,20 @@ func loadConfig() (*config, []string, error) {
 		chainParams := chaincfg.CustomSignetParams(
 			sigNetChallenge, sigNetSeeds,
 		)
+		if cfg.SigNetBlockTime != 0 {
+			params, err := chaincfg.CustomSignetParamsWithBlockTime(
+				sigNetChallenge, sigNetSeeds,
+				cfg.SigNetBlockTime,
+			)
+			if err != nil {
+				str := "%s: invalid signet block time: %v"
+				err := fmt.Errorf(str, funcName, err)
+				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, usageMessage)
+				return nil, nil, err
+			}
+			chainParams = params
+		}
 		activeNetParams.Params = &chainParams
 	}
 	if numNets > 1 {

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestValidateMaxPeers(t *testing.T) {
@@ -36,6 +37,40 @@ var (
 	rpcuserRegexp = regexp.MustCompile("(?m)^rpcuser=.+$")
 	rpcpassRegexp = regexp.MustCompile("(?m)^rpcpass=.+$")
 )
+
+// TestValidateSigNetBlockTime checks that a custom signet block interval is
+// only accepted together with the signet network and a custom challenge.
+func TestValidateSigNetBlockTime(t *testing.T) {
+	tests := []struct {
+		name      string
+		sigNet    bool
+		challenge string
+		blockTime time.Duration
+		wantErr   bool
+	}{
+		{name: "unset", sigNet: true, challenge: "51"},
+		{name: "unset without signet"},
+		{name: "signet and challenge", sigNet: true, challenge: "51",
+			blockTime: 30 * time.Second},
+		{name: "without signet", challenge: "51",
+			blockTime: 30 * time.Second, wantErr: true},
+		{name: "without challenge", sigNet: true,
+			blockTime: 30 * time.Second, wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateSigNetBlockTime(
+				test.sigNet, test.challenge, test.blockTime,
+			)
+			if test.wantErr && err == nil {
+				t.Fatal("expected validation error")
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("unexpected validation error: %v", err)
+			}
+		})
+	}
+}
 
 func TestCreateDefaultConfigFile(t *testing.T) {
 	// find out where the sample config lives
