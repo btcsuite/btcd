@@ -375,3 +375,109 @@ func (u *Updater) AddOutWitnessScript(witnessScript []byte,
 
 	return nil
 }
+
+// AddInMuSig2Participants adds a PSBT_IN_MUSIG2_PARTICIPANT_PUBKEYS field
+// to the input at index inIndex. Returns ErrDuplicateKey if a participants
+// record with the same aggregate key is already present.
+func (u *Updater) AddInMuSig2Participants(inIndex int,
+	participants *MuSig2Participants) error {
+
+	if err := assertIndexValid(inIndex, u.Upsbt.Inputs); err != nil {
+		return err
+	}
+	if err := participants.Validate(); err != nil {
+		return err
+	}
+	err := assertNoDuplicateKey(
+		participants, u.Upsbt.Inputs[inIndex].MuSig2Participants,
+	)
+	if err != nil {
+		return err
+	}
+
+	u.Upsbt.Inputs[inIndex].MuSig2Participants = append(
+		u.Upsbt.Inputs[inIndex].MuSig2Participants, participants,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
+
+// AddInMuSig2PubNonce adds a PSBT_IN_MUSIG2_PUB_NONCE field to the input at
+// index inIndex. Returns ErrDuplicateKey if a nonce with the same
+// (participant pubkey, aggregate pubkey, optional tap leaf hash) is already
+// present.
+func (u *Updater) AddInMuSig2PubNonce(inIndex int,
+	nonce *MuSig2PubNonce) error {
+
+	if err := assertIndexValid(inIndex, u.Upsbt.Inputs); err != nil {
+		return err
+	}
+	if err := nonce.Validate(); err != nil {
+		return err
+	}
+	err := assertNoDuplicateKey(
+		nonce, u.Upsbt.Inputs[inIndex].MuSig2PubNonces,
+	)
+	if err != nil {
+		return err
+	}
+
+	u.Upsbt.Inputs[inIndex].MuSig2PubNonces = append(
+		u.Upsbt.Inputs[inIndex].MuSig2PubNonces, nonce,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
+
+// AddInMuSig2PartialSig adds a PSBT_IN_MUSIG2_PARTIAL_SIG field to the input
+// at index inIndex. Returns ErrDuplicateKey if a partial signature with the
+// same (participant pubkey, aggregate pubkey, optional tap leaf hash) is
+// already present.
+func (u *Updater) AddInMuSig2PartialSig(inIndex int,
+	partialSig *MuSig2PartialSig) error {
+
+	if err := assertIndexValid(inIndex, u.Upsbt.Inputs); err != nil {
+		return err
+	}
+	if err := partialSig.Validate(); err != nil {
+		return err
+	}
+	err := assertNoDuplicateKey(
+		partialSig, u.Upsbt.Inputs[inIndex].MuSig2PartialSigs,
+	)
+	if err != nil {
+		return err
+	}
+
+	u.Upsbt.Inputs[inIndex].MuSig2PartialSigs = append(
+		u.Upsbt.Inputs[inIndex].MuSig2PartialSigs, partialSig,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
+
+// AddOutMuSig2Participants adds a PSBT_OUT_MUSIG2_PARTICIPANT_PUBKEYS field
+// to the output at index outIndex. Returns ErrDuplicateKey if a participants
+// record with the same aggregate key is already present.
+func (u *Updater) AddOutMuSig2Participants(outIndex int,
+	participants *MuSig2Participants) error {
+
+	if err := assertIndexValid(outIndex, u.Upsbt.Outputs); err != nil {
+		return err
+	}
+	if err := participants.Validate(); err != nil {
+		return err
+	}
+	err := assertNoDuplicateKey(
+		participants, u.Upsbt.Outputs[outIndex].MuSig2Participants,
+	)
+	if err != nil {
+		return err
+	}
+
+	u.Upsbt.Outputs[outIndex].MuSig2Participants = append(
+		u.Upsbt.Outputs[outIndex].MuSig2Participants, participants,
+	)
+
+	return u.Upsbt.SanityCheck()
+}
