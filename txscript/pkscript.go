@@ -178,7 +178,9 @@ func (s PkScript) String() string {
 // ComputePkScript computes the script of an output by looking at the spending
 // input's signature script or witness.
 //
-// NOTE: Only P2PKH, P2SH, P2WSH, and P2WPKH redeem scripts are supported.
+// NOTE: Only P2PKH, P2SH, P2WSH, P2WPKH and P2TR script path spends are
+// supported. A P2TR key path spend reveals only a signature, so it returns
+// ErrUnsupportedScriptType.
 func ComputePkScript(sigScript []byte, witness wire.TxWitness) (PkScript, error) {
 	switch {
 	case len(sigScript) > 0:
@@ -252,11 +254,17 @@ func computeNonWitnessPkScript(sigScript []byte) (PkScript, error) {
 // computeWitnessPkScript computes the script of an output by looking at the
 // spending input's witness.
 func computeWitnessPkScript(witness wire.TxWitness) (PkScript, error) {
+	// Taproot is checked first, since a two item script path spend with
+	// a 33 byte control block would otherwise be taken for P2WPKH.
+	pkScript, isTaproot, err := computeTaprootPkScript(witness)
+	if isTaproot {
+		return pkScript, err
+	}
+
 	// We'll use the last item of the witness stack to determine the proper
 	// witness type.
 	lastWitnessItem := witness[len(witness)-1]
 
-	var pkScript PkScript
 	switch {
 	// If the witness stack has a size of 2 and its last item is a
 	// compressed public key, then this is a P2WPKH witness.
@@ -283,6 +291,65 @@ func computeWitnessPkScript(witness wire.TxWitness) (PkScript, error) {
 	}
 
 	return pkScript, nil
+}
+
+// computeTaprootPkScript computes the script of a P2TR output from the
+// witness of a script path spend. The second return value is false if the
+// witness is not recognized as a taproot one.
+//
+// The witness is taproot if it ends in an annex, which starts with 0x50, or
+// in a control block, whose first byte is a leaf version of at least 0xc0.
+// Both are opcodes that fail when executed first in a witness script, so no
+// spendable P2WPKH or P2WSH witness ends that way. A lone 64 or 65 byte item
+// is taken as a key path signature, which has no script to derive the output
+// key from, although it could also be a P2WSH script that takes no input.
+func computeTaprootPkScript(witness wire.TxWitness) (PkScript, bool, error) {
+	if len(witness) == 1 &&
+		(len(witness[0]) == 64 || len(witness[0]) == 65) {
+
+		return PkScript{}, true, ErrUnsupportedScriptType
+	}
+
+	stack := witness
+	annexed := isAnnexedWitness(stack)
+	if annexed {
+		stack = stack[:len(stack)-1]
+	}
+
+	rawControlBlock := stack[len(stack)-1]
+	isControlBlock := len(rawControlBlock) >= ControlBlockBaseSize &&
+		len(rawControlBlock) <= ControlBlockMaxSize &&
+		(len(rawControlBlock)-ControlBlockBaseSize)%
+			ControlBlockNodeSize == 0 &&
+		rawControlBlock[0]&TaprootLeafMask >= byte(BaseLeafVersion)
+
+	switch {
+	case !isControlBlock && !annexed:
+		return PkScript{}, false, nil
+
+	// A single item left is a key path spend.
+	case !isControlBlock || len(stack) < 2:
+		return PkScript{}, true, ErrUnsupportedScriptType
+	}
+
+	controlBlock, err := ParseControlBlock(rawControlBlock)
+	if err != nil {
+		return PkScript{}, true, err
+	}
+
+	script := stack[len(stack)-2]
+	outputKey := ComputeTaprootOutputKey(
+		controlBlock.InternalKey, controlBlock.RootHash(script),
+	)
+	pkScript, err := PayToTaprootScript(outputKey)
+	if err != nil {
+		return PkScript{}, true, err
+	}
+
+	result := PkScript{class: WitnessV1TaprootTy}
+	copy(result.script[:], pkScript)
+
+	return result, true, nil
 }
 
 // hash160 returns the RIPEMD160 hash of the SHA-256 HASH of the given data.
