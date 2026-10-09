@@ -107,6 +107,15 @@ jobs:
           format: 'golang'
           parallel: true
 
+      - name: Send descriptors coverage
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          file: descriptors/coverage.txt
+          flag-name: descriptors
+          format: 'golang'
+          parallel: true
+
       - name: Send txscript coverage
         uses: coverallsapp/github-action@v2
         continue-on-error: true
