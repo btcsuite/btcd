@@ -11,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
@@ -1894,5 +1895,299 @@ func TestRawTxInTapscriptSignature(t *testing.T) {
 
 			require.NoError(t, vm.Execute())
 		})
+	}
+}
+
+// TestSignSigHashSingleNoOutput ensures that an input is never signed with
+// SigHashSingle when the transaction has no output at the index of that input.
+// Such a signature commits to no output at all, so it would stay valid however
+// the outputs are changed while the matching output remains absent. All other
+// inputs and hash types must still produce valid signatures.
+func TestSignSigHashSingleNoOutput(t *testing.T) {
+	t.Parallel()
+
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+
+	pubKey := privKey.PubKey()
+	pubKeyBytes := pubKey.SerializeCompressed()
+
+	p2pkhAddr, err := address.NewAddressPubKeyHash(
+		address.Hash160(pubKeyBytes), &chaincfg.TestNet3Params,
+	)
+	require.NoError(t, err)
+	p2pkhScript, err := PayToAddrScript(p2pkhAddr)
+	require.NoError(t, err)
+
+	pubKeyAddr, err := address.NewAddressPubKey(
+		pubKeyBytes, &chaincfg.TestNet3Params,
+	)
+	require.NoError(t, err)
+	multiSigScript, err := MultiSigScript(
+		[]*address.AddressPubKey{pubKeyAddr}, 1,
+	)
+	require.NoError(t, err)
+
+	p2shP2pkhAddr, err := address.NewAddressScriptHash(
+		p2pkhScript, &chaincfg.TestNet3Params,
+	)
+	require.NoError(t, err)
+	p2shP2pkhScript, err := PayToAddrScript(p2shP2pkhAddr)
+	require.NoError(t, err)
+
+	p2shMultiSigAddr, err := address.NewAddressScriptHash(
+		multiSigScript, &chaincfg.TestNet3Params,
+	)
+	require.NoError(t, err)
+	p2shMultiSigScript, err := PayToAddrScript(p2shMultiSigAddr)
+	require.NoError(t, err)
+
+	p2wkhAddr, err := address.NewAddressWitnessPubKeyHash(
+		address.Hash160(pubKeyBytes), &chaincfg.TestNet3Params,
+	)
+	require.NoError(t, err)
+	p2wkhScript, err := PayToAddrScript(p2wkhAddr)
+	require.NoError(t, err)
+
+	p2trScript, err := PayToTaprootScript(
+		ComputeTaprootKeyNoScript(pubKey),
+	)
+	require.NoError(t, err)
+
+	// The transaction has two inputs but a single output, so input 1 has
+	// no output at the same index.
+	const amt = 1e8
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Index: 0}})
+	tx.AddTxIn(&wire.TxIn{PreviousOutPoint: wire.OutPoint{Index: 1}})
+	tx.AddTxOut(wire.NewTxOut(amt, p2pkhScript))
+
+	getKey := KeyClosure(func(address.Address) (*btcec.PrivateKey, bool,
+		error) {
+
+		return privKey, true, nil
+	})
+	getScript := mkGetScript(map[string][]byte{
+		p2shP2pkhAddr.EncodeAddress():    p2pkhScript,
+		p2shMultiSigAddr.EncodeAddress(): multiSigScript,
+	})
+
+	// requireSingleIndexErr asserts that err reports an attempt to sign a
+	// SigHashSingle input that has no matching output.
+	requireSingleIndexErr := func(t *testing.T, err error) {
+		t.Helper()
+
+		require.Truef(
+			t, IsErrorCode(err, ErrInvalidSigHashSingleIndex),
+			"unexpected error: %v", err,
+		)
+	}
+
+	// scriptTest is a previous output script to spend. For multisig,
+	// unsigned is the script that SignTxOutput returns when it skips a
+	// refused signature.
+	type scriptTest struct {
+		name     string
+		pkScript []byte
+		unsigned []byte
+	}
+
+	// check signs input idx of a copy of tx the way a wallet would for
+	// the type of the script. Without an output to commit to, no signature
+	// may be produced. Otherwise, the signature must validly spend the
+	// input.
+	check := func(t *testing.T, test scriptTest, hashType SigHashType,
+		idx int) {
+
+		pkScript := test.pkScript
+		prevOuts := NewCannedPrevOutputFetcher(pkScript, amt)
+		sigHashes := NewTxSigHashes(tx, prevOuts)
+
+		txCopy := tx.Copy()
+		txIn := txCopy.TxIn[idx]
+		class := GetScriptClass(pkScript)
+
+		var err error
+		switch class {
+		case WitnessV0PubKeyHashTy:
+			txIn.Witness, err = WitnessSignature(
+				txCopy, sigHashes, idx, amt, pkScript,
+				hashType, privKey, true,
+			)
+
+		case WitnessV1TaprootTy:
+			txIn.Witness, err = TaprootWitnessSignature(
+				txCopy, sigHashes, idx, amt, pkScript,
+				hashType, privKey,
+			)
+
+		default:
+			txIn.SignatureScript, err = SignTxOutput(
+				&chaincfg.TestNet3Params, txCopy, idx,
+				pkScript, hashType, getKey, getScript, nil,
+			)
+		}
+
+		noOutput := hashType&sigHashMask == SigHashSingle &&
+			idx >= len(txCopy.TxOut)
+
+		switch {
+		// Every combination except SigHashSingle without a matching
+		// output must produce a valid spend.
+		case !noOutput:
+			require.NoError(t, err)
+
+			vm, err := NewEngine(
+				pkScript, txCopy, idx, StandardVerifyFlags,
+				nil, sigHashes, amt, prevOuts,
+			)
+			require.NoError(t, err)
+			require.NoError(t, vm.Execute())
+
+		// Multisig signing skips keys that fail to sign, so the script
+		// comes back without any signature.
+		case test.unsigned != nil:
+			require.NoError(t, err)
+			require.Equal(t, test.unsigned, txIn.SignatureScript)
+
+		// The taproot sighash itself rejects this combination, with an
+		// error of its own.
+		case class == WitnessV1TaprootTy:
+			require.Error(t, err)
+			require.Nil(t, txIn.Witness)
+
+		default:
+			requireSingleIndexErr(t, err)
+			require.Nil(t, txIn.SignatureScript)
+			require.Nil(t, txIn.Witness)
+		}
+	}
+
+	hashTypes := []SigHashType{
+		SigHashAll,
+		SigHashNone,
+		SigHashSingle,
+		SigHashAll | SigHashAnyOneCanPay,
+		SigHashNone | SigHashAnyOneCanPay,
+		SigHashSingle | SigHashAnyOneCanPay,
+	}
+
+	// The unsigned P2SH-multisig script keeps the redeem script after the
+	// dummy element.
+	unsignedP2shMultiSig, err := NewScriptBuilder().AddOp(OP_0).
+		AddData(multiSigScript).Script()
+	require.NoError(t, err)
+
+	scriptTests := []scriptTest{
+		{name: "p2pkh", pkScript: p2pkhScript},
+		{
+			name:     "bare multisig",
+			pkScript: multiSigScript,
+			unsigned: []byte{OP_0},
+		},
+		{name: "p2sh-p2pkh", pkScript: p2shP2pkhScript},
+		{
+			name:     "p2sh-multisig",
+			pkScript: p2shMultiSigScript,
+			unsigned: unsignedP2shMultiSig,
+		},
+		{name: "p2wkh", pkScript: p2wkhScript},
+		{name: "p2tr", pkScript: p2trScript},
+	}
+	for _, test := range scriptTests {
+		for _, hashType := range hashTypes {
+			for idx := range tx.TxIn {
+				name := fmt.Sprintf("%s sighash=%#x input=%d",
+					test.name, hashType, idx)
+
+				t.Run(name, func(t *testing.T) {
+					check(t, test, hashType, idx)
+				})
+			}
+		}
+	}
+
+	sigHashes := NewTxSigHashes(
+		tx, NewCannedPrevOutputFetcher(p2wkhScript, amt),
+	)
+
+	// checkRawSig signs input idx with hashType, using the legacy or the
+	// segwit v0 ECDSA signer. Unless refused, the result must be a
+	// signature of the input's sighash, followed by hashType.
+	checkRawSig := func(t *testing.T, witness bool, hashType SigHashType,
+		idx int, refused bool) {
+
+		var (
+			sig, hash    []byte
+			err, hashErr error
+		)
+		if witness {
+			sig, err = RawTxInWitnessSignature(
+				tx, sigHashes, idx, amt, p2wkhScript, hashType,
+				privKey,
+			)
+			hash, hashErr = CalcWitnessSigHash(
+				p2wkhScript, sigHashes, hashType, tx, idx, amt,
+			)
+		} else {
+			sig, err = RawTxInSignature(
+				tx, idx, p2pkhScript, hashType, privKey,
+			)
+			hash, hashErr = CalcSignatureHash(
+				p2pkhScript, hashType, tx, idx,
+			)
+		}
+		require.NoError(t, hashErr)
+
+		if refused {
+			requireSingleIndexErr(t, err)
+			require.Nil(t, sig)
+
+			return
+		}
+
+		require.NoError(t, err)
+		require.NotEmpty(t, sig)
+		require.Equal(t, byte(hashType), sig[len(sig)-1])
+
+		parsedSig, err := ecdsa.ParseDERSignature(sig[:len(sig)-1])
+		require.NoError(t, err)
+		require.True(t, parsedSig.Verify(hash, pubKey))
+	}
+
+	// The ECDSA signers mask the hash type with sigHashMask, like the
+	// legacy and segwit v0 sighashes. Without a matching output, they must
+	// refuse every type that the mask turns into SigHashSingle, such as
+	// 0x43, but still sign non-standard types such as 0x07, which the
+	// sighashes treat like SigHashAll and so commit to every output.
+	// Bitcoin Core masks with 3 instead, so without a matching output it
+	// refuses those too.
+	rawTests := []struct {
+		hashType SigHashType
+		idx      int
+		refused  bool
+	}{
+		{hashType: 0x03, idx: 1, refused: true},
+		{hashType: 0x83, idx: 1, refused: true},
+		{hashType: 0x23, idx: 1, refused: true},
+		{hashType: 0x43, idx: 1, refused: true},
+		{hashType: 0xc3, idx: 1, refused: true},
+		{hashType: 0x07, idx: 1},
+		{hashType: 0x0b, idx: 1},
+		{hashType: 0x13, idx: 1},
+		{hashType: 0x43, idx: 0},
+	}
+	for _, test := range rawTests {
+		for _, witness := range []bool{false, true} {
+			name := fmt.Sprintf("raw witness=%v sighash=%#x "+
+				"input=%d", witness, test.hashType, test.idx)
+
+			t.Run(name, func(t *testing.T) {
+				checkRawSig(
+					t, witness, test.hashType, test.idx,
+					test.refused,
+				)
+			})
+		}
 	}
 }

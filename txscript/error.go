@@ -416,6 +416,15 @@ const (
 	// non-segwit script.
 	ErrCodeSeparator
 
+	// ----------------------------
+	// Failures related to signing.
+	// ----------------------------
+
+	// ErrInvalidSigHashSingleIndex is returned when an attempt is made to
+	// sign an input with the SigHashSingle hash type and an index that is
+	// greater than or equal to the number of outputs.
+	ErrInvalidSigHashSingleIndex
+
 	// numErrorCodes is the maximum error code number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numErrorCodes
@@ -504,6 +513,7 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrTaprootMaxSigOps:                    "ErrTaprootMaxSigOps",
 	ErrNonConstScriptCode:                  "ErrNonConstScriptCode",
 	ErrCodeSeparator:                       "ErrCodeSeparator",
+	ErrInvalidSigHashSingleIndex:           "ErrInvalidSigHashSingleIndex",
 }
 
 // String returns the ErrorCode as a human-readable name.
