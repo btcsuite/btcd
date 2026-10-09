@@ -162,6 +162,10 @@ const (
 	// the deployment of BIPS 340, 341 and 342.
 	DeploymentTaproot
 
+	// DeploymentBIP54 defines the rule change deployment ID for the
+	// consensus cleanup soft-fork package described in BIP 54.
+	DeploymentBIP54
+
 	// DeploymentTestDummyAlwaysActive is a dummy deployment that is meant
 	// to always be active.
 	DeploymentTestDummyAlwaysActive
@@ -440,6 +444,17 @@ var MainNetParams = Params{
 			CustomActivationThreshold: 1815, // 90%
 			MinActivationHeight:       709_632,
 		},
+		DeploymentBIP54: {
+			BitNumber: 31,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{},
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				// Past end forces ThresholdFailed. BIP54 has
+				// no scheduled activation.
+				time.Unix(0, 0),
+			),
+		},
 	},
 
 	// Mempool parameters
@@ -563,6 +578,17 @@ var RegressionNetParams = Params{
 			MinActivationHeight:       0,
 			AlwaysActiveHeight:        1,
 			CustomActivationThreshold: 108, // Only needs 75% hash rate.
+		},
+		DeploymentBIP54: {
+			BitNumber: 31,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{},
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				// Past end forces ThresholdFailed. BIP54 has
+				// no scheduled activation.
+				time.Unix(0, 0),
+			),
 		},
 	},
 
@@ -709,6 +735,17 @@ var TestNet3Params = Params{
 			),
 			CustomActivationThreshold: 1512, // 75%
 		},
+		DeploymentBIP54: {
+			BitNumber: 31,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{},
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				// Past end forces ThresholdFailed. BIP54 has
+				// no scheduled activation.
+				time.Unix(0, 0),
+			),
+		},
 	},
 
 	// Mempool parameters
@@ -834,6 +871,17 @@ var TestNet4Params = Params{
 			MinActivationHeight: 0,
 			AlwaysActiveHeight:  1,
 		},
+		DeploymentBIP54: {
+			BitNumber: 31,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{},
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				// Past end forces ThresholdFailed. BIP54 has
+				// no scheduled activation.
+				time.Unix(0, 0),
+			),
+		},
 	},
 
 	// Mempool parameters
@@ -946,6 +994,17 @@ var SimNetParams = Params{
 				time.Time{}, // Never expires.
 			),
 			CustomActivationThreshold: 75, // Only needs 75% hash rate.
+		},
+		DeploymentBIP54: {
+			BitNumber: 31,
+			DeploymentStarter: NewMedianTimeDeploymentStarter(
+				time.Time{},
+			),
+			DeploymentEnder: NewMedianTimeDeploymentEnder(
+				// Past end forces ThresholdFailed. BIP54 has
+				// no scheduled activation.
+				time.Unix(0, 0),
+			),
 		},
 		DeploymentTestDummyAlwaysActive: {
 			BitNumber: 29,
@@ -1092,6 +1151,17 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 				),
 				DeploymentEnder: NewMedianTimeDeploymentEnder(
 					time.Time{}, // Never expires
+				),
+			},
+			DeploymentBIP54: {
+				BitNumber: 31,
+				DeploymentStarter: NewMedianTimeDeploymentStarter(
+					time.Time{},
+				),
+				DeploymentEnder: NewMedianTimeDeploymentEnder(
+					// Past end forces ThresholdFailed.
+					// BIP54 has no scheduled activation.
+					time.Unix(0, 0),
 				),
 			},
 		},

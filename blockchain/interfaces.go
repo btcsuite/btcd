@@ -31,6 +31,10 @@ type ChainCtx interface {
 	// have validated. Not all instances of FindPreviousCheckpoint will use
 	// this function for validation.
 	FindPreviousCheckpoint() (HeaderCtx, error)
+
+	// BIP54Active reports whether the BIP-54 deployment has reached the
+	// active threshold for a block extending prevNode.
+	BIP54Active(prevNode HeaderCtx) (bool, error)
 }
 
 // HeaderCtx is an interface that describes information about a block. This is

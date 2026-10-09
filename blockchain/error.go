@@ -229,6 +229,27 @@ const (
 	// been found to violate a consensus rule, as opposed to having an
 	// invalid ancestor.
 	ErrKnownInvalidBlock
+
+	// ErrBadCoinbaseLockTime indicates that a block's coinbase transaction
+	// does not satisfy the BIP-54 constraints: nLockTime must equal the
+	// block height minus one, and at least one input's nSequence must be
+	// less than 0xffffffff.
+	ErrBadCoinbaseLockTime
+
+	// ErrBadTxSize indicates a transaction's stripped (no-witness)
+	// serialization is exactly 64 bytes, which BIP-54 disallows to
+	// prevent Merkle tree malleability.
+	ErrBadTxSize
+
+	// ErrTooManyBIP54SigOps indicates a transaction's input scripts
+	// contain more than MaxBIP54LegacySigOpsPerTx potentially-executed
+	// legacy signature operations.
+	ErrTooManyBIP54SigOps
+
+	// ErrBadBIP54Timestamp indicates a block header violates one of
+	// BIP-54's two new timestamp constraints at difficulty-period
+	// boundaries (the first or last block of a period).
+	ErrBadBIP54Timestamp
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
@@ -277,6 +298,10 @@ var errorCodeStrings = map[ErrorCode]string{
 	ErrInvalidAncestorBlock:      "ErrInvalidAncestorBlock",
 	ErrPrevBlockNotBest:          "ErrPrevBlockNotBest",
 	ErrKnownInvalidBlock:         "ErrKnownInvalidBlock",
+	ErrBadCoinbaseLockTime:       "ErrBadCoinbaseLockTime",
+	ErrBadTxSize:                 "ErrBadTxSize",
+	ErrTooManyBIP54SigOps:        "ErrTooManyBIP54SigOps",
+	ErrBadBIP54Timestamp:         "ErrBadBIP54Timestamp",
 }
 
 // String returns the ErrorCode as a human-readable name.
