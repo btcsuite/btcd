@@ -122,6 +122,10 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlock, buf []byte)
 
+	// OnCmpctBlock is invoked when a peer receives a cmpctblock bitcoin
+	// message.
+	OnCmpctBlock func(p *Peer, msg *wire.MsgCmpctBlock)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -145,6 +149,14 @@ type MessageListeners struct {
 
 	// OnGetData is invoked when a peer receives a getdata bitcoin message.
 	OnGetData func(p *Peer, msg *wire.MsgGetData)
+
+	// OnGetBlockTxn is invoked when a peer receives a getblocktxn bitcoin
+	// message.
+	OnGetBlockTxn func(p *Peer, msg *wire.MsgGetBlockTxn)
+
+	// OnBlockTxn is invoked when a peer receives a blocktxn bitcoin
+	// message.
+	OnBlockTxn func(p *Peer, msg *wire.MsgBlockTxn)
 
 	// OnGetBlocks is invoked when a peer receives a getblocks bitcoin
 	// message.
@@ -198,6 +210,10 @@ type MessageListeners struct {
 	// OnSendHeaders is invoked when a peer receives a sendheaders bitcoin
 	// message.
 	OnSendHeaders func(p *Peer, msg *wire.MsgSendHeaders)
+
+	// OnSendCmpct is invoked when a peer receives a sendcmpct bitcoin
+	// message.
+	OnSendCmpct func(p *Peer, msg *wire.MsgSendCmpct)
 
 	// OnSendAddrV2 is invoked when a peer receives a sendaddrv2 message.
 	OnSendAddrV2 func(p *Peer, msg *wire.MsgSendAddrV2)
@@ -474,6 +490,13 @@ type Peer struct {
 	witnessEnabled       bool
 	sendAddrV2           bool
 
+	compactBlocksSendVersion    uint64
+	compactBlocksReceiveVersion uint64
+	compactBlocksAnnounce       uint8
+	compactBlocksLocalVersions  []uint64
+	compactBlocksRemoteVersions map[uint64]uint8
+	compactBlocksRemoteOrder    []uint64
+
 	V2Transport *v2transport.Peer
 
 	wireEncoding wire.MessageEncoding
@@ -550,6 +573,14 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 // This function is safe for concurrent access.
 func (p *Peer) AddKnownInventory(invVect *wire.InvVect) {
 	p.knownInventory.Add(invVect)
+}
+
+// HasKnownInventory returns whether the peer is already known to have the
+// passed inventory.
+//
+// This function is safe for concurrent access.
+func (p *Peer) HasKnownInventory(invVect *wire.InvVect) bool {
+	return p.knownInventory.Contains(invVect)
 }
 
 // StatsSnapshot returns a snapshot of the current peer flags and statistics.
@@ -829,6 +860,57 @@ func (p *Peer) WantsHeaders() bool {
 	return sendHeadersPreferred
 }
 
+// IsCompactBlocksEnabled returns true if the peer has signalled compact block
+// support with a known compact block version.
+//
+// This function is safe for concurrent access.
+func (p *Peer) IsCompactBlocksEnabled() bool {
+	p.flagsMtx.Lock()
+	enabled := p.compactBlocksReceiveVersion != 0
+	p.flagsMtx.Unlock()
+
+	return enabled
+}
+
+// PrefersHighBandwidthRelay returns true if the peer requested compact
+// block announcements via sendcmpct high-bandwidth mode.
+//
+// This function is safe for concurrent access.
+func (p *Peer) PrefersHighBandwidthRelay() bool {
+	p.flagsMtx.Lock()
+	wantsAnnouncements := p.compactBlocksSendVersion != 0 &&
+		p.compactBlocksAnnounce != 0
+	p.flagsMtx.Unlock()
+
+	return wantsAnnouncements
+}
+
+// CompactBlockVersion returns the compact block version negotiated for
+// receiving compact blocks from the peer.  A zero value means no common
+// compact block version is known.
+//
+// This function is safe for concurrent access.
+func (p *Peer) CompactBlockVersion() uint64 {
+	p.flagsMtx.Lock()
+	version := p.compactBlocksReceiveVersion
+	p.flagsMtx.Unlock()
+
+	return version
+}
+
+// CompactBlockSendVersion returns the compact block version negotiated for
+// sending compact blocks to the peer.  A zero value means no common compact
+// block version is known.
+//
+// This function is safe for concurrent access.
+func (p *Peer) CompactBlockSendVersion() uint64 {
+	p.flagsMtx.Lock()
+	version := p.compactBlocksSendVersion
+	p.flagsMtx.Unlock()
+
+	return version
+}
+
 // IsWitnessEnabled returns true if the peer has signalled that it supports
 // segregated witness.
 //
@@ -1042,6 +1124,89 @@ func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string
 	doneChan := make(chan struct{}, 1)
 	p.QueueMessage(msg, doneChan)
 	<-doneChan
+}
+
+// PushSendCmpctMsg sends a sendcmpct message to the connected peer.
+//
+// This function is safe for concurrent access.
+func (p *Peer) PushSendCmpctMsg(announce uint8, version uint64) {
+	if !p.Connected() ||
+		(p.VersionKnown() && p.ProtocolVersion() < wire.ShortIdsBlocksVersion) {
+		return
+	}
+
+	p.recordLocalSendCmpctVersion(version)
+	p.QueueMessage(wire.NewMsgSendCmpct(announce, version), nil)
+}
+
+func (p *Peer) recordLocalSendCmpctVersion(version uint64) {
+	if version != 1 && version != 2 {
+		return
+	}
+
+	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
+
+	for _, localVersion := range p.compactBlocksLocalVersions {
+		if localVersion == version {
+			return
+		}
+	}
+
+	p.compactBlocksLocalVersions = append(
+		p.compactBlocksLocalVersions, version,
+	)
+	p.updateCompactBlockVersions()
+}
+
+func (p *Peer) handleSendCmpctMsg(msg *wire.MsgSendCmpct) {
+	if msg.Version != 1 && msg.Version != 2 {
+		log.Debugf("Ignoring sendcmpct with unsupported version %d "+
+			"from %v", msg.Version, p)
+		return
+	}
+
+	p.flagsMtx.Lock()
+	defer p.flagsMtx.Unlock()
+
+	if p.compactBlocksRemoteVersions == nil {
+		p.compactBlocksRemoteVersions = make(map[uint64]uint8)
+	}
+	if _, ok := p.compactBlocksRemoteVersions[msg.Version]; !ok {
+		p.compactBlocksRemoteOrder = append(
+			p.compactBlocksRemoteOrder, msg.Version,
+		)
+	}
+	p.compactBlocksRemoteVersions[msg.Version] = msg.Announce
+	p.updateCompactBlockVersions()
+}
+
+// updateCompactBlockVersions selects the versions used in each direction
+// from the ordered intersection of locally and remotely announced versions.
+// The caller MUST hold flagsMtx.
+func (p *Peer) updateCompactBlockVersions() {
+	p.compactBlocksReceiveVersion = 0
+	for _, version := range p.compactBlocksLocalVersions {
+		if _, ok := p.compactBlocksRemoteVersions[version]; ok {
+			p.compactBlocksReceiveVersion = version
+			break
+		}
+	}
+
+	p.compactBlocksSendVersion = 0
+	p.compactBlocksAnnounce = 0
+	for _, version := range p.compactBlocksRemoteOrder {
+		for _, localVersion := range p.compactBlocksLocalVersions {
+			if localVersion != version {
+				continue
+			}
+
+			p.compactBlocksSendVersion = version
+			p.compactBlocksAnnounce =
+				p.compactBlocksRemoteVersions[version]
+			return
+		}
+	}
 }
 
 // handlePingMsg is invoked when a peer receives a ping bitcoin message.  For
@@ -1576,6 +1741,11 @@ out:
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
 
+		case *wire.MsgCmpctBlock:
+			if p.cfg.Listeners.OnCmpctBlock != nil {
+				p.cfg.Listeners.OnCmpctBlock(p, msg)
+			}
+
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {
 				p.cfg.Listeners.OnInv(p, msg)
@@ -1594,6 +1764,16 @@ out:
 		case *wire.MsgGetData:
 			if p.cfg.Listeners.OnGetData != nil {
 				p.cfg.Listeners.OnGetData(p, msg)
+			}
+
+		case *wire.MsgGetBlockTxn:
+			if p.cfg.Listeners.OnGetBlockTxn != nil {
+				p.cfg.Listeners.OnGetBlockTxn(p, msg)
+			}
+
+		case *wire.MsgBlockTxn:
+			if p.cfg.Listeners.OnBlockTxn != nil {
+				p.cfg.Listeners.OnBlockTxn(p, msg)
 			}
 
 		case *wire.MsgGetBlocks:
@@ -1668,6 +1848,13 @@ out:
 
 			if p.cfg.Listeners.OnSendHeaders != nil {
 				p.cfg.Listeners.OnSendHeaders(p, msg)
+			}
+
+		case *wire.MsgSendCmpct:
+			p.handleSendCmpctMsg(msg)
+
+			if p.cfg.Listeners.OnSendCmpct != nil {
+				p.cfg.Listeners.OnSendCmpct(p, msg)
 			}
 
 		default:
