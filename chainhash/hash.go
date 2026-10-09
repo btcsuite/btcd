@@ -28,6 +28,18 @@ var (
 	// TagBIP0340Nonce is the BIP-0340 tag for nonces.
 	TagBIP0340Nonce = []byte("BIP0340/nonce")
 
+	// TagBIP0445Nonce is the BIP-0445 tag for aux data.
+	TagBIP0445Aux = []byte("BIP0445/aux")
+
+	// TagBIP0445Nonce is the BIP-0445 tag for nonce coefficients.
+	TagBIP0445NonceCoef = []byte("BIP0445/noncecoef")
+
+	// TagBIP0445Nonce is the BIP-0445 tag for nonces.
+	TagBIP0445Nonce = []byte("BIP0445/nonce")
+
+	// TagBIP0445DetNonce is the BIP-0445 tag for deterministic nonces.
+	TagBIP0445DetNonce = []byte("BIP0445/deterministic/nonce")
+
 	// TagTapSighash is the tag used by BIP 341 to generate the sighash
 	// flags.
 	TagTapSighash = []byte("TapSighash")
@@ -55,6 +67,10 @@ var (
 		string(TagTapLeaf):          sha256.Sum256(TagTapLeaf),
 		string(TagTapBranch):        sha256.Sum256(TagTapBranch),
 		string(TagTapTweak):         sha256.Sum256(TagTapTweak),
+		string(TagBIP0445Aux):       sha256.Sum256(TagBIP0445Aux),
+		string(TagBIP0445NonceCoef): sha256.Sum256(TagBIP0445NonceCoef),
+		string(TagBIP0445Nonce):     sha256.Sum256(TagBIP0445Nonce),
+		string(TagBIP0445DetNonce):  sha256.Sum256(TagBIP0445DetNonce),
 	}
 )
 
