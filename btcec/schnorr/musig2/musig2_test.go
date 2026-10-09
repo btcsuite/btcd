@@ -431,17 +431,6 @@ func TestMuSigEarlyNonce(t *testing.T) {
 	}
 }
 
-type memsetRandReader struct {
-	i int
-}
-
-func (mr *memsetRandReader) Read(buf []byte) (n int, err error) {
-	for i := range buf {
-		buf[i] = byte(mr.i)
-	}
-	return len(buf), nil
-}
-
 // TestSigningWithAggregatedNonce tests the aggregated nonce signing flow where
 // nonces are aggregated externally and provided to participants via
 // RegisterCombinedNonce, rather than each participant aggregating nonces

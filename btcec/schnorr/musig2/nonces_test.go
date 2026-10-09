@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,8 @@ type nonceGenTestCase struct {
 	ExtraIn string  `json:"extra_in"`
 	Pk      string  `json:"pk"`
 
-	Expected string `json:"expected"`
+	ExpectedSecNonce string `json:"expected_secnonce"`
+	ExpectedPubNonce string `json:"expected_pubnonce"`
 }
 
 type nonceGenTestCases struct {
@@ -51,8 +53,9 @@ func TestMusig2NonceGenTestVectors(t *testing.T) {
 	for i, testCase := range testCases.TestCases {
 		testCase := testCase
 
+		randBytes := mustParseHex(testCase.Rand)
 		customOpts := nonceGenOpts{
-			randReader:  &memsetRandReader{i: 0},
+			randReader:  bytes.NewReader(randBytes),
 			secretKey:   mustParseHex(testCase.Sk),
 			combinedKey: mustParseHex(testCase.AggPk),
 			auxInput:    mustParseHex(testCase.ExtraIn),
@@ -68,12 +71,14 @@ func TestMusig2NonceGenTestVectors(t *testing.T) {
 				t.Fatalf("err gen nonce aux bytes %v", err)
 			}
 
-			expectedBytes, _ := hex.DecodeString(testCase.Expected)
-			if !bytes.Equal(nonce.SecNonce[:], expectedBytes) {
-
-				t.Fatalf("nonces don't match: expected %x, got %x",
-					expectedBytes, nonce.SecNonce[:])
-			}
+			require.Equal(
+				t, strings.ToLower(testCase.ExpectedSecNonce),
+				hex.EncodeToString(nonce.SecNonce[:]),
+			)
+			require.Equal(
+				t, strings.ToLower(testCase.ExpectedPubNonce),
+				hex.EncodeToString(nonce.PubNonce[:]),
+			)
 		})
 	}
 }
