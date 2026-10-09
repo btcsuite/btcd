@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
@@ -199,6 +200,43 @@ func TestHandleDecodeRawTransactionRejectsTrailingBytes(t *testing.T) {
 
 	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
 	require.Nil(t, result)
+}
+
+// TestCoinbaseTxForTemplate ensures the getblocktemplate coinbasetxn omits
+// the witness commitment without modifying the internal block template.
+func TestCoinbaseTxForTemplate(t *testing.T) {
+	t.Parallel()
+
+	paymentScript := []byte{0x51}
+	witnessCommitment := bytes.Repeat([]byte{0x01}, chainhash.HashSize)
+	witnessScript := append(
+		append([]byte{}, blockchain.WitnessMagicBytes...),
+		witnessCommitment...,
+	)
+
+	coinbase := wire.NewMsgTx(wire.TxVersion)
+	coinbase.AddTxOut(&wire.TxOut{
+		Value:    1,
+		PkScript: paymentScript,
+	})
+	coinbase.AddTxOut(&wire.TxOut{
+		PkScript: witnessScript,
+	})
+
+	result := coinbaseTxForTemplate(coinbase, witnessCommitment)
+	require.NotSame(t, coinbase, result)
+	require.Len(t, result.TxOut, 1)
+	require.Equal(t, paymentScript, result.TxOut[0].PkScript)
+
+	// The internal template must retain its commitment.
+	require.Len(t, coinbase.TxOut, 2)
+	require.Equal(t, witnessScript, coinbase.TxOut[1].PkScript)
+
+	// Transactions without the expected final commitment are unchanged.
+	require.Same(t, coinbase, coinbaseTxForTemplate(coinbase, nil))
+	require.Same(
+		t, coinbase, coinbaseTxForTemplate(coinbase, []byte{0x00}),
+	)
 }
 
 // TestHandleGetBlockTemplateProposalRejectsTrailingBytes ensures proposal mode
