@@ -9,6 +9,28 @@ env:
   GO_VERSION: 1.26.3
 
 jobs:
+  lint:
+    name: Format and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check formatting
+        run: |
+          make fmt
+          git diff --exit-code
+
+      - name: Lint
+        run: make lint
+
   build:
     name: Build
     runs-on: ubuntu-latest
