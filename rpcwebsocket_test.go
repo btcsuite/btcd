@@ -321,10 +321,12 @@ func requireClosed(t *testing.T, s *testWebsocketServer,
 
 	t.Helper()
 
-	s.waitDone()
-
+	// Read before waiting for shutdown so a queued reply cannot be hidden
+	// by the authentication timeout closing the connection.
 	_, msg, err := conn.ReadMessage()
 	require.Error(t, err, "unexpected message %q", msg)
+
+	s.waitDone()
 }
 
 // TestWebsocketUnauthenticatedReadLimit checks that a client that hasn't
