@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/decred/dcrd/lru"
+	"github.com/decred/dcrd/container/lru"
 	"golang.org/x/time/rate"
 )
 
@@ -89,7 +89,7 @@ type Admission struct {
 	now       func() time.Time
 
 	v2SourceMu       sync.Mutex
-	v2SourceLimiters lru.KVCache
+	v2SourceLimiters *lru.Map[netip.Prefix, *rate.Limiter]
 	v2SourceRate     rate.Limit
 	v2SourceBurst    int
 
@@ -158,9 +158,11 @@ func newAdmission(cfg admissionConfig) *Admission {
 		v2Limiter:        rate.NewLimiter(cfg.v2Rate, cfg.v2Burst),
 		v2Slots:          make(chan struct{}, cfg.v2Concurrency),
 		now:              cfg.now,
-		v2SourceLimiters: lru.NewKVCache(cfg.v2SourceCacheSize),
-		v2SourceRate:     cfg.v2SourceRate,
-		v2SourceBurst:    cfg.v2SourceBurst,
+		v2SourceLimiters: lru.NewMap[netip.Prefix, *rate.Limiter](
+			uint32(cfg.v2SourceCacheSize),
+		),
+		v2SourceRate:  cfg.v2SourceRate,
+		v2SourceBurst: cfg.v2SourceBurst,
 		sourceLog: rate.Sometimes{
 			First:    3,
 			Interval: 30 * time.Second,
@@ -388,14 +390,14 @@ func (a *Admission) reserveV2Source(
 ) (*rate.Reservation, bool) {
 
 	a.v2SourceMu.Lock()
-	value, ok := a.v2SourceLimiters.Lookup(prefix)
+	limiter, ok := a.v2SourceLimiters.Get(prefix)
 	if !ok {
-		value = rate.NewLimiter(a.v2SourceRate, a.v2SourceBurst)
-		a.v2SourceLimiters.Add(prefix, value)
+		limiter = rate.NewLimiter(a.v2SourceRate, a.v2SourceBurst)
+		a.v2SourceLimiters.Put(prefix, limiter)
 	}
 	a.v2SourceMu.Unlock()
 
-	return reserveImmediate(value.(*rate.Limiter), now)
+	return reserveImmediate(limiter, now)
 }
 
 // logV2Rejection records and occasionally logs a rejected v2 handshake.

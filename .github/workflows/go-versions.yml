@@ -1,0 +1,20 @@
+name: Go version policy
+
+# Fails when a new Go release leaves the repo behind the Go version policy in
+# README.md, so the versions get bumped.
+on:
+  schedule:
+    # Every Monday at 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check Go versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Check Go versions
+        run: ./scripts/check_go_versions.sh

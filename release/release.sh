@@ -10,6 +10,17 @@
 
 set -e
 
+# Release binaries must be built with the Go version CI uses (see the Go
+# version policy in README.md), otherwise they can't be reproduced.
+GO_VERSION=$(sed -n 's/^ *GO_VERSION: *//p' \
+    "$(git rev-parse --show-toplevel)/.github/workflows/main.yml")
+if [[ "$(go env GOVERSION)" != "go$GO_VERSION" ]]; then
+    echo "release.sh: found $(go env GOVERSION), but releases are built" \
+        "with go$GO_VERSION." >&2
+    echo "Run it as: GOTOOLCHAIN=go$GO_VERSION $0 $*" >&2
+    exit 1
+fi
+
 # If no tag specified, use date + version otherwise use tag.
 if [[ $1x = x ]]; then
     DATE=`date +%Y%m%d`

@@ -30,10 +30,10 @@ import (
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
+	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire/v2"
-	"github.com/btcsuite/go-socks/socks"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -102,6 +102,13 @@ func validateMaxPeers(maxPeers int) error {
 	}
 
 	return nil
+}
+
+// proxyTorIsolation returns whether connections through --proxy use Tor stream
+// isolation. When --onion is set too, --proxy isn't the Tor proxy and the
+// onion proxy is isolated instead.
+func proxyTorIsolation(torIsolation bool, onionProxy string) bool {
+	return torIsolation && onionProxy == ""
 }
 
 // config defines the configuration options for btcd.
@@ -1079,11 +1086,12 @@ func loadConfig() (*config, []string, error) {
 		// Tor isolation flag means proxy credentials will be overridden
 		// unless there is also an onion proxy configured in which case
 		// that one will be overridden.
-		torIsolation := false
-		if cfg.TorIsolation && cfg.OnionProxy == "" &&
+		torIsolation := proxyTorIsolation(
+			cfg.TorIsolation, cfg.OnionProxy,
+		)
+		if torIsolation &&
 			(cfg.ProxyUser != "" || cfg.ProxyPass != "") {
 
-			torIsolation = true
 			fmt.Fprintln(os.Stderr, "Tor isolation set -- "+
 				"overriding specified proxy user credentials")
 		}
