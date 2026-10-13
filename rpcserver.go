@@ -3800,6 +3800,16 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		}
 	}
 
+	// Bitcoin Core only looks at the low three bits of the header byte
+	// minus 27 (the recovery ID and the compressed flag), so it also
+	// accepts headers outside 27-34, such as the BIP 137 headers 35-42
+	// used by some wallets for P2SH-P2WPKH and P2WPKH signatures. Map the
+	// header into the range RecoverCompact expects so that the same
+	// signatures verify here.
+	if len(sig) == 65 {
+		sig[0] = 27 + byte((int(sig[0])-27)&7)
+	}
+
 	// Validate the signature - this just shows that it was valid at all.
 	// we will compare it with the key next.
 	var buf bytes.Buffer
