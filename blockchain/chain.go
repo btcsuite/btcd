@@ -1559,11 +1559,21 @@ func (b *BlockChain) BlockHashByHeight(blockHeight int32) (*chainhash.Hash, erro
 	return &node.hash, nil
 }
 
-// IsValidHeader checks that we've already checked that this header connects to the
-// chain of best headers and did not receive an invalid state.
+// IsValidHeader checks that we've already checked that this header connects to
+// the chain of best headers and did not receive an invalid state.
+//
+// This function is safe for concurrent access.
 func (b *BlockChain) IsValidHeader(blockHash *chainhash.Hash) bool {
 	node := b.index.LookupNode(blockHash)
-	if node == nil || !b.bestHeader.Contains(node) {
+	if node == nil {
+		return false
+	}
+
+	b.chainLock.RLock()
+	inBestHeader := b.bestHeader.Contains(node)
+	b.chainLock.RUnlock()
+
+	if !inBestHeader {
 		return false
 	}
 
@@ -1586,11 +1596,16 @@ func (b *BlockChain) LatestBlockLocatorByHeader() (BlockLocator, error) {
 // NOTE: If the blockNode at the given blockHeight is not included in the
 // bestHeader chain, the function will return an error indicating that the
 // blockHeight wasn't found.
+//
+// This function is safe for concurrent access.
 func (b *BlockChain) HeaderHashByHeight(blockHeight int32) (
 	*chainhash.Hash, error) {
 
+	b.chainLock.RLock()
 	node := b.bestHeader.NodeByHeight(blockHeight)
-	if node == nil || !b.bestHeader.Contains(node) {
+	b.chainLock.RUnlock()
+
+	if node == nil {
 		return nil, fmt.Errorf("blockheight %v not found", blockHeight)
 	}
 
@@ -1598,13 +1613,52 @@ func (b *BlockChain) HeaderHashByHeight(blockHeight int32) (
 }
 
 // HeaderHeightByHash returns the height of the header given its hash.
+//
+// This function is safe for concurrent access.
 func (b *BlockChain) HeaderHeightByHash(blockHash chainhash.Hash) (int32, error) {
 	node := b.index.LookupNode(&blockHash)
-	if node == nil || !b.bestHeader.Contains(node) {
+	if node == nil {
+		return -1, fmt.Errorf("blockhash %v not found", blockHash)
+	}
+
+	b.chainLock.RLock()
+	inBestHeader := b.bestHeader.Contains(node)
+	b.chainLock.RUnlock()
+
+	if !inBestHeader {
 		return -1, fmt.Errorf("blockhash %v not found", blockHash)
 	}
 
 	return node.height, nil
+}
+
+// ValidHeaderHeight performs a single index lookup to check that the given
+// block hash is a known, non-invalid header in the best header chain and
+// returns its height.  This is more efficient than calling IsValidHeader
+// followed by HeaderHeightByHash which each perform separate lookups.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) ValidHeaderHeight(
+	blockHash *chainhash.Hash) (int32, bool) {
+
+	node := b.index.LookupNode(blockHash)
+	if node == nil {
+		return -1, false
+	}
+
+	b.chainLock.RLock()
+	inBestHeader := b.bestHeader.Contains(node)
+	b.chainLock.RUnlock()
+
+	if !inBestHeader {
+		return -1, false
+	}
+
+	if b.index.NodeStatus(node).KnownInvalid() {
+		return -1, false
+	}
+
+	return node.height, true
 }
 
 // HeightRange returns a range of block hashes for the given start and end
