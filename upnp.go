@@ -39,6 +39,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -223,7 +224,7 @@ func getOurIP() (ip string, err error) {
 
 // getServiceURL parses the xml description at the given root url to find the
 // url for the WANIPConnection service to be used for port forwarding.
-func getServiceURL(rootURL string) (url string, err error) {
+func getServiceURL(rootURL string) (serviceURL string, err error) {
 	r, err := http.Get(rootURL)
 	if err != nil {
 		return
@@ -258,17 +259,26 @@ func getServiceURL(rootURL string) (url string, err error) {
 		err = errors.New("no WANIPConnection")
 		return
 	}
-	url = combineURL(rootURL, d.ControlURL)
+	serviceURL, err = combineURL(rootURL, d.ControlURL)
 	return
 }
 
-// combineURL appends subURL onto rootURL.
-func combineURL(rootURL, subURL string) string {
-	protocolEnd := "://"
-	protoEndIndex := strings.Index(rootURL, protocolEnd)
-	a := rootURL[protoEndIndex+len(protocolEnd):]
-	rootIndex := strings.Index(a, "/")
-	return rootURL[0:protoEndIndex+len(protocolEnd)+rootIndex] + subURL
+// combineURL resolves subURL against rootURL using standard URL reference
+// semantics.
+func combineURL(rootURL, subURL string) (string, error) {
+	subURL = strings.TrimSpace(subURL)
+
+	base, err := url.Parse(rootURL)
+	if err != nil {
+		return "", err
+	}
+
+	ref, err := url.Parse(subURL)
+	if err != nil {
+		return "", err
+	}
+
+	return base.ResolveReference(ref).String(), nil
 }
 
 // soapBody represents the <s:Body> element in a SOAP reply.
