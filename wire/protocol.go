@@ -52,6 +52,10 @@ const (
 	// feefilter message.
 	FeeFilterVersion uint32 = 70013
 
+	// ShortIdsBlocksVersion is the protocol version which added compact
+	// block relay messages.
+	ShortIdsBlocksVersion uint32 = 70014
+
 	// AddrV2Version is the protocol version which added two new messages.
 	// sendaddrv2 is sent during the version-verack handshake and signals
 	// support for sending and receiving the addrv2 message. In the future,
