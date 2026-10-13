@@ -364,19 +364,15 @@ func (pi *PInput) deserialize(r io.Reader) error {
 
 		default:
 			// A fall through case for any proprietary types.
-			keyCodeAndData := append(
-				[]byte{byte(keyCode)}, keyData...,
-			)
 			newUnknown := &Unknown{
-				Key:   keyCodeAndData,
+				Key:   unknownKey(keyCode, keyData),
 				Value: value,
 			}
 
-			// Duplicate key+keyData are not allowed.
+			// Duplicate key+keyData are not allowed, whatever
+			// the value.
 			for _, x := range pi.Unknowns {
-				if bytes.Equal(x.Key, newUnknown.Key) &&
-					bytes.Equal(x.Value, newUnknown.Value) {
-
+				if bytes.Equal(x.Key, newUnknown.Key) {
 					return ErrDuplicateKey
 				}
 			}
