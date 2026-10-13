@@ -631,6 +631,12 @@ func TestAddresses(t *testing.T) {
 			net:   &chaincfg.MainNetParams,
 		},
 		{
+			name:  "segwit v1 mainnet bech32m invalid program length (20 bytes)",
+			addr:  "bc1pqqqsyqcyq5rqwzqfpg9scrgwpugpzysntwgkaa",
+			valid: false,
+			net:   &chaincfg.MainNetParams,
+		},
+		{
 			name:  "segwit v1 testnet bech32m mixed case",
 			addr:  "tb1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vq47Zagq",
 			valid: false,

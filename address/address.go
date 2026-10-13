@@ -183,6 +183,15 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 				return nil, UnsupportedWitnessProgLenError(len(witnessProg))
 
 			case 20:
+				// A 20-byte program is only defined for witness
+				// version 0 (P2WPKH).
+				if witnessVer != 0 {
+					err := UnsupportedWitnessProgLenError(
+						len(witnessProg),
+					)
+					return nil, err
+				}
+
 				return newAddressWitnessPubKeyHash(hrp, witnessProg)
 
 			case 32:
