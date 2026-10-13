@@ -105,59 +105,93 @@ func (t *Immutable) Get(key []byte) []byte {
 	return nil
 }
 
-// KVPair is just a helper struct for a key-value pair that's going to be
-// inserted into the treap.
+// KVPair is a helper struct for a key-value pair that's going to be inserted
+// into the treap.
 type KVPair struct {
 	Key   []byte
 	Value []byte
 }
 
-// Put puts the passed in key/value pairs into the treap.  For operations
+// nodeInSet returns true if the given node pointer exists in the set array.
+// The set is terminated by the first nil entry.
+func nodeInSet(node *treapNode, set *[staticDepth]*treapNode) bool {
+	for _, n := range set {
+		if n == nil {
+			return false
+		}
+		if n == node {
+			return true
+		}
+	}
+	return false
+}
+
+// Put inserts the passed key/value pairs into the treap.  For operations
 // requiring many insertions at once, Put is memory efficient as the
-// intermediary treap nodes created between each put operation is recycled
+// intermediary treap nodes created between each put operation are recycled
 // through an internal sync.Pool, reducing overall memory allocation.
+//
+// MVCC Snapshot Safety: The recycling of intermediate nodes is safe with
+// respect to concurrent snapshot readers because:
+//
+//  1. Each internal put() call creates FRESH nodes via cloneTreapNode (pool
+//     allocation) that are distinct from any node in a pre-existing treap
+//     version or snapshot.
+//  2. Snapshots hold references to the ORIGINAL treap's root, whose nodes
+//     are never recycled here — only their clones are candidates.
+//  3. A cloned node from a previous put() iteration is recycled only if it
+//     was re-cloned by the subsequent put() (verified via pointer identity
+//     in the replaced source set), confirming the new treap no longer
+//     references it.
+//  4. Cloned nodes NOT re-cloned survive in the new treap via structural
+//     sharing and are never recycled.
 func (t *Immutable) Put(kvPairs ...KVPair) *Immutable {
+	if len(kvPairs) == 0 {
+		return t
+	}
+
 	treap := t
-	var prevTreapNodes [staticDepth]*treapNode
+	var prevCreated [staticDepth]*treapNode
 
 	for _, kvPair := range kvPairs {
-		newTreap, newTreapNodes := treap.put(kvPair.Key, kvPair.Value)
+		newTreap, created, replaced := treap.put(
+			kvPair.Key, kvPair.Value,
+		)
 
-		// Loop through the prevTreapNodes and check for treapNodes that
-		// are no longer being utilized.  These will be garbaged collected
-		// and they're better off being recycled in the treapNodePool.
-		for _, node := range prevTreapNodes {
+		// Recycle nodes from the previous put() that were re-cloned
+		// by the current put().  A node is safe to recycle when it
+		// appears in the replaced source set, meaning the new treap
+		// has a fresh clone in its place and no longer references the
+		// previous version.  This is O(depth^2) pointer comparisons
+		// which is far cheaper than the previous O(depth * log n)
+		// approach using get() with key comparisons.
+		for _, node := range prevCreated {
 			if node == nil {
 				break
 			}
 
-			// Make sure that the node we're going to recycle isn't
-			// being used by the latest immutable treap by checking
-			// if the pointer value of the node is the same.
-			got := newTreap.get(node.key)
-			if got == node {
-				continue
+			if nodeInSet(node, &replaced) {
+				node.recycle()
 			}
-
-			// This node is only being used by the previous immutable
-			// copy and can safely be put into the treapNodePool to be
-			// recycled.
-			node.recycle()
 		}
 
-		// Replace with the latest treap and treap nodes.
 		treap = newTreap
-		prevTreapNodes = newTreapNodes
+		prevCreated = created
 	}
 
 	return treap
 }
 
-// put inserts the passed key/value pair and returns all the newly created
-// treapNodes that were created during this put operation.  The returned
-// treapNodes can then be put into data structures like sync.Pool to reduce the
-// memory overhead of allocating new treapNodes during multiple put calls.
-func (t *Immutable) put(key, value []byte) (*Immutable, [staticDepth]*treapNode) {
+// put inserts the passed key/value pair and returns the new treap along with
+// two node arrays: created contains all newly allocated nodes (clones of
+// ancestors plus the new leaf), and replaced contains the original source
+// nodes that were cloned.  The caller can compare these arrays across
+// sequential put() calls to determine which intermediate nodes are no longer
+// live and can be safely returned to the pool.
+func (t *Immutable) put(key, value []byte) (
+	*Immutable, [staticDepth]*treapNode, [staticDepth]*treapNode,
+) {
+
 	// Use an empty byte slice for the value when none was provided.  This
 	// ultimately allows key existence to be determined from the value since
 	// an empty byte slice is distinguishable from nil.
@@ -165,19 +199,19 @@ func (t *Immutable) put(key, value []byte) (*Immutable, [staticDepth]*treapNode)
 		value = emptySlice
 	}
 
-	// recycle is the treapNodes that are created during this put operation.
-	// We keep track of the nodes as the caller may be choose to recycle
-	// them to keep memory allocation low.
 	var (
-		recycle             [staticDepth]*treapNode
-		currentRecycleIndex int
+		created     [staticDepth]*treapNode
+		replaced    [staticDepth]*treapNode
+		createdIdx  int
+		replacedIdx int
 	)
 
 	// The node is the root of the tree if there isn't already one.
 	if t.root == nil {
 		root := newTreapNode(key, value, rand.Int())
-		recycle[currentRecycleIndex] = root
-		return newImmutable(root, 1, nodeSize(root)), recycle
+		created[0] = root
+		return newImmutable(root, 1, nodeSize(root)),
+			created, replaced
 	}
 
 	// Find the binary tree insertion point and construct a replaced list of
@@ -194,13 +228,14 @@ func (t *Immutable) put(key, value []byte) (*Immutable, [staticDepth]*treapNode)
 		// Clone the node and link its parent to it if needed.
 		nodeCopy := cloneTreapNode(node)
 
-		// Check if we still have space in the recycle for this node.
-		// It's ok if we don't put every single new node to be recycled
-		// as there's no guarantee in the sync.Pool that every recycled
-		// treapNode will be re-utilized.
-		if currentRecycleIndex < staticDepth {
-			recycle[currentRecycleIndex] = nodeCopy
-			currentRecycleIndex++
+		// Track the new clone and the original source it replaced.
+		if createdIdx < staticDepth {
+			created[createdIdx] = nodeCopy
+			createdIdx++
+		}
+		if replacedIdx < staticDepth {
+			replaced[replacedIdx] = node
+			replacedIdx++
 		}
 
 		if oldParent := parents.At(0); oldParent != nil {
@@ -232,17 +267,16 @@ func (t *Immutable) put(key, value []byte) (*Immutable, [staticDepth]*treapNode)
 		newRoot := parents.At(parents.Len() - 1)
 		newTotalSize := t.totalSize - uint64(len(node.value)) +
 			uint64(len(value))
-		return newImmutable(newRoot, t.count, newTotalSize), recycle
+		return newImmutable(newRoot, t.count, newTotalSize),
+			created, replaced
 	}
 
-	// Check if we still have space in the recycle for this node.
-	// It's ok if we don't put every single new node to be recycled
-	// as there's no guarantee in the sync.Pool that every recycled
-	// treapNode will be re-utilized.
+	// Create the new leaf node.  There is no replaced source for a brand
+	// new node — only clones of existing nodes have sources.
 	node := newTreapNode(key, value, rand.Int())
-	if currentRecycleIndex < staticDepth {
-		recycle[currentRecycleIndex] = node
-		currentRecycleIndex++
+	if createdIdx < staticDepth {
+		created[createdIdx] = node
+		createdIdx++
 	}
 
 	// Link the new node into the binary tree in the correct position.
@@ -285,13 +319,68 @@ func (t *Immutable) put(key, value []byte) (*Immutable, [staticDepth]*treapNode)
 		}
 	}
 
-	return newImmutable(newRoot, t.count+1, t.totalSize+nodeSize(node)), recycle
+	return newImmutable(newRoot, t.count+1, t.totalSize+nodeSize(node)),
+		created, replaced
 }
 
-// Delete removes the passed key from the treap and returns the resulting treap
-// if it exists.  The original immutable treap is returned if the key does not
-// exist.
-func (t *Immutable) Delete(key []byte) *Immutable {
+// Delete removes the passed keys from the treap and returns the resulting
+// treap.  Keys that do not exist are silently ignored.  For operations
+// requiring many deletions at once, Delete is memory efficient as the
+// intermediary treap nodes created between each delete operation are recycled
+// through an internal sync.Pool, reducing overall memory allocation.
+//
+// The same MVCC snapshot safety guarantees as Put apply here — see Put for
+// the full safety argument.
+func (t *Immutable) Delete(keys ...[]byte) *Immutable {
+	if len(keys) == 0 {
+		return t
+	}
+
+	treap := t
+	var prevCreated [staticDepth]*treapNode
+
+	for _, key := range keys {
+		newTreap, created, replacedSrc := treap.delete(key)
+
+		// Only attempt recycling when the treap was actually modified.
+		// When the key was not found, delete() returns the same treap
+		// pointer and empty arrays, so prevCreated must be preserved
+		// for the next iteration that does modify the treap.
+		if newTreap != treap {
+			for _, node := range prevCreated {
+				if node == nil {
+					break
+				}
+
+				if nodeInSet(node, &replacedSrc) {
+					node.recycle()
+				}
+			}
+
+			prevCreated = created
+		}
+
+		treap = newTreap
+	}
+
+	return treap
+}
+
+// delete removes the passed key from the treap and returns the new treap along
+// with two node arrays following the same semantics as put(): created contains
+// all newly allocated clones, replaced contains the original source nodes.  If
+// the key does not exist, the original treap is returned with empty arrays.
+func (t *Immutable) delete(key []byte) (
+	*Immutable, [staticDepth]*treapNode, [staticDepth]*treapNode,
+) {
+
+	var (
+		created     [staticDepth]*treapNode
+		replaced    [staticDepth]*treapNode
+		createdIdx  int
+		replacedIdx int
+	)
+
 	// Find the node for the key while constructing a list of parents while
 	// doing so.
 	var parents parentStack
@@ -318,14 +407,14 @@ func (t *Immutable) Delete(key []byte) *Immutable {
 
 	// There is nothing to do if the key does not exist.
 	if delNode == nil {
-		return t
+		return t, created, replaced
 	}
 
 	// When the only node in the tree is the root node and it is the one
 	// being deleted, there is nothing else to do besides removing it.
 	parent := parents.At(1)
 	if parent == nil && delNode.left == nil && delNode.right == nil {
-		return newImmutable(nil, 0, 0)
+		return newImmutable(nil, 0, 0), created, replaced
 	}
 
 	// Construct a replaced list of parents and the node to delete itself.
@@ -336,6 +425,17 @@ func (t *Immutable) Delete(key []byte) *Immutable {
 	for i := parents.Len(); i > 0; i-- {
 		node := parents.At(i - 1)
 		nodeCopy := cloneTreapNode(node)
+
+		// Track the clone and its source.
+		if createdIdx < staticDepth {
+			created[createdIdx] = nodeCopy
+			createdIdx++
+		}
+		if replacedIdx < staticDepth {
+			replaced[replacedIdx] = node
+			replacedIdx++
+		}
+
 		if oldParent := newParents.At(0); oldParent != nil {
 			if oldParent.left == node {
 				oldParent.left = nodeCopy
@@ -367,11 +467,24 @@ func (t *Immutable) Delete(key []byte) *Immutable {
 			child = delNode.right
 		}
 
+		// Track the source before cloning.
+		if replacedIdx < staticDepth {
+			replaced[replacedIdx] = child
+			replacedIdx++
+		}
+
 		// Rotate left or right depending on which side the child node
 		// is on.  This has the effect of moving the node to delete
 		// towards the bottom of the tree while maintaining the
 		// min-heap.
 		child = cloneTreapNode(child)
+
+		// Track the newly created clone.
+		if createdIdx < staticDepth {
+			created[createdIdx] = child
+			createdIdx++
+		}
+
 		if isLeft {
 			child.right, delNode.left = delNode, child.right
 		} else {
@@ -406,7 +519,8 @@ func (t *Immutable) Delete(key []byte) *Immutable {
 		parent.left = nil
 	}
 
-	return newImmutable(newRoot, t.count-1, t.totalSize-nodeSize(delNode))
+	return newImmutable(newRoot, t.count-1, t.totalSize-nodeSize(delNode)),
+		created, replaced
 }
 
 // ForEach invokes the passed function with every key/value pair in the treap
