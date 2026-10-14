@@ -59,6 +59,16 @@ const (
 	// retries when connecting to persistent peers.  It is adjusted by the
 	// number of retries such that there is a retry backoff.
 	connectionRetryInterval = time.Second * 5
+
+	// maxCompactBlockDepth is the maximum depth (in number of blocks) from
+	// the active chain tip for which we are willing to serve a compact block.
+	// Requests for blocks older than this will fallback to get a full block.
+	maxCompactBlockDepth = 10
+
+	// maxHighBandwidthCompactBlockPeers is the maximum number of peers to
+	// which we request high-bandwidth compact block announcements.
+	// BIP 152 recommends three such peers.
+	maxHighBandwidthCompactBlockPeers = 3
 )
 
 var (
@@ -217,14 +227,61 @@ type peerLifecycleEvent struct {
 	sp     *serverPeer
 }
 
+// highBandwidthPeerList tracks the bounded set of peers from which we request
+// high-bandwidth compact block announcements. The ordering permits the least
+// recently successful peer to be replaced when a new peer proves useful.
+type highBandwidthPeerList struct {
+	peers []int32
+}
+
 // peerState maintains state of inbound, persistent, outbound peers as well
 // as banned peers and outbound groups.
 type peerState struct {
-	inboundPeers    map[int32]*serverPeer
-	outboundPeers   map[int32]*serverPeer
-	persistentPeers map[int32]*serverPeer
-	banned          map[string]time.Time
-	outboundGroups  map[string]int
+	inboundPeers                   map[int32]*serverPeer
+	outboundPeers                  map[int32]*serverPeer
+	persistentPeers                map[int32]*serverPeer
+	banned                         map[string]time.Time
+	outboundGroups                 map[string]int
+	highBandwidthCompactBlockPeers highBandwidthPeerList
+}
+
+// promote adds id to the high bandwidth list, or marks it as the most recently
+// selected when it is already present. When the list is full, it returns the
+// evicted peer.
+func (s *highBandwidthPeerList) promote(id int32) (evicted int32, replaced bool) {
+	for i, peerID := range s.peers {
+		if peerID != id {
+			continue
+		}
+
+		s.peers = append(s.peers[:i], s.peers[i+1:]...)
+		s.peers = append(s.peers, id)
+		return 0, false
+	}
+
+	if len(s.peers) >= maxHighBandwidthCompactBlockPeers {
+		evicted = s.peers[0]
+		s.peers = s.peers[1:]
+		replaced = true
+	}
+
+	s.peers = append(s.peers, id)
+	return evicted, replaced
+}
+
+// remove removes id from the high bandwidth list and reports whether
+// it was present.
+func (s *highBandwidthPeerList) remove(id int32) bool {
+	for i, peerID := range s.peers {
+		if peerID != id {
+			continue
+		}
+
+		s.peers = append(s.peers[:i], s.peers[i+1:]...)
+		return true
+	}
+
+	return false
 }
 
 // Count returns the count of all known peers.
@@ -251,6 +308,18 @@ func (ps *peerState) forAllPeers(closure func(sp *serverPeer)) {
 		closure(e)
 	}
 	ps.forAllOutboundPeers(closure)
+}
+
+// peer returns the server peer with the given ID, if it is still connected to
+// this server.
+func (ps *peerState) peer(id int32) *serverPeer {
+	if sp := ps.inboundPeers[id]; sp != nil {
+		return sp
+	}
+	if sp := ps.outboundPeers[id]; sp != nil {
+		return sp
+	}
+	return ps.persistentPeers[id]
 }
 
 // cfHeaderKV is a tuple of a filter header and its associated block hash. The
@@ -640,6 +709,14 @@ func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
 		sp.releaseHandshake()
 		close(sp.verAckCh)
 	})
+
+	if sp.ProtocolVersion() >= wire.ShortIdsBlocksVersion {
+		var compactBlockVersion uint64 = 1
+		if sp.IsWitnessEnabled() {
+			compactBlockVersion = 2
+		}
+		sp.PushSendCmpctMsg(0, compactBlockVersion)
+	}
 }
 
 // OnMemPool is invoked when a peer receives a mempool bitcoin message.
@@ -743,6 +820,124 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	// the bitcoin block has been fully processed.
 	sp.server.syncManager.QueueBlock(block, sp.Peer, sp.blockProcessed)
 	<-sp.blockProcessed
+}
+
+// OnCmpctBlock is invoked when a peer receives a cmpctblock bitcoin message.
+func (sp *serverPeer) OnCmpctBlock(_ *peer.Peer, msg *wire.MsgCmpctBlock) {
+	sp.server.syncManager.QueueCmpctBlock(msg, sp.Peer)
+}
+
+// OnSendCmpct is invoked when a peer receives a sendcmpct bitcoin message.
+func (sp *serverPeer) OnSendCmpct(_ *peer.Peer, msg *wire.MsgSendCmpct) {
+	peerLog.Tracef("Peer %v advertised compact blocks version %d "+
+		"(announce=%v)", sp, msg.Version, msg.Announce)
+}
+
+// OnBlockTxn is invoked when a peer receives a blocktxn bitcoin message.
+func (sp *serverPeer) OnBlockTxn(_ *peer.Peer, msg *wire.MsgBlockTxn) {
+	sp.server.syncManager.QueueBlockTxn(msg, sp.Peer)
+}
+
+// validGetBlockTxnIndexes returns whether all indexes fit in the 16 bit
+// limit used by BIP-152.
+func validGetBlockTxnIndexes(indexes []uint32) bool {
+	for _, index := range indexes {
+		if index > math.MaxUint16 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// OnGetBlockTxn is invoked when a peer receives a getblocktxn bitcoin message.
+func (sp *serverPeer) OnGetBlockTxn(_ *peer.Peer, msg *wire.MsgGetBlockTxn) {
+	if !validGetBlockTxnIndexes(msg.Indexes) {
+		peerLog.Debugf("Peer %v requested getblocktxn index exceeding "+
+			"16 bits", sp)
+		return
+	}
+
+	currentBestSnapshot := sp.server.chain.BestSnapshot()
+	currentBestHeight := currentBestSnapshot.Height
+	msgBlockHeight, err := sp.server.chain.BlockHeightByHash(&msg.BlockHash)
+	if err != nil {
+		peerLog.Debugf("Unable to serve blocktxn for block %v to %v: "+
+			"%v; falling back to full block", msg.BlockHash, sp, err)
+		if err := sp.server.pushBlockMsg(
+			sp, &msg.BlockHash, nil, compactBlockEncoding(sp),
+		); err != nil {
+			peerLog.Debugf("Unable to serve fallback block %v to %v: %v",
+				msg.BlockHash, sp, err)
+		}
+		return
+	}
+	depth := max(currentBestHeight-msgBlockHeight, 0)
+
+	if depth > maxCompactBlockDepth {
+		peerLog.Debugf("Serving full block for getblocktxn request from "+
+			"%v for block %v: block is not close to the tip of the "+
+			"best chain", sp, msg.BlockHash)
+		if err := sp.server.pushBlockMsg(
+			sp, &msg.BlockHash, nil, compactBlockEncoding(sp),
+		); err != nil {
+			peerLog.Debugf("Unable to serve fallback block %v to %v: %v",
+				msg.BlockHash, sp, err)
+		}
+		return
+	}
+
+	resp := wire.NewMsgBlockTxn(&msg.BlockHash)
+
+	var msgBlock wire.MsgBlock
+	err = sp.server.db.View(func(dbTx database.Tx) error {
+		blockBytes, err := dbTx.FetchBlock(&msg.BlockHash)
+		if err != nil {
+			return err
+		}
+
+		return msgBlock.Deserialize(bytes.NewReader(blockBytes))
+	})
+	if err != nil {
+		peerLog.Tracef("Unable to fetch getblocktxn block hash %v: %v",
+			msg.BlockHash, err)
+		return
+	}
+
+	lastIndex := uint32(0)
+	for i, index := range msg.Indexes {
+		if int(index) >= len(msgBlock.Transactions) {
+			peerLog.Debugf(
+				"Peer %v requested getblocktxn index %d outside block %v transaction count %d", sp, index,
+				msg.BlockHash,
+				len(msgBlock.Transactions),
+			)
+			return
+		}
+		if i > 0 && index <= lastIndex {
+			peerLog.Debugf(
+				"Peer %v sent non-increasing getblocktxn index %d after %d",
+				sp,
+				index,
+				lastIndex,
+			)
+			return
+		}
+		lastIndex = index
+
+		if err := resp.AddTransaction(msgBlock.Transactions[index]); err != nil {
+			peerLog.Debugf(
+				"Unable to add getblocktxn transaction %d for block %v: %v",
+				index,
+				msg.BlockHash,
+				err,
+			)
+			return
+		}
+	}
+
+	encoding := compactBlockEncoding(sp)
+	sp.QueueMessageWithEncoding(resp, nil, encoding)
 }
 
 // OnInv is invoked when a peer receives an inv bitcoin message and is
@@ -905,6 +1100,11 @@ func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
 
 	case wire.InvTypeBlock:
 		return s.pushBlockMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
+
+	case wire.InvTypeCompactBlock:
+		return s.pushCompactBlockMsg(
+			sp, &iv.Hash, doneChan, compactBlockEncoding(sp),
+		)
 
 	case wire.InvTypeFilteredWitnessBlock:
 		return s.pushMerkleBlockMsg(
@@ -1777,6 +1977,98 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash,
 	return nil
 }
 
+// compactBlockEncoding returns the encoding negotiated for compact block
+// messages sent to the peer.
+func compactBlockEncoding(sp *serverPeer) wire.MessageEncoding {
+	if sp.CompactBlockSendVersion() == 2 {
+		return wire.WitnessEncoding
+	}
+
+	return wire.BaseEncoding
+}
+
+// pushCompactBlockMsg sends a cmpctblock message for the provided block hash
+// to the connected peer.  An error is returned if the block hash is not known.
+func (s *server) pushCompactBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
+
+	// A compact block can only be encoded after a common version has been
+	// negotiated.
+	if sp.CompactBlockSendVersion() == 0 {
+		return s.pushBlockMsg(sp, hash, doneChan, encoding)
+	}
+
+	hashHeight, err := s.chain.BlockHeightByHash(hash)
+	if err != nil {
+		peerLog.Debugf("Unable to serve compact block %v to %v: %v; "+
+			"falling back to full block", hash, sp, err)
+		return s.pushBlockMsg(sp, hash, doneChan, encoding)
+	}
+
+	currentBestHeight := s.chain.BestSnapshot().Height
+
+	depth := max(currentBestHeight-hashHeight, 0)
+	if depth > maxCompactBlockDepth {
+		peerLog.Debugf("Compact block request from %v for block %v is at depth %d (limit %d); falling back to full block", sp, hash, depth, maxCompactBlockDepth)
+		return s.pushBlockMsg(sp, hash, doneChan, encoding)
+	}
+
+	// Fetch the raw block bytes from the database.
+	var blockBytes []byte
+	err = sp.server.db.View(func(dbTx database.Tx) error {
+		var err error
+		blockBytes, err = dbTx.FetchBlock(hash)
+		return err
+	})
+	if err != nil {
+		peerLog.Tracef("Unable to fetch requested compact block hash "+
+			"%v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	block, err := btcutil.NewBlockFromBytes(blockBytes)
+	if err != nil {
+		peerLog.Tracef("Unable to deserialize requested compact block "+
+			"hash %v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	nonce, err := wire.RandomUint64()
+	if err != nil {
+		peerLog.Tracef("Unable to generate compact block nonce for "+
+			"%v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	cmpctBlock, err := netsync.BuildCompactBlock(
+		block, nonce, nil, encoding == wire.WitnessEncoding,
+	)
+	if err != nil {
+		peerLog.Tracef("Unable to build compact block %v: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	sp.QueueMessageWithEncoding(cmpctBlock, doneChan, encoding)
+	sp.AddKnownInventory(wire.NewInvVect(wire.InvTypeBlock, hash))
+	return nil
+}
+
 // pushMerkleBlockMsg sends a merkleblock message for the provided block hash to
 // the connected peer.  Since a merkle block requires the peer to have a filter
 // loaded, this call will simply be ignored if there is no filter loaded.  An
@@ -1859,6 +2151,41 @@ func (s *server) handleUpdatePeerHeights(state *peerState, umsg updatePeerHeight
 			sp.UpdateLastAnnouncedBlock(nil)
 		}
 	})
+
+	// Request future compact block announcements from a peer that delivered a
+	// newly accepted block for low latency block relay, while keeping the
+	// BIP 152 limit of high-bandwidth peers.
+	if umsg.originPeer != nil {
+		if sp := state.peer(umsg.originPeer.ID()); sp != nil {
+			s.promoteHighBandwidthCompactBlockPeer(state, sp)
+		}
+	}
+}
+
+// compactBlockVersion returns the compact block version negotiated for
+// receiving compact blocks from a peer.
+func compactBlockVersion(sp *serverPeer) uint64 {
+	return sp.CompactBlockVersion()
+}
+
+// promoteHighBandwidthCompactBlockPeer asks sp to announce new blocks using
+// BIP 152 high-bandwidth mode.
+func (s *server) promoteHighBandwidthCompactBlockPeer(state *peerState,
+	sp *serverPeer) {
+	if !sp.Connected() || !sp.IsCompactBlocksEnabled() {
+		return
+	}
+
+	evictedID, replaced := state.highBandwidthCompactBlockPeers.promote(sp.ID())
+	if replaced {
+		if evicted := state.peer(evictedID); evicted != nil && evicted.Connected() {
+			evicted.PushSendCmpctMsg(0, compactBlockVersion(evicted))
+			peerLog.Debugf("Requested low-bandwidth compact block relay from %v", evicted)
+		}
+	}
+
+	sp.PushSendCmpctMsg(1, compactBlockVersion(sp))
+	peerLog.Debugf("Requested high-bandwidth compact block relay from %v", sp)
 }
 
 // handleAddPeerMsg deals with adding new peers.  It is invoked from the
@@ -1971,6 +2298,8 @@ func (s *server) handleAddPeerMsg(state *peerState, sp *serverPeer) bool {
 // handleDonePeerMsg deals with peers that have signalled they are done.  It is
 // invoked from the peerHandler goroutine.
 func (s *server) handleDonePeerMsg(state *peerState, sp *serverPeer) {
+	state.highBandwidthCompactBlockPeers.remove(sp.ID())
+
 	var list map[int32]*serverPeer
 	if sp.persistent {
 		list = state.persistentPeers
@@ -2050,6 +2379,21 @@ func (s *server) handleBanPeerMsg(state *peerState, sp *serverPeer) {
 func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 	state.forAllPeers(func(sp *serverPeer) {
 		if !sp.Connected() {
+			return
+		}
+
+		if msg.invVect.Type == wire.InvTypeBlock && sp.PrefersHighBandwidthRelay() {
+
+			if sp.HasKnownInventory(msg.invVect) {
+				return
+			}
+
+			err := s.pushCompactBlockMsg(
+				sp, &msg.invVect.Hash, nil, compactBlockEncoding(sp),
+			)
+			if err != nil {
+				peerLog.Debugf("Unable to relay compact block %v to %v: %v", msg.invVect.Hash, sp, err)
+			}
 			return
 		}
 
@@ -2307,9 +2651,12 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnMemPool:      sp.OnMemPool,
 			OnTx:           sp.OnTx,
 			OnBlock:        sp.OnBlock,
+			OnCmpctBlock:   sp.OnCmpctBlock,
 			OnInv:          sp.OnInv,
 			OnHeaders:      sp.OnHeaders,
 			OnGetData:      sp.OnGetData,
+			OnGetBlockTxn:  sp.OnGetBlockTxn,
+			OnBlockTxn:     sp.OnBlockTxn,
 			OnGetBlocks:    sp.OnGetBlocks,
 			OnGetHeaders:   sp.OnGetHeaders,
 			OnGetCFilters:  sp.OnGetCFilters,
@@ -2322,6 +2669,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnGetAddr:      sp.OnGetAddr,
 			OnAddr:         sp.OnAddr,
 			OnAddrV2:       sp.OnAddrV2,
+			OnSendCmpct:    sp.OnSendCmpct,
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
 			OnNotFound:     sp.OnNotFound,
