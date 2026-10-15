@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 
 	"github.com/btcsuite/btcd/wire/v2"
@@ -18,6 +19,7 @@ type POutput struct {
 	TaprootInternalKey     []byte
 	TaprootTapTree         []byte
 	TaprootBip32Derivation []*TaprootBip32Derivation
+	MuSig2Participants     []*MuSig2Participants
 	Unknowns               []*Unknown
 }
 
@@ -145,6 +147,26 @@ func (po *POutput) deserialize(r io.Reader) error {
 				po.TaprootBip32Derivation, taprootDerivation,
 			)
 
+		case MuSig2ParticipantsOutputType:
+			participants, err := ReadMuSig2Participants(
+				keyData, value,
+			)
+			if err != nil {
+				return err
+			}
+
+			// Duplicate keys are not allowed.
+			err = assertNoDuplicateKey(
+				participants, po.MuSig2Participants,
+			)
+			if err != nil {
+				return err
+			}
+
+			po.MuSig2Participants = append(
+				po.MuSig2Participants, participants,
+			)
+
 		default:
 			// A fall through case for any proprietary types.
 			keyCodeAndData := append(
@@ -247,6 +269,23 @@ func (po *POutput) serialize(w io.Writer) error {
 		err = serializeKVPairWithType(
 			w, uint8(TaprootBip32DerivationOutputType),
 			derivation.XOnlyPubKey, value,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := assertNoNilElements(po.MuSig2Participants); err != nil {
+		return err
+	}
+	slices.SortFunc(
+		po.MuSig2Participants, func(a, b *MuSig2Participants) int {
+			return bytes.Compare(a.KeyData(), b.KeyData())
+		},
+	)
+	for _, participants := range po.MuSig2Participants {
+		err := SerializeMuSig2Participants(
+			w, uint8(MuSig2ParticipantsOutputType), participants,
 		)
 		if err != nil {
 			return err
