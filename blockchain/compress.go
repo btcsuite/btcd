@@ -5,6 +5,8 @@
 package blockchain
 
 import (
+	"math"
+
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 )
@@ -287,6 +289,14 @@ func decodeCompressedScriptSize(serialized []byte) int {
 	}
 
 	scriptSize -= numSpecialScripts
+
+	// A script size this large can only come from corrupt data.  Return a
+	// size that exceeds any valid input so callers fail their length checks
+	// instead of converting it to a negative int.
+	if scriptSize > math.MaxInt32 {
+		return math.MaxInt32
+	}
+
 	scriptSize += uint64(bytesRead)
 	return int(scriptSize)
 }
