@@ -15,6 +15,11 @@ import (
 )
 
 const (
+	// DefaultMaxSigOpCostPerTx is the default maximum sigop cost of a
+	// single standard transaction. It matches Bitcoin Core's
+	// MAX_STANDARD_TX_SIGOPS_COST, which is a fifth of the block limit.
+	DefaultMaxSigOpCostPerTx = blockchain.MaxBlockSigOpsCost / 5
+
 	// maxStandardP2SHSigOps is the maximum number of signature operations
 	// that are considered standard in a pay-to-script-hash script.
 	maxStandardP2SHSigOps = 15
