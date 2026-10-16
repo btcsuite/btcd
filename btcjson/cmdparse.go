@@ -5,6 +5,7 @@
 package btcjson
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -131,6 +132,15 @@ func UnmarshalCmd(r *Request) (interface{}, error) {
 	// parameter into them.
 	for i := 0; i < numParams; i++ {
 		rvf := rv.Field(i)
+
+		// An explicit JSON null for an optional parameter means the
+		// same as omitting it, so use its default value if it has one.
+		defaultVal, hasDefault := info.defaults[i]
+		if hasDefault && string(bytes.TrimSpace(r.Params[i])) == "null" {
+			rvf.Set(defaultVal)
+			continue
+		}
+
 		// Unmarshal the parameter into the struct field.
 		concreteVal := rvf.Addr().Interface()
 		if err := json.Unmarshal(r.Params[i], &concreteVal); err != nil {
