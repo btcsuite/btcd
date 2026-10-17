@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -265,6 +266,11 @@ func btcdMain(serverChan chan<- *server) error {
 	// Create server and start it.
 	server, err := newServer(cfg.Listeners, cfg.AgentBlacklist,
 		cfg.AgentWhitelist, db, activeNetParams.Params, interrupt)
+	if err != nil && errors.Is(err, indexers.ErrInterruptRequested) {
+		btcdLog.Infof("Unable to start server on %v: %v",
+			cfg.Listeners, err)
+		return nil
+	}
 	if err != nil {
 		// TODO: this logging could do with some beautifying.
 		btcdLog.Errorf("Unable to start server on %v: %v",
