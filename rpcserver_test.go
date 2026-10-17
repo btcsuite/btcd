@@ -3,8 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
@@ -666,4 +673,153 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	results, err = handleGetTxSpendingPrevOut(s, cmd, closeChan)
 	require.NoError(err)
 	require.Equal(expectedResults, results)
+}
+
+// newTestHTTPServer starts an RPC server with no chain behind it that answers
+// JSON-RPC requests over HTTP, and returns a client for it.
+//
+// It must be called in a synctest bubble. The server swaps the global config,
+// so tests using it must not run in parallel.
+func newTestHTTPServer(t *testing.T) *http.Client {
+	t.Helper()
+
+	oldCfg := cfg
+	cfg = &config{}
+	t.Cleanup(func() {
+		cfg = oldCfg
+	})
+
+	s := &rpcServer{statusLines: make(map[int]string)}
+
+	// Wait for all requests to be handled before the config is restored.
+	// Hijacked connections aren't tracked by the HTTP server.
+	var handlers sync.WaitGroup
+	t.Cleanup(handlers.Wait)
+
+	srv := &http.Server{Handler: http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			handlers.Add(1)
+			defer handlers.Done()
+
+			w.Header().Set("Connection", "close")
+			w.Header().Set("Content-Type", "application/json")
+			r.Close = true
+			s.jsonRPCRead(w, r, true)
+		},
+	)}
+	listener := newPipeListener()
+	go func() {
+		_ = srv.Serve(listener)
+	}()
+	t.Cleanup(func() {
+		_ = srv.Close()
+	})
+
+	transport := &http.Transport{DialContext: listener.dial}
+	t.Cleanup(transport.CloseIdleConnections)
+
+	return &http.Client{Transport: transport}
+}
+
+// postRPC sends body to the HTTP test server and returns the reply body. It
+// fails the test if the server sends no HTTP response or a status other than
+// 200.
+func postRPC(t *testing.T, client *http.Client, body string) []byte {
+	t.Helper()
+
+	resp, err := client.Post(
+		"http://btcd/", "application/json", strings.NewReader(body),
+	)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	reply, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return reply
+}
+
+// TestHTTPRequestWithoutVersion checks that a request with no "jsonrpc" member
+// is answered as JSON-RPC 1.0, alone and in a batch.
+func TestHTTPRequestWithoutVersion(t *testing.T) {
+	request := `{"id":1,"method":"uptime","params":[]}`
+
+	synctest.Test(t, func(t *testing.T) {
+		client := newTestHTTPServer(t)
+
+		var reply btcjson.Response
+		err := json.Unmarshal(postRPC(t, client, request), &reply)
+		require.NoError(t, err)
+		require.Equal(t, btcjson.RpcVersion1, reply.Jsonrpc)
+		require.Nil(t, reply.Error)
+		require.NotEqual(t, "null", string(reply.Result))
+		require.NotNil(t, reply.ID)
+		require.EqualValues(t, 1, *reply.ID)
+
+		var replies []btcjson.Response
+		batch := postRPC(t, client, "["+request+"]")
+		require.NoError(t, json.Unmarshal(batch, &replies))
+		require.Len(t, replies, 1)
+		require.Equal(t, btcjson.RpcVersion1, replies[0].Jsonrpc)
+		require.Nil(t, replies[0].Error)
+	})
+}
+
+// TestHTTPUnparsableRequest checks that a single request that is not valid
+// JSON is answered with a parse error.
+func TestHTTPUnparsableRequest(t *testing.T) {
+	for _, body := range []string{"this is bad", ""} {
+		t.Run(fmt.Sprintf("%q", body), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				client := newTestHTTPServer(t)
+
+				var reply btcjson.Response
+				err := json.Unmarshal(
+					postRPC(t, client, body), &reply,
+				)
+				require.NoError(t, err)
+				require.NotNil(t, reply.Error)
+				require.Equal(
+					t, btcjson.ErrRPCParse.Code,
+					reply.Error.Code,
+				)
+				require.Nil(t, reply.ID)
+			})
+		})
+	}
+}
+
+// TestHTTPBatchEntryNotObject checks that a batch entry that is not a request
+// object is answered with an invalid request error, and does not stop the
+// entries after it from being answered.
+func TestHTTPBatchEntryNotObject(t *testing.T) {
+	valid := `{"jsonrpc":"2.0","id":2,"method":"uptime","params":[]}`
+
+	synctest.Test(t, func(t *testing.T) {
+		client := newTestHTTPServer(t)
+
+		var replies []btcjson.Response
+		reply := postRPC(t, client, "[1]")
+		require.NoError(t, json.Unmarshal(reply, &replies))
+		require.Len(t, replies, 1)
+		require.NotNil(t, replies[0].Error)
+		require.Equal(
+			t, btcjson.ErrRPCInvalidRequest.Code,
+			replies[0].Error.Code,
+		)
+
+		replies = nil
+		reply = postRPC(t, client, "[1,"+valid+"]")
+		require.NoError(t, json.Unmarshal(reply, &replies))
+		require.Len(t, replies, 2)
+		require.NotNil(t, replies[0].Error)
+		require.Equal(
+			t, btcjson.ErrRPCInvalidRequest.Code,
+			replies[0].Error.Code,
+		)
+		require.Nil(t, replies[1].Error)
+		require.NotNil(t, replies[1].ID)
+		require.EqualValues(t, 2, *replies[1].ID)
+	})
 }
