@@ -52,6 +52,15 @@ func NewPublicKey(x, y *FieldVal) *PublicKey {
 	return secp.NewPublicKey(x, y)
 }
 
+// CopyPublicKey returns a deep copy of the public key.
+func CopyPublicKey(pk *PublicKey) *PublicKey {
+	var result secp.JacobianPoint
+	pk.AsJacobian(&result)
+	result.ToAffine()
+
+	return NewPublicKey(&result.X, &result.Y)
+}
+
 // SerializedKey is a type for representing a public key in its compressed
 // serialized form.
 //
