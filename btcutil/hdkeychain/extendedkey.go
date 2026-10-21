@@ -70,11 +70,13 @@ var (
 	ErrNotPrivExtKey = errors.New("unable to create private keys from a " +
 		"public extended key")
 
-	// ErrInvalidChild describes an error in which the child at a specific
-	// index is invalid due to the derived key falling outside of the valid
-	// range for secp256k1 private keys.  This error indicates the caller
-	// should simply ignore the invalid child extended key at this index and
-	// increment to the next index.
+	// ErrInvalidChild describes an unusable child derivation, including
+	// an out-of-range intermediate scalar, a zero final private scalar,
+	// or a final public point at infinity. The caller should skip this
+	// child and increment to the next index.
+	//
+	// Final cancellation requires a particular HMAC output, making it
+	// impractical to exercise with natural derivation vectors.
 	ErrInvalidChild = errors.New("the extended key at this index is invalid")
 
 	// ErrUnusableSeed describes an error in which the provided seed is not
@@ -101,6 +103,14 @@ var (
 // masterKey is the master key used along with a random seed used to generate
 // the master node in the hierarchical tree.
 var masterKey = []byte("Bitcoin seed")
+
+// hmacSHA512 computes the HMAC used for child derivation. Tests replace this
+// function to reach cancellation results that natural vectors cannot exercise.
+var hmacSHA512 = func(chainCode, data []byte) []byte {
+	hmac512 := hmac.New(sha512.New, chainCode)
+	_, _ = hmac512.Write(data)
+	return hmac512.Sum(nil)
+}
 
 // ExtendedKey houses all the information needed to support a hierarchical
 // deterministic extended key.  See the package overview documentation for
@@ -275,9 +285,7 @@ func (k *ExtendedKey) Derive(i uint32) (*ExtendedKey, error) {
 	// Take the HMAC-SHA512 of the current key's chain code and the derived
 	// data:
 	//   I = HMAC-SHA512(Key = chainCode, Data = data)
-	hmac512 := hmac.New(sha512.New, k.chainCode)
-	_, _ = hmac512.Write(data)
-	ilr := hmac512.Sum(nil)
+	ilr := hmacSHA512(k.chainCode, data)
 
 	// Split "I" into two 32-byte sequences Il and Ir where:
 	//   Il = intermediate key used to derive the child
@@ -317,7 +325,12 @@ func (k *ExtendedKey) Derive(i uint32) (*ExtendedKey, error) {
 			return nil, ErrInvalidChild
 		}
 
-		childKeyBytes := ilNum.Add(&keyNum).Bytes()
+		// Valid operands can sum to zero modulo N even after Il passed
+		// its range check, leaving an unusable child private key.
+		if ilNum.Add(&keyNum).IsZero() {
+			return nil, ErrInvalidChild
+		}
+		childKeyBytes := ilNum.Bytes()
 		childKey = childKeyBytes[:]
 
 		// Strip leading zeroes from childKey, to match the expectation
@@ -364,6 +377,14 @@ func (k *ExtendedKey) Derive(i uint32) (*ExtendedKey, error) {
 		var childKeyPubJ btcec.JacobianPoint
 		btcec.AddNonConst(&ilJ, &pubKeyJ, &childKeyPubJ)
 
+		// Opposite valid points sum to infinity, which cannot represent
+		// a child public key. Check before affine conversion loses Z.
+		if (childKeyPubJ.X.IsZero() && childKeyPubJ.Y.IsZero()) ||
+			childKeyPubJ.Z.IsZero() {
+
+			return nil, ErrInvalidChild
+		}
+
 		// Convert the new child public key back to affine coordinates
 		// so we can serialize it in compressed format.
 		childKeyPubJ.ToAffine()
@@ -387,6 +408,10 @@ func (k *ExtendedKey) IsAffectedByIssue172() bool {
 	return len(k.key) < 32
 }
 
+// DeriveNonStandard derives a child using the historical derivation behavior.
+// It returns ErrInvalidChild for a zero private child or a public point
+// at infinity.
+//
 // Deprecated: This is a non-standard derivation that is affected by issue #172.
 // 1-of-256 hardened derivations will be wrong.  See note in the Derive method
 // and IsAffectedByIssue172.
@@ -409,9 +434,7 @@ func (k *ExtendedKey) DeriveNonStandard(i uint32) (*ExtendedKey, error) {
 	}
 	binary.BigEndian.PutUint32(data[keyLen:], i)
 
-	hmac512 := hmac.New(sha512.New, k.chainCode)
-	_, _ = hmac512.Write(data)
-	ilr := hmac512.Sum(nil)
+	ilr := hmacSHA512(k.chainCode, data)
 
 	il := ilr[:len(ilr)/2]
 	childChainCode := ilr[len(ilr)/2:]
@@ -427,6 +450,11 @@ func (k *ExtendedKey) DeriveNonStandard(i uint32) (*ExtendedKey, error) {
 		keyNum := new(big.Int).SetBytes(k.key)
 		ilNum.Add(ilNum, keyNum)
 		ilNum.Mod(ilNum, btcec.S256().N)
+		// Reject a zero sum of valid operands; serializing it would
+		// otherwise create an unusable child private key.
+		if ilNum.Sign() == 0 {
+			return nil, ErrInvalidChild
+		}
 		childKey = ilNum.Bytes()
 		isPrivate = true
 	} else {
@@ -453,6 +481,14 @@ func (k *ExtendedKey) DeriveNonStandard(i uint32) (*ExtendedKey, error) {
 
 		var childKeyPubJ btcec.JacobianPoint
 		btcec.AddNonConst(&ilJ, &pubKeyJ, &childKeyPubJ)
+
+		// Valid parent and intermediate points can cancel to infinity;
+		// reject the result before converting it for serialization.
+		if (childKeyPubJ.X.IsZero() && childKeyPubJ.Y.IsZero()) ||
+			childKeyPubJ.Z.IsZero() {
+
+			return nil, ErrInvalidChild
+		}
 
 		childKeyPubJ.ToAffine()
 		childKeyPub := btcec.NewPublicKey(
