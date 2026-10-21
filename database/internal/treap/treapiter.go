@@ -114,20 +114,25 @@ func (iter *Iterator) seek(key []byte, exactMatch bool, greater bool) bool {
 // single key/value pair both First and Last will point to the same pair.
 // Returns false if there are no key/value pairs.
 func (iter *Iterator) First() bool {
+	// Positioning the iterator discards any reseek requested by ForceReseek.
+	iter.isNew = false
+	iter.seekKey = nil
+
 	// Seek the start key if the iterator was created with one.  This will
 	// result in either an exact match, the first greater key, or an
 	// exhausted iterator if no such key exists.
-	iter.isNew = false
 	if iter.startKey != nil {
 		return iter.seek(iter.startKey, true, true)
 	}
 
-	// The smallest key is in the left-most node.
+	// The smallest key is in the left-most node, which can still be at or
+	// past the limit key.  An empty treap leaves the iterator exhausted.
 	iter.parents = parentStack{}
+	iter.node = nil
 	for node := iter.root; node != nil; node = node.left {
 		if node.left == nil {
 			iter.node = node
-			return true
+			return iter.limitIterator()
 		}
 		iter.parents.Push(node)
 	}
@@ -138,20 +143,25 @@ func (iter *Iterator) First() bool {
 // single key/value pair both First and Last will point to the same pair.
 // Returns false if there are no key/value pairs.
 func (iter *Iterator) Last() bool {
+	// Positioning the iterator discards any reseek requested by ForceReseek.
+	iter.isNew = false
+	iter.seekKey = nil
+
 	// Seek the limit key if the iterator was created with one.  This will
 	// result in the first key smaller than the limit key, or an exhausted
 	// iterator if no such key exists.
-	iter.isNew = false
 	if iter.limitKey != nil {
 		return iter.seek(iter.limitKey, false, false)
 	}
 
-	// The highest key is in the right-most node.
+	// The highest key is in the right-most node, which can still be before
+	// the start key.  An empty treap leaves the iterator exhausted.
 	iter.parents = parentStack{}
+	iter.node = nil
 	for node := iter.root; node != nil; node = node.right {
 		if node.right == nil {
 			iter.node = node
-			return true
+			return iter.limitIterator()
 		}
 		iter.parents.Push(node)
 	}
@@ -248,7 +258,9 @@ func (iter *Iterator) Prev() bool {
 // Seek moves the iterator to the first key/value pair with a key that is
 // greater than or equal to the given key and returns true if successful.
 func (iter *Iterator) Seek(key []byte) bool {
+	// Positioning the iterator discards any reseek requested by ForceReseek.
 	iter.isNew = false
+	iter.seekKey = nil
 	return iter.seek(key, true, true)
 }
 
