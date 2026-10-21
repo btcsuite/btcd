@@ -241,8 +241,8 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 	return true
 }
 
-// removeOpcodeByData will return the script minus any opcodes that perform a
-// canonical push of data that contains the passed data to remove.  This
+// removeOpcodeByData returns the script minus pushes that exactly match the
+// passed data using FindAndDelete's byte-vector push encoding. This
 // function assumes it is provided a version 0 script as any future version of
 // script should avoid this functionality since it is unnecessary due to the
 // signature scripts not being part of the witness-free transaction hash.
@@ -257,12 +257,11 @@ func isCanonicalPush(opcode byte, data []byte) bool {
 // versions.
 func removeOpcodeByData(script []byte, dataToRemove []byte) ([]byte, bool) {
 	// Avoid work when possible.
-	if len(script) == 0 || len(dataToRemove) == 0 {
+	if len(script) == 0 {
 		return script, false
 	}
 
-	// Parse through the script looking for a canonical data push that contains
-	// the data to remove.
+	// Parse through the script looking for matching byte-vector pushes.
 	const scriptVersion = 0
 	var result []byte
 	var prevOffset int32
@@ -270,7 +269,7 @@ func removeOpcodeByData(script []byte, dataToRemove []byte) ([]byte, bool) {
 	tokenizer := MakeScriptTokenizer(scriptVersion, script)
 	for tokenizer.Next() {
 		var found bool
-		result, prevOffset, found = removeOpcodeCanonical(
+		result, prevOffset, found = removeMatchingDataPush(
 			&tokenizer, script, dataToRemove, prevOffset, result,
 		)
 		if found {
@@ -283,7 +282,9 @@ func removeOpcodeByData(script []byte, dataToRemove []byte) ([]byte, bool) {
 	return result, match
 }
 
-func removeOpcodeCanonical(t *ScriptTokenizer, script, dataToRemove []byte,
+// removeMatchingDataPush omits matching byte-vector pushes from a tokenized
+// script, allocating a replacement only when the first match is found.
+func removeMatchingDataPush(t *ScriptTokenizer, script, dataToRemove []byte,
 	prevOffset int32, result []byte) ([]byte, int32, bool) {
 
 	var found bool
@@ -296,7 +297,13 @@ func removeOpcodeCanonical(t *ScriptTokenizer, script, dataToRemove []byte,
 	// Thus, as an optimization, avoid allocating a new script unless there
 	// is actually a match that needs to be removed.
 	op, data := t.Opcode(), t.Data()
-	if isCanonicalPush(op, data) && bytes.Equal(data, dataToRemove) {
+	// FindAndDelete uses OP_DATA_1 even when an integer opcode would be
+	// minimal. Restrict matches to pushes so nil data on ordinary opcodes
+	// cannot match an empty byte vector.
+	if op <= OP_PUSHDATA4 &&
+		(op == OP_DATA_1 || isCanonicalPush(op, data)) &&
+		bytes.Equal(data, dataToRemove) {
+
 		if result == nil {
 			fullPushLen := t.ByteIndex() - prevOffset
 			result = make([]byte, 0, int32(len(script))-fullPushLen)

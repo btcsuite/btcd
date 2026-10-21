@@ -27,7 +27,6 @@ type signatureVerifier interface {
 
 type verifyResult struct {
 	sigValid bool
-	sigMatch bool
 }
 
 // baseSigVerifier is used to verify signatures for the _base_ system, meaning
@@ -158,8 +157,9 @@ func (b *baseSigVerifier) verifySig(sigHash []byte) bool {
 // NOTE: This is part of the baseSigVerifier interface.
 func (b *baseSigVerifier) Verify() verifyResult {
 	// Remove the signature since there is no way for a signature
-	// to sign itself.
-	subScript, match := removeOpcodeByData(b.subScript, b.fullSigBytes)
+	// to sign itself. The opcode already applied script-code policy
+	// before constructing this verifier.
+	subScript, _ := removeOpcodeByData(b.subScript, b.fullSigBytes)
 
 	sigHash := calcSignatureHash(
 		subScript, b.hashType, &b.vm.tx, b.vm.txIdx,
@@ -167,7 +167,6 @@ func (b *baseSigVerifier) Verify() verifyResult {
 
 	return verifyResult{
 		sigValid: b.verifySig(sigHash),
-		sigMatch: match,
 	}
 }
 
@@ -404,21 +403,35 @@ type baseTapscriptSigVerifier struct {
 	vm *Engine
 }
 
-// newBaseTapscriptSigVerifier returns a new sig verifier for tapscript input
-// spends. If the public key or signature aren't correctly formatted, an error
-// is returned.
+// checkTapscriptPubKeyEncoding applies the tapscript key-type rules before an
+// opcode handles an empty signature. Empty keys always fail, while unknown key
+// types remain valid under consensus unless the policy flag rejects them.
+func (vm *Engine) checkTapscriptPubKeyEncoding(pkBytes []byte) error {
+	switch {
+	case len(pkBytes) == 0:
+		return scriptError(ErrTaprootPubkeyIsEmpty, "")
+
+	case len(pkBytes) != schnorr.PubKeyBytesLen &&
+		vm.hasFlag(ScriptVerifyDiscourageUpgradeablePubkeyType):
+
+		str := fmt.Sprintf("pubkey of length %v was used", len(pkBytes))
+		return scriptError(ErrDiscourageUpgradeablePubKeyType, str)
+	}
+
+	return nil
+}
+
+// newBaseTapscriptSigVerifier returns a verifier for a tapscript spend.
+// Callers must first apply checkTapscriptPubKeyEncoding and handle empty
+// signatures. For 32-byte keys, malformed keys or signatures return an error.
+// Other permitted key types verify successfully without parsing.
 func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 	vm *Engine) (*baseTapscriptSigVerifier, error) {
 
 	switch len(pkBytes) {
-	// If the public key is zero bytes, then this is invalid, and will fail
-	// immediately.
-	case 0:
-		return nil, scriptError(ErrTaprootPubkeyIsEmpty, "")
-
 	// If the public key is 32 byte as we expect, then we'll parse things
 	// as normal.
-	case 32:
+	case schnorr.PubKeyBytesLen:
 		baseTaprootVerifier, err := newTaprootSigVerifier(
 			pkBytes, rawSig, &vm.tx, vm.txIdx, vm.prevOutFetcher,
 			vm.sigCache, vm.hashCache, vm.taprootCtx.annex,
@@ -433,18 +446,9 @@ func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 		}, nil
 
 	// Otherwise, we consider this to be an unknown public key, which means
-	// that we'll just assume the sig to be valid.
+	// that we'll just assume the sig to be valid. Callers already checked
+	// the key-type policy before handling empty signatures.
 	default:
-		// However, if the flag preventing usage of unknown key types
-		// is active, then we'll return that error.
-		if vm.hasFlag(ScriptVerifyDiscourageUpgradeablePubkeyType) {
-			str := fmt.Sprintf("pubkey of length %v was used",
-				len(pkBytes))
-			return nil, scriptError(
-				ErrDiscourageUpgradeablePubKeyType, str,
-			)
-		}
-
 		return &baseTapscriptSigVerifier{
 			taprootSigVerifier: &taprootSigVerifier{},
 		}, nil
@@ -456,9 +460,8 @@ func newBaseTapscriptSigVerifier(pkBytes, rawSig []byte,
 //
 // NOTE: This is part of the baseSigVerifier interface.
 func (b *baseTapscriptSigVerifier) Verify() verifyResult {
-	// If the public key is blank, then that means it wasn't 0 or 32 bytes,
-	// so we'll treat this as an unknown public key version and return
-	// that it's valid.
+	// A nil parsed key represents an unknown key type already checked by
+	// the caller. Such keys succeed without parsing the signature.
 	if b.pubKey == nil {
 		return verifyResult{
 			sigValid: true,

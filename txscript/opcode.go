@@ -1985,6 +1985,17 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		return err
 	}
 
+	// Legacy script-code policy is checked before signature/key encoding
+	// or parsing. Witness scripts do not perform signature removal.
+	if vm.witnessProgram == nil &&
+		vm.hasFlag(ScriptVerifyConstScriptCode) {
+
+		_, match := removeOpcodeByData(vm.subScript(), fullSigBytes)
+		if match {
+			return scriptError(ErrNonConstScriptCode, "non-const script code")
+		}
+	}
+
 	// The signature actually needs to be longer than this, but at
 	// least 1 byte is needed for the hash type below.  The full length is
 	// checked depending on the script flags and upon parsing the signature.
@@ -2008,15 +2019,6 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		sigVerifier, err = newBaseSigVerifier(
 			pkBytes, fullSigBytes, vm,
 		)
-		if err != nil {
-			var scriptErr Error
-			if errors.As(err, &scriptErr) {
-				return err
-			}
-
-			vm.dstack.PushBool(false)
-			return nil
-		}
 
 	// If the base segwit version is active, then we'll create the verifier
 	// that factors in those new consensus rules.
@@ -2024,15 +2026,6 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		sigVerifier, err = newBaseSegwitSigVerifier(
 			pkBytes, fullSigBytes, vm,
 		)
-		if err != nil {
-			var scriptErr Error
-			if errors.As(err, &scriptErr) {
-				return err
-			}
-
-			vm.dstack.PushBool(false)
-			return nil
-		}
 
 	// Otherwise, this is routine tapscript execution.
 	case vm.taprootCtx != nil:
@@ -2044,23 +2037,22 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 			}
 		}
 
-		// Empty public keys immediately cause execution to fail.
-		if len(pkBytes) == 0 {
-			return scriptError(ErrTaprootPubkeyIsEmpty, "")
+		// Key-type rules apply even to empty signatures. Check them
+		// after sigop accounting to preserve its error precedence.
+		if err := vm.checkTapscriptPubKeyEncoding(pkBytes); err != nil {
+			return err
 		}
 
 		// If this is tapscript execution, and the signature was
 		// actually an empty vector, then we push on an empty vector
-		// and continue execution from there, but only if the pubkey
-		// isn't empty.
+		// and continue execution from there.
 		if len(fullSigBytes) == 0 {
 			vm.dstack.PushByteArray([]byte{})
 			return nil
 		}
 
-		// If the constructor fails immediately, then it's because
-		// the public key size is zero, so we'll fail all script
-		// execution.
+		// The key type is already checked, so constructor errors mean
+		// a malformed key or signature and fail script execution.
 		sigVerifier, err = newBaseTapscriptSigVerifier(
 			pkBytes, fullSigBytes, vm,
 		)
@@ -2079,13 +2071,16 @@ func opcodeCheckSig(op *opcode, data []byte, vm *Engine) error {
 		// TODO(roasbeef): return an error?
 	}
 
-	result := sigVerifier.Verify()
-	valid := result.sigValid
-
-	if vm.hasFlag(ScriptVerifyConstScriptCode) && result.sigMatch {
-		str := "non-const script code"
-		return scriptError(ErrNonConstScriptCode, str)
+	// Encoding violations remain immediate script errors. Parsing failures
+	// instead produce an invalid result for the shared NULLFAIL handling;
+	// short-circuiting avoids calling a verifier that could not be built.
+	if err != nil {
+		var scriptErr Error
+		if errors.As(err, &scriptErr) {
+			return err
+		}
 	}
+	valid := err == nil && sigVerifier.Verify().sigValid
 
 	switch {
 	// For tapscript, and prior execution with null fail active, if the
@@ -2155,9 +2150,10 @@ func opcodeCheckSigAdd(op *opcode, data []byte, vm *Engine) error {
 		}
 	}
 
-	// Empty public keys immediately cause execution to fail.
-	if len(pubKeyBytes) == 0 {
-		return scriptError(ErrTaprootPubkeyIsEmpty, "")
+	// Key-type rules apply even to empty signatures. Check them after
+	// sigop accounting to preserve its error precedence.
+	if err := vm.checkTapscriptPubKeyEncoding(pubKeyBytes); err != nil {
+		return err
 	}
 
 	// If the signature is empty, then we'll just push the value N back
@@ -2169,8 +2165,8 @@ func opcodeCheckSigAdd(op *opcode, data []byte, vm *Engine) error {
 
 	// Otherwise, we'll attempt to validate the signature as normal.
 	//
-	// If the constructor fails immediately, then it's because the public
-	// key size is zero, so we'll fail all script execution.
+	// The key type is already checked, so constructor errors mean a
+	// malformed key or signature and fail script execution.
 	sigVerifier, err := newBaseTapscriptSigVerifier(
 		pubKeyBytes, sigBytes, vm,
 	)
@@ -2349,6 +2345,12 @@ func opcodeCheckMultiSig(op *opcode, data []byte, vm *Engine) error {
 
 		rawSig := sigInfo.signature
 		if len(rawSig) == 0 {
+			// Empty signatures still require considered-key encoding
+			// checks; non-empty signatures keep their ordering below.
+			if err := vm.checkPubKeyEncoding(pubKey); err != nil {
+				return err
+			}
+
 			// Skip to the next pubkey if signature is empty.
 			continue
 		}

@@ -737,10 +737,12 @@ func (vm *Engine) verifyWitnessProgram(witness wire.TxWitness) error {
 			}
 
 			// Now that we know the commitment is valid, we'll
-			// check to see if OP_SUCCESS op codes are found in the
-			// script. If so, then we'll return here early as we
-			// skip proper validation.
-			if ScriptHasOpSuccess(witnessScript) {
+			// check for OP_SUCCESS only in a base tapscript leaf.
+			// Future leaves have unknown execution rules, so their bytes
+			// must remain opaque to preserve leaf-version policy below.
+			if controlBlock.LeafVersion == BaseLeafVersion &&
+				ScriptHasOpSuccess(witnessScript) {
+
 				// An op success op code has been found, however if
 				// the policy flag forbidding them is active, then
 				// we'll return an error.
