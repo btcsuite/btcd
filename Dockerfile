@@ -19,11 +19,11 @@ ARG ARCH=amd64
 # https://github.com/opencontainers/image-spec/blob/main/descriptor.md#digests
 # https://cloud.google.com/architecture/using-container-images
 # https://github.com/google/go-containerregistry/blob/main/cmd/crane/README.md
-# ➜  ~ crane digest golang:1.27.2-alpine3.24
-# sha256:85dc1069ac644ea3c527b177303a406eb3358192816cd7f9e5848eb658851673
+# ➜  ~ crane digest golang:1.27.3-alpine3.24
+# sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
 # Build on the host platform and cross-compile for ARCH, so no emulation is
 # needed for other architectures.
-FROM --platform=$BUILDPLATFORM golang@sha256:85dc1069ac644ea3c527b177303a406eb3358192816cd7f9e5848eb658851673 AS build-container
+FROM --platform=$BUILDPLATFORM golang@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS build-container
 
 ARG ARCH
 
