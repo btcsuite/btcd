@@ -36,7 +36,7 @@ which are both under active development.
 
 ## Requirements
 
-[Go](http://golang.org) 1.26.9 or newer.
+[Go](http://golang.org) 1.26.10 or newer.
 
 ### Go version policy
 
@@ -44,10 +44,15 @@ btcd is built with the newest Go release and requires the previous one, which
 still receives point releases. Both are kept at the latest point release of
 their branch:
 
-- CI, the Docker images and release binaries are built with Go 1.27.2, the
+- CI, the Docker images and release binaries are built with Go 1.27.3, the
   `GO_VERSION` in `.github/workflows/main.yml`.
 - The `go` line in every `go.mod`, which sets the minimum Go version and the
-  language version, is Go 1.26.9.
+  language version, is Go 1.26.10.
+
+The `go` directive sets only a minimum version, so it cannot encode the
+patched release floor for each supported Go branch. Use Go 1.26.10 or newer
+on the Go 1.26 branch, and Go 1.27.3 or newer on the Go 1.27 branch. Go
+1.27.0 through 1.27.2 do not include the CVE-2026-111943 mitigation.
 
 Both are bumped when Go publishes a point release, and both move up a branch
 when a new major version of Go is released. A weekly CI job checks this against

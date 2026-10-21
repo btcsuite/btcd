@@ -100,7 +100,7 @@ Release binaries are built with the same Go version as CI, the `GO_VERSION` in
 `.github/workflows/main.yml` (see the Go version policy in the
 [README](../README.md#go-version-policy)). `release.sh` refuses to run with any
 other version. If a different Go is installed, let the `go` command fetch the
-right one, for example `GOTOOLCHAIN=go1.27.2 ./release/release.sh <TAG>`.
+right one, for example `GOTOOLCHAIN=go1.27.3 ./release/release.sh <TAG>`.
 
 ### Pushing a release (for maintainers)
 
