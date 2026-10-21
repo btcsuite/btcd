@@ -14,12 +14,9 @@ that version should be used for verifying the release.
 Before running release scripts, a few things need to happen in order to finally
 create a release and make sure there are no mistakes in the release process.
 
-First, make sure that before the tagged commit there are modifications to the
-[CHANGES](../CHANGES) file committed.
-The CHANGES file should be a changelog that roughly mirrors the release notes.
-Generally, the PRs that have been merged since the last release have been
-listed in the CHANGES file and categorized.
-For example, these changes have had the following format in the past:
+Before creating the signed tag, draft release notes for the GitHub release.
+List the PRs merged since the previous release, group them by area, and include
+the contributors. For example:
 ```
 Changes in X.YY.Z (Month Day Year):
   - Protocol and Network-related changes:
@@ -42,8 +39,8 @@ contributors (from `vA.B.C` until the current `HEAD`) using the following comman
 ```bash
 git log vA.B.C..HEAD --pretty="%an" | sort | uniq
 ```
-After committing changes to the CHANGES file, the tagged release commit
-should be created.
+Once the notes are ready, create the tagged release commit. Publish the notes
+with the GitHub release after pushing the signed tag.
 
 The tagged commit should be a commit that bumps version numbers in `version.go`
 and `cmd/btcctl/version.go`.
