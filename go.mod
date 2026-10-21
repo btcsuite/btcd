@@ -68,3 +68,5 @@ retract (
 	v0.13.0-beta2
 	v0.13.0-beta
 )
+
+replace github.com/btcsuite/btcd/chaincfg/v2 => ./chaincfg
