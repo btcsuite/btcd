@@ -49,6 +49,11 @@ their branch:
 - The `go` line in every `go.mod`, which sets the minimum Go version and the
   language version, is Go 1.26.10.
 
+The `go` directive sets only a minimum version, so it cannot encode the
+patched release floor for each supported Go branch. Use Go 1.26.10 or newer
+on the Go 1.26 branch, and Go 1.27.3 or newer on the Go 1.27 branch. Go
+1.27.0 through 1.27.2 do not include the CVE-2026-111943 mitigation.
+
 Both are bumped when Go publishes a point release, and both move up a branch
 when a new major version of Go is released. A weekly CI job checks this against
 the releases listed on go.dev; `make check-go-versions` runs the same check
