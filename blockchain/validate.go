@@ -56,6 +56,21 @@ const (
 	// though BIP34 is active.  This mirrors Bitcoin Core's safeguard against
 	// coinbases that serialized future heights prior to BIP34 activation.
 	bip34ReenableBIP30Height int32 = 1983702
+
+	// MaxBIP54LegacySigOpsPerTx is the maximum number of legacy signature
+	// operations BIP-54 allows in a single transaction's input scripts.
+	// CHECKSIG and CHECKMULTISIG opcodes in each input's scriptSig, the
+	// spent output's scriptPubKey, and the P2SH redeemScript (when
+	// applicable) are accumulated with BIP-16 precise accounting; any
+	// transaction whose total strictly exceeds this limit is invalid.
+	MaxBIP54LegacySigOpsPerTx = 2500
+
+	// defaultCheckMultiSigSigOps is the sigop count charged to a
+	// CHECKMULTISIG or CHECKMULTISIGVERIFY opcode that is not
+	// immediately preceded by an OP_1..OP_16 push, under BIP-16 precise
+	// accounting. The script engine cannot cheaply recover the actual
+	// number of pubkeys in that case, so it conservatively assigns 20.
+	defaultCheckMultiSigSigOps = 20
 )
 
 var (
@@ -211,9 +226,19 @@ func isBIP0030Node(node *blockNode) bool {
 // has reached the height bip34ReenableBIP30Height where the optimization must
 // no longer apply.  This is a useful optimization because the BIP0030 check is
 // expensive since it involves a ton of cache misses in the utxoset.
-func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params) bool {
+//
+// Once BIP54 is active, the coinbase commits to its block height via
+// nLockTime, which makes duplicate-coinbase txids impossible without a
+// BIP30 lookup; the check is then skipped unconditionally.
+func bip0030CheckNeeded(node *blockNode, params *chaincfg.Params, bip54Active bool) bool {
 	// Sanity checks for the inputs not to dereference a nil pointer.
 	if node == nil || params == nil {
+		return false
+	}
+
+	// Once BIP54 is active the rule is superseded by the coinbase
+	// nLockTime commitment.
+	if bip54Active {
 		return false
 	}
 
@@ -691,6 +716,129 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 	return serializedHeight, nil
 }
 
+// CheckBIP54Coinbase enforces the BIP-54 restrictions on coinbase
+// transactions: the coinbase's nLockTime must equal blockHeight-1, and
+// its input's nSequence must not equal 0xffffffff. Together these
+// commit the coinbase to its block height in a way that BIP-30 lookups
+// cannot, preventing duplicate coinbase transactions.
+//
+// The caller is responsible for verifying that coinbaseTx is in fact the
+// block's coinbase (and therefore has exactly one input) and that the
+// rule is in force at blockHeight.
+func CheckBIP54Coinbase(coinbaseTx *btcutil.Tx, blockHeight int32) error {
+	msgTx := coinbaseTx.MsgTx()
+
+	wantLockTime := uint32(blockHeight - 1)
+	if msgTx.LockTime != wantLockTime {
+		str := fmt.Sprintf("coinbase nLockTime is %d but BIP-54 "+
+			"requires %d (block height %d minus one)",
+			msgTx.LockTime, wantLockTime, blockHeight)
+		return ruleError(ErrBadCoinbaseLockTime, str)
+	}
+
+	if msgTx.TxIn[0].Sequence == wire.MaxTxInSequenceNum {
+		str := "coinbase nSequence is final, BIP-54 requires non-final"
+		return ruleError(ErrBadCoinbaseLockTime, str)
+	}
+
+	return nil
+}
+
+// CheckBIP54TxSize enforces BIP-54's ban on transactions whose stripped
+// (no-witness) serialization is exactly 64 bytes. A 64-byte payload at
+// that position in a block's transaction list is indistinguishable from
+// an internal node in the Merkle tree, so allowing one would enable
+// Merkle tree malleability.
+func CheckBIP54TxSize(tx *btcutil.Tx) error {
+	const forbiddenSize = 64
+	if size := tx.MsgTx().SerializeSizeStripped(); size == forbiddenSize {
+		str := fmt.Sprintf("transaction stripped size is %d bytes, "+
+			"forbidden by BIP-54", size)
+		return ruleError(ErrBadTxSize, str)
+	}
+	return nil
+}
+
+// preciseLegacySigOps returns the BIP-16 precise legacy sigop count of a
+// single script:
+//
+//   - CHECKSIG and CHECKSIGVERIFY count as 1 each.
+//   - CHECKMULTISIG and CHECKMULTISIGVERIFY preceded by OP_1..OP_16 count
+//     as 1..16, and otherwise as 20.
+//
+// If the script fails to parse, the count up to the failure point is
+// returned.
+func preciseLegacySigOps(script []byte) int {
+	const scriptVersion = 0
+
+	count := 0
+	tokenizer := txscript.MakeScriptTokenizer(scriptVersion, script)
+	var prevOp byte
+	for tokenizer.Next() {
+		switch tokenizer.Opcode() {
+		case txscript.OP_CHECKSIG, txscript.OP_CHECKSIGVERIFY:
+			count++
+
+		case txscript.OP_CHECKMULTISIG, txscript.OP_CHECKMULTISIGVERIFY:
+			if prevOp >= txscript.OP_1 && prevOp <= txscript.OP_16 {
+				count += txscript.AsSmallInt(prevOp)
+			} else {
+				count += defaultCheckMultiSigSigOps
+			}
+		}
+		prevOp = tokenizer.Opcode()
+	}
+	return count
+}
+
+// CountBIP54SigOps returns the number of potentially-executed legacy
+// signature operations in a transaction's input scripts according to
+// BIP-54: for each input, the sigops in the scriptSig, in the spent
+// output's scriptPubKey, and (when the prevout is P2SH) in the
+// redeemScript embedded in the scriptSig are summed using BIP-16
+// precise accounting. Coinbase transactions always have zero such
+// sigops.
+//
+// prevOuts must be aligned 1:1 with tx.MsgTx().TxIn.
+func CountBIP54SigOps(tx *btcutil.Tx, prevOuts []*wire.TxOut) int {
+	if IsCoinBase(tx) {
+		return 0
+	}
+
+	msgTx := tx.MsgTx()
+	count := 0
+	for i, txIn := range msgTx.TxIn {
+		scriptSig := txIn.SignatureScript
+		scriptPubKey := prevOuts[i].PkScript
+
+		count += preciseLegacySigOps(scriptSig)
+		count += preciseLegacySigOps(scriptPubKey)
+
+		if txscript.IsPayToScriptHash(scriptPubKey) {
+			// GetPreciseSigOpCount returns the precise count of
+			// the redeemScript (the last data push in scriptSig)
+			// when scriptPubKey is P2SH and scriptSig is push-only.
+			count += txscript.GetPreciseSigOpCount(
+				scriptSig, scriptPubKey, true,
+			)
+		}
+	}
+	return count
+}
+
+// CheckBIP54SigOps rejects a transaction whose total potentially-executed
+// legacy signature operations exceed MaxBIP54LegacySigOpsPerTx. The
+// caller is responsible for verifying that the rule is in force.
+func CheckBIP54SigOps(tx *btcutil.Tx, prevOuts []*wire.TxOut) error {
+	if got := CountBIP54SigOps(tx, prevOuts); got > MaxBIP54LegacySigOpsPerTx {
+		str := fmt.Sprintf("transaction has %d legacy signature "+
+			"operations, BIP-54 allows at most %d",
+			got, MaxBIP54LegacySigOpsPerTx)
+		return ruleError(ErrTooManyBIP54SigOps, str)
+	}
+	return nil
+}
+
 // CheckSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
 func CheckSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
@@ -789,6 +937,20 @@ func CheckBlockHeaderContext(header *wire.BlockHeader, prevNode HeaderCtx,
 				return err
 			}
 		}
+
+		// Once BIP-54 is active, enforce its difficulty-period
+		// boundary timestamp constraints.
+		bip54Active, err := c.BIP54Active(prevNode)
+		if err != nil {
+			return err
+		}
+		if bip54Active {
+			if err := CheckBIP54Timestamps(
+				header, prevNode,
+			); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Reject outdated block versions once a majority of the network
@@ -859,6 +1021,57 @@ func assertNoTimeWarp(blockHeight, blocksPerReTarget int32, headerTimestamp,
 	return nil
 }
 
+// CheckBIP54Timestamps enforces BIP-54's two header-timestamp rules at
+// difficulty-period boundaries. Letting N be the block height and TN
+// its timestamp:
+//
+//   - If N % 2016 == 0, TN must satisfy TN >= TN-1 - 7200.
+//   - If N % 2016 == 2015, TN must satisfy TN >= TN-2015.
+//
+// The caller is responsible for verifying that BIP-54 is in force.
+func CheckBIP54Timestamps(header *wire.BlockHeader, prevNode HeaderCtx) error {
+	blockHeight := prevNode.Height() + 1
+	headerTime := header.Timestamp
+
+	switch {
+	case blockHeight%2016 == 0:
+		// First block of a new period: compare against block at
+		// height N-1 (prevNode).
+		prevTime := time.Unix(prevNode.Timestamp(), 0)
+		threshold := prevTime.Add(-7200 * time.Second)
+		if headerTime.Before(threshold) {
+			str := fmt.Sprintf("block at height %d has timestamp "+
+				"%v which is more than 7200 seconds before "+
+				"block at height %d (N-1) with timestamp %v, "+
+				"violating BIP-54", blockHeight, headerTime,
+				prevNode.Height(), prevTime)
+			return ruleError(ErrBadBIP54Timestamp, str)
+		}
+
+	case blockHeight%2016 == 2015:
+		// Last block of the current period: compare against the block
+		// at height N-2015, which sits 2014 nodes back from prevNode
+		// (at height N-1).
+		ancestor := prevNode.RelativeAncestorCtx(2014)
+		if ancestor == nil {
+			return AssertError(fmt.Sprintf("BIP-54 timestamp "+
+				"check could not find block at height N-2015 "+
+				"for height %d", blockHeight))
+		}
+		ancestorTime := time.Unix(ancestor.Timestamp(), 0)
+		if headerTime.Before(ancestorTime) {
+			str := fmt.Sprintf("block at height %d has timestamp "+
+				"%v which is earlier than block at height %d "+
+				"(N-2015) with timestamp %v, violating BIP-54",
+				blockHeight, headerTime, ancestor.Height(),
+				ancestorTime)
+			return ruleError(ErrBadBIP54Timestamp, str)
+		}
+	}
+
+	return nil
+}
+
 // checkBlockContext performs several validation checks on the block which depend
 // on its position within the block chain.
 //
@@ -900,7 +1113,20 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 		// previous block.
 		blockHeight := prevNode.height + 1
 
-		// Ensure all transactions in the block are finalized.
+		// BIP-54 introduces extra per-transaction and per-coinbase
+		// constraints that supersede some earlier checks (BIP-30 and
+		// BIP-34), so resolve its deployment state once up front and
+		// reuse it below.
+		bip54State, err := b.deploymentState(prevNode,
+			chaincfg.DeploymentBIP54)
+		if err != nil {
+			return err
+		}
+		bip54Active := bip54State == ThresholdActive
+
+		// Ensure all transactions in the block are finalized; under
+		// BIP-54, additionally reject any transaction whose stripped
+		// serialization is exactly 64 bytes (Merkle-tree malleability).
 		for _, tx := range block.Transactions() {
 			if !IsFinalizedTransaction(tx, blockHeight,
 				blockTime) {
@@ -909,18 +1135,31 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 					"transaction %v", tx.Hash())
 				return ruleError(ErrUnfinalizedTx, str)
 			}
+			if bip54Active {
+				if err := CheckBIP54TxSize(tx); err != nil {
+					return err
+				}
+			}
 		}
 
 		// Ensure coinbase starts with serialized block heights for
 		// blocks whose version is the serializedHeightVersion or newer
 		// once a majority of the network has upgraded.  This is part of
-		// BIP0034.
-		if ShouldHaveSerializedBlockHeight(header) &&
+		// BIP0034 and is superseded by the BIP-54 commitment above.
+		if !bip54Active && ShouldHaveSerializedBlockHeight(header) &&
 			blockHeight >= b.chainParams.BIP0034Height {
 
 			coinbaseTx := block.Transactions()[0]
 			err := CheckSerializedHeight(coinbaseTx, blockHeight)
 			if err != nil {
+				return err
+			}
+		}
+
+		if bip54Active {
+			if err := CheckBIP54Coinbase(
+				block.Transactions()[0], blockHeight,
+			); err != nil {
 				return err
 			}
 		}
@@ -1158,8 +1397,15 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// transactions that 'overwrite' older transactions which are not fully
 	// spent.  See the documentation for checkBIP0030 for more details.
 	// Sometimes BIP0030 must to skipped (as an exception) or may be skipped
-	// (as an optimization), see bip0030CheckNeeded for details.
-	if bip0030CheckNeeded(node, b.chainParams) {
+	// (as an optimization), see bip0030CheckNeeded for details. Once BIP54
+	// is active the coinbase commits to its block height via nLockTime, so
+	// the BIP30 lookup is no longer required.
+	bip54State, err := b.deploymentState(node.parent, chaincfg.DeploymentBIP54)
+	if err != nil {
+		return err
+	}
+	bip54Active := bip54State == ThresholdActive
+	if bip0030CheckNeeded(node, b.chainParams, bip54Active) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
 			return err
@@ -1171,7 +1417,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	//
 	// These utxo entries are needed for verification of things such as
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
-	err := view.fetchInputUtxos(b.utxoCache, block)
+	err = view.fetchInputUtxos(b.utxoCache, block)
 	if err != nil {
 		return err
 	}
@@ -1221,6 +1467,33 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
 			return ruleError(ErrTooManySigOps, str)
+		}
+
+		// Under BIP-54, every non-coinbase transaction is also subject
+		// to a per-transaction cap on the precisely-counted legacy
+		// signature operations in its input scripts.
+		if bip54Active && i != 0 {
+			prevOuts := make([]*wire.TxOut, len(tx.MsgTx().TxIn))
+			for j, txIn := range tx.MsgTx().TxIn {
+				utxo := view.LookupEntry(txIn.PreviousOutPoint)
+				if utxo == nil || utxo.IsSpent() {
+					str := fmt.Sprintf("output %v "+
+						"referenced from "+
+						"transaction %s:%d either "+
+						"does not exist or has "+
+						"already been spent",
+						txIn.PreviousOutPoint,
+						tx.Hash(), j)
+					return ruleError(ErrMissingTxOut, str)
+				}
+				prevOuts[j] = &wire.TxOut{
+					Value:    utxo.Amount(),
+					PkScript: utxo.PkScript(),
+				}
+			}
+			if err := CheckBIP54SigOps(tx, prevOuts); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1484,6 +1757,23 @@ func (b *BlockChain) FindPreviousCheckpoint() (HeaderCtx, error) {
 	}
 
 	return checkpoint, err
+}
+
+// BIP54Active reports whether the BIP-54 deployment has reached the active
+// threshold for a block extending prevNode.
+//
+// NOTE: Part of the ChainCtx interface.
+func (b *BlockChain) BIP54Active(prevNode HeaderCtx) (bool, error) {
+	bn, ok := prevNode.(*blockNode)
+	if !ok {
+		return false, AssertError(fmt.Sprintf("BIP54Active requires "+
+			"a *blockNode, got %T", prevNode))
+	}
+	state, err := b.deploymentState(bn, chaincfg.DeploymentBIP54)
+	if err != nil {
+		return false, err
+	}
+	return state == ThresholdActive, nil
 }
 
 // A compile-time assertion to ensure BlockChain implements the ChainCtx
