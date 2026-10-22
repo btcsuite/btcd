@@ -824,7 +824,7 @@ func TestExtractRejectsTrailingFinalScriptWitnessData(t *testing.T) {
 	}
 
 	_, err = Extract(packet)
-	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+	require.ErrorIs(t, err, ErrMoreDataAvailable)
 }
 
 func TestFinalizerAddSigHashFlags(t *testing.T) {
