@@ -4,7 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
@@ -666,4 +672,56 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	results, err = handleGetTxSpendingPrevOut(s, cmd, closeChan)
 	require.NoError(err)
 	require.Equal(expectedResults, results)
+}
+
+// TestJSONRPCReadCloseNotifier exercises the close watcher concurrently with
+// parsing both single and batch requests. Run with -race to detect shared errors.
+func TestJSONRPCReadCloseNotifier(t *testing.T) {
+	s := &rpcServer{statusLines: make(map[int]string)}
+	handled := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			s.jsonRPCRead(w, r, true)
+			handled <- struct{}{}
+		},
+	))
+	defer srv.Close()
+
+	requests := []string{
+		`{"jsonrpc":"1.0","id":1,"method":"unknown","params":[]}`,
+		`[{"jsonrpc":"1.0","id":1,"method":"unknown","params":[]}]`,
+	}
+	for _, body := range requests {
+		for _, disconnect := range []bool{false, true} {
+			for i := 0; i < 10; i++ {
+				conn, err := net.Dial(
+					"tcp", srv.Listener.Addr().String(),
+				)
+				require.NoError(t, err)
+				t.Cleanup(func() { _ = conn.Close() })
+				require.NoError(t, conn.SetDeadline(
+					time.Now().Add(5*time.Second),
+				))
+				_, err = fmt.Fprintf(conn,
+					"POST / HTTP/1.1\r\nHost: btcd\r\n"+
+						"Content-Length: %d\r\n\r\n%s",
+					len(body), body)
+				require.NoError(t, err)
+				if disconnect {
+					require.NoError(t, conn.Close())
+				} else {
+					response, err := io.ReadAll(conn)
+					require.NoError(t, err)
+					require.Contains(t, string(response), `"code":-32601`)
+					require.NoError(t, conn.Close())
+				}
+
+				select {
+				case <-handled:
+				case <-time.After(5 * time.Second):
+					t.Fatal("RPC handler did not finish")
+				}
+			}
+		}
+	}
 }
