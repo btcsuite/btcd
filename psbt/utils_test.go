@@ -10,6 +10,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestParseTxWitnessRawTooLarge asserts that ParseTxWitness rejects raw
+// inputs larger than maxWitnessItems up front.
+func TestParseTxWitnessRawTooLarge(t *testing.T) {
+	raw := make([]byte, maxWitnessItems+1)
+	_, err := ParseTxWitness(raw)
+	require.ErrorIs(t, err, ErrWitnessTooLarge)
+}
+
+// TestParseTxWitnessValidSmallStack asserts that ordinary, well-formed witness
+// stacks inside the new bounds still parse.
+func TestParseTxWitnessValidSmallStack(t *testing.T) {
+	sig := bytes.Repeat([]byte{0xaa}, 72)
+	pub := bytes.Repeat([]byte{0xbb}, 33)
+
+	var buf bytes.Buffer
+	require.NoError(t, wire.WriteVarInt(&buf, 0, 2))
+	for _, item := range [][]byte{sig, pub} {
+		require.NoError(t, wire.WriteVarInt(&buf, 0, uint64(len(item))))
+		_, err := buf.Write(item)
+		require.NoError(t, err)
+	}
+
+	stack, err := ParseTxWitness(buf.Bytes())
+	require.NoError(t, err)
+	require.Len(t, stack, 2)
+	require.Equal(t, sig, stack[0])
+	require.Equal(t, pub, stack[1])
+}
+
 func TestSumUtxoInputValues(t *testing.T) {
 	// Expect sum to fail for packet with non-matching txIn and PInputs.
 	tx := wire.NewMsgTx(2)

@@ -10,9 +10,6 @@ package psbt
 // transaction.
 
 import (
-	"bytes"
-
-	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
@@ -49,36 +46,12 @@ func Extract(p *Packet) (*wire.MsgTx, error) {
 			// PSBT_IN_FINAL_SCRIPTWITNESS stores the complete
 			// scriptWitness for this transaction input. Decode that
 			// single serialized witness stack into TxWitness below.
-			witnessReader := bytes.NewReader(
-				pInput.FinalScriptWitness,
-			)
-
-			// First extract the number of witness items encoded in
-			// the serialized scriptWitness.
-			witCount, err := wire.ReadVarInt(witnessReader, 0)
+			wit, err := ParseTxWitness(pInput.FinalScriptWitness)
 			if err != nil {
 				return nil, err
 			}
 
-			// Allocate one slot per witness item, then read each
-			// varint-prefixed item from the witness value. The value
-			// must contain exactly this one stack, so the exhaustion
-			// check below rejects trailing bytes.
-			tin.Witness = make(wire.TxWitness, witCount)
-			for j := uint64(0); j < witCount; j++ {
-				wit, err := wire.ReadVarBytes(
-					witnessReader, 0,
-					txscript.MaxScriptSize, "witness",
-				)
-				if err != nil {
-					return nil, err
-				}
-				tin.Witness[j] = wit
-			}
-
-			if err := assertFullyConsumed(witnessReader); err != nil {
-				return nil, err
-			}
+			tin.Witness = wit
 		}
 	}
 
