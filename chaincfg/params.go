@@ -190,6 +190,10 @@ type Params struct {
 	// as one method to discover peers.
 	DNSSeeds []DNSSeed
 
+	// SignetChallenge defines the signet block challenge script for signet
+	// networks.
+	SignetChallenge []byte
+
 	// GenesisBlock defines the first block of the chain.
 	GenesisBlock *wire.MsgBlock
 
@@ -1009,6 +1013,8 @@ func CustomSignetParams(challenge []byte, dnsSeeds []DNSSeed) Params {
 		Net:         wire.BitcoinNet(net),
 		DefaultPort: "38333",
 		DNSSeeds:    dnsSeeds,
+
+		SignetChallenge: append([]byte(nil), challenge...),
 
 		// Chain parameters
 		GenesisBlock:             &sigNetGenesisBlock,
