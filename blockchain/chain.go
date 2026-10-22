@@ -676,6 +676,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 			return err
 		}
 
+		// Prune the spend journal by depth.
+		err = dbPruneSpendJournalDepth(dbTx, block.Height())
+		if err != nil {
+			return err
+		}
+
 		// Allow the index manager to call each of the currently active
 		// optional indexes with the block being connected so they can
 		// update themselves accordingly.
@@ -2117,6 +2123,29 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 	return b.reorganizeChain(detachNodes, attachNodes)
 }
 
+// setupSpendJournalPruning initializes internal journal pruning control
+// structures and prunes the spend journal if needed.
+func (b *BlockChain) setupSpendJournalPruning(interrupt <-chan struct{}) error {
+	var stats spendJournalStats
+	err := b.db.Update(func(tx database.Tx) error {
+		err := dbInitSpendJournalStats(tx, interrupt)
+		if err != nil {
+			return err
+		}
+		stats, err = dbFetchSpendJournalStats(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	bestHeight := b.bestChain.height()
+	return dbPruneSpendJournalDepthSlow(b.db, stats.nextHeight, bestHeight,
+		interrupt)
+}
+
 // IndexManager provides a generic interface that the is called when blocks are
 // connected and disconnected to and from the tip of the main chain for the
 // purpose of supporting optional indexes.
@@ -2322,6 +2351,11 @@ func New(config *Config) (*BlockChain, error) {
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
 		bestNode.height, bestNode.hash, b.stateSnapshot.TotalTxns,
 		bestNode.workSum)
+
+	// Setup spend journal pruning.
+	if err := b.setupSpendJournalPruning(config.Interrupt); err != nil {
+		return nil, err
+	}
 
 	return &b, nil
 }
