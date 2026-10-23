@@ -1852,3 +1852,68 @@ func TestRBF(t *testing.T) {
 		}
 	}
 }
+
+// TestMempoolAbsoluteFinality checks absolute lock times independently of the
+// standardness policy, including their exclusive height and time boundaries.
+func TestMempoolAbsoluteFinality(t *testing.T) {
+	const medianTime = 1700000000
+	tests := []struct {
+		name     string
+		lockTime uint32
+		sequence uint32
+		accepted bool
+	}{
+		{"future height", 10000, MaxRBFSequence, false},
+		{"next height", 101, MaxRBFSequence, false},
+		{"past height", 100, MaxRBFSequence, true},
+		{"future time", medianTime + 300, MaxRBFSequence, false},
+		{"median time", medianTime, MaxRBFSequence, false},
+		{"past time", medianTime - 1, MaxRBFSequence, true},
+		{"disabled lock", 10000, wire.MaxTxInSequenceNum, true},
+	}
+	for _, acceptNonStd := range []bool{false, true} {
+		for _, test := range tests {
+			name := test.name + "/standard"
+			if acceptNonStd {
+				name = test.name + "/nonstandard"
+			}
+			t.Run(name, func(t *testing.T) {
+				harness, outputs, err := newPoolHarness(
+					&chaincfg.RegressionNetParams,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				harness.chain.SetMedianTimePast(time.Unix(medianTime, 0))
+				harness.txPool.cfg.Policy.AcceptNonStd = acceptNonStd
+				tx, err := harness.CreateSignedTx(outputs, 1, 1000, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				msgTx := tx.MsgTx()
+				msgTx.LockTime = test.lockTime
+				msgTx.TxIn[0].Sequence = test.sequence
+				script, err := txscript.SignatureScript(
+					msgTx, 0, harness.payScript,
+					txscript.SigHashAll, harness.signKey, true,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				msgTx.TxIn[0].SignatureScript = script
+				accepted, err := harness.txPool.ProcessTransaction(
+					tx, false, false, 0,
+				)
+				if test.accepted {
+					if err != nil || len(accepted) != 1 {
+						t.Fatalf("final transaction rejected: %v", err)
+					}
+				} else if err == nil || !strings.Contains(
+					err.Error(), "transaction is not finalized",
+				) {
+					t.Fatalf("non-final transaction: got %v", err)
+				}
+			})
+		}
+	}
+}
