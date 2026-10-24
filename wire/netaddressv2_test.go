@@ -272,15 +272,15 @@ func TestReadNetAddressV2(t *testing.T) {
 			ErrInvalidAddressSize,
 		},
 
-		// Valid torv2 encoding.
+		// Retired torv2 encoding is consumed and ignored.
 		{
 			[]byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x0a, 0x20,
 				0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
 				0x20, 0x22, 0x22,
 			},
-			string(torv2),
-			nil,
+			"",
+			ErrSkippedNetworkID,
 		},
 
 		// Invalid torv3 size.

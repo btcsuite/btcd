@@ -64,7 +64,12 @@ func (m *MsgAddrV2) BtcDecode(r io.Reader, pver uint32,
 func (m *MsgAddrV2) BtcEncode(w io.Writer, pver uint32,
 	enc MessageEncoding) error {
 
-	count := len(m.AddrList)
+	count := 0
+	for _, na := range m.AddrList {
+		if _, retired := na.Addr.(*torv2Addr); !retired {
+			count++
+		}
+	}
 	if count > MaxV2AddrPerMsg {
 		str := fmt.Sprintf("too many addresses for message: "+
 			"got %v, max %v", count, MaxV2AddrPerMsg)
@@ -77,6 +82,9 @@ func (m *MsgAddrV2) BtcEncode(w io.Writer, pver uint32,
 	}
 
 	for _, na := range m.AddrList {
+		if _, retired := na.Addr.(*torv2Addr); retired {
+			continue
+		}
 		err = writeNetAddressV2(w, pver, na)
 		if err != nil {
 			return err
