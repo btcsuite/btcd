@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
@@ -1279,6 +1281,96 @@ func TestIsSyncCandidateRegtest(t *testing.T) {
 
 			got := sm.isSyncCandidate(p)
 			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestDisconnectPrunesNonFinalTransactions exercises the notification path with
+// signed transactions already in the mempool, independently of re-admission.
+func TestDisconnectPrunesNonFinalTransactions(t *testing.T) {
+	for _, timeLock := range []bool{false, true} {
+		name := "height"
+		if timeLock {
+			name = "median time"
+		}
+		t.Run(name, func(t *testing.T) {
+			height := int32(100)
+			mtp := time.Unix(1700000010, 0)
+			key, _ := btcec.PrivKeyFromBytes([]byte{1})
+			script, err := txscript.NewScriptBuilder().
+				AddOp(txscript.OP_DUP).AddOp(txscript.OP_HASH160).
+				AddData(address.Hash160(key.PubKey().SerializeCompressed())).
+				AddOp(txscript.OP_EQUALVERIFY).AddOp(txscript.OP_CHECKSIG).
+				Script()
+			require.NoError(t, err)
+			funding := wire.NewMsgTx(1)
+			for range 2 {
+				funding.AddTxOut(wire.NewTxOut(100000000, script))
+			}
+			fundingTx := btcutil.NewTx(funding)
+			pool := mempool.New(&mempool.Config{
+				Policy: mempool.Policy{
+					DisableRelayPriority: true,
+					MaxTxVersion:         1,
+					MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
+					MinRelayTxFee:        1000,
+				},
+				ChainParams:    &chaincfg.RegressionNetParams,
+				BestHeight:     func() int32 { return height },
+				MedianTimePast: func() time.Time { return mtp },
+				FetchUtxoView: func(*btcutil.Tx) (*blockchain.UtxoViewpoint, error) {
+					view := blockchain.NewUtxoViewpoint()
+					view.AddTxOuts(fundingTx, 1)
+					return view, nil
+				},
+				CalcSequenceLock: func(*btcutil.Tx,
+					*blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+					return &blockchain.SequenceLock{Seconds: -1, BlockHeight: -1}, nil
+				},
+			})
+			spend := func(previous *btcutil.Tx, index, lockTime uint32) *btcutil.Tx {
+				tx := wire.NewMsgTx(1)
+				tx.LockTime = lockTime
+				input := wire.NewTxIn(wire.NewOutPoint(previous.Hash(), index), nil, nil)
+				input.Sequence = wire.MaxTxInSequenceNum - 1
+				tx.AddTxIn(input)
+				tx.AddTxOut(wire.NewTxOut(previous.MsgTx().TxOut[index].Value-1000, script))
+				sig, err := txscript.SignatureScript(
+					tx, 0, script, txscript.SigHashAll, key, true,
+				)
+				require.NoError(t, err)
+				tx.TxIn[0].SignatureScript = sig
+				return btcutil.NewTx(tx)
+			}
+			lockTime := uint32(100)
+			if timeLock {
+				lockTime = 1700000001
+			}
+			parent := spend(fundingTx, 0, lockTime)
+			child := spend(parent, 0, 0)
+			unrelated := spend(fundingTx, 1, 0)
+			for _, tx := range []*btcutil.Tx{parent, child, unrelated} {
+				accepted, err := pool.ProcessTransaction(tx, false, false, 0)
+				require.NoError(t, err)
+				require.Len(t, accepted, 1)
+			}
+			if timeLock {
+				mtp = time.Unix(int64(lockTime), 0)
+			} else {
+				height = 99
+			}
+			manager := &SyncManager{txMemPool: pool}
+			// A coinbase-only block cannot trigger removal through the
+			// existing loop that re-admits disconnected transactions.
+			disconnected := btcutil.NewBlock(&wire.MsgBlock{
+				Transactions: []*wire.MsgTx{wire.NewMsgTx(1)},
+			})
+			manager.handleBlockchainNotification(&blockchain.Notification{
+				Type: blockchain.NTBlockDisconnected, Data: disconnected,
+			})
+			require.False(t, pool.IsTransactionInPool(parent.Hash()))
+			require.False(t, pool.IsTransactionInPool(child.Hash()))
+			require.True(t, pool.IsTransactionInPool(unrelated.Hash()))
 		})
 	}
 }
