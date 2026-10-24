@@ -449,6 +449,14 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 		privKeyScalar.Negate()
 	}
 
+	// Here, we guard against a user signing a message for which they sign
+	// a hash separately, without providing a custom nonce, causing a nonce
+	// collision.
+	if opts.authNonce == nil && len(hash) != scalarSize {
+		var zeroAux [32]byte
+		opts.authNonce = &zeroAux
+	}
+
 	// At this point, we check to see if a CustomNonce has been passed in,
 	// and if so, then we'll deviate from the main routine here by
 	// generating the nonce value as specified by BIP-0340.
