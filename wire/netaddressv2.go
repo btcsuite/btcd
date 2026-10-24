@@ -30,9 +30,10 @@ var (
 	// maximum size for an unknown networkID.
 	ErrInvalidAddressSize = fmt.Errorf("invalid address size")
 
-	// ErrSkippedNetworkID is returned when the cjdns, i2p, or unknown
-	// networks are encountered during decoding. btcd does not support i2p
-	// or cjdns addresses. In the case of an unknown networkID, this is so
+	// ErrSkippedNetworkID is returned when the torv2, cjdns, i2p, or unknown
+	// networks are encountered during decoding. Tor v2 is retired per BIP-155.
+	// btcd does not support i2p or cjdns addresses. For an unknown networkID,
+	// this is so
 	// that a future BIP reserving a new networkID does not cause older
 	// addrv2-supporting btcd software to disconnect upon receiving the new
 	// addresses. This error can also be returned when an OnionCat-encoded
@@ -387,7 +388,9 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 			return err
 		}
 
-		na.Addr = addr
+		// Consume the complete entry before skipping it so the next
+		// address remains aligned in the enclosing addrv2 message.
+		return ErrSkippedNetworkID
 	case torv3:
 		addr := &torv3Addr{}
 		addr.netID = torv3
