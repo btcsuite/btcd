@@ -14,6 +14,7 @@ import (
 	"testing/quick"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/davecgh/go-spew/spew"
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	ecdsa_schnorr "github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
@@ -390,6 +391,18 @@ func TestSchnorrSignArbitraryLengthNoNonceCollision(t *testing.T) {
 			msg1: "11",
 			msg2: strings.Repeat("00", 31) + "11",
 		},
+		{
+			msg1: "",
+			msg2: sha256Hex(""),
+		},
+		{
+			msg1: "11",
+			msg2: sha256Hex("11"),
+		},
+		{
+			msg1: strings.Repeat("ab", 40),
+			msg2: sha256Hex(strings.Repeat("ab", 40)),
+		},
 	}
 
 	privKey, err := btcec.NewPrivateKey()
@@ -408,4 +421,8 @@ func TestSchnorrSignArbitraryLengthNoNonceCollision(t *testing.T) {
 			require.NotEqual(t, sig1.r, sig2.r)
 		})
 	}
+}
+
+func sha256Hex(preimage string) string {
+	return hex.EncodeToString(chainhash.HashB(decodeHex(preimage)))
 }
