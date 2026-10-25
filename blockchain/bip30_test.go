@@ -43,7 +43,7 @@ func TestBip0030CheckNeededExceptions(t *testing.T) {
 				height: tc.height,
 				hash:   mustHashFromStr(t, tc.hash),
 			}
-			require.False(t, bip0030CheckNeeded(node, &params))
+			require.False(t, bip0030CheckNeeded(node, &params, false))
 		})
 	}
 }
@@ -58,7 +58,7 @@ func TestBip0030CheckNeededBeforeBIP34(t *testing.T) {
 		hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000001"),
 	}
 
-	require.True(t, bip0030CheckNeeded(node, &params))
+	require.True(t, bip0030CheckNeeded(node, &params, false))
 }
 
 // TestBip0030CheckNeededAtActivationHeight validates that the activation block
@@ -72,7 +72,7 @@ func TestBip0030CheckNeededAtActivationHeight(t *testing.T) {
 		parent: &blockNode{height: params.BIP0034Height - 1},
 	}
 
-	require.True(t, bip0030CheckNeeded(node, &params))
+	require.True(t, bip0030CheckNeeded(node, &params, false))
 }
 
 // TestBip0030CheckNeededAfterBIP34 covers the happy-path where we are on a
@@ -96,7 +96,7 @@ func TestBip0030CheckNeededAfterBIP34(t *testing.T) {
 		parent: parent,
 	}
 
-	require.False(t, bip0030CheckNeeded(node, &params))
+	require.False(t, bip0030CheckNeeded(node, &params, false))
 }
 
 // TestBip0030CheckNeededMismatchedActivation verifies that if the block at the
@@ -121,7 +121,7 @@ func TestBip0030CheckNeededMismatchedActivation(t *testing.T) {
 		parent: parent,
 	}
 
-	require.True(t, bip0030CheckNeeded(node, &params))
+	require.True(t, bip0030CheckNeeded(node, &params, false))
 }
 
 // TestBip0030CheckNeededReenabled ensures that once the chain reaches the
@@ -145,5 +145,51 @@ func TestBip0030CheckNeededReenabled(t *testing.T) {
 		parent: parent,
 	}
 
-	require.True(t, bip0030CheckNeeded(node, &params))
+	require.True(t, bip0030CheckNeeded(node, &params, false))
+}
+
+// TestBip0030CheckNeededWithBIP54Active ensures the duplicate-coinbase
+// check is unconditionally skipped once BIP54 is active, including at
+// nodes that would otherwise demand it (pre-BIP34, mismatched activation
+// ancestor, and the re-enable height).
+func TestBip0030CheckNeededWithBIP54Active(t *testing.T) {
+	params := chaincfg.MainNetParams
+
+	cases := []struct {
+		name string
+		node *blockNode
+	}{{
+		name: "pre-BIP34 height",
+		node: &blockNode{
+			height: params.BIP0034Height - 1,
+			hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000001"),
+		},
+	}, {
+		name: "mismatched BIP34 activation ancestor",
+		node: &blockNode{
+			height: params.BIP0034Height + 2,
+			hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000005"),
+			parent: &blockNode{
+				height: params.BIP0034Height + 1,
+				hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000004"),
+				parent: &blockNode{
+					height: params.BIP0034Height,
+					hash:   mustHashFromStr(t, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+				},
+			},
+		},
+	}, {
+		name: "BIP30 re-enable height",
+		node: &blockNode{
+			height: bip34ReenableBIP30Height,
+			hash:   mustHashFromStr(t, "0000000000000000000000000000000000000000000000000000000000000200"),
+		},
+	}}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			require.False(t, bip0030CheckNeeded(tc.node, &params, true))
+		})
+	}
 }
