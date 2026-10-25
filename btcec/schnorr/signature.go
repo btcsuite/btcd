@@ -114,7 +114,15 @@ func (sig Signature) IsEqual(otherSig *Signature) bool {
 // This differs from the exported Verify method in that it returns a specific
 // error to support better testing while the exported method simply returns a
 // bool indicating success or failure.
-func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
+func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte,
+	signOpts ...SignOption) error {
+
+	// First, parse the set of optional signing options.
+	opts := defaultSignOptions()
+	for _, option := range signOpts {
+		option(opts)
+	}
+
 	// The algorithm for producing a BIP-340 signature is described in
 	// README.md and is reproduced here for reference:
 	//
@@ -131,8 +139,8 @@ func schnorrVerify(sig *Signature, hash []byte, pubKeyBytes []byte) error {
 
 	// Step 1.
 	//
-	// Fail if m is not 32 bytes
-	if len(hash) != scalarSize {
+	// Fail if m is not 32 bytes and the user didn't signal arbitrary size
+	if len(hash) != scalarSize && !opts.arbitrarySize {
 		str := fmt.Sprintf("wrong size for message (got %v, want %v)",
 			len(hash), scalarSize)
 		return signatureError(ecdsa_schnorr.ErrInvalidHashLen, str)
@@ -233,6 +241,15 @@ func (sig *Signature) Verify(hash []byte, pubKey *btcec.PublicKey) bool {
 	return schnorrVerify(sig, hash, pubkeyBytes) == nil
 }
 
+// VerifyCustom returns whether or not the signature is valid for the provided
+// hash and secp256k1 public key, and accepts custom options.
+func (sig *Signature) VerifyCustom(hash []byte, pubKey *btcec.PublicKey,
+	signOpts ...SignOption) bool {
+
+	pubkeyBytes := SerializePubKey(pubKey)
+	return schnorrVerify(sig, hash, pubkeyBytes, signOpts...) == nil
+}
+
 // zeroArray zeroes the memory of a scalar array.
 func zeroArray(a *[scalarSize]byte) {
 	for i := 0; i < scalarSize; i++ {
@@ -241,13 +258,14 @@ func zeroArray(a *[scalarSize]byte) {
 }
 
 // schnorrSign generates a BIP-340 signature over the secp256k1 curve for the
-// provided hash (which should be the result of hashing a larger message) using
-// the given nonce and private key.  The produced signature is deterministic
-// (same message, nonce, and key yield the same signature) and canonical.
+// provided hash (which should be the result of hashing a larger message unless
+// opts.arbitrarySize is set) using the given nonce and private key.  The
+// produced signature is deterministic (same message, nonce, and key yield the
+// same signature) and canonical.
 //
-// WARNING: The hash MUST be 32 bytes and both the nonce and private keys must
-// NOT be 0.  Since this is an internal use function, these preconditions MUST
-// be satisfied by the caller.
+// WARNING: The hash MUST be 32 bytes unless opts.arbitrarySize is set, and
+// both the nonce and private keys must NOT be 0.  Since this is an internal
+// use function, these preconditions MUST be satisfied by the caller.
 func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash []byte,
 	opts *signOptions) (*Signature, error) {
 
@@ -262,7 +280,7 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	// r, s = signature
 	//
 	// 1. d' = int(d)
-	// 2. Fail if m is not 32 bytes
+	// 2. Fail if m is not 32 bytes and the user didn't signal arbitrary size
 	// 3. Fail if d = 0 or d >= n
 	// 4. P = d'*G
 	// 5. Negate d if P.y is odd
@@ -331,7 +349,13 @@ func schnorrSign(privKey, nonce *btcec.ModNScalar, pubKey *btcec.PublicKey, hash
 	//
 	// If Verify(bytes(P), m, sig) fails, abort.
 	if !opts.fastSign {
-		if err := schnorrVerify(sig, hash, pBytes); err != nil {
+		var verifyOpts []SignOption
+		if opts.arbitrarySize {
+			verifyOpts = append(verifyOpts, ArbitrarySize())
+		}
+
+		err := schnorrVerify(sig, hash, pBytes, verifyOpts...)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -356,6 +380,10 @@ type signOptions struct {
 	// authNonce allows the user to pass in their own nonce information, which
 	// is useful for schemes like mu-sig.
 	authNonce *[32]byte
+
+	// arbitrarySize allows the user to signal that the message to be
+	// signed or verified is not 32 bytes in length.
+	arbitrarySize bool
 }
 
 // defaultSignOptions returns the default set of signing operations.
@@ -375,18 +403,31 @@ func FastSign() SignOption {
 // CustomNonce allows users to pass in a custom set of auxData that's used as
 // input randomness to generate the nonce used during signing. Users may want
 // to specify this custom value when using multi-signatures schemes such as
-// Mu-Sig2. If this option isn't set, then rfc6979 will be used to generate the
-// nonce material.
+// Mu-Sig2. If this option isn't set and the message size is 32 bytes, then
+// rfc6979 will be used to generate the nonce material. If this option isn't
+// set and the message size is any other length, the nonce will be "the
+// constant array with 32 null bytes" as specified in BIP-340.
 func CustomNonce(auxData [32]byte) SignOption {
 	return func(o *signOptions) {
 		o.authNonce = &auxData
 	}
 }
 
+// ArbitrarySize allows users to sign and verify arbitrary-size messages, which
+// https://github.com/bitcoin/bips/commit/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb
+// allows. This is added as an option to avoid changing semantics for existing
+// uses.
+func ArbitrarySize() SignOption {
+	return func(o *signOptions) {
+		o.arbitrarySize = true
+	}
+}
+
 // Sign generates an BIP-340 signature over the secp256k1 curve for the
-// provided hash (which should be the result of hashing a larger message) using
-// the given private key.  The produced signature is deterministic (same
-// message and same key yield the same signature) and canonical.
+// provided hash (which should be the result of hashing a larger message unless
+// ArbitrarySize() is passed) using the given nonce and private key.  The
+// produced signature is deterministic (same message, nonce, and key yield the
+// same signature) and canonical.
 //
 // Note that the current signing implementation has a few remaining variable
 // time aspects which make use of the private key and the generated nonce,
@@ -413,7 +454,7 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	// r, s = signature
 	//
 	// 1. d' = int(d)
-	// 2. Fail if m is not 32 bytes
+	// 2. Fail if m is not 32 bytes and the user didn't signal arbitrary size
 	// 3. Fail if d = 0 or d >= n
 	// 4. P = d'*G
 	// 5. Negate d if P.y is odd
@@ -443,8 +484,8 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 
 	// Step 2.
 	//
-	// Fail if m is not 32 bytes
-	if len(hash) != scalarSize {
+	// Fail if m is not 32 bytes and the user didn't signal arbitrary size
+	if len(hash) != scalarSize && !opts.arbitrarySize {
 		str := fmt.Sprintf("wrong size for message hash (got %v, want %v)",
 			len(hash), scalarSize)
 		return nil, signatureError(ecdsa_schnorr.ErrInvalidHashLen, str)
@@ -469,6 +510,14 @@ func Sign(privKey *btcec.PrivateKey, hash []byte,
 	pubKeyBytes := pub.SerializeCompressed()
 	if pubKeyBytes[0] == secp.PubKeyFormatCompressedOdd {
 		privKeyScalar.Negate()
+	}
+
+	// Here, we guard against a user signing a message for which they sign
+	// a hash separately, without providing a custom nonce, causing a nonce
+	// collision.
+	if opts.authNonce == nil && len(hash) != scalarSize {
+		var zeroAux [32]byte
+		opts.authNonce = &zeroAux
 	}
 
 	// At this point, we check to see if a CustomNonce has been passed in,
