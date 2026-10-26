@@ -357,3 +357,113 @@ func TestFastBuildChecksFlushBeforeStaging(t *testing.T) {
 	require.False(t, exists)
 	require.Empty(t, readAddrIndexTestBucket(t, c.db))
 }
+
+// indexDropInProgress reports whether the index with key idxKey has a drop in
+// progress.
+func indexDropInProgress(t *testing.T, db database.DB, idxKey []byte) bool {
+	t.Helper()
+	var dropping bool
+	require.NoError(t, db.View(func(dbTx database.Tx) error {
+		tips := dbTx.Metadata().Bucket(indexTipsBucketName)
+		dropping = tips.Get(indexDropKey(idxKey)) != nil
+		return nil
+	}))
+	return dropping
+}
+
+// addrBuildDrops are the index drops that remove address index build staging.
+var addrBuildDrops = []struct {
+	name string
+	drop func(database.DB, string, <-chan struct{}) error
+}{
+	{"address_index", DropAddrIndexWithDataDir},
+	{"transaction_index", DropTxIndexWithDataDir},
+}
+
+// TestInterruptedIndexDropsRetainAddrBuild ensures an address index or
+// transaction index drop that is interrupted keeps the address index build
+// staging, since staging is only removed after the drop finishes and is
+// flushed.  A transaction index drop drops the address index first, so the
+// interrupt stops both drops during the address index drop.  Manager.Init then
+// finishes the address index drop and fast builds the address index.
+func TestInterruptedIndexDropsRetainAddrBuild(t *testing.T) {
+	for _, test := range addrBuildDrops {
+		t.Run(test.name, func(t *testing.T) {
+			build := setupInterruptedAddrBuild(t)
+			interrupt := make(chan struct{})
+			close(interrupt)
+			require.ErrorIs(t, test.drop(
+				build.db, build.rootDir, interrupt,
+			), errInterruptRequested)
+			requireAddrBuildStaging(t, build.rootDir)
+			require.True(t, indexDropInProgress(
+				t, build.db, addrIndexKey,
+			))
+			require.False(t, indexDropInProgress(
+				t, build.db, txIndexKey,
+			))
+
+			idx := NewAddrIndexWithDataDir(build.db,
+				&chaincfg.MainNetParams, build.rootDir)
+			manager := NewManager(build.db, []Indexer{
+				NewTxIndex(build.db), idx,
+			})
+			require.NoError(t, manager.Init(build.chain, nil))
+			require.False(t, indexDropInProgress(
+				t, build.db, addrIndexKey,
+			))
+			requireGenesisAddrIndex(t, build, idx)
+		})
+	}
+}
+
+// TestIndexDropFlushFailureRetainsAddrBuild ensures an address index or
+// transaction index drop keeps the address index build staging when flushing
+// the drop fails, and that a retried drop removes it.
+func TestIndexDropFlushFailureRetainsAddrBuild(t *testing.T) {
+	for _, test := range addrBuildDrops {
+		t.Run(test.name, func(t *testing.T) {
+			build := setupInterruptedAddrBuild(t)
+			flushErr := errors.New("flush failure")
+			db := &failAddrFlushDB{DB: build.db, err: flushErr}
+			err := test.drop(db, build.rootDir, nil)
+			require.ErrorIs(t, err, flushErr)
+			requireAddrBuildStaging(t, build.rootDir)
+
+			err = test.drop(build.db, build.rootDir, nil)
+			require.NoError(t, err)
+			_, exists := AddrIndexFastBuildDir(build.rootDir)
+			require.False(t, exists)
+		})
+	}
+}
+
+// TestIndexDropChecksFlushBeforeMutation ensures an address index or
+// transaction index drop fails before it changes the database when address
+// index build staging exists and the database cannot flush.  Neither the address
+// index nor the transaction index has a drop in progress, and both buckets
+// remain.
+func TestIndexDropChecksFlushBeforeMutation(t *testing.T) {
+	for _, test := range addrBuildDrops {
+		t.Run(test.name, func(t *testing.T) {
+			build := setupInterruptedAddrBuild(t)
+			db := &noAddrFlushDB{DB: build.db}
+			require.Error(t, test.drop(db, build.rootDir, nil))
+
+			for _, idxKey := range [][]byte{addrIndexKey, txIndexKey} {
+				require.False(t, indexDropInProgress(
+					t, build.db, idxKey,
+				), "%s in-progress drop flag", idxKey)
+
+				var bucketExists bool
+				err := build.db.View(func(dbTx database.Tx) error {
+					meta := dbTx.Metadata()
+					bucketExists = meta.Bucket(idxKey) != nil
+					return nil
+				})
+				require.NoError(t, err)
+				require.True(t, bucketExists, "%s bucket", idxKey)
+			}
+		})
+	}
+}
