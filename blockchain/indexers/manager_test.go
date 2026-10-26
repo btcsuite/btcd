@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -173,6 +174,110 @@ func TestDropIndexDeleteBucketError(t *testing.T) {
 	err := dropIndex(db, idxKey, "test index", nil)
 	if !errors.Is(err, testErr) {
 		t.Fatalf("unexpected error: got %v, want %v", err, testErr)
+	}
+}
+
+// countBlockReadsDB wraps a database and counts the block reads its View
+// transactions make with FetchBlock.
+type countBlockReadsDB struct {
+	database.DB
+	blockReads int
+}
+
+// countBlockReadsTx wraps a database transaction and counts its block reads
+// with FetchBlock in db.blockReads.
+type countBlockReadsTx struct {
+	database.Tx
+	db *countBlockReadsDB
+}
+
+// View invokes the view function with a transaction that counts its block
+// reads.
+//
+// This is part of the database.DB interface.
+func (db *countBlockReadsDB) View(fn func(database.Tx) error) error {
+	return db.DB.View(func(dbTx database.Tx) error {
+		return fn(&countBlockReadsTx{Tx: dbTx, db: db})
+	})
+}
+
+// FetchBlock counts the read and passes the call to the wrapped transaction.
+//
+// This is part of the database.Tx interface.
+func (tx *countBlockReadsTx) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
+	tx.db.blockReads++
+	return tx.Tx.FetchBlock(hash)
+}
+
+// TestManagerCatchUpBlockReads ensures Manager.Init catches up the transaction
+// and address indexes to the chain tip with ordinary catchup, reading each
+// missing block once, when the address index needs no fast build.  The
+// address index needs none when it has no data directory or is already
+// initialized.
+func TestManagerCatchUpBlockReads(t *testing.T) {
+	const target = 10
+	tests := []struct {
+		name      string
+		tipHeight int32
+		dataDir   bool
+	}{
+		{name: "no_data_dir", tipHeight: -1},
+		{name: "index_behind_tip", tipHeight: 0, dataDir: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 1. Make a chain through block 10 and empty indexes.
+			c := setupAddrIndexTestChain(t, target)
+			db := &countBlockReadsDB{DB: c.db}
+			txIdx := NewTxIndex(db)
+			idx := NewAddrIndex(db, &chaincfg.MainNetParams)
+			if test.dataDir {
+				idx = NewAddrIndexWithDataDir(
+					db, &chaincfg.MainNetParams, c.rootDir,
+				)
+			}
+			manager := NewManager(db, []Indexer{txIdx, idx})
+			require.NoError(t, manager.createIndexes())
+
+			// 2. Fill both indexes through tipHeight.
+			c.connect(t, txIdx, 0, test.tipHeight)
+			c.connect(t, idx, 0, test.tipHeight)
+
+			// 3. Reopen the chain on the counting DB.
+			chain, err := blockchain.New(&blockchain.Config{
+				DB: db, ChainParams: &chaincfg.MainNetParams,
+				TimeSource: blockchain.NewMedianTime(),
+			})
+			require.NoError(t, err)
+
+			// 4. Run Init, not counting chain setup's reads.
+			db.blockReads = 0
+			require.NoError(t, manager.Init(chain, nil))
+
+			// 5. Check that both index tips are at the chain tip.
+			best := chain.BestSnapshot()
+			for _, key := range [][]byte{txIndexKey, addrIndexKey} {
+				var (
+					hash   *chainhash.Hash
+					height int32
+				)
+				err := db.View(func(dbTx database.Tx) error {
+					var err error
+					hash, height, err = dbFetchIndexerTip(
+						dbTx, key,
+					)
+					return err
+				})
+				require.NoError(t, err)
+				require.Equal(t, int32(target), height)
+				require.Equal(t, best.Hash, *hash)
+			}
+
+			// 6. Check that each missing block is read only once.
+			wantReads := int(target - test.tipHeight)
+			require.Equal(t, wantReads, db.blockReads,
+				"ordinary catchup should read each block once")
+		})
 	}
 }
 
