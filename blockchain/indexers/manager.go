@@ -134,6 +134,13 @@ type Manager struct {
 	enabledIndexes []Indexer
 }
 
+// staleBuildDropper drops an index whose unfinished fast build targets a block
+// that is no longer in the main chain.
+type staleBuildDropper interface {
+	dropStaleBuild(chain *blockchain.BlockChain,
+		interrupt <-chan struct{}) (bool, error)
+}
+
 // Ensure the Manager type implements the blockchain.IndexManager interface.
 var _ blockchain.IndexManager = (*Manager)(nil)
 
@@ -279,6 +286,22 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	for i := len(m.enabledIndexes); i > 0; i-- {
 		indexer := m.enabledIndexes[i-1]
 
+		// An unfinished fast build can leave entries in an
+		// uninitialized index, which the rollback below cannot
+		// disconnect one block at a time.  Drop such an index when its
+		// build target is no longer in the main chain.
+		if dropper, ok := indexer.(staleBuildDropper); ok {
+			dropped, err := dropper.dropStaleBuild(chain, interrupt)
+			if err != nil {
+				return err
+			}
+			if dropped {
+				if err := m.createIndexes(); err != nil {
+					return err
+				}
+			}
+		}
+
 		// Fetch the current tip for the index.
 		var height int32
 		var hash *chainhash.Hash
@@ -292,7 +315,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			return err
 		}
 
-		// Nothing to do if the index does not have any entries yet.
+		// Nothing to roll back for an uninitialized index.
 		if height == -1 {
 			continue
 		}

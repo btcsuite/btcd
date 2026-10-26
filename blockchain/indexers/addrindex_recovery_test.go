@@ -237,6 +237,70 @@ func TestInterruptedAddrBuildReplay(t *testing.T) {
 	require.True(t, ok, "checkpoint entry")
 }
 
+// TestFastBuildReorgRebuildsAddressIndex ensures Manager.Init drops the address
+// index and its staging when the target of an unfinished build is no longer in
+// the main chain, which removes the entries the write pass left, and builds the
+// address index again.
+func TestFastBuildReorgRebuildsAddressIndex(t *testing.T) {
+	build := setupInterruptedAddrBuild(t)
+	stagingDir := filepath.Join(
+		build.rootDir, addrIndexBuildDirName, "staging",
+	)
+	manifest, ok := readAddrBuildManifest(stagingDir)
+	require.True(t, ok)
+	manifest.TargetHash = chainhash.Hash{2}
+	require.NoError(t, writeAddrBuildManifest(stagingDir, &manifest))
+
+	// Put an entry for an address that is not in the chain, standing in for
+	// one the write pass left for a block that is no longer in the main
+	// chain.  It must not survive the rebuild.
+	var orphanAddrKey [addrKeySize]byte
+	orphanAddrKey[1] = 0xff
+	orphanKey := keyForLevel(orphanAddrKey, 0)
+	err := build.db.Update(func(dbTx database.Tx) error {
+		bucket := dbTx.Metadata().Bucket(addrIndexKey)
+		return bucket.Put(orphanKey[:], make([]byte, txEntrySize))
+	})
+	require.NoError(t, err)
+
+	idx := NewAddrIndexWithDataDir(
+		build.db, &chaincfg.MainNetParams, build.rootDir,
+	)
+	manager := NewManager(build.db, []Indexer{NewTxIndex(build.db), idx})
+	require.NoError(t, manager.Init(build.chain, nil))
+	requireGenesisAddrIndex(t, build, idx)
+	_, ok = readAddrIndexTestBucket(t, build.db)[orphanKey]
+	require.False(t, ok, "orphaned entry")
+}
+
+// TestDropStaleBuildKeepsMainChainBuild ensures an unfinished build whose
+// target is in the main chain keeps its staging so that it can resume.
+func TestDropStaleBuildKeepsMainChainBuild(t *testing.T) {
+	build := setupInterruptedAddrBuild(t)
+	idx := NewAddrIndexWithDataDir(
+		build.db, &chaincfg.MainNetParams, build.rootDir,
+	)
+	dropped, err := idx.dropStaleBuild(build.chain, nil)
+	require.NoError(t, err)
+	require.False(t, dropped)
+	requireAddrBuildStaging(t, build.rootDir)
+}
+
+// TestStagingForInitializedAddrIndex ensures Manager.Init returns an error for
+// staging next to an address index whose tip is set below the build target.
+func TestStagingForInitializedAddrIndex(t *testing.T) {
+	const target = 10
+	c := setupAddrIndexTestChain(t, target)
+	txIdx := NewTxIndex(c.db)
+	idx := NewAddrIndexWithDataDir(c.db, &chaincfg.MainNetParams, c.rootDir)
+	manager := NewManager(c.db, []Indexer{txIdx, idx})
+	require.NoError(t, manager.createIndexes())
+	c.connect(t, txIdx, 0, target)
+	c.interruptBuild(t, 1)
+	c.resetAddrIndex(t, idx, 5, nil)
+	require.ErrorContains(t, manager.Init(c.chain, nil), "staging exists")
+}
+
 // TestAddrIndexInitCompletedStaging ensures Init removes the staging of a
 // build whose target is the index tip and keeps the index.  A build leaves
 // such staging when it stops after it flushes the tip and before it removes
