@@ -9,9 +9,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 )
 
 type bucketBase struct {
@@ -170,4 +174,127 @@ func TestDropIndexDeleteBucketError(t *testing.T) {
 	if !errors.Is(err, testErr) {
 		t.Fatalf("unexpected error: got %v, want %v", err, testErr)
 	}
+}
+
+// catchUpTestIndex is an index that counts the blocks connected to it.
+type catchUpTestIndex struct {
+	key       []byte
+	connected int
+}
+
+// Key returns the key of the index.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Key() []byte {
+	return idx.key
+}
+
+// Name returns the key of the index as its name.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Name() string {
+	return string(idx.key)
+}
+
+// Create does nothing.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Create(database.Tx) error {
+	return nil
+}
+
+// Init does nothing.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Init() error {
+	return nil
+}
+
+// ConnectBlock counts the block.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) ConnectBlock(database.Tx, *btcutil.Block,
+	[]blockchain.SpentTxOut) error {
+
+	idx.connected++
+	return nil
+}
+
+// DisconnectBlock does nothing.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) DisconnectBlock(database.Tx, *btcutil.Block,
+	[]blockchain.SpentTxOut) error {
+
+	return nil
+}
+
+// newManagerTestChain returns a database with a chain that holds only the
+// genesis block.
+func newManagerTestChain(t *testing.T) (database.DB, *blockchain.BlockChain) {
+	t.Helper()
+	db, err := database.Create(
+		"ffldb", filepath.Join(t.TempDir(), "db"), wire.MainNet,
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	chain, err := blockchain.New(&blockchain.Config{
+		DB: db, ChainParams: &chaincfg.MainNetParams,
+		TimeSource: blockchain.NewMedianTime(),
+	})
+	require.NoError(t, err)
+	return db, chain
+}
+
+// fetchTestIndexTips returns the tip heights of the indexes with the passed
+// keys.
+func fetchTestIndexTips(db database.DB, keys ...[]byte) ([]int32, error) {
+	heights := make([]int32, len(keys))
+	err := db.View(func(dbTx database.Tx) error {
+		for i, key := range keys {
+			_, height, err := dbFetchIndexerTip(dbTx, key)
+			if err != nil {
+				return err
+			}
+			heights[i] = height
+		}
+		return nil
+	})
+	return heights, err
+}
+
+// TestManagerCatchUp ensures Manager.Init creates the tip of a missing index
+// and connects the genesis block only to that index, not to an index whose
+// tip is already the genesis block.
+func TestManagerCatchUp(t *testing.T) {
+	// 1. Make a genesis-only chain and set one index tip to the chain tip.
+	db, chain := newManagerTestChain(t)
+	caughtUp := &catchUpTestIndex{key: []byte("caughtup")}
+	behind := &catchUpTestIndex{key: []byte("behind")}
+	best := chain.BestSnapshot()
+	err := db.Update(func(dbTx database.Tx) error {
+		meta := dbTx.Metadata()
+		_, err := meta.CreateBucket(indexTipsBucketName)
+		if err != nil {
+			return err
+		}
+		return dbPutIndexerTip(
+			dbTx, caughtUp.key, &best.Hash, best.Height,
+		)
+	})
+	require.NoError(t, err)
+
+	// 2. Run Init.  The index that is behind comes first, so the lowest
+	// tip is not the tip of the last index.
+	manager := NewManager(db, []Indexer{behind, caughtUp})
+	require.NoError(t, manager.Init(chain, nil))
+
+	// 3. Check that only the index that was behind had a block connected.
+	require.Zero(t, caughtUp.connected)
+	require.Equal(t, 1, behind.connected)
+
+	// 4. Check that both index tips are at the chain tip height.
+	tips, err := fetchTestIndexTips(db, caughtUp.key, behind.key)
+	require.NoError(t, err)
+	require.Equal(t, []int32{best.Height, best.Height}, tips)
 }
