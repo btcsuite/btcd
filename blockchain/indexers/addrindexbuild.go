@@ -45,7 +45,9 @@ import (
 // Until the build sets the index tip, the index can hold entries from an
 // unfinished write pass, and only the staging shows that the build is
 // unfinished.  So staging is removed only after the database is flushed, both
-// after a build sets the tip and after an index drop.
+// after a build sets the tip and after an index drop.  When the target is no
+// longer in the main chain, Manager.Init drops the index and its staging and
+// the build starts over.
 // -----------------------------------------------------------------------------
 
 const addrIndexBuildDirName = "addrindexbuild"
@@ -55,6 +57,7 @@ const addrIndexBuildDirName = "addrindexbuild"
 const addrBuildScanChunkSize = 50000
 
 var _ FastBuilder = (*AddrIndex)(nil)
+var _ staleBuildDropper = (*AddrIndex)(nil)
 
 // createAddrBuildStager creates the staging directory for a new build.  It
 // creates the staging files and the initial manifest in staging.tmp and then
@@ -245,6 +248,36 @@ func (idx *AddrIndex) Init() error {
 	}
 	log.Infof("Removing stale address index build staging")
 	return removeAddrIndexBuildDir(idx.dataDir)
+}
+
+// dropStaleBuild drops the address index and its staging when the build target
+// is no longer in the main chain, and reports whether it dropped them.
+// Manager.Init calls Init first, which removes the staging of a build that set
+// the index tip, so staging for an initialized index is an error.
+func (idx *AddrIndex) dropStaleBuild(chain *blockchain.BlockChain,
+	interrupt <-chan struct{}) (bool, error) {
+
+	state, err := idx.loadAddrBuildState()
+	if err != nil || state == nil {
+		return false, err
+	}
+	if state.tipHeight != -1 {
+		return false, fmt.Errorf("address index build staging exists " +
+			"for an initialized address index, drop the address " +
+			"index before restarting the build")
+	}
+	if addrBuildOnMainChain(chain, &state.manifest) {
+		return false, nil
+	}
+
+	log.Infof("Rebuilding address index after a chain reorganization")
+	if err := DropAddrIndexWithDataDir(
+		idx.db, idx.dataDir, interrupt,
+	); err != nil {
+
+		return false, err
+	}
+	return true, nil
 }
 
 // addrBuildScanRange returns the first and last heights of the scan chunk of
