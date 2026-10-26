@@ -1470,6 +1470,9 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 			}
 		}
 
+		// Existing pool transactions can become non-final at the lower tip.
+		sm.txMemPool.RemoveNonFinalTransactions()
+
 		// Rollback previous block recorded by the fee estimator.
 		if sm.feeEstimator != nil {
 			sm.feeEstimator.Rollback(block.Hash())
