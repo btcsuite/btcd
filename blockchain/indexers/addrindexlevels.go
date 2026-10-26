@@ -40,3 +40,43 @@ func addrLevelEntryCounts(numEntries int) []int {
 	}
 	return levelCounts
 }
+
+// addrRecordLevelValues constructs the complete level layout for the records
+// of one address, which must be ordered from oldest to newest.  The values
+// share one buffer of the serialized entries, with older entries in higher
+// levels.
+func addrRecordLevelValues(records []addrRecord) [][]byte {
+	entries := make([]byte, 0, len(records)*txEntrySize)
+	for i := range records {
+		entries = append(entries, records[i][addrKeySize:]...)
+	}
+
+	counts := addrLevelEntryCounts(len(records))
+	levels := make([][]byte, len(counts))
+	offset := 0
+	for level := len(counts) - 1; level >= 0; level-- {
+		end := offset + counts[level]*txEntrySize
+		levels[level] = entries[offset:end]
+		offset = end
+	}
+	return levels
+}
+
+// writeAddrLevelValues writes the level layout for the records of one address.
+// Existing levels can only come from an interrupted write of this build, which
+// wrote the layout of a prefix of these records.  Adding entries never removes
+// a level, so putting each level replaces all of them.
+func writeAddrLevelValues(bucket internalBucket,
+	records []addrRecord) (int, error) {
+
+	addrKey := records[0].key()
+	levelBytes := 0
+	for level, value := range addrRecordLevelValues(records) {
+		key := keyForLevel(addrKey, uint8(level))
+		if err := bucket.Put(key[:], value); err != nil {
+			return 0, err
+		}
+		levelBytes += len(value) + levelKeySize
+	}
+	return levelBytes, nil
+}

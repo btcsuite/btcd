@@ -18,6 +18,20 @@ func addrBuildTestEntry(i int) (uint32, wire.TxLoc) {
 	return uint32(i / 3), wire.TxLoc{TxStart: i * 4, TxLen: i + 1}
 }
 
+// addrBuildTestRecords returns the staging records of the test entries in
+// [start, end) for the provided address key.
+func addrBuildTestRecords(addrKey [addrKeySize]byte, start,
+	end int) []addrRecord {
+
+	records := make([]addrRecord, 0, end-start)
+	for i := start; i < end; i++ {
+		blockID, txLoc := addrBuildTestEntry(i)
+		record := makeAddrRecord(&addrKey, blockID, txLoc)
+		records = append(records, record)
+	}
+	return records
+}
+
 // putAddrBuildTestEntries adds the test entries in [start, end) to bucket under
 // the provided address key, one at a time with dbPutAddrIndexEntry, the way
 // ConnectBlock adds them.
@@ -30,6 +44,18 @@ func putAddrBuildTestEntries(t *testing.T, bucket internalBucket,
 		require.NoError(t, dbPutAddrIndexEntry(
 			bucket, addrKey, blockID, txLoc,
 		))
+	}
+}
+
+// requireAddrBuildLevels requires got and want to hold the same level keys and
+// values.
+func requireAddrBuildLevels(t *testing.T, got,
+	want map[[levelKeySize]byte][]byte) {
+
+	t.Helper()
+	require.Len(t, got, len(want))
+	for key, value := range want {
+		require.Equalf(t, value, got[key], "level %x", key)
 	}
 }
 
@@ -54,6 +80,36 @@ func TestAddrLevelEntryCounts(t *testing.T) {
 			key := keyForLevel(addrKey, uint8(level))
 			got := len(bucket.levels[key]) / txEntrySize
 			require.Equal(t, got, count)
+		}
+	}
+}
+
+// TestWriteAddrLevelValuesReplacesPrefix writes the layout of a prefix of an
+// address's records, then the full records, and requires the layout that
+// dbPutAddrIndexEntry leaves for the full records.
+func TestWriteAddrLevelValuesReplacesPrefix(t *testing.T) {
+	t.Parallel()
+
+	var addrKey [addrKeySize]byte
+	for total := 1; total <= 300; total++ {
+		records := addrBuildTestRecords(addrKey, 0, total)
+		want := &addrIndexBucket{
+			levels: make(map[[levelKeySize]byte][]byte),
+		}
+		putAddrBuildTestEntries(t, want, addrKey, 0, total)
+		for prefix := 0; prefix <= total; prefix++ {
+			got := &addrIndexBucket{
+				levels: make(map[[levelKeySize]byte][]byte),
+			}
+			if prefix > 0 {
+				_, err := writeAddrLevelValues(
+					got, records[:prefix],
+				)
+				require.NoError(t, err)
+			}
+			_, err := writeAddrLevelValues(got, records)
+			require.NoError(t, err)
+			requireAddrBuildLevels(t, got.levels, want.levels)
 		}
 	}
 }
