@@ -4,6 +4,21 @@
 
 package indexers
 
+import (
+	"fmt"
+	"sort"
+
+	"github.com/btcsuite/btcd/database"
+)
+
+// addrBuildWriteBatchBytes is the batch size of the write pass.  A database
+// transaction stops at the next address boundary once it writes this many level
+// key and value bytes.  A transaction keeps its writes in memory until it
+// commits, so the batch size limits how much memory it holds.  The number of
+// entries of an address varies widely, so the batch size is counted in bytes
+// rather than in addresses.
+const addrBuildWriteBatchBytes = 32 * 1024 * 1024
+
 // addrLevelEntryCounts returns the number of entries in each address index
 // level, from level 0 up, after numEntries entries are added one at a time
 // with dbPutAddrIndexEntry.
@@ -79,4 +94,107 @@ func writeAddrLevelValues(bucket internalBucket,
 		levelBytes += len(value) + levelKeySize
 	}
 	return levelBytes, nil
+}
+
+// addrRecordsEnd returns the end of the records for the address of
+// records[start].
+func addrRecordsEnd(records []addrRecord, start int,
+	interrupt <-chan struct{}) (int, error) {
+
+	addrKey := records[start].key()
+	end := start + 1
+	for end < len(records) && records[end].key() == addrKey {
+		if (end-start)%addrStagingInterruptCheckRecords == 0 &&
+			interruptRequested(interrupt) {
+
+			return 0, errInterruptRequested
+		}
+		end++
+	}
+	return end, nil
+}
+
+// writeAddrIndexToDB sorts and writes one staging shard at a time.  blockIDs
+// holds the block ID of each staged block, indexed by height.
+// Database transactions stop at address boundaries once they write batchBytes.
+func (idx *AddrIndex) writeAddrIndexToDB(stager *addrStager,
+	blockIDs []uint32, batchBytes int, interrupt <-chan struct{}) error {
+
+	stager.close()
+	for shard := 0; shard < numAddrStagingShards; shard++ {
+		if interruptRequested(interrupt) {
+			return errInterruptRequested
+		}
+
+		records, err := readAddrStagingShard(
+			addrStagingShardPath(stager.dir, shard), interrupt,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Staged records hold heights, so they are sorted into height
+		// order before the heights are resolved to block IDs.
+		sort.Sort(addrRecords(records))
+		for i := range records {
+			if i%addrStagingInterruptCheckRecords == 0 &&
+				interruptRequested(interrupt) {
+
+				return errInterruptRequested
+			}
+			height := int64(records[i].blockID())
+			if height >= int64(len(blockIDs)) {
+				return fmt.Errorf(
+					"address staging block height %d "+
+						"is outside the build range",
+					height,
+				)
+			}
+			byteOrder.PutUint32(
+				records[i][addrKeySize:], blockIDs[height],
+			)
+		}
+
+		for start := 0; start < len(records); {
+			next := start
+			err := idx.db.Update(func(dbTx database.Tx) error {
+				bucket := dbTx.Metadata().Bucket(addrIndexKey)
+				written := 0
+				for next < len(records) {
+					if interruptRequested(interrupt) {
+						return errInterruptRequested
+					}
+
+					end, err := addrRecordsEnd(
+						records, next, interrupt,
+					)
+					if err != nil {
+						return err
+					}
+					levelBytes, err := writeAddrLevelValues(
+						bucket, records[next:end],
+					)
+					if err != nil {
+						return err
+					}
+					written += levelBytes
+					next = end
+					if written >= batchBytes {
+						break
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			start = next
+		}
+
+		if (shard+1)%16 == 0 {
+			log.Infof("Address index write: %d/%d shards", shard+1,
+				numAddrStagingShards)
+		}
+	}
+	return nil
 }
