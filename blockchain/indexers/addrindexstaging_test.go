@@ -233,3 +233,21 @@ func TestAddrStagingManifestValidation(t *testing.T) {
 	_, err = openAddrStager(dir, &manifest, interrupt)
 	require.ErrorIs(t, err, errInterruptRequested)
 }
+
+// TestRemoveAddrIndexBuildDir ensures removeAddrIndexBuildDir removes the build
+// directory and an addrindexbuild.delete directory that an interrupted removal
+// left behind.
+func TestRemoveAddrIndexBuildDir(t *testing.T) {
+	dataDir := t.TempDir()
+	buildDir := filepath.Join(dataDir, addrIndexBuildDirName)
+	require.NoError(t, os.MkdirAll(
+		filepath.Join(buildDir, "staging"), 0700,
+	))
+	require.NoError(t, os.Mkdir(buildDir+".delete", 0700))
+
+	require.NoError(t, removeAddrIndexBuildDir(dataDir))
+	_, err := os.Stat(buildDir)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(buildDir + ".delete")
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
