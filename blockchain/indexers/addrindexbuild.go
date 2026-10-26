@@ -44,8 +44,8 @@ import (
 //
 // Until the build sets the index tip, the index can hold entries from an
 // unfinished write pass, and only the staging shows that the build is
-// unfinished.  So staging is removed only after the build sets the tip and the
-// database is flushed.
+// unfinished.  So staging is removed only after the database is flushed, both
+// after a build sets the tip and after an index drop.
 // -----------------------------------------------------------------------------
 
 const addrIndexBuildDirName = "addrindexbuild"
@@ -502,4 +502,38 @@ func addrIndexBuildDirExists(dataDir string) (string, bool, error) {
 func AddrIndexFastBuildDir(dataDir string) (string, bool) {
 	dir, exists, _ := addrIndexBuildDirExists(dataDir)
 	return dir, exists
+}
+
+// DropAddrIndexWithDataDir drops the address index and removes fast-build
+// staging from dataDir.
+func DropAddrIndexWithDataDir(db database.DB, dataDir string,
+	interrupt <-chan struct{}) error {
+
+	_, buildExists, err := addrIndexBuildDirExists(dataDir)
+	if err != nil {
+		return err
+	}
+	// Fail before changing the index when the database cannot flush, since
+	// staging is only removed after the drop is flushed.
+	if buildExists {
+		if _, err := addrBuildFlusher(db); err != nil {
+			return err
+		}
+	}
+	if err := DropAddrIndex(db, interrupt); err != nil {
+		return err
+	}
+	if !buildExists {
+		return removeAddrIndexBuildDeleteDir(dataDir)
+	}
+	return removeAddrIndexBuildStaging(db, dataDir)
+}
+
+// removeAddrIndexBuildStaging flushes the database and then removes the build
+// directory, so staging is removed only after an index drop is durable.
+func removeAddrIndexBuildStaging(db database.DB, dataDir string) error {
+	if err := flushAddrIndexDB(db); err != nil {
+		return err
+	}
+	return removeAddrIndexBuildDir(dataDir)
 }

@@ -255,3 +255,77 @@ func TestFastBuildChecksFlushBeforeStaging(t *testing.T) {
 	_, exists := AddrIndexFastBuildDir(c.rootDir)
 	require.False(t, exists)
 }
+
+// addrBuildDrops are the index drops that remove address index build staging.
+var addrBuildDrops = []struct {
+	name string
+	drop func(database.DB, string, <-chan struct{}) error
+}{
+	{"address_index", DropAddrIndexWithDataDir},
+	{"transaction_index", DropTxIndexWithDataDir},
+}
+
+func TestInterruptedIndexDropsRetainAddrBuild(t *testing.T) {
+	for _, test := range addrBuildDrops {
+		t.Run(test.name, func(t *testing.T) {
+			build := setupInterruptedAddrBuild(t)
+			interrupt := make(chan struct{})
+			close(interrupt)
+			require.ErrorIs(t, test.drop(
+				build.db, build.rootDir, interrupt,
+			), errInterruptRequested)
+			_, exists := AddrIndexFastBuildDir(build.rootDir)
+			require.True(t, exists)
+
+			idx := NewAddrIndexWithDataDir(build.db,
+				&chaincfg.MainNetParams, build.rootDir)
+			manager := NewManager(build.db, []Indexer{
+				NewTxIndex(build.db), idx,
+			})
+			require.NoError(t, manager.Init(build.chain, nil))
+			requireGenesisAddrIndex(t, build, idx)
+		})
+	}
+}
+
+func TestIndexDropFlushFailureRetainsAddrBuild(t *testing.T) {
+	for _, test := range addrBuildDrops {
+		t.Run(test.name, func(t *testing.T) {
+			build := setupInterruptedAddrBuild(t)
+			flushErr := errors.New("flush failure")
+			db := &failAddrFlushDB{DB: build.db, err: flushErr}
+			err := test.drop(db, build.rootDir, nil)
+			require.ErrorIs(t, err, flushErr)
+			_, exists := AddrIndexFastBuildDir(build.rootDir)
+			require.True(t, exists)
+
+			err = test.drop(build.db, build.rootDir, nil)
+			require.NoError(t, err)
+			_, exists = AddrIndexFastBuildDir(build.rootDir)
+			require.False(t, exists)
+		})
+	}
+}
+
+func TestIndexDropChecksFlushBeforeMutation(t *testing.T) {
+	for _, test := range addrBuildDrops {
+		t.Run(test.name, func(t *testing.T) {
+			build := setupInterruptedAddrBuild(t)
+			db := &noAddrFlushDB{DB: build.db}
+			require.Error(t, test.drop(db, build.rootDir, nil))
+
+			var dropping, bucketExists bool
+			err := build.db.View(func(dbTx database.Tx) error {
+				meta := dbTx.Metadata()
+				tips := meta.Bucket(indexTipsBucketName)
+				dropKey := indexDropKey(addrIndexKey)
+				dropping = tips.Get(dropKey) != nil
+				bucketExists = meta.Bucket(addrIndexKey) != nil
+				return nil
+			})
+			require.NoError(t, err)
+			require.False(t, dropping, "in-progress drop flag")
+			require.True(t, bucketExists, "index bucket")
+		})
+	}
+}
