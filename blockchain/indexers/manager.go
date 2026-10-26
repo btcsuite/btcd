@@ -366,6 +366,27 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		}
 	}
 
+	// Earlier indexes can supply data needed by a fast build.
+	for i, indexer := range m.enabledIndexes {
+		builder, ok := indexer.(FastBuilder)
+		if !ok {
+			continue
+		}
+		needed, err := builder.NeedsFastBuild(chain)
+		if err != nil {
+			return err
+		}
+		if !needed {
+			continue
+		}
+		err = m.catchUpIndexes(chain, m.enabledIndexes[:i], interrupt)
+		if err != nil {
+			return err
+		}
+		if err := builder.FastBuild(chain, interrupt); err != nil {
+			return err
+		}
+	}
 	return m.catchUpIndexes(chain, m.enabledIndexes, interrupt)
 }
 

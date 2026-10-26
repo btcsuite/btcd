@@ -298,3 +298,92 @@ func TestManagerCatchUp(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int32{best.Height, best.Height}, tips)
 }
+
+// fastBuildTestIndex is a FastBuilder that records the tips of other indexes
+// when FastBuild runs and sets its own tip to the chain tip.
+type fastBuildTestIndex struct {
+	catchUpTestIndex
+	db       database.DB
+	needed   bool
+	observed [][]byte
+	tips     []int32
+}
+
+// NeedsFastBuild returns needed.
+//
+// This is part of the FastBuilder interface.
+func (idx *fastBuildTestIndex) NeedsFastBuild(
+	*blockchain.BlockChain) (bool, error) {
+
+	return idx.needed, nil
+}
+
+// FastBuild records the tips of the observed indexes and sets its own tip to
+// the chain tip.
+//
+// This is part of the FastBuilder interface.
+func (idx *fastBuildTestIndex) FastBuild(chain *blockchain.BlockChain,
+	interrupt <-chan struct{}) error {
+
+	tips, err := fetchTestIndexTips(idx.db, idx.observed...)
+	if err != nil {
+		return err
+	}
+	idx.tips = tips
+
+	best := chain.BestSnapshot()
+	return idx.db.Update(func(dbTx database.Tx) error {
+		return dbPutIndexerTip(dbTx, idx.key, &best.Hash, best.Height)
+	})
+}
+
+// TestManagerFastBuild ensures that when a FastBuilder needs a fast build,
+// Manager.Init calls FastBuild after it catches up the earlier index and while
+// the later index is still uninitialized.  In that case Init connects the
+// genesis block to the earlier and later indexes but not to the FastBuilder.
+// When no fast build is needed, Init does not call FastBuild and connects the
+// genesis block to all three indexes.
+func TestManagerFastBuild(t *testing.T) {
+	// wantTips holds the earlier and later tips FastBuild sees, or nil when
+	// FastBuild does not run.  Height 0 is the chain tip, which is the
+	// genesis block, and a height of -1 marks an uninitialized index.
+	tests := []struct {
+		name          string
+		needed        bool
+		wantTips      []int32
+		wantConnected int
+	}{
+		{name: "build_not_needed", wantConnected: 1},
+		{name: "build_needed", needed: true, wantTips: []int32{0, -1}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 1. Make a genesis-only chain and three indexes.
+			db, chain := newManagerTestChain(t)
+			earlier := &catchUpTestIndex{key: []byte("earlier")}
+			later := &catchUpTestIndex{key: []byte("later")}
+			builder := &fastBuildTestIndex{
+				catchUpTestIndex: catchUpTestIndex{
+					key: []byte("builder"),
+				},
+				db:       db,
+				needed:   test.needed,
+				observed: [][]byte{earlier.key, later.key},
+			}
+
+			// 2. Run Init with the builder in the middle.
+			indexes := []Indexer{earlier, builder, later}
+			manager := NewManager(db, indexes)
+			require.NoError(t, manager.Init(chain, nil))
+
+			// 3. Check the earlier and later tips FastBuild saw.
+			require.Equal(t, test.wantTips, builder.tips,
+				"earlier and later tips during FastBuild")
+
+			// 4. Check the blocks connected to each index.
+			require.Equal(t, test.wantConnected, builder.connected)
+			require.Equal(t, 1, earlier.connected)
+			require.Equal(t, 1, later.connected)
+		})
+	}
+}
