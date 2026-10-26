@@ -146,7 +146,10 @@ func btcdMain(serverChan chan<- *server) error {
 	// NOTE: The order is important here because dropping the tx index also
 	// drops the address index since it relies on it.
 	if cfg.DropAddrIndex {
-		if err := indexers.DropAddrIndex(db, interrupt); err != nil {
+		err := indexers.DropAddrIndexWithDataDir(
+			db, cfg.DataDir, interrupt,
+		)
+		if err != nil {
 			btcdLog.Errorf("%v", err)
 			return err
 		}
@@ -154,7 +157,10 @@ func btcdMain(serverChan chan<- *server) error {
 		return nil
 	}
 	if cfg.DropTxIndex {
-		if err := indexers.DropTxIndex(db, interrupt); err != nil {
+		err := indexers.DropTxIndexWithDataDir(
+			db, cfg.DataDir, interrupt,
+		)
+		if err != nil {
 			btcdLog.Errorf("%v", err)
 			return err
 		}
@@ -168,6 +174,20 @@ func btcdMain(serverChan chan<- *server) error {
 		}
 
 		return nil
+	}
+
+	// An interrupted address index fast build keeps its staging files on
+	// disk so a later run can resume the build.  Nothing maintains them
+	// while the index is disabled, so point the user at them.
+	if !cfg.AddrIndex {
+		dir, ok := indexers.AddrIndexFastBuildDir(cfg.DataDir)
+		if ok {
+			btcdLog.Warnf("Address index fast build staging "+
+				"found in \"%s\" but the address index is "+
+				"disabled. Enable --addrindex to resume the "+
+				"build or remove the leftover files with "+
+				"--dropaddrindex", dir)
+		}
 	}
 
 	// Check if the database had previously been pruned.  If it had been, it's
