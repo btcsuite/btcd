@@ -13,3 +13,5 @@ require (
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
+
+replace github.com/btcsuite/btcd/chainhash/v2 => ../chainhash

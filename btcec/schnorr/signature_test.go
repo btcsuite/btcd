@@ -8,26 +8,30 @@ package schnorr
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"testing/quick"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/davecgh/go-spew/spew"
 	secp_ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4"
 	ecdsa_schnorr "github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
+	"github.com/stretchr/testify/require"
 )
 
 type bip340Test struct {
-	secretKey    string
-	publicKey    string
-	auxRand      string
-	message      string
-	signature    string
-	verifyResult bool
-	validPubKey  bool
-	expectErr    error
-	rfc6979      bool
+	secretKey     string
+	publicKey     string
+	auxRand       string
+	message       string
+	signature     string
+	verifyResult  bool
+	validPubKey   bool
+	expectErr     error
+	rfc6979       bool
+	arbitrarySize bool
 }
 
 var bip340TestVectors = []bip340Test{
@@ -148,6 +152,46 @@ var bip340TestVectors = []bip340Test{
 		validPubKey:  false,
 		expectErr:    secp_ecdsa.ErrPubKeyXTooBig,
 	},
+	{
+		secretKey:     "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:     "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:       "0000000000000000000000000000000000000000000000000000000000000000",
+		message:       "",
+		signature:     "71535DB165ECD9FBBC046E5FFAEA61186BB6AD436732FCCC25291A55895464CF6069CE26BF03466228F19A3A62DB8A649F2D560FAC652827D1AF0574E427AB63",
+		verifyResult:  true,
+		validPubKey:   true,
+		arbitrarySize: true,
+	},
+	{
+		secretKey:     "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:     "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:       "0000000000000000000000000000000000000000000000000000000000000000",
+		message:       "11",
+		signature:     "08A20A0AFEF64124649232E0693C583AB1B9934AE63B4C3511F3AE1134C6A303EA3173BFEA6683BD101FA5AA5DBC1996FE7CACFC5A577D33EC14564CEC2BACBF",
+		verifyResult:  true,
+		validPubKey:   true,
+		arbitrarySize: true,
+	},
+	{
+		secretKey:     "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:     "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:       "0000000000000000000000000000000000000000000000000000000000000000",
+		message:       "0102030405060708090A0B0C0D0E0F1011",
+		signature:     "5130F39A4059B43BC7CAC09A19ECE52B5D8699D1A71E3C52DA9AFDB6B50AC370C4A482B77BF960F8681540E25B6771ECE1E5A37FD80E5A51897C5566A97EA5A5",
+		verifyResult:  true,
+		validPubKey:   true,
+		arbitrarySize: true,
+	},
+	{
+		secretKey:     "0340034003400340034003400340034003400340034003400340034003400340",
+		publicKey:     "778CAA53B4393AC467774D09497A87224BF9FAB6F6E68B23086497324D6FD117",
+		auxRand:       "0000000000000000000000000000000000000000000000000000000000000000",
+		message:       "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+		signature:     "403B12B0D8555A344175EA7EC746566303321E5DBFA8BE6F091635163ECA79A8585ED3E3170807E7C03B720FC54C7B23897FCBA0E9D0B4A06894CFD249F22367",
+		verifyResult:  true,
+		validPubKey:   true,
+		arbitrarySize: true,
+	},
 }
 
 // decodeHex decodes the passed hex string and returns the resulting bytes.  It
@@ -180,9 +224,14 @@ func TestSchnorrSign(t *testing.T) {
 
 		msg := decodeHex(test.message)
 
-		var signOpts []SignOption
+		var signOpts, verifyOpts []SignOption
 		if !test.rfc6979 {
 			signOpts = []SignOption{CustomNonce(auxBytes)}
+		}
+
+		if test.arbitrarySize {
+			signOpts = append(signOpts, ArbitrarySize())
+			verifyOpts = []SignOption{ArbitrarySize()}
 		}
 
 		sig, err := Sign(privKey, msg, signOpts...)
@@ -196,7 +245,7 @@ func TestSchnorrSign(t *testing.T) {
 		}
 
 		pubKeyBytes := decodeHex(test.publicKey)
-		err = schnorrVerify(sig, msg, pubKeyBytes)
+		err = schnorrVerify(sig, msg, pubKeyBytes, verifyOpts...)
 		if err != nil {
 			t.Fail()
 		}
@@ -238,7 +287,12 @@ func TestSchnorrVerify(t *testing.T) {
 			t.Fatalf("unable to parse sig: %v", err)
 		}
 
-		err = schnorrVerify(sig, msg, pubKeyBytes)
+		var verifyOpts []SignOption
+		if test.arbitrarySize {
+			verifyOpts = []SignOption{ArbitrarySize()}
+		}
+
+		err = schnorrVerify(sig, msg, pubKeyBytes, verifyOpts...)
 		if err != nil && test.verifyResult {
 			t.Fatalf("test #%v: verification shouldn't have failed: %v", i, err)
 		}
@@ -328,4 +382,62 @@ func TestParseSignatureComponentRange(t *testing.T) {
 				test.name, err, test.err)
 		}
 	}
+}
+
+// TestSchnorrSignArbitraryLengthNoNonceCollision checks that different
+// messages don't result in the same nonce when using RFC 6979 due to message
+// truncation or padding during nonce generation.
+func TestSchnorrSignArbitraryLengthNoNonceCollision(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		msg1 string
+		msg2 string
+	}{
+		{
+			msg1: strings.Repeat("ab", 40),
+			msg2: strings.Repeat("ab", 32),
+		},
+		{
+			msg1: strings.Repeat("cd", 32) + "01",
+			msg2: strings.Repeat("cd", 32) + "02",
+		},
+		{
+			msg1: "11",
+			msg2: strings.Repeat("00", 31) + "11",
+		},
+		{
+			msg1: "",
+			msg2: sha256Hex(""),
+		},
+		{
+			msg1: "11",
+			msg2: sha256Hex("11"),
+		},
+		{
+			msg1: strings.Repeat("ab", 40),
+			msg2: sha256Hex(strings.Repeat("ab", 40)),
+		},
+	}
+
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
+			msg1 := decodeHex(tc.msg1)
+			sig1, err := Sign(privKey, msg1, ArbitrarySize())
+			require.NoError(t, err)
+
+			msg2 := decodeHex(tc.msg2)
+			sig2, err := Sign(privKey, msg2, ArbitrarySize())
+			require.NoError(t, err)
+
+			require.NotEqual(t, sig1.r, sig2.r)
+		})
+	}
+}
+
+func sha256Hex(preimage string) string {
+	return hex.EncodeToString(chainhash.HashB(decodeHex(preimage)))
 }
