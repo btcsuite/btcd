@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -173,6 +174,85 @@ func TestDropIndexDeleteBucketError(t *testing.T) {
 	err := dropIndex(db, idxKey, "test index", nil)
 	if !errors.Is(err, testErr) {
 		t.Fatalf("unexpected error: got %v, want %v", err, testErr)
+	}
+}
+
+type countBlockReadsDB struct {
+	database.DB
+	blockReads int
+}
+
+type countBlockReadsTx struct {
+	database.Tx
+	db *countBlockReadsDB
+}
+
+func (db *countBlockReadsDB) View(fn func(database.Tx) error) error {
+	return db.DB.View(func(dbTx database.Tx) error {
+		return fn(&countBlockReadsTx{Tx: dbTx, db: db})
+	})
+}
+
+func (tx *countBlockReadsTx) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
+	tx.db.blockReads++
+	return tx.Tx.FetchBlock(hash)
+}
+
+func TestManagerCatchUpBlockReads(t *testing.T) {
+	const target = 10
+	tests := []struct {
+		name      string
+		tipHeight int32
+		fastBuild bool
+	}{
+		{name: "fast_build_disabled", tipHeight: -1},
+		{name: "index_not_empty", tipHeight: 0, fastBuild: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := setupAddrIndexTestChain(t, target)
+			db := &countBlockReadsDB{DB: c.db}
+			txIdx := NewTxIndex(db)
+			idx := NewAddrIndex(db, &chaincfg.MainNetParams)
+			if test.fastBuild {
+				idx = NewAddrIndexWithDataDir(
+					db, &chaincfg.MainNetParams, c.rootDir,
+				)
+			}
+			manager := NewManager(db, []Indexer{txIdx, idx})
+			require.NoError(t, manager.createIndexes())
+			c.connect(t, txIdx, 0, test.tipHeight)
+			c.connect(t, idx, 0, test.tipHeight)
+			chain, err := blockchain.New(&blockchain.Config{
+				DB: db, ChainParams: &chaincfg.MainNetParams,
+				TimeSource: blockchain.NewMedianTime(),
+			})
+			require.NoError(t, err)
+
+			// Chain initialization also reads blocks.
+			db.blockReads = 0
+			require.NoError(t, manager.Init(chain, nil))
+			best := chain.BestSnapshot()
+			for _, key := range [][]byte{txIndexKey, addrIndexKey} {
+				var (
+					hash   *chainhash.Hash
+					height int32
+				)
+				err := db.View(func(dbTx database.Tx) error {
+					var err error
+					hash, height, err = dbFetchIndexerTip(
+						dbTx, key,
+					)
+					return err
+				})
+				require.NoError(t, err)
+				require.Equal(t, int32(target), height)
+				require.Equal(t, best.Hash, *hash)
+			}
+			wantReads := int(target - test.tipHeight)
+			require.Equal(t, wantReads, db.blockReads,
+				"ordinary catchup should read each block once")
+		})
 	}
 }
 
