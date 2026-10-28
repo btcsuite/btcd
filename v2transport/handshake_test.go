@@ -2,9 +2,11 @@ package v2transport
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -428,3 +430,104 @@ type shortReadWriter struct{}
 
 func (shortReadWriter) Read([]byte) (int, error)  { return 0, io.EOF }
 func (shortReadWriter) Write([]byte) (int, error) { return 1, nil }
+
+// newHandshakedPair returns an initiator and responder that completed the v2
+// handshake over a buffered in-memory pipe.
+func newHandshakedPair(t *testing.T) (*Peer, *Peer) {
+	t.Helper()
+
+	const testNet = BitcoinNet(0xd9b4bef9)
+
+	initiatorRW, responderRW := newBufferedReadWriterPair()
+	initiator := NewPeer()
+	responder := NewPeer()
+	initiator.UseReadWriter(initiatorRW)
+	responder.UseReadWriter(responderRW)
+
+	errs := make(chan error, 2)
+	go func() {
+		if err := initiator.InitiateV2Handshake(0); err != nil {
+			errs <- err
+			return
+		}
+		errs <- initiator.CompleteHandshake(true, nil, testNet)
+	}()
+	go func() {
+		if err := responder.RespondV2Handshake(0, testNet); err != nil {
+			errs <- err
+			return
+		}
+		errs <- responder.CompleteHandshake(false, nil, testNet)
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-errs:
+			if err != nil {
+				t.Fatalf("handshake failed: %v", err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("handshake timed out")
+		}
+	}
+
+	return initiator, responder
+}
+
+// TestReceivePacketLengthOnlyAllocation ensures a decrypted length field
+// cannot reserve the claimed packet size before the body arrives.
+func TestReceivePacketLengthOnlyAllocation(t *testing.T) {
+	initiator, responder := newHandshakedPair(t)
+
+	var lenLE [4]byte
+	binary.LittleEndian.PutUint32(lenLE[:], maxContentLen)
+	encLen, err := initiator.sendL.Crypt(lenLE[:lengthFieldLen])
+	if err != nil {
+		t.Fatalf("unable to encrypt length: %v", err)
+	}
+	responder.UseReadWriter(newSplitReadWriter(encLen))
+
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, err = responder.V2ReceivePacket(nil)
+	runtime.ReadMemStats(&after)
+
+	if err == nil {
+		t.Fatal("expected an error for a packet without a body")
+	}
+	allocated := after.TotalAlloc - before.TotalAlloc
+	if allocated > 1<<20 {
+		t.Fatalf("length field alone allocated %d bytes", allocated)
+	}
+}
+
+// TestReceivePacketLargePayload verifies a payload larger than the initial
+// receive buffer still round-trips, including when the body is truncated.
+func TestReceivePacketLargePayload(t *testing.T) {
+	initiator, responder := newHandshakedPair(t)
+
+	payload := bytes.Repeat([]byte{0xab}, 300_000)
+	encPacket, _, err := initiator.V2EncPacket(payload, nil, false)
+	if err != nil {
+		t.Fatalf("packet send failed: %v", err)
+	}
+	got, err := responder.V2ReceivePacket(nil)
+	if err != nil {
+		t.Fatalf("packet receive failed: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatal("payload mismatch")
+	}
+
+	// Replay a truncated copy of the next packet: the receiver must report
+	// an unexpected EOF rather than a partial body.
+	encPacket, _, err = initiator.V2EncPacket(payload, nil, false)
+	if err != nil {
+		t.Fatalf("packet send failed: %v", err)
+	}
+	responder.UseReadWriter(newSplitReadWriter(encPacket[:len(encPacket)/2]))
+	_, err = responder.V2ReceivePacket(nil)
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("unexpected error for truncated packet: %v", err)
+	}
+}
