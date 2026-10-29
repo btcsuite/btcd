@@ -9,8 +9,41 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain/internal/workmath"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 )
+
+// RetargetParams holds the values derived from the chain parameters that
+// difficulty retargeting uses. They are the values reported by the
+// BlocksPerRetarget, MinRetargetTimespan and MaxRetargetTimespan methods of
+// the ChainCtx interface.
+type RetargetParams struct {
+	// BlocksPerRetarget is the number of blocks between difficulty
+	// adjustments.
+	BlocksPerRetarget int32
+
+	// MinRetargetTimespan is the minimum retarget timespan in seconds.
+	MinRetargetTimespan int64
+
+	// MaxRetargetTimespan is the maximum retarget timespan in seconds.
+	MaxRetargetTimespan int64
+}
+
+// NewRetargetParams derives the retarget values from the passed chain
+// parameters using integer seconds. It lets implementations of ChainCtx that
+// do not have a BlockChain, such as light clients, share the derivation used
+// by New.
+func NewRetargetParams(params *chaincfg.Params) RetargetParams {
+	targetTimespan := int64(params.TargetTimespan / time.Second)
+	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
+	adjustmentFactor := params.RetargetAdjustmentFactor
+
+	return RetargetParams{
+		BlocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
+		MinRetargetTimespan: targetTimespan / adjustmentFactor,
+		MaxRetargetTimespan: targetTimespan * adjustmentFactor,
+	}
+}
 
 // HashToBig converts a chainhash.Hash into a big.Int that can be used to
 // perform math comparisons.
