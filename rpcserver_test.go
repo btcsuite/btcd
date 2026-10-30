@@ -3,7 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -666,4 +671,118 @@ func TestGetTxSpendingPrevOut(t *testing.T) {
 	results, err = handleGetTxSpendingPrevOut(s, cmd, closeChan)
 	require.NoError(err)
 	require.Equal(expectedResults, results)
+}
+
+// TestRPCQuirksNullID checks the notification exception used by Core clients.
+func TestRPCQuirksNullID(t *testing.T) {
+	// Restore the shared configuration after checking both quirks modes.
+	oldCfg := cfg
+	t.Cleanup(func() { cfg = oldCfg })
+	s := &rpcServer{}
+
+	for _, quirks := range []bool{false, true} {
+		cfg = &config{RPCQuirks: quirks}
+
+		for _, version := range []btcjson.RPCVersion{
+			"", btcjson.RpcVersion1, btcjson.RpcVersion2,
+		} {
+			request := &btcjson.Request{
+				Jsonrpc: version,
+				Method:  "uptime",
+				Params:  []json.RawMessage{},
+			}
+
+			// Quirks only exempt unversioned notifications.
+			response := s.processRequest(request, true, nil)
+			if !quirks || version != "" {
+				require.Empty(t, response)
+				continue
+			}
+
+			// A successful quirks reply retains the null ID.
+			var reply btcjson.Response
+			require.NoError(t, json.Unmarshal(response, &reply))
+			require.Nil(t, reply.ID)
+			require.Nil(t, reply.Error)
+			require.NotEmpty(t, reply.Result)
+			require.Equal(t, btcjson.RpcVersion1, reply.Jsonrpc)
+		}
+	}
+
+	// RPC errors must also produce a quirks reply with a null ID.
+	cfg = &config{RPCQuirks: true}
+	request := &btcjson.Request{
+		Method: "no_such_method",
+		Params: []json.RawMessage{},
+	}
+	response := s.processRequest(request, true, nil)
+
+	var reply btcjson.Response
+	require.NoError(t, json.Unmarshal(response, &reply))
+	require.Nil(t, reply.ID)
+	require.NotNil(t, reply.Error)
+	require.Equal(t, btcjson.ErrRPCMethodNotFound.Code, reply.Error.Code)
+	require.Equal(t, btcjson.RpcVersion1, reply.Jsonrpc)
+}
+
+// TestHTTPRPCQuirksNullID checks real HTTP replies for absent and null IDs,
+// both for single requests and entries in a batch.
+func TestHTTPRPCQuirksNullID(t *testing.T) {
+	oldCfg := cfg
+	cfg = &config{RPCQuirks: true}
+	t.Cleanup(func() { cfg = oldCfg })
+
+	// Exercise the HTTP reader as well as command processing.
+	s := &rpcServer{statusLines: make(map[int]string)}
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		s.jsonRPCRead(w, r, true)
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(server.Close)
+
+	for _, id := range []string{"", `,"id":null`} {
+		request := `{"method":"uptime","params":[]` + id + `}`
+
+		for _, batch := range []bool{false, true} {
+			// Send the same request alone and as a batch entry.
+			body := request
+			if batch {
+				body = "[" + body + "]"
+			}
+
+			resp, err := server.Client().Post(
+				server.URL, "application/json",
+				strings.NewReader(body),
+			)
+			require.NoError(t, err)
+
+			replyBody, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			// Decode both response forms before checking the reply.
+			var replies []btcjson.Response
+			if batch {
+				require.NoError(
+					t, json.Unmarshal(replyBody, &replies),
+				)
+			} else {
+				var reply btcjson.Response
+				require.NoError(
+					t, json.Unmarshal(replyBody, &reply),
+				)
+				replies = append(replies, reply)
+			}
+
+			// Expect one JSON-RPC 1.0 reply with a null ID.
+			require.Len(t, replies, 1)
+			require.Nil(t, replies[0].ID)
+			require.Nil(t, replies[0].Error)
+			require.NotEmpty(t, replies[0].Result)
+			require.Equal(
+				t, btcjson.RpcVersion1, replies[0].Jsonrpc,
+			)
+		}
+	}
 }
