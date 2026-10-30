@@ -28,12 +28,16 @@ func TestMapSlice(t *testing.T) {
 		{
 			keys: func() []wire.OutPoint {
 				outPoints := make([]wire.OutPoint, 1000)
-				for i := uint32(0); i < uint32(len(outPoints)); i++ {
+				for i := uint32(0); i < uint32(
+					len(outPoints),
+				); i++ {
 					var buf [4]byte
 					binary.BigEndian.PutUint32(buf[:], i)
 					hash := sha256.Sum256(buf[:])
 
-					op := wire.OutPoint{Hash: hash, Index: i}
+					op := wire.OutPoint{
+						Hash: hash, Index: i,
+					}
 					outPoints[i] = op
 				}
 				return outPoints
@@ -44,12 +48,14 @@ func TestMapSlice(t *testing.T) {
 	for _, test := range tests {
 		m := make(map[wire.OutPoint]*UtxoEntry)
 
-		maxSize := calculateRoughMapSize(1000, bucketSize)
+		maxSize := mapSize(1000, groupSize)
 
 		maxEntriesFirstMap := 500
 		ms1 := make(map[wire.OutPoint]*UtxoEntry, maxEntriesFirstMap)
 		ms := mapSlice{
-			maps:                []map[wire.OutPoint]*UtxoEntry{ms1},
+			maps: []map[wire.OutPoint]*UtxoEntry{
+				ms1,
+			},
 			maxEntries:          []int{maxEntriesFirstMap},
 			maxTotalMemoryUsage: uint64(maxSize),
 		}
@@ -59,14 +65,16 @@ func TestMapSlice(t *testing.T) {
 			ms.put(key, nil, 0)
 		}
 
-		// Put in the same elements twice to test that the map slice won't hold duplicates.
+		// Put in the same elements twice to test that the map slice
+		// won't hold duplicates.
 		for _, key := range test.keys {
 			m[key] = nil
 			ms.put(key, nil, 0)
 		}
 
 		if len(m) != ms.length() {
-			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+			t.Fatalf("expected len of %d, got %d", len(m),
+				ms.length())
 		}
 
 		// Delete the first element in the first map.
@@ -79,29 +87,34 @@ func TestMapSlice(t *testing.T) {
 
 		// Check that the duplicate didn't make it in.
 		if len(m) != ms.length() {
-			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+			t.Fatalf("expected len of %d, got %d", len(m),
+				ms.length())
 		}
 
 		ms.put(test.keys[0], &UtxoEntry{}, 0)
 		m[test.keys[0]] = &UtxoEntry{}
 
 		if len(m) != ms.length() {
-			t.Fatalf("expected len of %d, got %d", len(m), ms.length())
+			t.Fatalf("expected len of %d, got %d", len(m),
+				ms.length())
 		}
 
 		for _, key := range test.keys {
 			expected, found := m[key]
 			if !found {
-				t.Fatalf("expected key %s to exist in the go map", key.String())
+				t.Fatalf("expected key %s to exist in the go "+
+					"map", key.String())
 			}
 
 			got, found := ms.get(key)
 			if !found {
-				t.Fatalf("expected key %s to exist in the map slice", key.String())
+				t.Fatalf("expected key %s to exist in the map "+
+					"slice", key.String())
 			}
 
 			if !reflect.DeepEqual(got, expected) {
-				t.Fatalf("expected value of %v, got %v", expected, got)
+				t.Fatalf("expected value of %v, got %v",
+					expected, got)
 			}
 		}
 	}
@@ -116,12 +129,16 @@ func TestMapsliceConcurrency(t *testing.T) {
 		{
 			keys: func() []wire.OutPoint {
 				outPoints := make([]wire.OutPoint, 10000)
-				for i := uint32(0); i < uint32(len(outPoints)); i++ {
+				for i := uint32(0); i < uint32(
+					len(outPoints),
+				); i++ {
 					var buf [4]byte
 					binary.BigEndian.PutUint32(buf[:], i)
 					hash := sha256.Sum256(buf[:])
 
-					op := wire.OutPoint{Hash: hash, Index: i}
+					op := wire.OutPoint{
+						Hash: hash, Index: i,
+					}
 					outPoints[i] = op
 				}
 				return outPoints
@@ -130,12 +147,14 @@ func TestMapsliceConcurrency(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		maxSize := calculateRoughMapSize(1000, bucketSize)
+		maxSize := mapSize(1000, groupSize)
 
 		maxEntriesFirstMap := 500
 		ms1 := make(map[wire.OutPoint]*UtxoEntry, maxEntriesFirstMap)
 		ms := mapSlice{
-			maps:                []map[wire.OutPoint]*UtxoEntry{ms1},
+			maps: []map[wire.OutPoint]*UtxoEntry{
+				ms1,
+			},
 			maxEntries:          []int{maxEntriesFirstMap},
 			maxTotalMemoryUsage: uint64(maxSize),
 		}
@@ -194,8 +213,8 @@ func TestMapsliceConcurrency(t *testing.T) {
 	}
 }
 
-// getValidP2PKHScript returns a valid P2PKH script.  Useful as unspendables cannot be
-// added to the cache.
+// getValidP2PKHScript returns a valid P2PKH script. Useful as unspendables
+// cannot be added to the cache.
 func getValidP2PKHScript() []byte {
 	validP2PKHScript := []byte{
 		// OP_DUP
@@ -216,8 +235,8 @@ func getValidP2PKHScript() []byte {
 	return validP2PKHScript
 }
 
-// outpointFromInt generates an outpoint from an int by hashing the int and making
-// the given int the index.
+// outpointFromInt generates an outpoint from an int by hashing the int and
+// making the given int the index.
 func outpointFromInt(i int) wire.OutPoint {
 	// Boilerplate to create an outpoint.
 	var buf [4]byte
@@ -227,6 +246,13 @@ func outpointFromInt(i int) wire.OutPoint {
 }
 
 func TestUtxoCacheEntrySize(t *testing.T) {
+	vTxOutP2PKH := func(value int64) *wire.TxOut {
+		return &wire.TxOut{
+			Value:    value,
+			PkScript: getValidP2PKHScript(),
+		}
+	}
+
 	type block struct {
 		txOuts []*wire.TxOut
 		outOps []wire.OutPoint
@@ -243,7 +269,7 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 				return []block{
 					{
 						txOuts: []*wire.TxOut{
-							{Value: 10000, PkScript: getValidP2PKHScript()},
+							vTxOutP2PKH(10000),
 						},
 						outOps: []wire.OutPoint{
 							outpointFromInt(0),
@@ -262,7 +288,7 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 
 					block := block{
 						txOuts: []*wire.TxOut{
-							{Value: 10000, PkScript: getValidP2PKHScript()},
+							vTxOutP2PKH(10000),
 						},
 						outOps: []wire.OutPoint{
 							op,
@@ -292,7 +318,7 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 
 					block := block{
 						txOuts: []*wire.TxOut{
-							{Value: 1000, PkScript: getValidP2PKHScript()},
+							vTxOutP2PKH(1000),
 						},
 						outOps: []wire.OutPoint{
 							op,
@@ -313,13 +339,16 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Size is just something big enough so that the mapslice doesn't
-		// run out of memory.
+		// Size is just something big enough so that the mapslice
+		// doesn't run out of memory.
 		s := newUtxoCache(nil, 1*1024*1024)
 
 		for height, block := range test.blocks {
 			for i, out := range block.txOuts {
-				s.addTxOut(block.outOps[i], out, true, int32(height))
+				s.addTxOut(
+					block.outOps[i], out, true,
+					int32(height),
+				)
 			}
 
 			for _, in := range block.txIns {
@@ -329,7 +358,8 @@ func TestUtxoCacheEntrySize(t *testing.T) {
 
 		if s.totalEntryMemory != test.expectedSize {
 			t.Errorf("Failed test %s. Expected size of %d, got %d",
-				test.name, test.expectedSize, s.totalEntryMemory)
+				test.name, test.expectedSize,
+				s.totalEntryMemory)
 		}
 	}
 }
@@ -342,15 +372,16 @@ func assertConsistencyState(chain *BlockChain, hash *chainhash.Hash) error {
 		return
 	})
 	if err != nil {
-		return fmt.Errorf("Error fetching utxo state consistency: %v", err)
+		return fmt.Errorf("Error fetching utxo state consistency: %v",
+			err)
 	}
 	actualHash, err := chainhash.NewHash(bytes)
 	if err != nil {
 		return err
 	}
 	if !actualHash.IsEqual(hash) {
-		return fmt.Errorf("Unexpected consistency hash: %v instead of %v",
-			actualHash, hash)
+		return fmt.Errorf("Unexpected consistency hash: %v instead of "+
+			"%v", actualHash, hash)
 	}
 
 	return nil
@@ -367,7 +398,8 @@ func assertNbEntriesOnDisk(chain *BlockChain, expectedNumber int) error {
 			nb++
 			_, err := deserializeUtxoEntry(cursor.Value())
 			if err != nil {
-				return fmt.Errorf("Failed to deserialize entry: %v", err)
+				return fmt.Errorf("Failed to deserialize "+
+					"entry: %v", err)
 			}
 		}
 		return nil
@@ -376,8 +408,8 @@ func assertNbEntriesOnDisk(chain *BlockChain, expectedNumber int) error {
 		return fmt.Errorf("Error fetching utxo entries: %v", err)
 	}
 	if nb != expectedNumber {
-		return fmt.Errorf("Expected %d elements in the UTXO set, but found %d",
-			expectedNumber, nb)
+		return fmt.Errorf("Expected %d elements in the UTXO set, but "+
+			"found %d", expectedNumber, nb)
 	}
 
 	return nil
@@ -386,16 +418,20 @@ func assertNbEntriesOnDisk(chain *BlockChain, expectedNumber int) error {
 // utxoCacheTestChain creates a test BlockChain to be used for utxo cache tests.
 // It uses the regression test parameters, a coin matutiry of 1 block and sets
 // the cache size limit to 10 MiB.
-func utxoCacheTestChain(testName string) (*BlockChain, *chaincfg.Params, func()) {
+func utxoCacheTestChain(
+	testName string) (*BlockChain, *chaincfg.Params, func()) {
+
 	params := chaincfg.RegressionNetParams
 	chain, tearDown, err := chainSetup(testName, &params)
 	if err != nil {
-		panic(fmt.Sprintf("error loading blockchain with database: %v", err))
+		panic(fmt.Sprintf("error loading blockchain with database: %v",
+			err))
 	}
 
 	chain.TstSetCoinbaseMaturity(1)
 	chain.utxoCache.maxTotalMemoryUsage = 10 * 1024 * 1024
-	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.maxTotalMemoryUsage
+	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.
+		maxTotalMemoryUsage
 
 	return chain, &params, tearDown
 }
@@ -421,7 +457,8 @@ func TestUtxoCacheFlush(t *testing.T) {
 	// LastFlushHash starts with genesis.
 	if cache.lastFlushHash != *params.GenesisHash {
 		t.Fatalf("lastFlushHash before first flush expected to be "+
-			"genesis block hash, instead was %v", cache.lastFlushHash)
+			"genesis block hash, instead was %v",
+			cache.lastFlushHash)
 	}
 
 	// First, add 10 utxos without flushing.
@@ -431,19 +468,23 @@ func TestUtxoCacheFlush(t *testing.T) {
 		outPoints[i] = op
 
 		// Add the txout.
-		txOut := wire.TxOut{Value: 10000, PkScript: getValidP2PKHScript()}
+		txOut := wire.TxOut{
+			Value: 10000, PkScript: getValidP2PKHScript(),
+		}
 		cache.addTxOut(op, &txOut, true, int32(i))
 	}
 
 	if cache.cachedEntries.length() != len(outPoints) {
-		t.Fatalf("Expected 10 entries, has %d instead", cache.cachedEntries.length())
+		t.Fatalf("Expected 10 entries, has %d instead",
+			cache.cachedEntries.length())
 	}
 
 	// All entries should be fresh and modified.
 	for _, m := range cache.cachedEntries.maps {
 		for outpoint, entry := range m {
 			if entry == nil {
-				t.Fatalf("Unexpected nil entry found for %v", outpoint)
+				t.Fatalf("Unexpected nil entry found for %v",
+					outpoint)
 			}
 			if !entry.isModified() {
 				t.Fatal("Entry should be marked modified")
@@ -456,7 +497,8 @@ func TestUtxoCacheFlush(t *testing.T) {
 
 	// Spend the last outpoint and pop it off from the outpoints slice.
 	var spendOp wire.OutPoint
-	spendOp, outPoints = outPoints[len(outPoints)-1], outPoints[:len(outPoints)-1]
+	spendOp, outPoints = outPoints[len(outPoints)-1],
+		outPoints[:len(outPoints)-1]
 	cache.addTxIn(&wire.TxIn{PreviousOutPoint: spendOp}, nil)
 
 	if cache.cachedEntries.length() != len(outPoints) {
@@ -483,7 +525,8 @@ func TestUtxoCacheFlush(t *testing.T) {
 		t.Fatalf("unexpected error while flushing cache: %v", err)
 	}
 	if cache.cachedEntries.length() != 0 {
-		t.Fatalf("Expected 0 entries, has %d instead", cache.cachedEntries.length())
+		t.Fatalf("Expected 0 entries, has %d instead",
+			cache.cachedEntries.length())
 	}
 
 	err = assertConsistencyState(chain, tip.Hash())
@@ -511,11 +554,13 @@ func TestUtxoCacheFlush(t *testing.T) {
 		}
 	}
 
-	// Check that the fetched entries in the cache are not marked fresh and modified.
+	// Check that the fetched entries in the cache are not marked fresh and
+	// modified.
 	for _, m := range cache.cachedEntries.maps {
 		for outpoint, elem := range m {
 			if elem == nil {
-				t.Fatalf("Unexpected nil entry found for %v", outpoint)
+				t.Fatalf("Unexpected nil entry found for %v",
+					outpoint)
 			}
 			if elem.isFresh() {
 				t.Fatal("Entry should not be marked fresh")
@@ -529,13 +574,16 @@ func TestUtxoCacheFlush(t *testing.T) {
 	// Spend 5 utxos.
 	prevLen := len(outPoints)
 	for i := 0; i < 5; i++ {
-		spendOp, outPoints = outPoints[len(outPoints)-1], outPoints[:len(outPoints)-1]
+		spendOp, outPoints = outPoints[len(outPoints)-1],
+			outPoints[:len(outPoints)-1]
 		cache.addTxIn(&wire.TxIn{PreviousOutPoint: spendOp}, nil)
 	}
 
-	// Should still have the entries in cache so they can be flushed to disk.
+	// Should still have the entries in cache so they can be flushed to
+	// disk.
 	if cache.cachedEntries.length() != prevLen {
-		t.Fatalf("Expected 10 entries, has %d instead", cache.cachedEntries.length())
+		t.Fatalf("Expected 10 entries, has %d instead",
+			cache.cachedEntries.length())
 	}
 
 	// Flush.
@@ -546,7 +594,8 @@ func TestUtxoCacheFlush(t *testing.T) {
 		t.Fatalf("unexpected error while flushing cache: %v", err)
 	}
 	if cache.cachedEntries.length() != 0 {
-		t.Fatalf("Expected 0 entries, has %d instead", cache.cachedEntries.length())
+		t.Fatalf("Expected 0 entries, has %d instead",
+			cache.cachedEntries.length())
 	}
 
 	err = assertConsistencyState(chain, tip.Hash())
@@ -567,7 +616,9 @@ func TestUtxoCacheFlush(t *testing.T) {
 		outPoints1[i] = op
 
 		// Add the txout.
-		txOut := wire.TxOut{Value: 10000, PkScript: getValidP2PKHScript()}
+		txOut := wire.TxOut{
+			Value: 10000, PkScript: getValidP2PKHScript(),
+		}
 		cache.addTxOut(op, &txOut, true, int32(i+prevLen))
 	}
 	if cache.cachedEntries.length() != len(outPoints1) {
@@ -575,7 +626,7 @@ func TestUtxoCacheFlush(t *testing.T) {
 			len(outPoints1), cache.cachedEntries.length())
 	}
 
-	// Attempt to flush with flush periodic.  Shouldn't flush.
+	// Attempt to flush with flush periodic. Shouldn't flush.
 	err = chain.db.Update(func(dbTx database.Tx) error {
 		return cache.flush(dbTx, FlushPeriodic, chain.stateSnapshot)
 	})
@@ -590,7 +641,7 @@ func TestUtxoCacheFlush(t *testing.T) {
 	// Arbitrarily set the last flush time to 6 minutes ago.
 	cache.lastFlushTime = time.Now().Add(-time.Minute * 6)
 
-	// Attempt to flush with flush periodic.  Should flush now.
+	// Attempt to flush with flush periodic. Should flush now.
 	err = chain.db.Update(func(dbTx database.Tx) error {
 		return cache.flush(dbTx, FlushPeriodic, chain.stateSnapshot)
 	})
@@ -598,7 +649,8 @@ func TestUtxoCacheFlush(t *testing.T) {
 		t.Fatalf("unexpected error while flushing cache: %v", err)
 	}
 	if cache.cachedEntries.length() != 0 {
-		t.Fatalf("Expected 0 entries, has %d instead", cache.cachedEntries.length())
+		t.Fatalf("Expected 0 entries, has %d instead",
+			cache.cachedEntries.length())
 	}
 
 	err = assertConsistencyState(chain, tip.Hash())
@@ -614,7 +666,7 @@ func TestUtxoCacheFlush(t *testing.T) {
 func TestFlushNeededAfterPrune(t *testing.T) {
 	// Construct a synthetic block chain with a block index consisting of
 	// the following structure.
-	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16  -> 17  -> 18
+	// 	genesis -> 1 -> 2 -> ... -> 15 -> 16 -> 17 -> 18
 	tip := tstTip
 	chain := newFakeChain(&chaincfg.MainNetParams)
 	chain.utxoCache = newUtxoCache(nil, 0)
@@ -632,19 +684,24 @@ func TestFlushNeededAfterPrune(t *testing.T) {
 		expected      bool
 	}{
 		{
-			name: "deleted block up to height 9, last flush hash at block 10",
+			name: "deleted block up to height 9, last flush hash " +
+				"at block 10",
 			delHashes: func() []chainhash.Hash {
 				delBlockHashes := make([]chainhash.Hash, 0, 9)
 				for i := range branchNodes {
 					if branchNodes[i].height < 10 {
-						delBlockHashes = append(delBlockHashes, branchNodes[i].hash)
+						delBlockHashes = append(
+							delBlockHashes,
+							branchNodes[i].hash,
+						)
 					}
 				}
 
 				return delBlockHashes
 			}(),
 			lastFlushHash: func() chainhash.Hash {
-				// Just some sanity checking to make sure the height is 10.
+				// Just some sanity checking to make sure the
+				// height is 10.
 				if branchNodes[9].height != 10 {
 					panic("was looking for height 10")
 				}
@@ -653,18 +710,23 @@ func TestFlushNeededAfterPrune(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "deleted blocks up to height 10, last flush hash at block 10",
+			name: "deleted blocks up to height 10, last flush " +
+				"hash at block 10",
 			delHashes: func() []chainhash.Hash {
 				delBlockHashes := make([]chainhash.Hash, 0, 10)
 				for i := range branchNodes {
 					if branchNodes[i].height < 11 {
-						delBlockHashes = append(delBlockHashes, branchNodes[i].hash)
+						delBlockHashes = append(
+							delBlockHashes,
+							branchNodes[i].hash,
+						)
 					}
 				}
 				return delBlockHashes
 			}(),
 			lastFlushHash: func() chainhash.Hash {
-				// Just some sanity checking to make sure the height is 10.
+				// Just some sanity checking to make sure the
+				// height is 10.
 				if branchNodes[9].height != 10 {
 					panic("was looking for height 10")
 				}
@@ -673,18 +735,21 @@ func TestFlushNeededAfterPrune(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "deleted block height 17, last flush hash at block 5",
+			name: "deleted block height 17, last flush hash at " +
+				"block 5",
 			delHashes: func() []chainhash.Hash {
 				delBlockHashes := make([]chainhash.Hash, 1)
 				delBlockHashes[0] = branchNodes[16].hash
-				// Just some sanity checking to make sure the height is 10.
+				// Just some sanity checking to make sure the
+				// height is 10.
 				if branchNodes[16].height != 17 {
 					panic("was looking for height 17")
 				}
 				return delBlockHashes
 			}(),
 			lastFlushHash: func() chainhash.Hash {
-				// Just some sanity checking to make sure the height is 10.
+				// Just some sanity checking to make sure the
+				// height is 10.
 				if branchNodes[4].height != 5 {
 					panic("was looking for height 5")
 				}
@@ -693,18 +758,21 @@ func TestFlushNeededAfterPrune(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "deleted block height 3, last flush hash at block 4",
+			name: "deleted block height 3, last flush hash at " +
+				"block 4",
 			delHashes: func() []chainhash.Hash {
 				delBlockHashes := make([]chainhash.Hash, 1)
 				delBlockHashes[0] = branchNodes[2].hash
-				// Just some sanity checking to make sure the height is 10.
+				// Just some sanity checking to make sure the
+				// height is 10.
 				if branchNodes[2].height != 3 {
 					panic("was looking for height 3")
 				}
 				return delBlockHashes
 			}(),
 			lastFlushHash: func() chainhash.Hash {
-				// Just some sanity checking to make sure the height is 10.
+				// Just some sanity checking to make sure the
+				// height is 10.
 				if branchNodes[3].height != 4 {
 					panic("was looking for height 4")
 				}
@@ -722,24 +790,28 @@ func TestFlushNeededAfterPrune(t *testing.T) {
 		}
 
 		if got != test.expected {
-			t.Fatalf("for test %s, expected need flush to return %v but got %v",
-				test.name, test.expected, got)
+			t.Fatalf("for test %s, expected need flush to return "+
+				"%v but got %v", test.name, test.expected, got)
 		}
 	}
 }
 
 func TestFlushOnPrune(t *testing.T) {
-	chain, tearDown, err := chainSetup("TestFlushOnPrune", &chaincfg.MainNetParams)
+	chain, tearDown, err := chainSetup(
+		"TestFlushOnPrune", &chaincfg.MainNetParams,
+	)
 	if err != nil {
-		panic(fmt.Sprintf("error loading blockchain with database: %v", err))
+		panic(fmt.Sprintf("error loading blockchain with database: %v",
+			err))
 	}
 	defer tearDown()
 
 	chain.utxoCache.maxTotalMemoryUsage = 10 * 1024 * 1024
-	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.maxTotalMemoryUsage
+	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.
+		maxTotalMemoryUsage
 
-	// Set the maxBlockFileSize and the prune target small so that we can trigger a
-	// prune to happen.
+	// Set the maxBlockFileSize and the prune target small so that we can
+	// trigger a prune to happen.
 	maxBlockFileSize := uint32(8192)
 	chain.pruneTarget = uint64(maxBlockFileSize) * 2
 
@@ -750,16 +822,16 @@ func TestFlushOnPrune(t *testing.T) {
 	}
 
 	syncBlocks := func() {
-		// Modify block 1 to be a different hash.  This is to artificially
-		// create a stale branch in the chain.
+		// Modify block 1 to be a different hash. This is to
+		// artificially create a stale branch in the chain.
 		staleMsgBlock := blocks[1].MsgBlock().Copy()
 		staleMsgBlock.Header.Nonce = 0
 		staleBlock := btcutil.NewBlock(staleMsgBlock)
 
 		// Add the stale block here to create a chain view like so. The
 		// block will be the main chain at first but become stale as we
-		// keep adding blocks.  BFNoPoWCheck is given as the pow check will
-		// fail.
+		// keep adding blocks. BFNoPoWCheck is given as the pow check
+		// will fail.
 		//
 		// (genesis block) -> 1 -> 2 -> 3 -> ...
 		//                \-> 1a
@@ -776,7 +848,8 @@ func TestFlushOnPrune(t *testing.T) {
 			_, _, err = chain.ProcessBlock(block, BFNone)
 			if err != nil {
 				t.Fatalf("Failed to process block %v(%v). %v",
-					block.Hash().String(), block.Height(), err)
+					block.Hash().String(), block.Height(),
+					err)
 			}
 		}
 	}
@@ -784,7 +857,8 @@ func TestFlushOnPrune(t *testing.T) {
 	// Sync the chain.
 	ffldb.TstRunWithMaxBlockFileSize(chain.db, maxBlockFileSize, syncBlocks)
 
-	// Function that errors out if the block that should exist doesn't exist.
+	// Function that errors out if the block that should exist doesn't
+	// exist.
 	shouldExist := func(dbTx database.Tx, blockHash *chainhash.Hash) error {
 		bytes, err := dbTx.FetchBlock(blockHash)
 		if err != nil {
@@ -792,26 +866,32 @@ func TestFlushOnPrune(t *testing.T) {
 		}
 		block, err := btcutil.NewBlockFromBytes(bytes)
 		if err != nil {
-			return fmt.Errorf("didn't find block %v. %v", blockHash, err)
+			return fmt.Errorf("didn't find block %v. %v", blockHash,
+				err)
 		}
 
 		if !block.Hash().IsEqual(blockHash) {
-			return fmt.Errorf("expected to find block %v but got %v",
-				blockHash, block.Hash())
+			return fmt.Errorf("expected to find block %v but got "+
+				"%v", blockHash, block.Hash())
 		}
 
 		return nil
 	}
 
 	// Function that errors out if the block that shouldn't exist exists.
-	shouldNotExist := func(dbTx database.Tx, blockHash *chainhash.Hash) error {
-		bytes, err := dbTx.FetchBlock(chaincfg.MainNetParams.GenesisHash)
+	shouldNotExist := func(dbTx database.Tx,
+		blockHash *chainhash.Hash) error {
+
+		bytes, err := dbTx.FetchBlock(
+			chaincfg.MainNetParams.GenesisHash,
+		)
 		if err == nil {
-			return fmt.Errorf("expected block %s to be pruned", blockHash.String())
+			return fmt.Errorf("expected block %s to be pruned",
+				blockHash.String())
 		}
 		if len(bytes) != 0 {
-			return fmt.Errorf("expected block %s to be pruned but got %v",
-				blockHash, bytes)
+			return fmt.Errorf("expected block %s to be pruned but "+
+				"got %v", blockHash, bytes)
 		}
 
 		return nil
@@ -822,9 +902,12 @@ func TestFlushOnPrune(t *testing.T) {
 		exist := false
 		for _, block := range blocks {
 			// Blocks up to the last flush hash should not exist.
-			// The utxocache is big enough so that it shouldn't flush
-			// on it being full.  It should only flush on prunes.
-			if block.Hash().IsEqual(&chain.utxoCache.lastFlushHash) {
+			// The utxocache is big enough so that it shouldn't
+			// flush on it being full. It should only flush on
+			// prunes.
+			if block.Hash().IsEqual(
+				&chain.utxoCache.lastFlushHash,
+			) {
 				exist = true
 			}
 
@@ -849,15 +932,17 @@ func TestFlushOnPrune(t *testing.T) {
 }
 
 func TestInitConsistentState(t *testing.T) {
-	//  Boilerplate for creating a chain.
+	// Boilerplate for creating a chain.
 	dbName := "TestFlushOnPrune"
 	chain, tearDown, err := chainSetup(dbName, &chaincfg.MainNetParams)
 	if err != nil {
-		panic(fmt.Sprintf("error loading blockchain with database: %v", err))
+		panic(fmt.Sprintf("error loading blockchain with database: %v",
+			err))
 	}
 	defer tearDown()
 	chain.utxoCache.maxTotalMemoryUsage = 10 * 1024 * 1024
-	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.maxTotalMemoryUsage
+	chain.utxoCache.cachedEntries.maxTotalMemoryUsage = chain.utxoCache.
+		maxTotalMemoryUsage
 
 	// Read blocks from the file.
 	blocks, err := loadBlocks("blk_0_to_14131.dat")
@@ -865,7 +950,7 @@ func TestInitConsistentState(t *testing.T) {
 		t.Fatalf("failed to read block from file. %v", err)
 	}
 
-	// Sync up to height 13,000.  Flush the utxocache at height 11_000.
+	// Sync up to height 13,000. Flush the utxocache at height 11_000.
 	cacheFlushHeight := 9000
 	initialSyncHeight := 12_000
 	for i, block := range blocks {
@@ -880,7 +965,8 @@ func TestInitConsistentState(t *testing.T) {
 		}
 
 		if !isMainChain {
-			t.Fatalf("expected block %s to be on the main chain", block.Hash())
+			t.Fatalf("expected block %s to be on the main chain",
+				block.Hash())
 		}
 
 		if i == cacheFlushHeight {
@@ -896,11 +982,13 @@ func TestInitConsistentState(t *testing.T) {
 
 	// Sanity check.
 	if chain.BestSnapshot().Height != int32(initialSyncHeight) {
-		t.Fatalf("expected the chain to sync up to height %d", initialSyncHeight)
+		t.Fatalf("expected the chain to sync up to height %d",
+			initialSyncHeight)
 	}
 
-	// Close the database without flushing the utxocache.  This leaves the
-	// chaintip at height 13,000 but the utxocache consistent state at 11,000.
+	// Close the database without flushing the utxocache. This leaves the
+	// chaintip at height 13,000 but the utxocache consistent state at
+	// 11,000.
 	err = chain.db.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -934,7 +1022,7 @@ func TestInitConsistentState(t *testing.T) {
 			blocks[cacheFlushHeight].Hash(), statusHash)
 	}
 
-	// Call InitConsistentState.  This will make the utxocache catch back
+	// Call InitConsistentState. This will make the utxocache catch back
 	// up to the tip.
 	err = chain.InitConsistentState(chain.bestChain.tip(), nil)
 	if err != nil {
@@ -952,7 +1040,8 @@ func TestInitConsistentState(t *testing.T) {
 		}
 
 		if !isMainChain {
-			t.Fatalf("expected block %s to be on the main chain", block.Hash())
+			t.Fatalf("expected block %s to be on the main chain",
+				block.Hash())
 		}
 	}
 
