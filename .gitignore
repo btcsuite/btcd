@@ -18,6 +18,7 @@ btcd.db
 _obj
 _test
 vendor
+blockchain/testdbs
 
 # Architecture specific extensions/prefixes
 *.[568vq]
