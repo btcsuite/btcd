@@ -4,19 +4,114 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
+	_ "github.com/btcsuite/btcd/database/ffldb"
+	"github.com/btcsuite/btcd/integration/rpctest"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/mempool/mempooltest"
+	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	disableRPCChainLogsOnce sync.Once
+)
+
+// newTestRPCChain returns a fresh mainnet chain backed by a temporary
+// database, along with a teardown func that closes the database.
+func newTestRPCChain(t *testing.T) (*blockchain.BlockChain, func()) {
+	t.Helper()
+
+	paramsCopy := chaincfg.MainNetParams
+	return newTestRPCChainWithParams(t, &paramsCopy)
+}
+
+// newTestRPCChainWithParams returns a fresh chain for the given params backed by
+// a temporary database, along with a teardown func that closes the database.
+func newTestRPCChainWithParams(t *testing.T, params *chaincfg.Params) (*blockchain.BlockChain, func()) {
+	t.Helper()
+
+	// These tests construct chain instances directly without going through the
+	// normal btcd startup path that initializes the global log rotator.
+	disableRPCChainLogsOnce.Do(func() {
+		blockchain.DisableLog()
+		database.DisableLog()
+	})
+
+	dbPath := filepath.Join(t.TempDir(), "rpcserver")
+	db, err := database.Create("ffldb", dbPath, params.Net)
+	require.NoError(t, err)
+
+	paramsCopy := *params
+	for i := range paramsCopy.Deployments {
+		deployment := &paramsCopy.Deployments[i]
+		if starter, ok := deployment.DeploymentStarter.(*chaincfg.MedianTimeDeploymentStarter); ok {
+			deployment.DeploymentStarter = chaincfg.NewMedianTimeDeploymentStarter(starter.StartTime())
+		}
+		if ender, ok := deployment.DeploymentEnder.(*chaincfg.MedianTimeDeploymentEnder); ok {
+			deployment.DeploymentEnder = chaincfg.NewMedianTimeDeploymentEnder(ender.EndTime())
+		}
+	}
+
+	chain, err := blockchain.New(&blockchain.Config{
+		DB:          db,
+		ChainParams: &paramsCopy,
+		TimeSource:  blockchain.NewMedianTime(),
+		SigCache:    txscript.NewSigCache(1000),
+	})
+	require.NoError(t, err)
+
+	return chain, func() {
+		db.Close()
+	}
+}
+
+// newTestRPCServer returns an rpcServer backed by a fresh mainnet chain, along
+// with a teardown func that closes the underlying database.
+func newTestRPCServer(t *testing.T) (*rpcServer, func()) {
+	t.Helper()
+
+	chain, teardown := newTestRPCChain(t)
+	return &rpcServer{cfg: rpcserverConfig{Chain: chain}}, teardown
+}
+
+// encodeMerkleProof serializes the passed merkle block and returns it as a hex
+// string, as expected by verifytxoutproof.
+func encodeMerkleProof(t *testing.T, proof *wire.MsgMerkleBlock) string {
+	t.Helper()
+
+	var encoded bytes.Buffer
+	err := proof.BtcEncode(&encoded, wire.ProtocolVersion, wire.LatestEncoding)
+	require.NoError(t, err)
+	return hex.EncodeToString(encoded.Bytes())
+}
+
+// genesisProof returns a merkle proof for the coinbase transaction of the
+// mainnet genesis block, along with that transaction's hash string.
+func genesisProof() (*wire.MsgMerkleBlock, string) {
+	genesis := chaincfg.MainNetParams.GenesisBlock
+	txHash := genesis.Transactions[0].TxHash()
+	proof := &wire.MsgMerkleBlock{
+		Header:       genesis.Header,
+		Transactions: 1,
+		Hashes:       []*chainhash.Hash{&txHash},
+		Flags:        []byte{0x01},
+	}
+	return proof, txHash.String()
+}
 
 // TestHandleTestMempoolAcceptFailDecode checks that when invalid hex string is
 // used as the raw txns, the corresponding error is returned.
@@ -583,6 +678,314 @@ func TestHandleTestMempoolAcceptFees(t *testing.T) {
 			mm.AssertExpectations(t)
 		})
 	}
+}
+
+// TestHandleGetTxOutProof checks that handleGetTxOutProof builds a proof for a
+// transaction in an explicitly provided block, and that the proof round-trips
+// through handleVerifyTxOutProof.
+func TestHandleGetTxOutProof(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	s, teardown := newTestRPCServer(t)
+	defer teardown()
+
+	genesis := chaincfg.MainNetParams.GenesisBlock
+	txHash := genesis.Transactions[0].TxHash().String()
+	blockHash := genesis.BlockHash().String()
+
+	result, err := handleGetTxOutProof(s, btcjson.NewGetTxOutProofCmd(
+		[]string{txHash}, btcjson.String(blockHash),
+	), make(chan struct{}))
+	require.NoError(err)
+
+	proofHex, ok := result.(string)
+	require.True(ok)
+	require.NotEmpty(proofHex)
+
+	verified, err := handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd(proofHex), make(chan struct{}))
+	require.NoError(err)
+	require.Equal([]string{txHash}, verified)
+}
+
+// TestHandleGetTxOutProofWithoutBlockHash checks that handleGetTxOutProof
+// locates the containing block through the UTXO set when no block hash is
+// given, and that the resulting proof verifies.
+func TestHandleGetTxOutProofWithoutBlockHash(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	paramsCopy := chaincfg.RegressionNetParams
+	chain, teardown := newTestRPCChainWithParams(t, &paramsCopy)
+	defer teardown()
+	s := &rpcServer{cfg: rpcserverConfig{Chain: chain}}
+
+	miningAddr, err := address.NewAddressPubKeyHash(make([]byte, 20), &paramsCopy)
+	require.NoError(err)
+
+	block, err := rpctest.CreateBlock(nil, nil, 4, time.Time{}, miningAddr, nil, &paramsCopy)
+	require.NoError(err)
+
+	isMainChain, isOrphan, err := chain.ProcessBlock(block, blockchain.BFNone)
+	require.NoError(err)
+	require.True(isMainChain)
+	require.False(isOrphan)
+
+	txHash := block.Transactions()[0].Hash().String()
+
+	result, err := handleGetTxOutProof(s, btcjson.NewGetTxOutProofCmd(
+		[]string{txHash}, nil,
+	), make(chan struct{}))
+	require.NoError(err)
+
+	proofHex, ok := result.(string)
+	require.True(ok)
+	require.NotEmpty(proofHex)
+
+	verified, err := handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd(proofHex), make(chan struct{}))
+	require.NoError(err)
+	require.Equal([]string{txHash}, verified)
+}
+
+// TestHandleGetTxOutProofErrors checks that handleGetTxOutProof returns the
+// expected RPC error codes for invalid parameters.
+func TestHandleGetTxOutProofErrors(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	s, teardown := newTestRPCServer(t)
+	defer teardown()
+	genesisTxID := chaincfg.MainNetParams.GenesisBlock.Transactions[0].TxHash().String()
+
+	tests := []struct {
+		name            string
+		cmd             *btcjson.GetTxOutProofCmd
+		expectedErrCode btcjson.RPCErrorCode
+	}{
+		{
+			name:            "empty tx list",
+			cmd:             btcjson.NewGetTxOutProofCmd(nil, nil),
+			expectedErrCode: btcjson.ErrRPCInvalidParameter,
+		},
+		{
+			name:            "duplicate tx ids",
+			cmd:             btcjson.NewGetTxOutProofCmd([]string{genesisTxID, genesisTxID}, nil),
+			expectedErrCode: btcjson.ErrRPCInvalidParameter,
+		},
+		{
+			name:            "invalid tx id",
+			cmd:             btcjson.NewGetTxOutProofCmd([]string{"nope"}, nil),
+			expectedErrCode: btcjson.ErrRPCDecodeHexString,
+		},
+		{
+			name:            "invalid block hash",
+			cmd:             btcjson.NewGetTxOutProofCmd([]string{genesisTxID}, btcjson.String("nope")),
+			expectedErrCode: btcjson.ErrRPCDecodeHexString,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := handleGetTxOutProof(s, test.cmd, make(chan struct{}))
+			require.Nil(result)
+			requireRPCErrorCode(t, err, test.expectedErrCode)
+		})
+	}
+}
+
+// TestFindTxOutProofBlockHash checks that findTxOutProofBlockHash returns the
+// first block hash resolved by the lookup, skips unresolved transactions, and
+// propagates lookup errors.
+func TestFindTxOutProofBlockHash(t *testing.T) {
+	t.Parallel()
+
+	blockHash := chainhash.DoubleHashH([]byte("block"))
+	otherHash := chainhash.DoubleHashH([]byte("other-block"))
+	txHashes := []*chainhash.Hash{
+		func() *chainhash.Hash {
+			h := chainhash.DoubleHashH([]byte("tx-1"))
+			return &h
+		}(),
+		func() *chainhash.Hash {
+			h := chainhash.DoubleHashH([]byte("tx-2"))
+			return &h
+		}(),
+		func() *chainhash.Hash {
+			h := chainhash.DoubleHashH([]byte("tx-3"))
+			return &h
+		}(),
+	}
+
+	tests := []struct {
+		name          string
+		lookupResults map[chainhash.Hash]*chainhash.Hash
+		lookupErr     error
+		wantHash      *chainhash.Hash
+		wantErrCode   btcjson.RPCErrorCode
+	}{
+		{
+			name: "uses any resolved hash",
+			lookupResults: map[chainhash.Hash]*chainhash.Hash{
+				*txHashes[0]: nil,
+				*txHashes[1]: &blockHash,
+				*txHashes[2]: nil,
+			},
+			wantHash: &blockHash,
+		},
+		{
+			name: "returns nil when no hashes resolve",
+			lookupResults: map[chainhash.Hash]*chainhash.Hash{
+				*txHashes[0]: nil,
+				*txHashes[1]: nil,
+				*txHashes[2]: nil,
+			},
+		},
+		{
+			name: "uses first resolved hash",
+			lookupResults: map[chainhash.Hash]*chainhash.Hash{
+				*txHashes[0]: &blockHash,
+				*txHashes[1]: &otherHash,
+			},
+			wantHash: &blockHash,
+		},
+		{
+			name:        "propagates lookup error",
+			lookupErr:   errors.New("boom"),
+			wantErrCode: btcjson.ErrRPCMisc,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			resolvedHash, err := findTxOutProofBlockHash(txHashes, func(txHash *chainhash.Hash) (*chainhash.Hash, error) {
+				if test.lookupErr != nil {
+					return nil, &btcjson.RPCError{
+						Code:    btcjson.ErrRPCMisc,
+						Message: test.lookupErr.Error(),
+					}
+				}
+
+				return test.lookupResults[*txHash], nil
+			})
+
+			if test.wantErrCode != 0 {
+				require.Error(t, err)
+				rpcErr, ok := err.(*btcjson.RPCError)
+				require.True(t, ok)
+				require.Equal(t, test.wantErrCode, rpcErr.Code)
+				return
+			}
+
+			require.NoError(t, err)
+			if test.wantHash == nil {
+				require.Nil(t, resolvedHash)
+				return
+			}
+
+			require.NotNil(t, resolvedHash)
+			require.True(t, test.wantHash.IsEqual(resolvedHash))
+		})
+	}
+}
+
+// TestHandleGetTxOutProofMixedBlocks checks that handleGetTxOutProof rejects
+// transactions from different blocks when no block hash is given, matching
+// Bitcoin Core's "Not all transactions found" error.
+func TestHandleGetTxOutProofMixedBlocks(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	paramsCopy := chaincfg.RegressionNetParams
+	chain, teardown := newTestRPCChainWithParams(t, &paramsCopy)
+	defer teardown()
+	s := &rpcServer{cfg: rpcserverConfig{Chain: chain}}
+
+	miningAddr, err := address.NewAddressPubKeyHash(make([]byte, 20), &paramsCopy)
+	require.NoError(err)
+
+	block1, err := rpctest.CreateBlock(nil, nil, 4, time.Time{}, miningAddr, nil, &paramsCopy)
+	require.NoError(err)
+
+	isMainChain, isOrphan, err := chain.ProcessBlock(block1, blockchain.BFNone)
+	require.NoError(err)
+	require.True(isMainChain)
+	require.False(isOrphan)
+
+	block2, err := rpctest.CreateBlock(block1, nil, 4, time.Time{}, miningAddr, nil, &paramsCopy)
+	require.NoError(err)
+
+	isMainChain, isOrphan, err = chain.ProcessBlock(block2, blockchain.BFNone)
+	require.NoError(err)
+	require.True(isMainChain)
+	require.False(isOrphan)
+
+	block1TxHash := block1.Transactions()[0].Hash().String()
+	block2TxHash := block2.Transactions()[0].Hash().String()
+
+	result, err := handleGetTxOutProof(s, btcjson.NewGetTxOutProofCmd(
+		[]string{block1TxHash, block2TxHash}, nil,
+	), make(chan struct{}))
+	require.Nil(result)
+
+	rpcErr, ok := err.(*btcjson.RPCError)
+	require.True(ok)
+	require.Equal(btcjson.ErrRPCInvalidAddressOrKey, rpcErr.Code)
+	require.Equal("Not all transactions found in specified or retrieved block", rpcErr.Message)
+}
+
+// TestHandleVerifyTxOutProof checks that handleVerifyTxOutProof returns the
+// matched transaction hashes for a valid proof of a block in the main chain.
+func TestHandleVerifyTxOutProof(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	s, teardown := newTestRPCServer(t)
+	defer teardown()
+
+	proof, txHash := genesisProof()
+	result, err := handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd(encodeMerkleProof(t, proof)),
+		make(chan struct{}))
+	require.NoError(err)
+	require.Equal([]string{txHash}, result)
+}
+
+// TestHandleVerifyTxOutProofErrors checks that handleVerifyTxOutProof returns
+// errors for invalid hex, undecodable proofs, and proofs of unknown blocks.
+func TestHandleVerifyTxOutProofErrors(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+	s, teardown := newTestRPCServer(t)
+	defer teardown()
+
+	result, err := handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd("zz"), make(chan struct{}))
+	require.Nil(result)
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDecodeHexString)
+
+	result, err = handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd(hex.EncodeToString([]byte{0x01, 0x02})),
+		make(chan struct{}))
+	require.Nil(result)
+	requireRPCErrorCode(t, err, btcjson.ErrRPCDeserialization)
+
+	proof, _ := genesisProof()
+	proof.Header.Timestamp = proof.Header.Timestamp.Add(1)
+	proof.Header.Nonce++
+	result, err = handleVerifyTxOutProof(s,
+		btcjson.NewVerifyTxOutProofCmd(encodeMerkleProof(t, proof)),
+		make(chan struct{}))
+	require.Nil(result)
+	requireRPCErrorCode(t, err, btcjson.ErrRPCBlockNotFound)
 }
 
 // TestGetTxSpendingPrevOut checks that handleGetTxSpendingPrevOut handles the
