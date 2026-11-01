@@ -32,6 +32,14 @@ type NeedsInputser interface {
 	NeedsInputs() bool
 }
 
+// FastBuilder builds an index after the manager catches up earlier indexes.
+// It persists the tip of anything it builds and returns without changing the
+// index when a fast build is not needed.
+type FastBuilder interface {
+	NeedsFastBuild(chain *blockchain.BlockChain) (bool, error)
+	FastBuild(chain *blockchain.BlockChain, interrupt <-chan struct{}) error
+}
+
 // Indexer provides a generic interface for an indexer that is managed by an
 // index manager such as the Manager type provided by this package.
 type Indexer interface {

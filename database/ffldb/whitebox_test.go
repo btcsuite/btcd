@@ -21,9 +21,34 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	ldberrors "github.com/syndtr/goleveldb/leveldb/errors"
 )
+
+// TestFlush ensures Flush writes pending cache entries to the backing database.
+func TestFlush(t *testing.T) {
+	dbPath := t.TempDir()
+	databaseHandle, err := database.Create(dbType, dbPath, blockDataNet)
+	require.NoError(t, err)
+	defer databaseHandle.Close()
+
+	err = databaseHandle.Update(func(tx database.Tx) error {
+		bucket, err := tx.Metadata().CreateBucket([]byte("flush"))
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte("key"), []byte("value"))
+	})
+	require.NoError(t, err)
+
+	idb := databaseHandle.(*db)
+	require.True(t, idb.cache.hasEntries(),
+		"metadata update did not enter the cache")
+	require.NoError(t, idb.Flush())
+	require.False(t, idb.cache.hasEntries(),
+		"Flush left metadata entries in the cache")
+}
 
 var (
 	// blockDataNet is the expected network in the test block data.

@@ -610,6 +610,9 @@ type AddrIndex struct {
 	db          database.DB
 	chainParams *chaincfg.Params
 
+	// dataDir is the directory the fast build stages its work in.
+	dataDir string
+
 	// The following fields are used to quickly link transactions and
 	// addresses that have not been included into a block yet when an
 	// address index is being maintained.  The are protected by the
@@ -640,15 +643,6 @@ var _ NeedsInputser = (*AddrIndex)(nil)
 // This implements the NeedsInputser interface.
 func (idx *AddrIndex) NeedsInputs() bool {
 	return true
-}
-
-// Init is only provided to satisfy the Indexer interface as there is nothing to
-// initialize for this index.
-//
-// This is part of the Indexer interface.
-func (idx *AddrIndex) Init() error {
-	// Nothing to do.
-	return nil
 }
 
 // Key returns the database key to use for the index as a byte slice.
@@ -971,17 +965,34 @@ func (idx *AddrIndex) UnconfirmedTxnsForAddress(addr address.Address) []*btcutil
 	return nil
 }
 
-// NewAddrIndex returns a new instance of an indexer that is used to create a
-// mapping of all addresses in the blockchain to the respective transactions
-// that involve them.
+// NewAddrIndex returns a new address index that uses incremental catchup.  It
+// does not look for fast build staging, so it must not open a database whose
+// address index has an unfinished fast build.
 //
 // It implements the Indexer interface which plugs into the IndexManager that in
 // turn is used by the blockchain package.  This allows the index to be
 // seamlessly maintained along with the chain.
 func NewAddrIndex(db database.DB, chainParams *chaincfg.Params) *AddrIndex {
+	return newAddrIndex(db, chainParams, "")
+}
+
+// NewAddrIndexWithDataDir returns a new address index that uses dataDir for
+// resumable fast-build staging.
+func NewAddrIndexWithDataDir(db database.DB, chainParams *chaincfg.Params,
+	dataDir string) *AddrIndex {
+
+	return newAddrIndex(db, chainParams, dataDir)
+}
+
+// newAddrIndex returns a new address index with the provided staging data
+// directory.  An empty data directory disables fast builds.
+func newAddrIndex(db database.DB, chainParams *chaincfg.Params,
+	dataDir string) *AddrIndex {
+
 	return &AddrIndex{
 		db:          db,
 		chainParams: chainParams,
+		dataDir:     dataDir,
 		txnsByAddr:  make(map[[addrKeySize]byte]map[chainhash.Hash]*btcutil.Tx),
 		addrsByTx:   make(map[chainhash.Hash]map[[addrKeySize]byte]struct{}),
 	}
