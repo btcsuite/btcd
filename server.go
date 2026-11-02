@@ -281,6 +281,7 @@ type server struct {
 	syncManager          *netsync.SyncManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
+	minRelayTxFee        btcutil.Amount
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	p2pDowngrader        *peer.P2PDowngrader
@@ -638,6 +639,14 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 func (sp *serverPeer) OnVerAck(_ *peer.Peer, _ *wire.MsgVerAck) {
 	sp.verAckOnce.Do(func() {
 		sp.releaseHandshake()
+
+		// Tell peers that support BIP133 which transactions this node will
+		// relay.  This is the same threshold the mempool uses to accept
+		// transactions, expressed in satoshis per kilobyte.
+		if sp.ProtocolVersion() >= wire.FeeFilterVersion {
+			sp.QueueMessage(wire.NewMsgFeeFilter(int64(sp.server.minRelayTxFee)), nil)
+		}
+
 		close(sp.verAckCh)
 	})
 }
@@ -3024,6 +3033,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),
 		services:             services,
+		minRelayTxFee:        cfg.minRelayTxFee,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 		hashCache:            txscript.NewHashCache(cfg.SigCacheMaxSize),
 		cfCheckptCaches:      make(map[wire.FilterType][]cfHeaderKV),

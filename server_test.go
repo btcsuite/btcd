@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/btcsuite/btcd/peer"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/btclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,7 @@ func newTestServerPeer(t *testing.T) (*server, *serverPeer) {
 
 	s := &server{
 		peerLifecycle: make(chan peerLifecycleEvent, 10),
+		minRelayTxFee: 1234,
 	}
 	sp := newServerPeer(s, false)
 	sp.Peer = peer.NewInboundPeer(&peer.Config{
@@ -99,6 +101,127 @@ func TestOnVerAckDoubleCall(t *testing.T) {
 	}
 	require.Equal(t, uint32(1), releases.Load(),
 		"the source-prefix slot must be released exactly once")
+}
+
+// TestOnVerAckSendsFeeFilter verifies that completing a modern peer
+// handshake announces the same minimum fee rate used by the mempool.
+func TestOnVerAckSendsFeeFilter(t *testing.T) {
+	t.Parallel()
+
+	s, sp := newTestServerPeer(t)
+	sp.Peer = peer.NewInboundPeer(&peer.Config{
+		AllowSelfConns: true,
+		ChainParams:    &chaincfg.SimNetParams,
+		Listeners: peer.MessageListeners{
+			OnVerAck: sp.OnVerAck,
+		},
+	})
+
+	feeFilters := make(chan *wire.MsgFeeFilter, 1)
+	remotePeer, err := peer.NewOutboundPeer(&peer.Config{
+		AllowSelfConns: true,
+		ChainParams:    &chaincfg.SimNetParams,
+		Listeners: peer.MessageListeners{
+			OnFeeFilter: func(_ *peer.Peer, msg *wire.MsgFeeFilter) {
+				feeFilters <- msg
+			},
+		},
+	}, "127.0.0.1:8333")
+	require.NoError(t, err)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err == nil {
+			accepted <- conn
+		}
+	}()
+
+	conn, err := net.Dial("tcp", listener.Addr().String())
+	require.NoError(t, err)
+	sp.AssociateConnection(<-accepted)
+	remotePeer.AssociateConnection(conn)
+	defer func() {
+		sp.Disconnect()
+		remotePeer.Disconnect()
+		sp.WaitForDisconnect()
+		remotePeer.WaitForDisconnect()
+	}()
+
+	select {
+	case msg := <-feeFilters:
+		require.Equal(t, int64(s.minRelayTxFee), msg.MinFee)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for feefilter message")
+	}
+}
+
+// TestOnVerAckSkipsFeeFilterForLegacyPeer verifies that peers which do not
+// support BIP133 never receive an unsupported feefilter message.
+func TestOnVerAckSkipsFeeFilterForLegacyPeer(t *testing.T) {
+	t.Parallel()
+
+	feeFilterWrites := make(chan struct{}, 1)
+	_, sp := newTestServerPeer(t)
+	sp.Peer = peer.NewInboundPeer(&peer.Config{
+		AllowSelfConns:  true,
+		ChainParams:     &chaincfg.SimNetParams,
+		ProtocolVersion: wire.FeeFilterVersion - 1,
+		Listeners: peer.MessageListeners{
+			OnVerAck: sp.OnVerAck,
+			OnWrite: func(_ *peer.Peer, _ int, msg wire.Message, _ error) {
+				if msg.Command() == wire.CmdFeeFilter {
+					feeFilterWrites <- struct{}{}
+				}
+			},
+		},
+	})
+
+	remotePeer, err := peer.NewOutboundPeer(&peer.Config{
+		AllowSelfConns:  true,
+		ChainParams:     &chaincfg.SimNetParams,
+		ProtocolVersion: wire.FeeFilterVersion - 1,
+	}, "127.0.0.1:8333")
+	require.NoError(t, err)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err == nil {
+			accepted <- conn
+		}
+	}()
+
+	conn, err := net.Dial("tcp", listener.Addr().String())
+	require.NoError(t, err)
+	sp.AssociateConnection(<-accepted)
+	remotePeer.AssociateConnection(conn)
+	defer func() {
+		sp.Disconnect()
+		remotePeer.Disconnect()
+		sp.WaitForDisconnect()
+		remotePeer.WaitForDisconnect()
+	}()
+
+	select {
+	case <-sp.verAckCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for legacy peer handshake")
+	}
+
+	select {
+	case <-feeFilterWrites:
+		t.Fatal("legacy peer received an unsupported feefilter message")
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 // TestHandshakeReleaseOnDisconnect verifies that a connection which
