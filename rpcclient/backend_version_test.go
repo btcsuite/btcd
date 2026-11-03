@@ -68,6 +68,64 @@ func TestParseBitcoindVersion(t *testing.T) {
 	}
 }
 
+// TestParseBitcoindNumericVersion checks that the numeric `version` field of
+// `getnetworkinfo`, which a bitcoind-compatible backend reports beside its own
+// subversion, is parsed.
+func TestParseBitcoindNumericVersion(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		rpcVersion    int32
+		parsedVersion BitcoindVersion
+	}{
+		{
+			name:          "parse version 0.18",
+			rpcVersion:    180100,
+			parsedVersion: BitcoindPre19,
+		},
+		{
+			name:          "parse version 0.19",
+			rpcVersion:    190000,
+			parsedVersion: BitcoindPre22,
+		},
+		{
+			name:          "parse version 0.21",
+			rpcVersion:    210200,
+			parsedVersion: BitcoindPre22,
+		},
+		{
+			name:          "parse version 22.0",
+			rpcVersion:    220000,
+			parsedVersion: BitcoindPre24,
+		},
+		{
+			name:          "parse version 24.0",
+			rpcVersion:    240100,
+			parsedVersion: BitcoindPre25,
+		},
+		{
+			name:          "parse version 25.0",
+			rpcVersion:    250000,
+			parsedVersion: BitcoindPost25,
+		},
+		{
+			name:          "parse version 28.0",
+			rpcVersion:    280000,
+			parsedVersion: BitcoindPost25,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			version := parseBitcoindNumericVersion(tc.rpcVersion)
+			require.Equal(t, tc.parsedVersion, version)
+		})
+	}
+}
+
 // TestParseBtcdVersion checks that the correct version from btcd's `getinfo`
 // RPC call is parsed.
 func TestParseBtcdVersion(t *testing.T) {
