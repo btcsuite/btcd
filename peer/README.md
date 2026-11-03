@@ -63,7 +63,7 @@ $ go get -u github.com/btcsuite/btcd/peer
 
 ## Examples
 
-* [New Outbound Peer Example](https://pkg.go.dev/github.com/btcsuite/btcd/peer#example-package--NewOutboundPeer)  
+* [New Outbound Peer Example](https://pkg.go.dev/github.com/btcsuite/btcd/peer#example-package-NewOutboundPeer)  
   Demonstrates the basic process for initializing and creating an outbound peer.
   Peers negotiate by exchanging version and verack messages.  For demonstration,
   a simple handler for the version message is attached to the peer.
