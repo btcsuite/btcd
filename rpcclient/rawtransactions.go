@@ -727,6 +727,99 @@ func (c *Client) SignRawTransactionWithWallet3(tx *wire.MsgTx,
 	return c.SignRawTransactionWithWallet3Async(tx, inputs, hashType).Receive()
 }
 
+// FutureSignRawTransactionWithKeyResult is a future promise to deliver the
+// result of the SignRawTransactionWithKeyAsync RPC invocation (or an
+// applicable error).
+type FutureSignRawTransactionWithKeyResult chan *Response
+
+// Receive waits for the Response promised by the future and returns the
+// signed transaction as well as whether or not all inputs are now signed.
+func (r FutureSignRawTransactionWithKeyResult) Receive() (*wire.MsgTx, bool,
+	error) {
+
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Unmarshal as a signrawtransactionwithkey result.
+	var result btcjson.SignRawTransactionWithKeyResult
+	if err := json.Unmarshal(res, &result); err != nil {
+		return nil, false, err
+	}
+
+	// Decode the serialized transaction hex to raw bytes.
+	serializedTx, err := hex.DecodeString(result.Hex)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Deserialize the transaction and return it.
+	var msgTx wire.MsgTx
+	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
+		return nil, false, err
+	}
+
+	return &msgTx, result.Complete, nil
+}
+
+// SignRawTransactionWithKeyAsync returns an instance of a type that can be used
+// to get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See SignRawTransactionWithKey for the blocking version and more details.
+func (c *Client) SignRawTransactionWithKeyAsync(tx *wire.MsgTx,
+	privKeysWIF []string, inputs []btcjson.RawTxWitnessInput,
+	hashType SigHashType) FutureSignRawTransactionWithKeyResult {
+
+	txHex := ""
+	if tx != nil {
+		// Serialize the transaction and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+		if err := tx.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		txHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	// The optional parameters are positional, so an empty input list is
+	// sent when only the signature hash type is given.
+	var prevTxs *[]btcjson.RawTxWitnessInput
+	if inputs != nil || hashType != "" {
+		if inputs == nil {
+			inputs = []btcjson.RawTxWitnessInput{}
+		}
+		prevTxs = &inputs
+	}
+
+	var sigHashType *string
+	if hashType != "" {
+		sigHashType = btcjson.String(string(hashType))
+	}
+
+	cmd := btcjson.NewSignRawTransactionWithKeyCmd(
+		txHex, privKeysWIF, prevTxs, sigHashType,
+	)
+
+	return c.SendCmd(cmd)
+}
+
+// SignRawTransactionWithKey signs inputs for the passed transaction with the
+// given base58-encoded (WIF) private keys and returns the signed transaction
+// as well as whether or not all inputs are now signed.
+//
+// The inputs list describes the previous outputs being spent and may be nil
+// if the RPC server already knows them all.  An empty hashType uses the
+// server's default signature hash type (ALL).
+func (c *Client) SignRawTransactionWithKey(tx *wire.MsgTx,
+	privKeysWIF []string, inputs []btcjson.RawTxWitnessInput,
+	hashType SigHashType) (*wire.MsgTx, bool, error) {
+
+	return c.SignRawTransactionWithKeyAsync(
+		tx, privKeysWIF, inputs, hashType,
+	).Receive()
+}
+
 // FutureSearchRawTransactionsResult is a future promise to deliver the result
 // of the SearchRawTransactionsAsync RPC invocation (or an applicable error).
 type FutureSearchRawTransactionsResult chan *Response
