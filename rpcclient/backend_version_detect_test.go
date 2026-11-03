@@ -25,7 +25,13 @@ func newNetworkInfoServer(t *testing.T, subversion string,
 			Method string          `json:"method"`
 			ID     json.RawMessage `json:"id"`
 		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		// The handler runs on the server's goroutine, where
+		// t.FailNow (and so require) must not be called.
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		switch req.Method {

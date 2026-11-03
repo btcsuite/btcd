@@ -156,7 +156,10 @@ func parseBitcoindVersion(version string) BitcoindVersion {
 
 const (
 	// bitcoind19 is bitcoind v0.19.0 as getnetworkinfo's numeric
-	// `version` field reports it (10000*major + 100*minor + patch).
+	// `version` field reports it. Before v22, bitcoind encoded its
+	// version as 1000000*major + 10000*minor + 100*revision + build;
+	// since v22 it is 10000*major + 100*minor + patch. Both give
+	// increasing values, so one comparison covers the two schemes.
 	bitcoind19 = 190000
 
 	// bitcoind22 is bitcoind v22.0.0 as a numeric version.
