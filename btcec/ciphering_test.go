@@ -6,6 +6,9 @@ package btcec
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -28,4 +31,31 @@ func TestGenerateSharedSecret(t *testing.T) {
 		t.Errorf("ECDH failed, secrets mismatch - first: %x, second: %x",
 			secret1, secret2)
 	}
+}
+
+func TestEncryptAndDecrypt(t *testing.T) {
+	privateKey, err := NewPrivateKey()
+	if err != nil {
+		t.Errorf("private key generation error: %s", err)
+		return
+	}
+	publicKey := privateKey.PubKey()
+	message := []byte("Hello, this is a test message.")
+
+	encryptedMessage, err := Encrypt(publicKey, message)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	fmt.Println("Encrypted Message:", hex.EncodeToString(encryptedMessage))
+
+	decryptedMessage, err := Decrypt(privateKey, encryptedMessage)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	fmt.Println("Decrypted Message:", string(decryptedMessage))
+
+	assert.Equal(t, string(message), string(decryptedMessage))
+
 }
