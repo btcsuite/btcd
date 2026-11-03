@@ -5,6 +5,9 @@
 package btcec
 
 import (
+	"bytes"
+
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -50,6 +53,17 @@ type PublicKey = secp.PublicKey
 // can be used to determine validity.
 func NewPublicKey(x, y *FieldVal) *PublicKey {
 	return secp.NewPublicKey(x, y)
+}
+
+// IsEquivalentPubKeys reports whether two public keys are equivalent when
+// compared in their BIP340-serialized form. This avoids issues with multiple
+// encodings of the same elliptic curve point, since BIP340 serialization
+// provides a unique, canonical byte representation.
+func IsEquivalentPubKeys(a, b *PublicKey) bool {
+	return bytes.Equal(
+		schnorr.SerializePubKey(a),
+		schnorr.SerializePubKey(b),
+	)
 }
 
 // SerializedKey is a type for representing a public key in its compressed
