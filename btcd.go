@@ -2,6 +2,9 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
+// Disable MPTCP listeners until affected Linux kernels are patched.
+//go:debug multipathtcp=0
+
 package main
 
 import (
