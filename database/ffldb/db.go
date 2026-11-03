@@ -43,6 +43,13 @@ const (
 	// The serialized block index row format is:
 	//   <blocklocation><blockheader>
 	blockHdrOffset = blockLocSize
+
+	// bytesMiB is the number of bytes in a mebibyte.
+	bytesMiB = 1024 * 1024
+
+	// minAvailableSpaceUpdate is the minimum space available (in bytes) to
+	// allow a write transaction.  The value is 25 MiB.
+	minAvailableSpaceUpdate = 25 * bytesMiB
 )
 
 var (
@@ -1885,6 +1892,22 @@ func (db *db) Type() string {
 // which is used by the managed transaction code while the database method
 // returns the interface.
 func (db *db) begin(writable bool) (*transaction, error) {
+	// Make sure there is enough available disk space so we can inform the
+	// user of the problem instead of causing a db failure.
+	if writable {
+		freeSpace, err := getAvailableDiskSpace()
+		if err != nil {
+			return nil, makeDbErr(database.ErrDriverSpecific,
+				"failed to inspect available disk space", err)
+		}
+		if freeSpace < minAvailableSpaceUpdate {
+			errMsg := fmt.Sprintf("available disk space too low: "+
+				"%.1f MiB", float64(freeSpace)/float64(bytesMiB))
+			return nil, makeDbErr(database.ErrAvailableDiskSpace,
+				errMsg, nil)
+		}
+	}
+
 	// Whenever a new writable transaction is started, grab the write lock
 	// to ensure only a single write transaction can be active at the same
 	// time.  This lock will not be released until the transaction is
