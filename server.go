@@ -788,6 +788,20 @@ func (sp *serverPeer) OnHeaders(_ *peer.Peer, msg *wire.MsgHeaders) {
 	sp.server.syncManager.QueueHeaders(msg, sp.Peer)
 }
 
+// getDataAddBanScore is called by OnGetData to add the banScore if needed. A
+// decaying ban score increase is applied to prevent exhausting resources with
+// unusually large inventory queries.
+//
+// Requesting more than the maximum inventory vector length within a
+// short period of time yields a score above the default ban threshold.
+// Sustained bursts of small requests are not penalized as that would
+// potentially ban peers performing IBD.
+//
+// This incremental score decays each minute to half of its value.
+func (sp *serverPeer) getDataAddBanScore(invLen int) bool {
+	return sp.addBanScore(0, uint32(invLen)*99/wire.MaxInvPerMsg, "getdata")
+}
+
 // OnGetData is invoked when a peer receives a getdata bitcoin message and is
 // used to deliver block and transaction information.
 func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
@@ -796,17 +810,7 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 	failedMsg := wire.NewMsgNotFound()
 
 	length := len(msg.InvList)
-
-	// A decaying ban score increase is applied to prevent exhausting
-	// resources with unusually large inventory queries.
-	//
-	// Requesting more than the maximum inventory vector length within a
-	// short period of time yields a score above the default ban threshold.
-	// Sustained bursts of small requests are not penalized as that would
-	// potentially ban peers performing IBD.
-	//
-	// This incremental score decays each minute to half of its value.
-	if sp.addBanScore(0, uint32(length)*99/wire.MaxInvPerMsg, "getdata") {
+	if sp.getDataAddBanScore(length) {
 		return
 	}
 
