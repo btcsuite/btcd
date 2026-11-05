@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/internal/inbound"
 	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/btcsuite/btcd/peer"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/btcsuite/btclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -372,4 +375,93 @@ func TestPeerLifecycleSimultaneousReady(t *testing.T) {
 	t.Logf("peerAdd emitted in %d/%d iterations "+
 		"(both outcomes are valid per documented behavior)",
 		addEmitted, iterations)
+}
+
+// TestGetDataAddBanScore asserts that the ban score is incremented or not
+// based on the length of the getdata inv length.
+func TestGetDataAddBanScore(t *testing.T) {
+	tests := []struct {
+		name         string
+		invLen       int
+		wantBanScore int
+		wantBan      bool
+		count        int
+	}{
+		{
+			"up to 505 inv vectors does not increment ban score",
+			505,
+			0,
+			false,
+			1,
+		},
+		{
+			"more than 505 inv vectors increments ban score",
+			506,
+			1,
+			false,
+			1,
+		},
+		{
+			"two messages of maxInv causes the peer to be banned",
+			wire.MaxInvPerMsg,
+			198,
+			true,
+			2,
+		},
+	}
+
+	// Set the config ban threshold to the defaults.
+	oldCfg := cfg
+	t.Cleanup(func() { cfg = oldCfg })
+	cfg = &config{BanThreshold: defaultBanThreshold}
+
+	// Start a TCP listener in a random port to accept the peer connections.
+	var wg sync.WaitGroup
+	lst, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		lst.Close()
+		wg.Wait()
+	})
+	srvConn := make(chan net.Conn)
+	wg.Go(func() {
+		for {
+			conn, err := lst.Accept()
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			require.NoError(t, err)
+
+			srvConn <- conn
+		}
+	})
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// setup the peer and server
+			conn, err := net.Dial("tcp", lst.Addr().String())
+			require.NoError(t, err)
+			s, sp := newTestServerPeer(t)
+			s.banPeers = make(chan *serverPeer, 1)
+			sp.AssociateConnection(conn)
+			defer func() {
+				sp.Disconnect()
+				c := <-srvConn
+				c.Close()
+
+				sp.WaitForDisconnect()
+			}()
+
+			// simulate the increment of the ban score for
+			// test.count messages.
+			var ban bool
+			for range test.count {
+				ban = sp.getDataAddBanScore(test.invLen)
+			}
+			require.Equal(t, test.wantBan, ban)
+			require.Equal(
+				t, test.wantBanScore, int(sp.banScore.Int()),
+			)
+		})
+	}
 }

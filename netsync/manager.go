@@ -900,6 +900,17 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 	}
 	length := bestHeaderHeight - forkHeight
 	gdmsg := wire.NewMsgGetDataSizeHint(uint(length))
+
+	// Limit max inv request size to avoid being banned during IBD.
+	//
+	// transient_ban_increment = int(505)*int(99)/int(50000) == int(0)
+	//
+	// The `addBanScore` call in the procedure `OnGetData` in server.go
+	// increments the ban score if we request more than 505 elements in a
+	// getdata message, causing the node performing IBD to be banned. Using
+	// a request limit of 505 blocks per message avoids this.
+	const maxBlocksRequest = 505
+
 	numRequested := 0
 	for h := forkHeight + 1; h <= bestHeaderHeight; h++ {
 		hash, err := sm.chain.HeaderHashByHeight(h)
@@ -943,7 +954,7 @@ func (sm *SyncManager) buildBlockRequest(peer *peerpkg.Peer) *wire.MsgGetData {
 			numRequested++
 		}
 
-		if numRequested >= wire.MaxInvPerMsg {
+		if numRequested >= maxBlocksRequest {
 			break
 		}
 	}
