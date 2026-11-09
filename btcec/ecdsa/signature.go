@@ -18,8 +18,20 @@ import (
 var (
 	errNegativeValue          = errors.New("value may be interpreted as negative")
 	errExcessivelyPaddedValue = errors.New("value is excessively padded")
-	errHighS                  = errors.New("non-canonical signature: S value not in low-S form")
-	errNoHeaderMagic          = errors.New("malformed signature: no header magic")
+)
+
+// Errors returned by parseSig.
+var (
+	errNegativeR          = errors.New("negative R")
+	errNegativeS          = errors.New("negative S")
+	errExcessivelyPaddedR = errors.New("excessively padded R")
+	errExcessivelyPaddedS = errors.New("excessively padded S")
+	errNoHeaderMagic      = errors.New("malformed signature: no header magic")
+)
+
+// Errors returned by VerifyLowS.
+var (
+	errHighS = errors.New("non-canonical signature: S value not in low-S form")
 )
 
 // Signature is a type representing an ecdsa signature.
@@ -69,7 +81,7 @@ func canonicalPadding(b []byte) error {
 	}
 }
 
-func parseSig(sigStr []byte, der bool) (*Signature, error) {
+func parseSig(sig *Signature, sigStr []byte, der bool) error {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.
 	// Despite the fact that signatures are stored as DER, the difference
@@ -83,16 +95,16 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// The signature must adhere to the minimum and maximum allowed length.
 	totalSigLen := len(sigStr)
 	if totalSigLen < MinSigLen {
-		return nil, errors.New("malformed signature: too short")
+		return errors.New("malformed signature: too short")
 	}
 	if der && totalSigLen > MaxSigLen {
-		return nil, errors.New("malformed signature: too long")
+		return errors.New("malformed signature: too long")
 	}
 
 	// 0x30
 	index := 0
 	if sigStr[index] != 0x30 {
-		return nil, errNoHeaderMagic
+		return errNoHeaderMagic
 	}
 	index++
 	// length of remaining message
@@ -102,15 +114,14 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// siglen should be less than the entire message and greater than
 	// the minimal message size.
 	if int(siglen+2) > len(sigStr) || int(siglen+2) < MinSigLen {
-		return nil, errors.New("malformed signature: bad length")
+		return errors.New("malformed signature: bad length")
 	}
 	// trim the slice we're working on so we only look at what matters.
 	sigStr = sigStr[:siglen+2]
 
 	// 0x02
 	if sigStr[index] != 0x02 {
-		return nil,
-			errors.New("malformed signature: no 1st int marker")
+		return errors.New("malformed signature: no 1st int marker")
 	}
 	index++
 
@@ -120,7 +131,7 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// hence the -3. We assume that the length must be at least one byte.
 	index++
 	if rLen <= 0 || rLen > len(sigStr)-index-3 {
-		return nil, errors.New("malformed signature: bogus R length")
+		return errors.New("malformed signature: bogus R length")
 	}
 
 	// Then R itself.
@@ -128,9 +139,9 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	if der {
 		switch err := canonicalPadding(rBytes); err {
 		case errNegativeValue:
-			return nil, errors.New("signature R is negative")
+			return errNegativeR
 		case errExcessivelyPaddedValue:
-			return nil, errors.New("signature R is excessively padded")
+			return errExcessivelyPaddedR
 		}
 	}
 
@@ -145,20 +156,20 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	var r btcec.ModNScalar
 	if len(rBytes) > 32 {
 		str := "invalid signature: R is larger than 256 bits"
-		return nil, errors.New(str)
+		return errors.New(str)
 	}
 	if overflow := r.SetByteSlice(rBytes); overflow {
 		str := "invalid signature: R >= group order"
-		return nil, errors.New(str)
+		return errors.New(str)
 	}
 	if r.IsZero() {
 		str := "invalid signature: R is 0"
-		return nil, errors.New(str)
+		return errors.New(str)
 	}
 	index += rLen
 	// 0x02. length already checked in previous if.
 	if sigStr[index] != 0x02 {
-		return nil, errors.New("malformed signature: no 2nd int marker")
+		return errors.New("malformed signature: no 2nd int marker")
 	}
 	index++
 
@@ -167,7 +178,7 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	index++
 	// S should be the rest of the string.
 	if sLen <= 0 || sLen > len(sigStr)-index {
-		return nil, errors.New("malformed signature: bogus S length")
+		return errors.New("malformed signature: bogus S length")
 	}
 
 	// Then S itself.
@@ -175,9 +186,9 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	if der {
 		switch err := canonicalPadding(sBytes); err {
 		case errNegativeValue:
-			return nil, errors.New("signature S is negative")
+			return errNegativeS
 		case errExcessivelyPaddedValue:
-			return nil, errors.New("signature S is excessively padded")
+			return errExcessivelyPaddedS
 		}
 	}
 
@@ -192,39 +203,65 @@ func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	var s btcec.ModNScalar
 	if len(sBytes) > 32 {
 		str := "invalid signature: S is larger than 256 bits"
-		return nil, errors.New(str)
+		return errors.New(str)
 	}
 	if overflow := s.SetByteSlice(sBytes); overflow {
 		str := "invalid signature: S >= group order"
-		return nil, errors.New(str)
+		return errors.New(str)
 	}
 	if s.IsZero() {
 		str := "invalid signature: S is 0"
-		return nil, errors.New(str)
+		return errors.New(str)
 	}
 	index += sLen
 
 	// sanity check length parsing
 	if index != len(sigStr) {
-		return nil, fmt.Errorf("malformed signature: bad final length %v != %v",
+		return fmt.Errorf("malformed signature: bad final length %v != %v",
 			index, len(sigStr))
 	}
 
-	return NewSignature(&r, &s), nil
+	sig2 := secp_ecdsa.NewSignature(&r, &s)
+	*sig = *sig2
+	return nil
+}
+
+// parseBERSig exists to make ParseSignature eligible to inlining and
+// therefore avoid allocation.
+//
+//go:noinline
+func parseBERSig(sig *Signature, sigb []byte) error {
+	return parseSig(sig, sigb, false)
 }
 
 // ParseSignature parses a signature in BER format for the curve type `curve'
 // into a Signature type, performing some basic sanity checks.  If parsing
 // according to the more strict DER format is needed, use ParseDERSignature.
 func ParseSignature(sigStr []byte) (*Signature, error) {
-	return parseSig(sigStr, false)
+	sig := new(Signature)
+	if err := parseBERSig(sig, sigStr); err != nil {
+		return nil, err
+	}
+	return sig, nil
+}
+
+// parseDERSig exists to make ParseDERSignature eligible to inlining and
+// therefore avoid allocation.
+//
+//go:noinline
+func parseDERSig(sig *Signature, sigb []byte) error {
+	return parseSig(sig, sigb, true)
 }
 
 // ParseDERSignature parses a signature in DER format for the curve type
 // `curve` into a Signature type.  If parsing according to the less strict
 // BER format is needed, use ParseSignature.
 func ParseDERSignature(sigStr []byte) (*Signature, error) {
-	return parseSig(sigStr, true)
+	sig := new(Signature)
+	if err := parseDERSig(sig, sigStr); err != nil {
+		return nil, err
+	}
+	return sig, nil
 }
 
 // SignCompact produces a compact signature of the data in hash with the given
@@ -261,8 +298,8 @@ func Sign(key *btcec.PrivateKey, hash []byte) *Signature {
 // and uses a canonical low-S value. It returns nil if the signature is valid;
 // otherwise it returns the encountered error.
 func VerifyLowS(sigStr []byte) error {
-	sig, err := parseSig(sigStr, true)
-	if err != nil {
+	sig := new(Signature)
+	if err := parseSig(sig, sigStr, true); err != nil {
 		return err
 	}
 	sValue := sig.S()

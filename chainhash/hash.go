@@ -154,10 +154,9 @@ func NewHash(newHash []byte) (*Hash, error) {
 	return &sh, err
 }
 
-// TaggedHash implements the tagged hash scheme described in BIP-340. We use
-// sha-256 to bind a message hash to a specific context using a tag:
-// sha256(sha256(tag) || sha256(tag) || msg).
-func TaggedHash(tag []byte, msgs ...[]byte) *Hash {
+// taggedHash is here to make TaggedHash eligible to inlining and therefore
+// reducing allocations.
+func taggedHash(hash *Hash, tag []byte, msgs ...[]byte) {
 	// Check to see if we've already pre-computed the hash of the tag. If
 	// so then this'll save us an extra sha256 hash.
 	shaTag, ok := precomputedTags[string(tag)]
@@ -174,13 +173,22 @@ func TaggedHash(tag []byte, msgs ...[]byte) *Hash {
 		h.Write(msg)
 	}
 
-	taggedHash := h.Sum(nil)
+	var tagHash [32]byte
+	h.Sum(tagHash[:0])
 
 	// The function can't error out since the above hash is guaranteed to
 	// be 32 bytes.
-	hash, _ := NewHash(taggedHash)
+	hash2, _ := NewHash(tagHash[:])
+	*hash = *hash2
+}
 
-	return hash
+// TaggedHash implements the tagged hash scheme described in BIP-340. We use
+// sha-256 to bind a message hash to a specific context using a tag:
+// sha256(sha256(tag) || sha256(tag) || msg).
+func TaggedHash(tag []byte, msgs ...[]byte) *Hash {
+	var hash Hash
+	taggedHash(&hash, tag, msgs...)
+	return &hash
 }
 
 // NewHashFromStr creates a Hash from a hash string.  The string should be
