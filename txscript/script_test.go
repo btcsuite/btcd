@@ -245,6 +245,32 @@ func TestGetWitnessSigOpCount(t *testing.T) {
 					" EQUALVERIFY CHECKSIG DATA_20 0x91"),
 			},
 		},
+		// Regression test for #1508: a P2SH pkScript spent with an
+		// empty signature script and empty witness must not panic. The
+		// historical crash ("slice bounds out of range [1:0]" in
+		// GetWitnessSigOpCount, reachable from the mempool) occurred
+		// because the nested-p2sh branch sliced the signature script
+		// without first checking it was non-empty. It must now count 0
+		// sig ops without panicking.
+		{
+			name:      "issue 1508: empty sig & witness, p2sh",
+			sigScript: nil,
+			pkScript: mustParseShortForm("HASH160 DATA_20 " +
+				"0x00{20} EQUAL"),
+			witness:   nil,
+			numSigOps: 0,
+		},
+		// Companion coverage: a P2WSH program with an empty witness
+		// stack. This is not an issue #1508 variant;
+		// GetWitnessSigOpCount guards for a non-empty witness before
+		// indexing. It must count 0.
+		{
+			name: "issue 1508: p2wsh pkScript, empty witness",
+			pkScript: mustParseShortForm("OP_0 DATA_32 " +
+				"0x00{32}"),
+			witness:   wire.TxWitness{},
+			numSigOps: 0,
+		},
 	}
 
 	for _, test := range tests {

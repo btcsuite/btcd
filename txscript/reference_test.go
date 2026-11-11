@@ -117,7 +117,8 @@ func parseHex(tok string) ([]byte, error) {
 	repeat := 1
 	if braceIdx := strings.IndexByte(tok, '{'); braceIdx != -1 {
 		if !strings.HasSuffix(tok, "}") {
-			return nil, errors.New("missing closing brace in repeat count")
+			return nil, errors.New(
+				"missing closing brace in repeat count")
 		}
 		n, err := strconv.Atoi(tok[braceIdx+1 : len(tok)-1])
 		if err != nil {
