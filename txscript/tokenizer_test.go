@@ -13,8 +13,6 @@ import (
 // TestScriptTokenizer ensures a wide variety of behavior provided by the script
 // tokenizer performs as expected.
 func TestScriptTokenizer(t *testing.T) {
-	t.Skip()
-
 	type expectedResult struct {
 		op    byte   // expected parsed opcode
 		data  []byte // expected parsed data

@@ -104,12 +104,43 @@ func scriptTestName(test []interface{}) (string, error) {
 	return name, nil
 }
 
-// parse hex string into a []byte.
+// parse hex string into a []byte.  In addition to plain hex, it supports a
+// repeat suffix of the form 0xHH{N} (as used by the ported Decred script
+// tokenizer tests), which repeats the decoded bytes N times.  For example,
+// "0x01{76}" yields 76 bytes of 0x01.
 func parseHex(tok string) ([]byte, error) {
 	if !strings.HasPrefix(tok, "0x") {
 		return nil, errors.New("not a hex number")
 	}
-	return hex.DecodeString(tok[2:])
+
+	// Detect and strip an optional "{N}" repeat suffix.
+	repeat := 1
+	if braceIdx := strings.IndexByte(tok, '{'); braceIdx != -1 {
+		if !strings.HasSuffix(tok, "}") {
+			return nil, errors.New(
+				"missing closing brace in repeat count")
+		}
+		n, err := strconv.Atoi(tok[braceIdx+1 : len(tok)-1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid repeat count: %w", err)
+		}
+		if n < 0 {
+			return nil, errors.New("negative repeat count")
+		}
+		repeat = n
+		tok = tok[:braceIdx]
+	}
+
+	decoded, err := hex.DecodeString(tok[2:])
+	if err != nil {
+		return nil, err
+	}
+
+	if repeat == 1 {
+		return decoded, nil
+	}
+
+	return bytes.Repeat(decoded, repeat), nil
 }
 
 // parseWitnessStack parses a json array of witness items encoded as hex into a
