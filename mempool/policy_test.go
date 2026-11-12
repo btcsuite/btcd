@@ -6,6 +6,9 @@ package mempool
 
 import (
 	"bytes"
+	"fmt"
+	"math"
+	"math/big"
 	"testing"
 	"time"
 
@@ -780,5 +783,258 @@ func TestP2ASpendingStandardness(t *testing.T) {
 			mockView.AssertExpectations(t)
 			mockEntry.AssertExpectations(t)
 		})
+	}
+}
+
+type dustThresholdTest struct {
+	name      string
+	script    []byte
+	isWitness bool
+	wantSize  uint64
+}
+
+func dustThresholdTestVectors() []dustThresholdTest {
+	p2pkh := append(
+		[]byte{txscript.OP_DUP, txscript.OP_HASH160, 20},
+		make([]byte, 20)...,
+	)
+	p2pkh = append(p2pkh, txscript.OP_EQUALVERIFY, txscript.OP_CHECKSIG)
+	p2sh := append([]byte{txscript.OP_HASH160, 20}, make([]byte, 20)...)
+	p2sh = append(p2sh, txscript.OP_EQUAL)
+	p2wpkh := append([]byte{txscript.OP_0, 20}, make([]byte, 20)...)
+	p2wsh := append([]byte{txscript.OP_0, 32}, make([]byte, 32)...)
+	p2tr := append([]byte{txscript.OP_1, 32}, make([]byte, 32)...)
+	script252 := bytes.Repeat([]byte{txscript.OP_TRUE}, 252)
+	script253 := bytes.Repeat([]byte{txscript.OP_TRUE}, 253)
+	script65535 := bytes.Repeat([]byte{txscript.OP_TRUE}, 65535)
+	script65536 := bytes.Repeat([]byte{txscript.OP_TRUE}, 65536)
+	script4MB := bytes.Repeat([]byte{txscript.OP_TRUE}, 4_000_000)
+
+	return []dustThresholdTest{
+		{name: "P2PKH", script: p2pkh, wantSize: 546},
+		{name: "P2SH", script: p2sh, wantSize: 540},
+		{
+			name: "P2WPKH", script: p2wpkh, isWitness: true,
+			wantSize: 294,
+		},
+		{
+			name: "P2WSH", script: p2wsh, isWitness: true,
+			wantSize: 330,
+		},
+		{
+			name: "P2TR", script: p2tr, isWitness: true,
+			wantSize: 330,
+		},
+		{name: "script-252", script: script252, wantSize: 1227},
+		{name: "script-253", script: script253, wantSize: 1236},
+		{name: "script-65535", script: script65535, wantSize: 197082},
+		{name: "script-65536", script: script65536, wantSize: 197091},
+		{name: "script-4MB", script: script4MB, wantSize: 12000483},
+	}
+}
+
+// TestGetDustThreshold fixes the existing output-based size calculation to
+// explicit vectors so the same expectations can guard size-based helpers.
+func TestGetDustThreshold(t *testing.T) {
+	t.Parallel()
+
+	tests := dustThresholdTestVectors()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			txOut := wire.NewTxOut(0, test.script)
+			got := GetDustThreshold(txOut)
+			if uint64(got) != test.wantSize {
+				t.Fatalf("threshold = %d, want %d", got, test.wantSize)
+			}
+		})
+	}
+}
+
+// TestDustThresholdForScriptSize checks script sizes against actual serialized
+// outputs, including the boundaries where the script length prefix grows.
+func TestDustThresholdForScriptSize(t *testing.T) {
+	t.Parallel()
+
+	tests := dustThresholdTestVectors()
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			txOut := wire.NewTxOut(0, test.script)
+			witness := test.isWitness
+
+			// Check the size against actual serialization.
+			inputSize := 148
+			if witness {
+				inputSize = 67
+			}
+
+			want := uint64(3 * (txOut.SerializeSize() + inputSize))
+			got := DustThresholdForScriptSize(
+				uint32(len(test.script)), witness,
+			)
+			if got != want {
+				t.Fatalf("threshold = %d, want %d", got, want)
+			}
+			if got != test.wantSize {
+				t.Fatalf("threshold = %d, want %d", got,
+					test.wantSize)
+			}
+
+			// Only compare sizes for unspendable scripts.
+			if txscript.IsUnspendable(test.script) {
+				return
+			}
+
+			fees := []btcutil.Amount{
+				0, 1, 999, 1000, 1001, 3000, 10000,
+			}
+			for _, fee := range fees {
+				amount := MinNonDustAmount(
+					uint32(len(test.script)), witness, fee,
+				)
+				txOut.Value = int64(amount)
+				if IsDust(txOut, fee) {
+					t.Fatal("unexpected dust", amount, fee)
+				}
+				if amount == 0 {
+					continue
+				}
+
+				// The preceding amount must still be dust.
+				txOut.Value--
+				if !IsDust(txOut, fee) {
+					t.Fatalf("%d is not dust, fee=%d",
+						txOut.Value, fee)
+				}
+			}
+		})
+	}
+}
+
+// referenceMinNonDustAmount computes ceil(fee * size / 1000) with arbitrary
+// precision. It avoids the production implementation's fixed-width overflow
+// handling so the test can check that handling independently.
+func referenceMinNonDustAmount(scriptSize uint32, witness bool,
+	fee btcutil.Amount) int64 {
+
+	if fee <= 0 {
+		return 0
+	}
+
+	inputSize := int64(148)
+	if witness {
+		inputSize = 67
+	}
+
+	lengthPrefix := wire.VarIntSerializeSize(uint64(scriptSize))
+	outputSize := 8 + int64(lengthPrefix) + int64(scriptSize)
+	threshold := big.NewInt(3 * (outputSize + inputSize))
+	amount := new(big.Int).Mul(big.NewInt(int64(fee)), threshold)
+	amount.Add(amount, big.NewInt(999))
+	amount.Quo(amount, big.NewInt(1000))
+
+	limit := big.NewInt(btcutil.MaxSatoshi + 1)
+	if amount.Cmp(limit) > 0 {
+		return limit.Int64()
+	}
+
+	return amount.Int64()
+}
+
+// TestMinNonDustAmount checks rounding and overflow against arbitrary precision
+// arithmetic across CompactSize boundaries, witness forms and relay fees.
+func TestMinNonDustAmount(t *testing.T) {
+	t.Parallel()
+
+	sizes := []uint32{
+		0, 22, 25, 34, 252, 253, 65535, 65536, math.MaxUint32,
+	}
+	fees := []btcutil.Amount{
+		math.MinInt64, -1, 0, 1, 999, 1000, 1001, 10000, math.MaxInt64,
+	}
+
+	// Generate the complete boundary matrix before checking each case.
+	type dustCase struct {
+		size    uint32
+		witness bool
+		fee     btcutil.Amount
+	}
+	var tests []dustCase
+	for _, size := range sizes {
+		for _, witness := range []bool{false, true} {
+			for _, fee := range fees {
+				tests = append(tests, dustCase{
+					size:    size,
+					witness: witness,
+					fee:     fee,
+				})
+			}
+		}
+	}
+
+	for _, test := range tests {
+		name := fmt.Sprintf(
+			"size=%d/witness=%t/fee=%d",
+			test.size, test.witness, test.fee,
+		)
+		t.Run(name, func(t *testing.T) {
+			want := referenceMinNonDustAmount(
+				test.size, test.witness, test.fee,
+			)
+			got := MinNonDustAmount(
+				test.size, test.witness, test.fee,
+			)
+			if int64(got) != want {
+				t.Fatalf("amount = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+// TestIsDustSignedCompatibility preserves the existing signed comparison,
+// including its behavior for negative fees and overflowing output values.
+func TestIsDustSignedCompatibility(t *testing.T) {
+	t.Parallel()
+
+	script := append([]byte{txscript.OP_0, 20}, make([]byte, 20)...)
+	tests := []struct {
+		name  string
+		value int64
+		fee   btcutil.Amount
+		want  bool
+	}{{
+		name:  "negative fee and output",
+		value: -1,
+		fee:   -1000,
+		want:  false,
+	}, {
+		name:  "output multiplication overflow",
+		value: math.MaxInt64,
+		fee:   1000,
+		want:  true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			txOut := wire.NewTxOut(test.value, script)
+			if got := IsDust(txOut, test.fee); got != test.want {
+				t.Fatalf("dust=%t, want=%t", got, test.want)
+			}
+		})
+	}
+}
+
+// TestMinNonDustAmountRoundingOverflow checks a product whose unrounded
+// quotient is MaxUint64, so rounding before clamping would wrap to zero.
+func TestMinNonDustAmountRoundingOverflow(t *testing.T) {
+	t.Parallel()
+
+	// This fee and script size make ceil(fee * threshold / 1000)
+	// exceed MaxUint64. The result must clamp above the money range.
+	const fee = btcutil.Amount(8101336879099495659)
+	got := MinNonDustAmount(600, false, fee)
+	want := btcutil.Amount(btcutil.MaxSatoshi + 1)
+	if got != want {
+		t.Fatalf("MinNonDustAmount() = %d, want %d", got, want)
 	}
 }
