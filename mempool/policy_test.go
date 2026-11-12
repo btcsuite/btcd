@@ -782,3 +782,67 @@ func TestP2ASpendingStandardness(t *testing.T) {
 		})
 	}
 }
+
+type dustThresholdTest struct {
+	name      string
+	script    []byte
+	isWitness bool
+	wantSize  uint64
+}
+
+func dustThresholdTestVectors() []dustThresholdTest {
+	p2pkh := append(
+		[]byte{txscript.OP_DUP, txscript.OP_HASH160, 20},
+		make([]byte, 20)...,
+	)
+	p2pkh = append(p2pkh, txscript.OP_EQUALVERIFY, txscript.OP_CHECKSIG)
+	p2sh := append([]byte{txscript.OP_HASH160, 20}, make([]byte, 20)...)
+	p2sh = append(p2sh, txscript.OP_EQUAL)
+	p2wpkh := append([]byte{txscript.OP_0, 20}, make([]byte, 20)...)
+	p2wsh := append([]byte{txscript.OP_0, 32}, make([]byte, 32)...)
+	p2tr := append([]byte{txscript.OP_1, 32}, make([]byte, 32)...)
+	script252 := bytes.Repeat([]byte{txscript.OP_TRUE}, 252)
+	script253 := bytes.Repeat([]byte{txscript.OP_TRUE}, 253)
+	script65535 := bytes.Repeat([]byte{txscript.OP_TRUE}, 65535)
+	script65536 := bytes.Repeat([]byte{txscript.OP_TRUE}, 65536)
+	script4MB := bytes.Repeat([]byte{txscript.OP_TRUE}, 4_000_000)
+
+	return []dustThresholdTest{
+		{name: "P2PKH", script: p2pkh, wantSize: 546},
+		{name: "P2SH", script: p2sh, wantSize: 540},
+		{
+			name: "P2WPKH", script: p2wpkh, isWitness: true,
+			wantSize: 294,
+		},
+		{
+			name: "P2WSH", script: p2wsh, isWitness: true,
+			wantSize: 330,
+		},
+		{
+			name: "P2TR", script: p2tr, isWitness: true,
+			wantSize: 330,
+		},
+		{name: "script-252", script: script252, wantSize: 1227},
+		{name: "script-253", script: script253, wantSize: 1236},
+		{name: "script-65535", script: script65535, wantSize: 197082},
+		{name: "script-65536", script: script65536, wantSize: 197091},
+		{name: "script-4MB", script: script4MB, wantSize: 12000483},
+	}
+}
+
+// TestGetDustThreshold fixes the existing output-based size calculation to
+// explicit vectors so the same expectations can guard size-based helpers.
+func TestGetDustThreshold(t *testing.T) {
+	t.Parallel()
+
+	tests := dustThresholdTestVectors()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			txOut := wire.NewTxOut(0, test.script)
+			got := GetDustThreshold(txOut)
+			if uint64(got) != test.wantSize {
+				t.Fatalf("threshold = %d, want %d", got, test.wantSize)
+			}
+		})
+	}
+}
