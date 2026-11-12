@@ -612,6 +612,13 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 }
 
 // ReadVarInt reads a variable length integer from r and returns it as a uint64.
+//
+// The result is only checked for canonical (minimal) encoding; it is not range
+// checked against an upper bound. Unlike Bitcoin Core's ReadCompactSize, which
+// rejects values greater than MAX_SIZE (0x02000000) by default, this function
+// returns any canonically encoded value up to 2^64-1. Callers that use the
+// result as an element count must validate it against their own limit (for
+// example MaxMessagePayload) before allocating or reading that many elements.
 func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
@@ -622,6 +629,10 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 
 // ReadVarIntBuf reads a variable length integer from r using a preallocated
 // scratch buffer and returns it as a uint64.
+//
+// As with ReadVarInt, the result is only checked for canonical encoding and is
+// not range checked against an upper bound, so callers must bound it against
+// their own limit before using it as an element count.
 //
 // NOTE: buf MUST at least an 8-byte slice.
 func ReadVarIntBuf(r io.Reader, pver uint32, buf []byte) (uint64, error) {

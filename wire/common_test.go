@@ -410,6 +410,48 @@ func TestVarIntNonCanonical(t *testing.T) {
 	}
 }
 
+// TestVarIntUnbounded ensures ReadVarInt returns canonically encoded values
+// that are above Bitcoin Core's MAX_SIZE (0x02000000) without an error. The
+// function does not range check the returned value, so this pins the documented
+// contract that callers are responsible for bounding the count themselves.
+func TestVarIntUnbounded(t *testing.T) {
+	pver := ProtocolVersion
+
+	tests := []struct {
+		name string // Test name for easier identification
+		in   []byte // Value to decode
+		want uint64 // Expected decoded value
+	}{
+		{
+			"MAX_SIZE + 1 (fe encoded)",
+			[]byte{0xfe, 0x01, 0x00, 0x00, 0x02}, 0x02000001,
+		},
+		{
+			"0x03000000 (fe encoded)",
+			[]byte{0xfe, 0x00, 0x00, 0x00, 0x03}, 0x03000000,
+		},
+		{
+			"max uint64 (ff encoded)",
+			[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			0xffffffffffffffff,
+		},
+	}
+
+	for i, test := range tests {
+		rbuf := bytes.NewReader(test.in)
+		val, err := ReadVarInt(rbuf, pver)
+		if err != nil {
+			t.Errorf("ReadVarInt #%d (%s) unexpected error %v", i,
+				test.name, err)
+			continue
+		}
+		if val != test.want {
+			t.Errorf("ReadVarInt #%d (%s)\n got: %d want: %d", i,
+				test.name, val, test.want)
+		}
+	}
+}
+
 // TestVarIntWire tests the serialize size for variable length integers.
 func TestVarIntSerializeSize(t *testing.T) {
 	tests := []struct {
