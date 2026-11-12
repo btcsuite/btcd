@@ -6,6 +6,7 @@ package mempool
 
 import (
 	"fmt"
+	"math/bits"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -223,16 +224,22 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 	return nil
 }
 
-// GetDustThreshold calculates the dust limit for a *wire.TxOut by taking the
-// size of a typical spending transaction and multiplying it by 3 to account
-// for the minimum dust relay fee of 3000sat/kvb.
-//
-// Pay-to-Anchor outputs are not special-cased here: because P2A is a witness
-// program with a 4-byte script, the generic witness path below yields a
-// threshold of 240 satoshis at the default 1000 sat/kvB relay fee, matching
-// the BIP 433 default. At other relay fees the threshold scales accordingly,
-// which is the same behavior as Bitcoin Core's GetDustThreshold.
+// GetDustThreshold returns the dust threshold, in bytes, for txOut. It is
+// three times the serialized size of the output plus a typical spending input,
+// not a satoshi amount. Use MinNonDustAmount for the minimum non-dust value.
 func GetDustThreshold(txOut *wire.TxOut) int64 {
+	return int64(DustThresholdForScriptSize(
+		uint32(len(txOut.PkScript)),
+		txscript.IsWitnessProgram(txOut.PkScript),
+	))
+}
+
+// DustThresholdForScriptSize returns the dust threshold, in bytes, for an
+// output with a scriptSize-byte public key script. When isWitness is true,
+// the typical spending input's signature script receives the witness discount.
+// The result is a size, not a satoshi amount, and matches GetDustThreshold for
+// an output with the same script size and witness classification.
+func DustThresholdForScriptSize(scriptSize uint32, isWitness bool) uint64 {
 	// The total serialized size consists of the output and the associated
 	// input script to redeem it.  Since there is no input script
 	// to redeem it yet, use the minimum size of a typical input script.
@@ -296,14 +303,50 @@ func GetDustThreshold(txOut *wire.TxOut) int64 {
 	//
 	// Both cases share a 41 byte preamble required to reference the input
 	// being spent and the sequence number of the input.
-	totalSize := txOut.SerializeSize() + 41
-	if txscript.IsWitnessProgram(txOut.PkScript) {
+	totalSize := uint64(8+wire.VarIntSerializeSize(uint64(scriptSize))) +
+		uint64(scriptSize) + 41
+
+	if isWitness {
 		totalSize += (107 / blockchain.WitnessScaleFactor)
 	} else {
 		totalSize += 107
 	}
 
-	return 3 * int64(totalSize)
+	return 3 * totalSize
+}
+
+// MinNonDustAmount returns the smallest non-dust value for a spendable output
+// described by scriptSize and isWitness at minRelayTxFee satoshis per kilobyte.
+// Zero or negative fees return zero. Results above btcutil.MaxSatoshi are
+// clamped to btcutil.MaxSatoshi+1, meaning every value in the money range is
+// dust. Script-specific unspendability is not represented by these arguments.
+// A non-dust value does not by itself make a transaction standard.
+func MinNonDustAmount(scriptSize uint32, isWitness bool,
+	minRelayTxFee btcutil.Amount) btcutil.Amount {
+
+	if minRelayTxFee <= 0 {
+		return 0
+	}
+
+	threshold := DustThresholdForScriptSize(scriptSize, isWitness)
+	hi, lo := bits.Mul64(uint64(minRelayTxFee), threshold)
+
+	// Div64 requires hi < divisor. A larger high word already puts the
+	// result above the money range, so it can be clamped before division.
+	if hi >= 1000 {
+		return btcutil.MaxSatoshi + 1
+	}
+
+	amount, remainder := bits.Div64(hi, lo, 1000)
+	if amount > btcutil.MaxSatoshi {
+		return btcutil.MaxSatoshi + 1
+	}
+
+	if remainder != 0 {
+		amount++
+	}
+
+	return btcutil.Amount(amount)
 }
 
 // IsDust returns whether or not the passed transaction output amount is
