@@ -811,6 +811,11 @@ func (c *Client) SignRawTransactionWithKeyAsync(tx *wire.MsgTx,
 // The inputs list describes the previous outputs being spent and may be nil
 // if the RPC server already knows them all.  An empty hashType uses the
 // server's default signature hash type (ALL).
+//
+// NOTE: The private keys are sent to the RPC server in the request, so only
+// use this against a node you control over a local or encrypted connection.
+// To sign without sending keys anywhere, use the txscript package instead
+// (for example txscript.SignatureScript or txscript.WitnessSignature).
 func (c *Client) SignRawTransactionWithKey(tx *wire.MsgTx,
 	privKeysWIF []string, inputs []btcjson.RawTxWitnessInput,
 	hashType SigHashType) (*wire.MsgTx, bool, error) {
