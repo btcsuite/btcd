@@ -64,3 +64,69 @@ func TestMempoolAcceptPreservesTransactions(t *testing.T) {
 		})
 	}
 }
+
+// TestSignRawTransactionWithKey checks which optional parameters
+// SignRawTransactionWithKeyAsync sends and that the result is decoded.
+func TestSignRawTransactionWithKey(t *testing.T) {
+	keys := []string{"test-wif-key"}
+	inputs := []btcjson.RawTxWitnessInput{{
+		Txid:         "00",
+		Vout:         1,
+		ScriptPubKey: "0014",
+	}}
+
+	tests := []struct {
+		name         string
+		inputs       []btcjson.RawTxWitnessInput
+		hashType     SigHashType
+		wantInputs   *[]btcjson.RawTxWitnessInput
+		wantHashType *string
+	}{{
+		name: "keys only",
+	}, {
+		name:       "inputs",
+		inputs:     inputs,
+		wantInputs: &inputs,
+	}, {
+		name:         "hash type without inputs",
+		hashType:     SigHashAllAnyoneCanPay,
+		wantInputs:   &[]btcjson.RawTxWitnessInput{},
+		wantHashType: btcjson.String("ALL|ANYONECANPAY"),
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &Client{
+				config:       &ConnConfig{HTTPPostMode: true},
+				sendPostChan: make(chan *jsonRequest, 1),
+				shutdown:     make(chan struct{}),
+			}
+			tx := wire.NewMsgTx(2)
+			tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Index: 1}, nil, nil))
+			tx.AddTxOut(wire.NewTxOut(1000, []byte{0x51}))
+			var serialized bytes.Buffer
+			require.NoError(t, tx.Serialize(&serialized))
+			txHex := hex.EncodeToString(serialized.Bytes())
+
+			future := client.SignRawTransactionWithKeyAsync(
+				tx, keys, tc.inputs, tc.hashType,
+			)
+
+			request := <-client.sendPostChan
+			require.Equal(t, "signrawtransactionwithkey", request.method)
+			cmd := request.cmd.(*btcjson.SignRawTransactionWithKeyCmd)
+			require.Equal(t, txHex, cmd.RawTx)
+			require.Equal(t, keys, cmd.PrivKeys)
+			require.Equal(t, tc.wantInputs, cmd.Inputs)
+			require.Equal(t, tc.wantHashType, cmd.SigHashType)
+
+			request.responseChan <- &Response{result: []byte(
+				`{"hex":"` + txHex + `","complete":true}`,
+			)}
+			signed, complete, err := future.Receive()
+			require.NoError(t, err)
+			require.True(t, complete)
+			require.Equal(t, tx.TxHash(), signed.TxHash())
+		})
+	}
+}
