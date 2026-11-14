@@ -265,22 +265,23 @@ func TestReadNetAddressV2(t *testing.T) {
 			nil,
 		},
 
-		// Invalid torv2 size.
+		// Torv2 with an unexpected size is skipped.
 		{
-			[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x02},
+			[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03,
+				0x01, 0x02, 0x03, 0x00, 0x00},
 			"",
-			ErrInvalidAddressSize,
+			ErrSkippedNetworkID,
 		},
 
-		// Valid torv2 encoding.
+		// Retired torv2 encoding is consumed and ignored.
 		{
 			[]byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x0a, 0x20,
 				0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
 				0x20, 0x22, 0x22,
 			},
-			string(torv2),
-			nil,
+			"",
+			ErrSkippedNetworkID,
 		},
 
 		// Invalid torv3 size.
@@ -367,5 +368,42 @@ func TestReadNetAddressV2(t *testing.T) {
 			t.Errorf("Test #%d had unexpected network %v", i,
 				na.Addr.Network())
 		}
+	}
+}
+
+// TestRetiredTorV2Sizes treats retired entries like unknown networks while
+// preserving framing, size bounds and truncation errors.
+func TestRetiredTorV2Sizes(t *testing.T) {
+	for _, size := range []int{0, 3, torv2Size, maxAddrV2Size} {
+		var entry bytes.Buffer
+		entry.Write([]byte{0, 0, 0, 0, 0, byte(torv2)})
+		if err := WriteVarInt(&entry, ProtocolVersion, uint64(size)); err != nil {
+			t.Fatal(err)
+		}
+		entry.Write(make([]byte, size+2))
+		payload := append([]byte{2}, entry.Bytes()...)
+		payload = append(payload, []byte{0, 0, 0, 0, 0, byte(ipv4), 4,
+			127, 0, 0, 1, 0, 0}...)
+		reader := bytes.NewReader(payload)
+		msg := &MsgAddrV2{}
+		if err := msg.BtcDecode(reader, ProtocolVersion, LatestEncoding); err != nil {
+			t.Fatalf("size=%d: decode: %v", size, err)
+		}
+		if len(msg.AddrList) != 1 || reader.Len() != 0 {
+			t.Fatalf("size=%d: addresses=%d unread=%d", size,
+				len(msg.AddrList), reader.Len())
+		}
+	}
+
+	oversized := []byte{0, 0, 0, 0, 0, byte(torv2), 0xfd, 0x01, 0x02}
+	var addr NetAddressV2
+	err := readNetAddressV2(bytes.NewReader(oversized), ProtocolVersion, &addr)
+	if err != ErrInvalidAddressSize {
+		t.Fatalf("oversized: got %v, want %v", err, ErrInvalidAddressSize)
+	}
+	truncated := []byte{0, 0, 0, 0, 0, byte(torv2), 3, 1, 2}
+	err = readNetAddressV2(bytes.NewReader(truncated), ProtocolVersion, &addr)
+	if err != io.EOF && err != io.ErrUnexpectedEOF {
+		t.Fatalf("truncated: got %v, want EOF", err)
 	}
 }
