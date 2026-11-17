@@ -194,7 +194,15 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 				return nil, UnsupportedWitnessProgLenError(len(witnessProg))
 
 			case 20:
-				return newAddressWitnessPubKeyHash(hrp, witnessProg)
+				if witnessVer == 0 {
+					return newAddressWitnessPubKeyHash(
+						hrp, witnessProg,
+					)
+				}
+
+				return nil, UnsupportedWitnessProgLenError(
+					len(witnessProg),
+				)
 
 			case 32:
 				if witnessVer == 1 {
