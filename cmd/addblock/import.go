@@ -331,7 +331,10 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 	}
 	if cfg.AddrIndex {
 		log.Info("Address index is enabled")
-		indexes = append(indexes, indexers.NewAddrIndex(db, activeNetParams))
+		addrIndex := indexers.NewAddrIndexWithDataDir(
+			db, activeNetParams, cfg.DataDir,
+		)
+		indexes = append(indexes, addrIndex)
 	}
 
 	// Create an index manager if any of the optional indexes are enabled.

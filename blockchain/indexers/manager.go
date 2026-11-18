@@ -134,6 +134,13 @@ type Manager struct {
 	enabledIndexes []Indexer
 }
 
+// staleBuildDropper drops an index whose unfinished fast build targets a block
+// that is no longer in the main chain.
+type staleBuildDropper interface {
+	dropStaleBuild(chain *blockchain.BlockChain,
+		interrupt <-chan struct{}) (bool, error)
+}
+
 // Ensure the Manager type implements the blockchain.IndexManager interface.
 var _ blockchain.IndexManager = (*Manager)(nil)
 
@@ -225,6 +232,18 @@ func (m *Manager) maybeCreateIndexes(dbTx database.Tx) error {
 	return nil
 }
 
+// createIndexes creates the index tips bucket and any missing indexes.
+func (m *Manager) createIndexes() error {
+	return m.db.Update(func(dbTx database.Tx) error {
+		meta := dbTx.Metadata()
+		_, err := meta.CreateBucketIfNotExists(indexTipsBucketName)
+		if err != nil {
+			return err
+		}
+		return m.maybeCreateIndexes(dbTx)
+	})
+}
+
 // Init initializes the enabled indexes.  This is called during chain
 // initialization and primarily consists of catching up all indexes to the
 // current best chain tip.  This is necessary since each index can be disabled
@@ -249,17 +268,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	}
 
 	// Create the initial state for the indexes as needed.
-	err := m.db.Update(func(dbTx database.Tx) error {
-		// Create the bucket for the current tips as needed.
-		meta := dbTx.Metadata()
-		_, err := meta.CreateBucketIfNotExists(indexTipsBucketName)
-		if err != nil {
-			return err
-		}
-
-		return m.maybeCreateIndexes(dbTx)
-	})
-	if err != nil {
+	if err := m.createIndexes(); err != nil {
 		return err
 	}
 
@@ -277,19 +286,36 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	for i := len(m.enabledIndexes); i > 0; i-- {
 		indexer := m.enabledIndexes[i-1]
 
+		// An unfinished fast build can leave entries in an
+		// uninitialized index, which the rollback below cannot
+		// disconnect one block at a time.  Drop such an index when its
+		// build target is no longer in the main chain.
+		if dropper, ok := indexer.(staleBuildDropper); ok {
+			dropped, err := dropper.dropStaleBuild(chain, interrupt)
+			if err != nil {
+				return err
+			}
+			if dropped {
+				if err := m.createIndexes(); err != nil {
+					return err
+				}
+			}
+		}
+
 		// Fetch the current tip for the index.
 		var height int32
 		var hash *chainhash.Hash
 		err := m.db.View(func(dbTx database.Tx) error {
 			idxKey := indexer.Key()
-			hash, height, err = dbFetchIndexerTip(dbTx, idxKey)
-			return err
+			var fetchErr error
+			hash, height, fetchErr = dbFetchIndexerTip(dbTx, idxKey)
+			return fetchErr
 		})
 		if err != nil {
 			return err
 		}
 
-		// Nothing to do if the index does not have any entries yet.
+		// Nothing to roll back for an uninitialized index.
 		if height == -1 {
 			continue
 		}
@@ -363,15 +389,42 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 		}
 	}
 
-	// Fetch the current tip heights for each index along with tracking the
-	// lowest one so the catchup code only needs to start at the earliest
-	// block and is able to skip connecting the block for the indexes that
-	// don't need it.
+	// Earlier indexes can supply data needed by a fast build.
+	for i, indexer := range m.enabledIndexes {
+		builder, ok := indexer.(FastBuilder)
+		if !ok {
+			continue
+		}
+		needed, err := builder.NeedsFastBuild(chain)
+		if err != nil {
+			return err
+		}
+		if !needed {
+			continue
+		}
+		err = m.catchUpIndexes(chain, m.enabledIndexes[:i], interrupt)
+		if err != nil {
+			return err
+		}
+		if err := builder.FastBuild(chain, interrupt); err != nil {
+			return err
+		}
+	}
+	return m.catchUpIndexes(chain, m.enabledIndexes, interrupt)
+}
+
+// catchUpIndexes connects missing blocks in index order so dependent indexes
+// can use entries written by earlier indexes.
+func (m *Manager) catchUpIndexes(chain *blockchain.BlockChain,
+	indexes []Indexer, interrupt <-chan struct{}) error {
+
+	// Fetch the current tip heights and find the earliest block needed by
+	// ordinary catchup.
 	bestHeight := chain.BestSnapshot().Height
 	lowestHeight := bestHeight
-	indexerHeights := make([]int32, len(m.enabledIndexes))
-	err = m.db.View(func(dbTx database.Tx) error {
-		for i, indexer := range m.enabledIndexes {
+	indexerHeights := make([]int32, len(indexes))
+	err := m.db.View(func(dbTx database.Tx) error {
+		for i, indexer := range indexes {
 			idxKey := indexer.Key()
 			hash, height, err := dbFetchIndexerTip(dbTx, idxKey)
 			if err != nil {
@@ -418,7 +471,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 
 		// Connect the block for all indexes that need it.
 		var spentTxos []blockchain.SpentTxOut
-		for i, indexer := range m.enabledIndexes {
+		for i, indexer := range indexes {
 			// Skip indexes that don't need to be updated with this
 			// block.
 			if indexerHeights[i] >= height {
