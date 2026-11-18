@@ -1282,3 +1282,60 @@ func TestIsSyncCandidateRegtest(t *testing.T) {
 		})
 	}
 }
+
+// TestIBDModeClearedWithoutSyncPeer asserts that ibdMode never outlives the
+// sync peer. If the sync peer is lost and no other peer is ahead of us,
+// startSync can't select a replacement. Leaving ibdMode set in that state
+// makes handleInvMsg drop every announcement and nothing restarts the sync,
+// so the node stays behind the tip until it happens to connect to a new peer.
+func TestIBDModeClearedWithoutSyncPeer(t *testing.T) {
+	t.Parallel()
+
+	params := chaincfg.RegressionNetParams
+	params.Checkpoints = nil
+
+	// loseSyncPeer drives the two ways the sync peer goes away: the stall
+	// sampler giving up on it, and the peer disconnecting.
+	tests := []struct {
+		name string
+		lose func(sm *SyncManager, p *peer.Peer)
+	}{
+		{
+			name: "stalled sync peer",
+			lose: func(sm *SyncManager, _ *peer.Peer) {
+				sm.lastProgressTime = time.Now().Add(
+					-(maxStallDuration + time.Minute),
+				)
+				sm.handleStallSample()
+			},
+		},
+		{
+			name: "disconnected sync peer",
+			lose: func(sm *SyncManager, p *peer.Peer) {
+				sm.handleDonePeerMsg(p)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			sm, tearDown := makeMockSyncManager(t, &params)
+			defer tearDown()
+
+			// The sync peer and a second peer, both at our height
+			// so that neither is a replacement candidate.
+			syncPeer := newSyncCandidate(t, sm, 0)
+			newSyncCandidate(t, sm, 0)
+			sm.syncPeer = syncPeer
+			sm.ibdMode = true
+
+			test.lose(sm, syncPeer)
+
+			require.Nil(t, sm.syncPeer)
+			require.False(t, sm.ibdMode,
+				"ibdMode must be off without a sync peer")
+		})
+	}
+}

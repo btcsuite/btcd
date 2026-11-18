@@ -555,7 +555,14 @@ func (sm *SyncManager) updateSyncPeer(dcSyncPeer bool) {
 		sm.syncPeer.Disconnect()
 	}
 
+	// ibdMode only makes sense while we have a sync peer driving the
+	// download. Clear it here so that it can't outlive the peer: if
+	// startSync finds no replacement, a stale ibdMode would make
+	// handleInvMsg ignore every announcement, and with no peer ahead of us
+	// nothing would ever start the sync again. startSync sets it again when
+	// it does select a new sync peer.
 	sm.syncPeer = nil
+	sm.ibdMode = false
 	sm.startSync()
 }
 
