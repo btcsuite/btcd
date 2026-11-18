@@ -55,15 +55,9 @@ func (u AmountUnit) String() string {
 // to as a `Satoshi').  A single Amount is equal to 1e-8 of a bitcoin.
 type Amount int64
 
-// round converts a floating point number, which may or may not be representable
-// as an integer, to the Amount integer type by rounding to the nearest integer.
-// This is performed by adding or subtracting 0.5 depending on the sign, and
-// relying on integer truncation to round the value to the nearest Amount.
+// round returns the nearest integer amount, rounding ties away from zero.
 func round(f float64) Amount {
-	if f < 0 {
-		return Amount(f - 0.5)
-	}
-	return Amount(f + 0.5)
+	return Amount(math.Round(f))
 }
 
 // NewAmount creates an Amount from a floating point value representing

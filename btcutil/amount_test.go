@@ -74,6 +74,19 @@ func TestAmountCreation(t *testing.T) {
 			expected: 55 * SatoshiPerBitcoin,
 		},
 
+		{
+			name:     "just below half a satoshi",
+			amount:   math.Nextafter(0.5e-8, 0),
+			valid:    true,
+			expected: 0,
+		},
+		{
+			name:     "just above negative half a satoshi",
+			amount:   math.Nextafter(-0.5e-8, 0),
+			valid:    true,
+			expected: 0,
+		},
+
 		// Negative tests.
 		{
 			name:   "not-a-number",
@@ -318,6 +331,24 @@ func TestAmountMulF64(t *testing.T) {
 			amt:  100, // 100 Satoshis
 			mul:  2.0 / 3,
 			res:  67, // 67 Satoshis
+		},
+		{
+			name: "Keep an exactly representable odd integer",
+			amt:  1<<52 + 1,
+			mul:  1,
+			res:  1<<52 + 1,
+		},
+		{
+			name: "Keep an exactly representable negative odd integer",
+			amt:  -(1<<52 + 1),
+			mul:  1,
+			res:  -(1<<52 + 1),
+		},
+		{
+			name: "Round negative half a satoshi away from zero",
+			amt:  -1,
+			mul:  0.5,
+			res:  -1,
 		},
 	}
 
