@@ -1913,3 +1913,49 @@ func TestNewFromRawBytesRejectsDuplicateGlobalXPub(t *testing.T) {
 	require.ErrorIs(t, err, ErrDuplicateKey)
 	require.Nil(t, pkt)
 }
+
+// TestExtractRejectsOversizedWitnessCount ensures Extract returns
+// ErrInvalidPsbtFormat rather than panicking when FinalScriptWitness encodes an
+// impossibly large witness item count varint.
+func TestExtractRejectsOversizedWitnessCount(t *testing.T) {
+	newTestPacket := func(finalWitness []byte) *Packet {
+		tx := wire.NewMsgTx(wire.TxVersion)
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Index: 0},
+		})
+		tx.AddTxOut(&wire.TxOut{
+			Value:    1000,
+			PkScript: []byte{0x00, 0x14, 0x01},
+		})
+
+		pkt, err := NewFromUnsignedTx(tx)
+		require.NoError(t, err)
+		pkt.Inputs[0].FinalScriptWitness = finalWitness
+
+		return pkt
+	}
+
+	// Positive control: a valid 1-item witness stack extracts cleanly.
+	validWitness := []byte{0x01, 0x02, 0xaa, 0xbb}
+	extractedTx, err := Extract(newTestPacket(validWitness))
+	require.NoError(t, err)
+	require.NotNil(t, extractedTx)
+	require.Equal(
+		t, wire.TxWitness{{0xaa, 0xbb}}, extractedTx.TxIn[0].Witness,
+	)
+
+	// Regression check: encode a 9-byte varint equal to math.MaxUint64 as
+	// the witness count with no trailing witness items.
+	var maliciousWitness [9]byte
+	maliciousWitness[0] = 0xff
+	binary.LittleEndian.PutUint64(maliciousWitness[1:], math.MaxUint64)
+
+	var extractErr error
+	require.NotPanics(t, func() {
+		extractedTx, extractErr = Extract(
+			newTestPacket(maliciousWitness[:]),
+		)
+	})
+	require.ErrorIs(t, extractErr, ErrInvalidPsbtFormat)
+	require.Nil(t, extractedTx)
+}
