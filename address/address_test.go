@@ -923,3 +923,57 @@ func TestDecodeAddressBase58Fallback(t *testing.T) {
 	_, err = address.DecodeAddress(addrStr, &chaincfg.MainNetParams)
 	require.ErrorAs(t, err, &bech32.ErrMixedCase{})
 }
+
+// encodeSegWitAddress encodes a SegWit witness version and program using
+// Bech32 (for v0) or Bech32m (for v1+).
+func encodeSegWitAddress(t *testing.T, hrp string, witnessVer byte,
+	program []byte) string {
+
+	t.Helper()
+
+	conv, err := bech32.ConvertBits(program, 8, 5, true)
+	require.NoError(t, err)
+
+	payload := append([]byte{witnessVer}, conv...)
+
+	if witnessVer == 0 {
+		encoded, err := bech32.Encode(hrp, payload)
+		require.NoError(t, err)
+		return encoded
+	}
+
+	encoded, err := bech32.EncodeM(hrp, payload)
+	require.NoError(t, err)
+	return encoded
+}
+
+// TestDecodeAddressRejectsWitnessV1TwentyByteProgram verifies that
+// DecodeAddress rejects a Bech32m-encoded witness v1 address with a 20-byte
+// witness program instead of silently downgrading it to a v0 P2WPKH address.
+func TestDecodeAddressRejectsWitnessV1TwentyByteProgram(t *testing.T) {
+	prog20 := bytes.Repeat([]byte{0x42}, 20)
+
+	// Positive control: witness v0 with a 20-byte program must decode as
+	// AddressWitnessPubKeyHash.
+	v0AddrStr := encodeSegWitAddress(
+		t, chaincfg.MainNetParams.Bech32HRPSegwit, 0, prog20,
+	)
+	decodedV0, err := address.DecodeAddress(
+		v0AddrStr, &chaincfg.MainNetParams,
+	)
+	require.NoError(t, err)
+	require.IsType(t, &address.AddressWitnessPubKeyHash{}, decodedV0)
+
+	// Regression check: this library has no address type for a v1 20-byte
+	// program, so DecodeAddress must reject it with
+	// UnsupportedWitnessProgLenError rather than downgrading it to v0
+	// P2WPKH.
+	v1AddrStr := encodeSegWitAddress(
+		t, chaincfg.MainNetParams.Bech32HRPSegwit, 1, prog20,
+	)
+	decodedV1, err := address.DecodeAddress(
+		v1AddrStr, &chaincfg.MainNetParams,
+	)
+	require.ErrorIs(t, err, address.UnsupportedWitnessProgLenError(20))
+	require.Nil(t, decodedV1)
+}
