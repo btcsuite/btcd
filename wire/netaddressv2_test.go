@@ -265,22 +265,23 @@ func TestReadNetAddressV2(t *testing.T) {
 			nil,
 		},
 
-		// Invalid torv2 size.
+		// Torv2 with an unexpected size is skipped.
 		{
-			[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x02},
+			[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03,
+				0x01, 0x02, 0x03, 0x00, 0x00},
 			"",
-			ErrInvalidAddressSize,
+			ErrSkippedNetworkID,
 		},
 
-		// Valid torv2 encoding.
+		// Retired torv2 encoding is consumed and ignored.
 		{
 			[]byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x0a, 0x20,
 				0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
 				0x20, 0x22, 0x22,
 			},
-			string(torv2),
-			nil,
+			"",
+			ErrSkippedNetworkID,
 		},
 
 		// Invalid torv3 size.
@@ -342,6 +343,17 @@ func TestReadNetAddressV2(t *testing.T) {
 			},
 			string(cjdns),
 			ErrSkippedNetworkID,
+		},
+		// Retired Tor v2 retains unknown-network error bounds.
+		{
+			[]byte{0, 0, 0, 0, 0, byte(torv2), 0xfd, 0x01, 0x02},
+			"",
+			ErrInvalidAddressSize,
+		},
+		{
+			[]byte{0, 0, 0, 0, 0, byte(torv2), 3, 1, 2},
+			"",
+			io.ErrUnexpectedEOF,
 		},
 	}
 
