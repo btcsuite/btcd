@@ -1,11 +1,14 @@
 package psbt
 
 import (
+	"bytes"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInPlaceSort(t *testing.T) {
@@ -164,4 +167,41 @@ func TestInPlaceSort(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestTaprootScriptSpendSigSortBeforeTransitive verifies that
+// TaprootScriptSpendSig.SortBefore implements a strict weak ordering across
+// both distinct and equal XOnlyPubKey values, and orders slices canonically
+// when used with sort.Slice.
+func TestTaprootScriptSpendSigSortBeforeTransitive(t *testing.T) {
+	pubA := bytes.Repeat([]byte{0x02}, 32)
+	pubB := bytes.Repeat([]byte{0x03}, 32)
+
+	sigA1 := &TaprootScriptSpendSig{
+		XOnlyPubKey: pubA,
+		LeafHash:    bytes.Repeat([]byte{0x01}, 32),
+	}
+	sigA2 := &TaprootScriptSpendSig{
+		XOnlyPubKey: pubA,
+		LeafHash:    bytes.Repeat([]byte{0x02}, 32),
+	}
+	sigB0 := &TaprootScriptSpendSig{
+		XOnlyPubKey: pubB,
+		LeafHash:    bytes.Repeat([]byte{0x00}, 32),
+	}
+
+	// Equal XOnlyPubKey values must break ties by LeafHash.
+	require.True(t, sigA1.SortBefore(sigA2))
+	require.False(t, sigA2.SortBefore(sigA1))
+	require.False(t, sigA1.SortBefore(sigA1))
+
+	// Smaller XOnlyPubKey must win even when its LeafHash is larger.
+	require.True(t, sigA2.SortBefore(sigB0))
+	require.False(t, sigB0.SortBefore(sigA2))
+
+	sigs := []*TaprootScriptSpendSig{sigB0, sigA2, sigA1}
+	sort.Slice(sigs, func(i, j int) bool {
+		return sigs[i].SortBefore(sigs[j])
+	})
+	require.Equal(t, []*TaprootScriptSpendSig{sigA1, sigA2, sigB0}, sigs)
 }
