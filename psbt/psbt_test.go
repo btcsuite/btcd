@@ -1852,3 +1852,64 @@ func TestUnknowns(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, packetWithUnknowns, encoded)
 }
+
+// buildGlobalXPubPSBT builds a minimal raw PSBT containing an unsigned
+// transaction and the provided serialized 78-byte global xpub keys.
+func buildGlobalXPubPSBT(t *testing.T, xpubKeys ...[]byte) []byte {
+	t.Helper()
+
+	tx := wire.NewMsgTx(wire.TxVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Index: 0},
+	})
+	tx.AddTxOut(&wire.TxOut{
+		Value:    1000,
+		PkScript: []byte{0x51},
+	})
+
+	var txBuf bytes.Buffer
+	require.NoError(t, tx.SerializeNoWitness(&txBuf))
+
+	var raw bytes.Buffer
+	raw.Write(psbtMagic[:])
+
+	// Global unsigned tx (type 0x00).
+	require.NoError(t, wire.WriteVarBytes(&raw, 0, []byte{0x00}))
+	require.NoError(t, wire.WriteVarBytes(&raw, 0, txBuf.Bytes()))
+
+	// Append each PSBT_GLOBAL_XPUB entry (type 0x01 || 78-byte xpub).
+	xpubVal := make([]byte, 8)
+	for _, xpubKey := range xpubKeys {
+		entry := append([]byte{byte(XPubType)}, xpubKey...)
+		require.NoError(t, wire.WriteVarBytes(&raw, 0, entry))
+		require.NoError(t, wire.WriteVarBytes(&raw, 0, xpubVal))
+	}
+
+	// Global separator, input separator, output separator.
+	raw.WriteByte(0x00)
+	raw.WriteByte(0x00)
+	raw.WriteByte(0x00)
+
+	return raw.Bytes()
+}
+
+// TestNewFromRawBytesRejectsDuplicateGlobalXPub verifies that distinct global
+// PSBT_GLOBAL_XPUB keys are accepted while duplicate keys are rejected per
+// BIP-174.
+func TestNewFromRawBytesRejectsDuplicateGlobalXPub(t *testing.T) {
+	xpubKeyA := makeTestExtendedKey(t, 1)
+	xpubKeyB := makeTestExtendedKey(t, 1)
+
+	// Positive control: two distinct global xpubs must deserialize cleanly.
+	validBytes := buildGlobalXPubPSBT(t, xpubKeyA, xpubKeyB)
+	pkt, err := NewFromRawBytes(bytes.NewReader(validBytes), false)
+	require.NoError(t, err)
+	require.NotNil(t, pkt)
+	require.Len(t, pkt.XPubs, 2)
+
+	// Regression check: two identical global xpubs must be rejected.
+	dupBytes := buildGlobalXPubPSBT(t, xpubKeyA, xpubKeyA)
+	pkt, err = NewFromRawBytes(bytes.NewReader(dupBytes), false)
+	require.ErrorIs(t, err, ErrDuplicateKey)
+	require.Nil(t, pkt)
+}
