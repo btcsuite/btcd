@@ -116,8 +116,10 @@ func ReadXPub(keyData []byte, path []byte) (*XPub, error) {
 	}
 	numPathElements := xPub.Depth()
 
-	// The path also contains the master key fingerprint,
-	expectedSize := int(uint32Size * (numPathElements + 1))
+	// The path also contains the master key fingerprint. Cast
+	// numPathElements to int before arithmetic to avoid uint8 overflow for
+	// depths >= 63.
+	expectedSize := uint32Size * (int(numPathElements) + 1)
 	if len(path) != expectedSize {
 		return nil, ErrInvalidPsbtFormat
 	}

@@ -46,8 +46,11 @@ func (s *TaprootScriptSpendSig) EqualKey(other *TaprootScriptSpendSig) bool {
 // lexicographically smaller than the given other script spend signature's key
 // and should come first when being sorted.
 func (s *TaprootScriptSpendSig) SortBefore(other *TaprootScriptSpendSig) bool {
-	return bytes.Compare(s.XOnlyPubKey, other.XOnlyPubKey) < 0 &&
-		bytes.Compare(s.LeafHash, other.LeafHash) < 0
+	if cmp := bytes.Compare(s.XOnlyPubKey, other.XOnlyPubKey); cmp != 0 {
+		return cmp < 0
+	}
+
+	return bytes.Compare(s.LeafHash, other.LeafHash) < 0
 }
 
 // TaprootTapLeafScript represents a single taproot leaf script that is
