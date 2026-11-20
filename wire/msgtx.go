@@ -48,11 +48,11 @@ const (
 	// seconds. Enforced relative lock times are multiples of 512 seconds.
 	SequenceLockTimeGranularity = 9
 
-	// defaultTxInOutAlloc is the default size used for the backing array for
-	// transaction inputs and outputs.  The array will dynamically grow as needed,
-	// but this figure is intended to provide enough space for the number of
-	// inputs and outputs in a typical transaction without needing to grow the
-	// backing array multiple times.
+	// defaultTxInOutAlloc is the default size used for the backing array
+	// for transaction inputs and outputs. The array will dynamically grow
+	// as needed, but this figure is intended to provide enough space for
+	// the number of inputs and outputs in a typical transaction without
+	// needing to grow the backing array multiple times.
 	defaultTxInOutAlloc = 15
 
 	// minTxInPayload is the minimum payload size for a transaction input.
@@ -72,7 +72,7 @@ const (
 	// a transaction which fits into a message could possibly have.
 	maxTxOutPerMessage = (MaxMessagePayload / MinTxOutPayload) + 1
 
-	// minTxPayload is the minimum payload size for a transaction.  Note
+	// minTxPayload is the minimum payload size for a transaction. Note
 	// that any realistically usable transaction must have at least one
 	// input or output, but that is a rule enforced at a higher layer, so
 	// it is intentionally not included here.
@@ -98,8 +98,8 @@ const (
 )
 
 var (
-	// errSuperfluousWitnessRecord is returned during tx deserialization when
-	// a tx has the witness marker flag set but has no witnesses.
+	// errSuperfluousWitnessRecord is returned during tx deserialization
+	// when a tx has the witness marker flag set but has no witnesses.
 	errSuperfluousWitnessRecord = fmt.Errorf(
 		"witness flag set but tx has no witnesses",
 	)
@@ -133,10 +133,11 @@ const TxFlagMarker = 0x00
 type TxFlag = byte
 
 const (
-	// WitnessFlag is a flag specific to witness encoding. If the TxFlagMarker
-	// is encountered followed by the WitnessFlag, then it indicates a
-	// transaction has witness data. This allows decoders to distinguish a
-	// serialized transaction with witnesses from a legacy one.
+	// WitnessFlag is a flag specific to witness encoding. If the
+	// TxFlagMarker is encountered followed by the WitnessFlag, then it
+	// indicates a transaction has witness data. This allows decoders to
+	// distinguish a serialized transaction with witnesses from a legacy
+	// one.
 	WitnessFlag TxFlag = 0x01
 )
 
@@ -161,7 +162,9 @@ func NewOutPoint(hash *chainhash.Hash, index uint32) *OutPoint {
 func NewOutPointFromString(outpoint string) (*OutPoint, error) {
 	parts := strings.Split(outpoint, ":")
 	if len(parts) != 2 {
-		return nil, errors.New("outpoint should be of the form txid:index")
+		return nil, errors.New(
+			"outpoint should be of the form txid:index",
+		)
 	}
 
 	if len(parts[0]) != chainhash.MaxHashStringSize {
@@ -186,7 +189,7 @@ func NewOutPointFromString(outpoint string) (*OutPoint, error) {
 
 // String returns the OutPoint in the human-readable form "hash:index".
 func (o OutPoint) String() string {
-	// Allocate enough for hash string, colon, and 10 digits.  Although
+	// Allocate enough for hash string, colon, and 10 digits. Although
 	// at the time of writing, the number of digits can be no greater than
 	// the length of the decimal representation of maxTxOutPerMessage, the
 	// maximum message payload may increase in the future and this
@@ -220,7 +223,9 @@ func (t *TxIn) SerializeSize() int {
 // NewTxIn returns a new bitcoin transaction input with the provided
 // previous outpoint point and signature script with a default sequence of
 // MaxTxInSequenceNum.
-func NewTxIn(prevOut *OutPoint, signatureScript []byte, witness [][]byte) *TxIn {
+func NewTxIn(prevOut *OutPoint, signatureScript []byte,
+	witness [][]byte) *TxIn {
+
 	return &TxIn{
 		PreviousOutPoint: *prevOut,
 		SignatureScript:  signatureScript,
@@ -277,7 +282,8 @@ type TxOut struct {
 func (t *TxOut) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of PkScript +
 	// PkScript bytes.
-	return 8 + VarIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
+	return 8 + VarIntSerializeSize(uint64(len(t.PkScript))) +
+		len(t.PkScript)
 }
 
 // NewTxOut returns a new bitcoin transaction output with the provided
@@ -414,10 +420,12 @@ func (msg *MsgTx) Copy() *MsgTx {
 // This is part of the Message interface implementation.
 // See Deserialize for decoding transactions stored to disk, such as in a
 // database, as opposed to decoding transactions from the wire.
-// If decoding fails, TxIn and TxOut are cleared.  Other fields may be partially
+// If decoding fails, TxIn and TxOut are cleared. Other fields may be partially
 // populated, so the receiver's contents must not be used unless a subsequent
 // decode succeeds.
-func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32,
+	enc MessageEncoding) error {
+
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
@@ -426,13 +434,20 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 
 	err := msg.btcDecode(r, pver, enc, buf, ar)
 	if err != nil {
-		// Drop staged scripts before their arena is returned to the pool.
+		// Drop staged scripts before their arena is returned to the
+		// pool.
 		msg.TxIn = nil
 		msg.TxOut = nil
 	}
 	return err
 }
 
+// btcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
+// See Deserialize for decoding transactions stored to disk, such as in a
+// database, as opposed to decoding transactions from the wire.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	buf []byte, ar *scriptArena) error {
 
@@ -455,16 +470,17 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	// value is a TxFlagMarker, and hence indicates the presence of a flag.
 	var flag [1]TxFlag
 	if count == TxFlagMarker && enc == WitnessEncoding {
-		// The count varint was in fact the flag marker byte. Next, we need to
-		// read the flag value, which is a single byte.
+		// The count varint was in fact the flag marker byte. Next, we
+		// need to read the flag value, which is a single byte.
 		if _, err = io.ReadFull(r, flag[:]); err != nil {
 			return err
 		}
 
-		// At the moment, the flag MUST be WitnessFlag (0x01). In the future
-		// other flag types may be supported.
+		// At the moment, the flag MUST be WitnessFlag (0x01). In the
+		// future other flag types may be supported.
 		if flag[0] != WitnessFlag {
-			str := fmt.Sprintf("witness tx but flag byte is %x", flag)
+			str := fmt.Sprintf("witness tx but flag byte is %x",
+				flag)
 			return messageError("MsgTx.BtcDecode", str)
 		}
 
@@ -477,7 +493,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	}
 
 	// Prevent more input transactions than could possibly fit into a
-	// message.  It would be possible to cause memory exhaustion and panics
+	// message. It would be possible to cause memory exhaustion and panics
 	// without a sane upper bound on this count.
 	if count > uint64(maxTxInPerMessage) {
 		str := fmt.Sprintf("too many input transactions to fit into "+
@@ -509,9 +525,9 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			txIns = append(txIns, TxIn{})
 		}
 
-		// Buffered inputs can point into their final backing array before
-		// the decode call populates it. Streaming inputs are wired up once
-		// their backing array stops growing.
+		// Buffered inputs can point into their final backing array
+		// before the decode call populates it. Streaming inputs are
+		// wired up once their backing array stops growing.
 		ti := &txIns[i]
 		if preallocateInputs {
 			msg.TxIn[i] = ti
@@ -535,7 +551,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	}
 
 	// Prevent more output transactions than could possibly fit into a
-	// message.  It would be possible to cause memory exhaustion and panics
+	// message. It would be possible to cause memory exhaustion and panics
 	// without a sane upper bound on this count.
 	if count > uint64(maxTxOutPerMessage) {
 		str := fmt.Sprintf("too many output transactions to fit into "+
@@ -566,9 +582,9 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			txOuts = append(txOuts, TxOut{})
 		}
 
-		// Buffered outputs can point into their final backing array before
-		// the decode call populates it. Streaming outputs are wired up once
-		// their backing array stops growing.
+		// Buffered outputs can point into their final backing array
+		// before the decode call populates it. Streaming outputs are
+		// wired up once their backing array stops growing.
 		to := &txOuts[i]
 		if preallocateOutputs {
 			msg.TxOut[i] = to
@@ -601,8 +617,9 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			// Prevent a possible memory exhaustion attack by
 			// limiting the witCount value to a sane upper bound.
 			if witCount > maxWitnessItemsPerInput {
-				str := fmt.Sprintf("too many witness items to fit "+
-					"into max message size [count %d, max %d]",
+				str := fmt.Sprintf("too many witness items "+
+					"to fit into max message size "+
+					"[count %d, max %d]",
 					witCount, maxWitnessItemsPerInput)
 				return messageError("MsgTx.BtcDecode", str)
 			}
@@ -621,10 +638,13 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 			} else {
 				txin.Witness = make(
 					[][]byte, 0,
-					min(witCount, defaultStreamingElementCap),
+					min(
+						witCount,
+						defaultStreamingElementCap,
+					),
 				)
 			}
-			for j := uint64(0); j < witCount; j++ {
+			for j := range witCount {
 				item, err := readScriptBuf(
 					r, pver, buf, ar, "script witness item",
 				)
@@ -634,7 +654,9 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 				if preallocateWitness {
 					txin.Witness[j] = item
 				} else {
-					txin.Witness = append(txin.Witness, item)
+					txin.Witness = append(
+						txin.Witness, item,
+					)
 				}
 				totalScriptSize += uint64(len(item))
 			}
@@ -654,10 +676,10 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 
 	// Create a single allocation to house all of the scripts and set each
 	// input signature script, witness item, and output public key script
-	// to the appropriate subslice of the overall contiguous buffer.  This
+	// to the appropriate subslice of the overall contiguous buffer. This
 	// copies the scripts out of the transient decode arena into memory
 	// the transaction owns, which is what makes rewinding the arena for
-	// the next transaction safe.  A single backing allocation also
+	// the next transaction safe. A single backing allocation also
 	// significantly reduces the number of allocations the garbage
 	// collector needs to track, which in turn improves performance and
 	// drastically reduces the amount of runtime overhead that would
@@ -714,17 +736,17 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 
 // Deserialize decodes a transaction from r into the receiver using a format
 // that is suitable for long-term storage such as a database while respecting
-// the Version field in the transaction.  This function differs from BtcDecode
+// the Version field in the transaction. This function differs from BtcDecode
 // in that BtcDecode decodes from the bitcoin wire protocol as it was sent
-// across the network.  The wire encoding can technically differ depending on
+// across the network. The wire encoding can technically differ depending on
 // the protocol version and doesn't even really need to match the format of a
-// stored transaction at all.  As of the time this comment was written, the
+// stored transaction at all. As of the time this comment was written, the
 // encoded transaction is the same in both instances, but there is a distinct
 // difference and separating the two allows the API to be flexible enough to
 // deal with changes.
 func (msg *MsgTx) Deserialize(r io.Reader) error {
 	// At the current time, there is no difference between the wire encoding
-	// at protocol version 0 and the stable long-term storage format.  As
+	// at protocol version 0 and the stable long-term storage format. As
 	// a result, make use of BtcDecode.
 	return msg.BtcDecode(r, 0, WitnessEncoding)
 }
@@ -741,7 +763,9 @@ func (msg *MsgTx) DeserializeNoWitness(r io.Reader) error {
 // This is part of the Message interface implementation.
 // See Serialize for encoding transactions to be stored to disk, such as in a
 // database, as opposed to encoding transactions for the wire.
-func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
+func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32,
+	enc MessageEncoding) error {
+
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
@@ -749,6 +773,12 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	return err
 }
 
+// btcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// This is part of the Message interface implementation.
+// See Serialize for encoding transactions to be stored to disk, such as in a
+// database, as opposed to encoding transactions for the wire.
+//
+// NOTE: buf length MUST be at least 8.
 func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	buf []byte) error {
 
@@ -763,11 +793,13 @@ func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	// defined in BIP0144.
 	doWitness := enc == WitnessEncoding && msg.HasWitness()
 	if doWitness {
-		// After the transaction's Version field, we include two additional
-		// bytes specific to the witness encoding. This byte sequence is known
-		// as a flag. The first byte is a marker byte (TxFlagMarker) and the
-		// second one is the flag value to indicate presence of witness data.
-		if _, err := w.Write([]byte{TxFlagMarker, WitnessFlag}); err != nil {
+		// After the transaction's Version field, we include two
+		// additional bytes specific to the witness encoding. This byte
+		// sequence is known as a flag. The first byte is a marker byte
+		// (TxFlagMarker) and the second one is the flag value to
+		// indicate presence of witness data.
+		_, err := w.Write([]byte{TxFlagMarker, WitnessFlag})
+		if err != nil {
 			return err
 		}
 	}
@@ -803,7 +835,9 @@ func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	// within the transaction.
 	if doWitness {
 		for _, ti := range msg.TxIn {
-			err = writeTxWitnessBuf(w, pver, msg.Version, ti.Witness, buf)
+			err = writeTxWitnessBuf(
+				w, pver, msg.Version, ti.Witness, buf,
+			)
 			if err != nil {
 				return err
 			}
@@ -829,17 +863,17 @@ func (msg *MsgTx) HasWitness() bool {
 
 // Serialize encodes the transaction to w using a format that suitable for
 // long-term storage such as a database while respecting the Version field in
-// the transaction.  This function differs from BtcEncode in that BtcEncode
+// the transaction. This function differs from BtcEncode in that BtcEncode
 // encodes the transaction to the bitcoin wire protocol in order to be sent
-// across the network.  The wire encoding can technically differ depending on
+// across the network. The wire encoding can technically differ depending on
 // the protocol version and doesn't even really need to match the format of a
-// stored transaction at all.  As of the time this comment was written, the
+// stored transaction at all. As of the time this comment was written, the
 // encoded transaction is the same in both instances, but there is a distinct
 // difference and separating the two allows the API to be flexible enough to
 // deal with changes.
 func (msg *MsgTx) Serialize(w io.Writer) error {
 	// At the current time, there is no difference between the wire encoding
-	// at protocol version 0 and the stable long-term storage format.  As
+	// at protocol version 0 and the stable long-term storage format. As
 	// a result, make use of BtcEncode.
 	//
 	// Passing a encoding type of WitnessEncoding to BtcEncode for MsgTx
@@ -900,20 +934,20 @@ func (msg *MsgTx) SerializeSizeStripped() int {
 	return msg.baseSize()
 }
 
-// Command returns the protocol command string for the message.  This is part
+// Command returns the protocol command string for the message. This is part
 // of the Message interface implementation.
 func (msg *MsgTx) Command() string {
 	return CmdTx
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
-// receiver.  This is part of the Message interface implementation.
+// receiver. This is part of the Message interface implementation.
 func (msg *MsgTx) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayload
 }
 
 // PkScriptLocs returns a slice containing the start of each public key script
-// within the raw serialized transaction.  The caller can easily obtain the
+// within the raw serialized transaction. The caller can easily obtain the
 // length of each script by using len on the script available via the
 // appropriate transaction output entry.
 func (msg *MsgTx) PkScriptLocs() []int {
@@ -957,8 +991,8 @@ func (msg *MsgTx) PkScriptLocs() []int {
 }
 
 // NewMsgTx returns a new bitcoin tx message that conforms to the Message
-// interface.  The return instance has a default version of TxVersion and there
-// are no transaction inputs or outputs.  Also, the lock time is set to zero
+// interface. The return instance has a default version of TxVersion and there
+// are no transaction inputs or outputs. Also, the lock time is set to zero
 // to indicate the transaction is valid immediately as opposed to some time in
 // future.
 func NewMsgTx(version int32) *MsgTx {
@@ -990,7 +1024,9 @@ func readOutPointBuf(r io.Reader, pver uint32, version int32, op *OutPoint,
 
 // WriteOutPoint encodes op to the bitcoin protocol encoding for an OutPoint to
 // w.
-func WriteOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error {
+func WriteOutPoint(w io.Writer, pver uint32, version int32,
+	op *OutPoint) error {
+
 	buf := binarySerializer.Borrow()
 	defer binarySerializer.Return(buf)
 
@@ -1016,12 +1052,12 @@ func writeOutPointBuf(w io.Writer, pver uint32, version int32, op *OutPoint,
 }
 
 // readScriptBuf reads a variable length byte array that represents a
-// transaction script.  It is encoded as a varInt containing the length of the
-// array followed by the bytes themselves.  The script bytes are staged in the
+// transaction script. It is encoded as a varInt containing the length of the
+// array followed by the bytes themselves. The script bytes are staged in the
 // provided arena, so the returned slice is only valid until the arena is
-// rewound or released.  An error is returned if the length is greater than
+// rewound or released. An error is returned if the length is greater than
 // the max allowed script size which helps protect against memory exhaustion
-// attacks and forced panics through malformed messages.  The fieldName
+// attacks and forced panics through malformed messages. The fieldName
 // parameter is only used for the error message so it provides more context in
 // the error.
 //
@@ -1034,7 +1070,7 @@ func readScriptBuf(r io.Reader, pver uint32, buf []byte, ar *scriptArena,
 		return nil, err
 	}
 
-	// Prevent byte array larger than the max message size.  It would
+	// Prevent byte array larger than the max message size. It would
 	// be possible to cause memory exhaustion and panics without a sane
 	// upper bound on this count.
 	if count > maxWitnessItemSize {
@@ -1044,7 +1080,7 @@ func readScriptBuf(r io.Reader, pver uint32, buf []byte, ar *scriptArena,
 		return nil, messageError("readScript", str)
 	}
 
-	// Stage the script in the decode arena.  This fails if the total
+	// Stage the script in the decode arena. This fails if the total
 	// script data staged for the transaction being decoded exceeds the
 	// arena capacity, which no valid transaction can reach.
 	s, err := ar.alloc(int(count))
@@ -1091,8 +1127,10 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 }
 
 // writeTxInBuf encodes ti to the bitcoin protocol encoding for a transaction
-// input (TxIn) to w.  The buf parameter is the scratch buffer used for
+// input (TxIn) to w. The buf parameter is the scratch buffer used for
 // serializing small values.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
 	buf []byte) error {
 
@@ -1137,8 +1175,10 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 }
 
 // readTxOutBuf reads the next sequence of bytes from r as a transaction output
-// (TxOut).  The buf parameter is the scratch buffer used for serializing
+// (TxOut). The buf parameter is the scratch buffer used for serializing
 // small values.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	buf []byte, ar *scriptArena) error {
 
@@ -1168,11 +1208,13 @@ func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 }
 
 // WriteTxOutBuf encodes to into the bitcoin protocol encoding for a transaction
-// output (TxOut) to w.  The buf parameter is the scratch buffer used for
+// output (TxOut) to w. The buf parameter is the scratch buffer used for
 // serializing small values.
 //
 // NOTE: This function is exported in order to allow txscript to compute the
 // new sighashes for witness transactions (BIP0143).
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
 	buf []byte) error {
 
@@ -1186,8 +1228,10 @@ func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
 }
 
 // writeTxWitnessBuf encodes the bitcoin protocol encoding for a transaction
-// input's witness into to w.  The buf parameter is the scratch buffer used
+// input's witness into to w. The buf parameter is the scratch buffer used
 // for serializing small values.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeTxWitnessBuf(w io.Writer, pver uint32, version int32, wit [][]byte,
 	buf []byte) error {
 

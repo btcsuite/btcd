@@ -17,19 +17,20 @@ import (
 )
 
 const (
-	// MaxVarIntPayload is the maximum payload size for a variable length integer.
+	// MaxVarIntPayload is the maximum payload size for a variable length
+	// integer.
 	MaxVarIntPayload = 9
 
 	// binaryFreeListMaxItems is the number of buffers to keep in the free
 	// list to use for binary serialization and deserialization.
 	binaryFreeListMaxItems = 1024
 
-	// defaultReadBufferSize bounds speculative allocation when a reader does
-	// not expose the number of bytes it has remaining.
+	// defaultReadBufferSize bounds speculative allocation when a reader
+	// does not expose the number of bytes it has remaining.
 	defaultReadBufferSize = 4096
 
-	// defaultStreamingElementCap bounds speculative vector allocation when a
-	// reader does not expose the number of bytes it has remaining.
+	// defaultStreamingElementCap bounds speculative vector allocation when
+	// a reader does not expose the number of bytes it has remaining.
 	defaultStreamingElementCap = 128
 )
 
@@ -51,10 +52,10 @@ func readBytes(r io.Reader, count uint64) ([]byte, error) {
 	}
 
 	// Read into bounded chunks rather than using io.CopyN with a
-	// bytes.Buffer. Buffer.ReadFrom reserves more space before its final EOF
-	// check, which can grow the buffer beyond count after a complete read.
-	// Each chunk below is capped by the remaining payload and is allocated
-	// only after the preceding bytes arrive.
+	// bytes.Buffer. Buffer.ReadFrom reserves more space before its final
+	// EOF check, which can grow the buffer beyond count after a complete
+	// read. Each chunk below is capped by the remaining payload and is
+	// allocated only after the preceding bytes arrive.
 	remaining := count
 	chunkSize := uint64(defaultReadBufferSize)
 
@@ -163,7 +164,7 @@ var (
 
 // binaryFreeList defines a concurrent safe free list of byte slices (up to the
 // maximum number defined by the binaryFreeListMaxItems constant) that have a
-// cap of 8 (thus it supports up to a uint64).  It is used to provide temporary
+// cap of 8 (thus it supports up to a uint64). It is used to provide temporary
 // buffers for serializing and deserializing primitive numbers to and from their
 // binary encoding in order to greatly reduce the number of allocations
 // required.
@@ -174,7 +175,7 @@ var (
 // io.Writer, and return the buffer to the free list.
 type binaryFreeList chan []byte
 
-// Borrow returns a byte slice from the free list with a length of 8.  A new
+// Borrow returns a byte slice from the free list with a length of 8. A new
 // buffer is allocated if there are not any available on the free list.
 func (l binaryFreeList) Borrow() []byte {
 	var buf []byte
@@ -186,7 +187,7 @@ func (l binaryFreeList) Borrow() []byte {
 	return buf[:8]
 }
 
-// Return puts the provided byte slice back on the free list.  The buffer MUST
+// Return puts the provided byte slice back on the free list. The buffer MUST
 // have been obtained via the Borrow function and therefore have a cap of 8.
 func (l binaryFreeList) Return(buf []byte) {
 	select {
@@ -213,7 +214,9 @@ func (l binaryFreeList) Uint8(r io.Reader) (uint8, error) {
 // Uint16 reads two bytes from the provided reader using a buffer from the
 // free list, converts it to a number using the provided byte order, and returns
 // the resulting uint16.
-func (l binaryFreeList) Uint16(r io.Reader, byteOrder binary.ByteOrder) (uint16, error) {
+func (l binaryFreeList) Uint16(r io.Reader,
+	byteOrder binary.ByteOrder) (uint16, error) {
+
 	buf := l.Borrow()[:2]
 	defer l.Return(buf)
 
@@ -228,7 +231,9 @@ func (l binaryFreeList) Uint16(r io.Reader, byteOrder binary.ByteOrder) (uint16,
 // Uint32 reads four bytes from the provided reader using a buffer from the
 // free list, converts it to a number using the provided byte order, and returns
 // the resulting uint32.
-func (l binaryFreeList) Uint32(r io.Reader, byteOrder binary.ByteOrder) (uint32, error) {
+func (l binaryFreeList) Uint32(r io.Reader,
+	byteOrder binary.ByteOrder) (uint32, error) {
+
 	buf := l.Borrow()[:4]
 	defer l.Return(buf)
 
@@ -243,7 +248,9 @@ func (l binaryFreeList) Uint32(r io.Reader, byteOrder binary.ByteOrder) (uint32,
 // Uint64 reads eight bytes from the provided reader using a buffer from the
 // free list, converts it to a number using the provided byte order, and returns
 // the resulting uint64.
-func (l binaryFreeList) Uint64(r io.Reader, byteOrder binary.ByteOrder) (uint64, error) {
+func (l binaryFreeList) Uint64(r io.Reader,
+	byteOrder binary.ByteOrder) (uint64, error) {
+
 	buf := l.Borrow()[:8]
 	defer l.Return(buf)
 
@@ -270,7 +277,9 @@ func (l binaryFreeList) PutUint8(w io.Writer, val uint8) error {
 // PutUint16 serializes the provided uint16 using the given byte order into a
 // buffer from the free list and writes the resulting two bytes to the given
 // writer.
-func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder, val uint16) error {
+func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder,
+	val uint16) error {
+
 	buf := l.Borrow()[:2]
 	defer l.Return(buf)
 
@@ -283,7 +292,9 @@ func (l binaryFreeList) PutUint16(w io.Writer, byteOrder binary.ByteOrder, val u
 // PutUint32 serializes the provided uint32 using the given byte order into a
 // buffer from the free list and writes the resulting four bytes to the given
 // writer.
-func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder, val uint32) error {
+func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder,
+	val uint32) error {
+
 	buf := l.Borrow()[:4]
 	defer l.Return(buf)
 
@@ -296,7 +307,9 @@ func (l binaryFreeList) PutUint32(w io.Writer, byteOrder binary.ByteOrder, val u
 // PutUint64 serializes the provided uint64 using the given byte order into a
 // buffer from the free list and writes the resulting eight bytes to the given
 // writer.
-func (l binaryFreeList) PutUint64(w io.Writer, byteOrder binary.ByteOrder, val uint64) error {
+func (l binaryFreeList) PutUint64(w io.Writer, byteOrder binary.ByteOrder,
+	val uint64) error {
+
 	buf := l.Borrow()[:8]
 	defer l.Return(buf)
 
@@ -315,19 +328,19 @@ var binarySerializer binaryFreeList = make(chan []byte, binaryFreeListMaxItems)
 var errNonCanonicalVarInt = "non-canonical varint %x - discriminant %x must " +
 	"encode a value greater than %x"
 
-// uint32Time represents a unix timestamp encoded with a uint32.  It is used as
+// uint32Time represents a unix timestamp encoded with a uint32. It is used as
 // a way to signal the readElement function how to decode a timestamp into a Go
 // time.Time since it is otherwise ambiguous.
 type uint32Time time.Time
 
-// int64Time represents a unix timestamp encoded with an int64.  It is used as
+// int64Time represents a unix timestamp encoded with an int64. It is used as
 // a way to signal the readElement function how to decode a timestamp into a Go
 // time.Time since it is otherwise ambiguous.
 type int64Time time.Time
 
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.
-func readElement(r io.Reader, element interface{}) error {
+func readElement(r io.Reader, element any) error {
 	// Attempt to read the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
@@ -470,9 +483,9 @@ func readElement(r io.Reader, element interface{}) error {
 	return binary.Read(r, littleEndian, element)
 }
 
-// readElements reads multiple items from r.  It is equivalent to multiple
+// readElements reads multiple items from r. It is equivalent to multiple
 // calls to readElement.
-func readElements(r io.Reader, elements ...interface{}) error {
+func readElements(r io.Reader, elements ...any) error {
 	for _, element := range elements {
 		err := readElement(r, element)
 		if err != nil {
@@ -483,7 +496,7 @@ func readElements(r io.Reader, elements ...interface{}) error {
 }
 
 // writeElement writes the little endian representation of element to w.
-func writeElement(w io.Writer, element interface{}) error {
+func writeElement(w io.Writer, element any) error {
 	// Attempt to write the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
@@ -599,9 +612,9 @@ func writeElement(w io.Writer, element interface{}) error {
 	return binary.Write(w, littleEndian, element)
 }
 
-// writeElements writes multiple items to w.  It is equivalent to multiple
+// writeElements writes multiple items to w. It is equivalent to multiple
 // calls to writeElement.
-func writeElements(w io.Writer, elements ...interface{}) error {
+func writeElements(w io.Writer, elements ...any) error {
 	for _, element := range elements {
 		err := writeElement(w, element)
 		if err != nil {
@@ -623,7 +636,7 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 // ReadVarIntBuf reads a variable length integer from r using a preallocated
 // scratch buffer and returns it as a uint64.
 //
-// NOTE: buf MUST at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func ReadVarIntBuf(r io.Reader, pver uint32, buf []byte) (uint64, error) {
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
 		return 0, err
@@ -694,7 +707,7 @@ func WriteVarInt(w io.Writer, pver uint32, val uint64) error {
 // WriteVarIntBuf serializes val to w using a variable number of bytes depending
 // on its value using a preallocated scratch buffer.
 //
-// NOTE: buf MUST at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func WriteVarIntBuf(w io.Writer, pver uint32, val uint64, buf []byte) error {
 	switch {
 	case val < 0xfd:
@@ -750,9 +763,9 @@ func VarIntSerializeSize(val uint64) int {
 }
 
 // ReadVarString reads a variable length string from r and returns it as a Go
-// string.  A variable length string is encoded as a variable length integer
+// string. A variable length string is encoded as a variable length integer
 // containing the length of the string followed by the bytes that represent the
-// string itself.  An error is returned if the length is greater than the
+// string itself. An error is returned if the length is greater than the
 // maximum block payload size since it helps protect against memory exhaustion
 // attacks and forced panics through malformed messages.
 func ReadVarString(r io.Reader, pver uint32) (string, error) {
@@ -764,9 +777,9 @@ func ReadVarString(r io.Reader, pver uint32) (string, error) {
 }
 
 // readVarStringBuf reads a variable length string from r and returns it as a Go
-// string.  A variable length string is encoded as a variable length integer
+// string. A variable length string is encoded as a variable length integer
 // containing the length of the string followed by the bytes that represent the
-// string itself.  An error is returned if the length is greater than the
+// string itself. An error is returned if the length is greater than the
 // maximum block payload size since it helps protect against memory exhaustion
 // attacks and forced panics through malformed messages.
 //
@@ -778,7 +791,7 @@ func readVarStringBuf(r io.Reader, pver uint32, buf []byte) (string, error) {
 	}
 
 	// Prevent variable length strings that are larger than the maximum
-	// message size.  It would be possible to cause memory exhaustion and
+	// message size. It would be possible to cause memory exhaustion and
 	// panics without a sane upper bound on this count.
 	if count > MaxMessagePayload {
 		str := fmt.Sprintf("variable length string is too long "+
@@ -819,11 +832,11 @@ func writeVarStringBuf(w io.Writer, pver uint32, str string, buf []byte) error {
 	return err
 }
 
-// ReadVarBytes reads a variable length byte array.  A byte array is encoded
+// ReadVarBytes reads a variable length byte array. A byte array is encoded
 // as a varInt containing the length of the array followed by the bytes
-// themselves.  An error is returned if the length is greater than the
+// themselves. An error is returned if the length is greater than the
 // passed maxAllowed parameter which helps protect against memory exhaustion
-// attacks and forced panics through malformed messages.  The fieldName
+// attacks and forced panics through malformed messages. The fieldName
 // parameter is only used for the error message so it provides more context in
 // the error.
 func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
@@ -836,11 +849,11 @@ func ReadVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 	return b, err
 }
 
-// ReadVarBytesBuf reads a variable length byte array.  A byte array is encoded
+// ReadVarBytesBuf reads a variable length byte array. A byte array is encoded
 // as a varInt containing the length of the array followed by the bytes
-// themselves.  An error is returned if the length is greater than the
+// themselves. An error is returned if the length is greater than the
 // passed maxAllowed parameter which helps protect against memory exhaustion
-// attacks and forced panics through malformed messages.  The fieldName
+// attacks and forced panics through malformed messages. The fieldName
 // parameter is only used for the error message so it provides more context in
 // the error.
 //
@@ -853,7 +866,7 @@ func ReadVarBytesBuf(r io.Reader, pver uint32, buf []byte, maxAllowed uint32,
 		return nil, err
 	}
 
-	// Prevent byte array larger than the max message size.  It would
+	// Prevent byte array larger than the max message size. It would
 	// be possible to cause memory exhaustion and panics without a sane
 	// upper bound on this count.
 	if count > uint64(maxAllowed) {
@@ -881,10 +894,9 @@ func WriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 }
 
 // WriteVarBytesBuf serializes a variable length byte array to w as a varInt
-// containing the number of bytes, followed by the bytes themselves. If b is
-// non-nil, the provided buffer will be used for serializing small values.
-// Otherwise a buffer will be drawn from the binarySerializer's pool and return
-// when the method finishes.
+// containing the number of bytes, followed by the bytes themselves.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func WriteVarBytesBuf(w io.Writer, pver uint32, bytes, buf []byte) error {
 	slen := uint64(len(bytes))
 
@@ -897,7 +909,7 @@ func WriteVarBytesBuf(w io.Writer, pver uint32, bytes, buf []byte) error {
 	return err
 }
 
-// randomUint64 returns a cryptographically random uint64 value.  This
+// randomUint64 returns a cryptographically random uint64 value. This
 // unexported version takes a reader primarily to ensure the error paths
 // can be properly tested by passing a fake reader in the tests.
 func randomUint64(r io.Reader) (uint64, error) {
