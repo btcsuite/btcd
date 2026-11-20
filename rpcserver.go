@@ -4273,8 +4273,13 @@ func parseCmd(request *btcjson.Request) *parsedRPCCmd {
 
 // createMarshalledReply returns a new marshalled JSON-RPC response given the
 // passed parameters.  It will automatically convert errors that are not of
-// the type *btcjson.RPCError to the appropriate type as needed.
+// the type *btcjson.RPCError to the appropriate type as needed.  A request
+// that names no valid JSON-RPC version is answered as JSON-RPC 1.0.
 func createMarshalledReply(rpcVersion btcjson.RPCVersion, id interface{}, result interface{}, replyErr error) ([]byte, error) {
+	if rpcVersion == "" {
+		rpcVersion = btcjson.RpcVersion1
+	}
+
 	var jsonErr *btcjson.RPCError
 	if replyErr != nil {
 		if jErr, ok := replyErr.(*btcjson.RPCError); ok {
@@ -4427,9 +4432,7 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 			if err != nil {
 				rpcsLog.Errorf("Failed to create reply: %v", err)
 			}
-		}
-
-		if err == nil {
+		} else {
 			// The JSON-RPC 1.0 spec defines that notifications must have their "id"
 			// set to null and states that notifications do not have a response.
 			//
@@ -4529,7 +4532,9 @@ func (s *rpcServer) jsonRPCRead(w http.ResponseWriter, r *http.Request, isAdmin 
 							Message: fmt.Sprintf("Invalid request: %v",
 								err),
 						}
-						resp, err = btcjson.MarshalResponse("", nil, nil, jsonErr)
+						resp, err = btcjson.MarshalResponse(
+							btcjson.RpcVersion2, nil, nil, jsonErr,
+						)
 						if err != nil {
 							rpcsLog.Errorf("Failed to create reply: %v", err)
 						}
