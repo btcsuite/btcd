@@ -77,11 +77,7 @@ func NewInvVect(typ InvType, hash *chainhash.Hash) *InvVect {
 // readInvVectBuf reads an encoded InvVect from r depending on the protocol
 // version.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readInvVectBuf(r io.Reader, pver uint32, iv *InvVect, buf []byte) error {
 	if _, err := io.ReadFull(r, buf[:4]); err != nil {
 		return err
@@ -94,11 +90,7 @@ func readInvVectBuf(r io.Reader, pver uint32, iv *InvVect, buf []byte) error {
 
 // writeInvVectBuf serializes an InvVect to w depending on the protocol version.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeInvVectBuf(w io.Writer, pver uint32, iv *InvVect, buf []byte) error {
 	littleEndian.PutUint32(buf[:4], uint32(iv.Type))
 	if _, err := w.Write(buf[:4]); err != nil {
