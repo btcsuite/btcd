@@ -131,11 +131,12 @@ func TestBlockHeaderWire(t *testing.T) {
 		},
 	}
 
+	var tmpBuf [8]byte
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire format.
 		var buf bytes.Buffer
-		err := writeBlockHeader(&buf, test.pver, test.in)
+		err := writeBlockHeaderBuf(&buf, test.pver, test.in, tmpBuf[:])
 		if err != nil {
 			t.Errorf("writeBlockHeader #%d error %v", i, err)
 			continue
@@ -161,7 +162,7 @@ func TestBlockHeaderWire(t *testing.T) {
 		// Decode the block header from wire format.
 		var bh BlockHeader
 		rbuf := bytes.NewReader(test.buf)
-		err = readBlockHeader(rbuf, test.pver, &bh)
+		err = readBlockHeaderBuf(rbuf, test.pver, &bh, tmpBuf[:])
 		if err != nil {
 			t.Errorf("readBlockHeader #%d error %v", i, err)
 			continue
