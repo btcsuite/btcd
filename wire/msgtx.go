@@ -644,7 +644,7 @@ func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 					),
 				)
 			}
-			for j := uint64(0); j < witCount; j++ {
+			for j := range witCount {
 				item, err := readScriptBuf(
 					r, pver, buf, ar, "script witness item",
 				)

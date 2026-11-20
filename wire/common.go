@@ -340,7 +340,7 @@ type int64Time time.Time
 
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.
-func readElement(r io.Reader, element interface{}) error {
+func readElement(r io.Reader, element any) error {
 	// Attempt to read the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
@@ -485,7 +485,7 @@ func readElement(r io.Reader, element interface{}) error {
 
 // readElements reads multiple items from r. It is equivalent to multiple
 // calls to readElement.
-func readElements(r io.Reader, elements ...interface{}) error {
+func readElements(r io.Reader, elements ...any) error {
 	for _, element := range elements {
 		err := readElement(r, element)
 		if err != nil {
@@ -496,7 +496,7 @@ func readElements(r io.Reader, elements ...interface{}) error {
 }
 
 // writeElement writes the little endian representation of element to w.
-func writeElement(w io.Writer, element interface{}) error {
+func writeElement(w io.Writer, element any) error {
 	// Attempt to write the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
@@ -614,7 +614,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 // writeElements writes multiple items to w. It is equivalent to multiple
 // calls to writeElement.
-func writeElements(w io.Writer, elements ...interface{}) error {
+func writeElements(w io.Writer, elements ...any) error {
 	for _, element := range elements {
 		err := writeElement(w, element)
 		if err != nil {
