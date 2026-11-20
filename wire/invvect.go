@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// MaxInvPerMsg is the maximum number of inventory vectors that can be in a
-	// single bitcoin inv message.
+	// MaxInvPerMsg is the maximum number of inventory vectors that can be
+	// in a single bitcoin inv message.
 	MaxInvPerMsg = 50000
 
 	// Maximum payload size for an inventory vector.
@@ -24,7 +24,7 @@ const (
 	InvWitnessFlag = 1 << 30
 )
 
-// InvType represents the allowed types of inventory vectors.  See InvVect.
+// InvType represents the allowed types of inventory vectors. See InvVect.
 type InvType uint32
 
 // These constants define the various supported inventory vector types.
@@ -35,7 +35,8 @@ const (
 	InvTypeFilteredBlock        InvType = 3
 	InvTypeWitnessBlock         InvType = InvTypeBlock | InvWitnessFlag
 	InvTypeWitnessTx            InvType = InvTypeTx | InvWitnessFlag
-	InvTypeFilteredWitnessBlock InvType = InvTypeFilteredBlock | InvWitnessFlag
+	InvTypeFilteredWitnessBlock InvType = InvTypeFilteredBlock |
+		InvWitnessFlag
 )
 
 // Map of service flags back to their constant names for pretty printing.
