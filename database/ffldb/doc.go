@@ -13,15 +13,16 @@ ensure data integrity.
 # Usage
 
 This package is a driver to the database package and provides the database type
-of "ffldb".  The parameters the Open and Create functions take are the
-database path as a string and the block network:
+of "ffldb". Open and Create take a database path, block network, and optional
+ffldb.Options to configure the LevelDB read cache:
 
 	db, err := database.Open("ffldb", "path/to/database", wire.MainNet)
 	if err != nil {
 		// Handle error
 	}
 
-	db, err := database.Create("ffldb", "path/to/database", wire.MainNet)
+	opts := ffldb.Options{BlockCacheSize: 32 << 20}
+	db, err := database.Create("ffldb", "path/to/database", wire.MainNet, opts)
 	if err != nil {
 		// Handle error
 	}

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
@@ -21,6 +22,28 @@ import (
 
 // dbType is the database type name for this driver.
 const dbType = "ffldb"
+
+// TestInvalidOptions checks the optional third argument for both entry points.
+func TestInvalidOptions(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		opts    interface{}
+		message string
+	}{
+		{true, "expected ffldb.Options"},
+		{ffldb.Options{BlockCacheSize: -1}, "must be non-negative"},
+	} {
+		for _, open := range []func(string, ...interface{}) (database.DB, error){
+			database.Create, database.Open,
+		} {
+			_, err := open(dbType, t.TempDir(), blockDataNet, test.opts)
+			if err == nil || !strings.Contains(err.Error(), test.message) {
+				t.Errorf("options %v: got %v, want %q", test.opts,
+					err, test.message)
+			}
+		}
+	}
+}
 
 // TestCreateOpenFail ensures that errors related to creating and opening a
 // database are handled properly.
@@ -38,8 +61,8 @@ func TestCreateOpenFail(t *testing.T) {
 	// Ensure that attempting to open a database with the wrong number of
 	// parameters returns the expected error.
 	wantErr := fmt.Errorf("invalid arguments to %s.Open -- expected "+
-		"database path and block network", dbType)
-	_, err = database.Open(dbType, 1, 2, 3)
+		"database path, block network and optional ffldb.Options", dbType)
+	_, err = database.Open(dbType, 1, 2, 3, 4)
 	if err.Error() != wantErr.Error() {
 		t.Errorf("Open: did not receive expected error - got %v, "+
 			"want %v", err, wantErr)
@@ -71,8 +94,8 @@ func TestCreateOpenFail(t *testing.T) {
 	// Ensure that attempting to create a database with the wrong number of
 	// parameters returns the expected error.
 	wantErr = fmt.Errorf("invalid arguments to %s.Create -- expected "+
-		"database path and block network", dbType)
-	_, err = database.Create(dbType, 1, 2, 3)
+		"database path, block network and optional ffldb.Options", dbType)
+	_, err = database.Create(dbType, 1, 2, 3, 4)
 	if err.Error() != wantErr.Error() {
 		t.Errorf("Create: did not receive expected error - got %v, "+
 			"want %v", err, wantErr)
