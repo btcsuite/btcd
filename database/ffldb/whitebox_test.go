@@ -23,6 +23,7 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/syndtr/goleveldb/leveldb"
 	ldberrors "github.com/syndtr/goleveldb/leveldb/errors"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 var (
@@ -179,7 +180,7 @@ func TestCornerCases(t *testing.T) {
 	// directory is needed.
 	testName := "openDB: fail due to file at target location"
 	wantErrCode := database.ErrDriverSpecific
-	idb, err := openDB(dbPath, blockDataNet, true)
+	idb, err := openDB(dbPath, blockDataNet, true, Options{})
 	if !checkDbError(t, testName, err, wantErrCode) {
 		if err == nil {
 			idb.Close()
@@ -191,7 +192,7 @@ func TestCornerCases(t *testing.T) {
 	// Remove the file and create the database to run tests against.  It
 	// should be successful this time.
 	_ = os.RemoveAll(dbPath)
-	idb, err = openDB(dbPath, blockDataNet, true)
+	idb, err = openDB(dbPath, blockDataNet, true, Options{})
 	if err != nil {
 		t.Errorf("openDB: unexpected error: %v", err)
 		return
@@ -702,4 +703,117 @@ func TestFailureScenarios(t *testing.T) {
 
 	// Test various corruption scenarios.
 	testCorruption(tc)
+}
+
+// writeCacheTestData flushes keys into an SSTable so reads exercise the
+// LevelDB block cache instead of the in-memory write buffer.
+func writeCacheTestData(t testing.TB, ldb *leveldb.DB, count int) [][8]byte {
+	t.Helper()
+	keys := make([][8]byte, count)
+	value := make([]byte, 512)
+	batch := new(leveldb.Batch)
+	for i := range keys {
+		binary.BigEndian.PutUint64(keys[i][:], uint64(i+1024))
+		batch.Put(keys[i][:], value)
+	}
+	if err := ldb.Write(batch, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := ldb.CompactRange(util.Range{}); err != nil {
+		t.Fatal(err)
+	}
+	return keys
+}
+
+// readCacheTestData interleaves reads across table blocks in a repeatable
+// order. An odd stride visits every key in these power-of-two fixtures once.
+func readCacheTestData(t testing.TB, ldb *leveldb.DB, keys [][8]byte) {
+	t.Helper()
+	for i := range keys {
+		key := &keys[(i*8191)%len(keys)]
+		if _, err := ldb.Get(key[:], nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func cacheReadBytes(t testing.TB, ldb *leveldb.DB) uint64 {
+	t.Helper()
+	var stats leveldb.DBStats
+	if err := ldb.Stats(&stats); err != nil {
+		t.Fatal(err)
+	}
+	return stats.IORead
+}
+
+// TestBlockCacheSize checks that creating and reopening the same database
+// applies the requested cache capacity to LevelDB.
+func TestBlockCacheSize(t *testing.T) {
+	path := t.TempDir()
+	idb, err := database.Create(dbType, path, blockDataNet, Options{
+		BlockCacheSize: 16 << 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ldb := idb.(*db).cache.ldb
+	keys := writeCacheTestData(t, ldb, 512)
+	readAgain := func(ldb *leveldb.DB) uint64 {
+		readCacheTestData(t, ldb, keys)
+		before := cacheReadBytes(t, ldb)
+		readCacheTestData(t, ldb, keys)
+		return cacheReadBytes(t, ldb) - before
+	}
+	if readAgain(ldb) == 0 {
+		t.Error("expected cache misses with a 16 KiB cache")
+	}
+	if err := idb.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	idb, err = database.Open(dbType, path, blockDataNet, Options{
+		BlockCacheSize: 1 << 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer idb.Close()
+	if got := readAgain(idb.(*db).cache.ldb); got != 0 {
+		t.Errorf("second pass with a 1 MiB cache read %d bytes", got)
+	}
+}
+
+// BenchmarkMetadataBlockCache reports LevelDB file reads after warming the
+// cache with the same 32,768-key working set at each capacity.
+func BenchmarkMetadataBlockCache(b *testing.B) {
+	path := b.TempDir()
+	idb, err := database.Create(dbType, path, blockDataNet)
+	if err != nil {
+		b.Fatal(err)
+	}
+	keys := writeCacheTestData(b, idb.(*db).cache.ldb, 32768)
+	if err := idb.Close(); err != nil {
+		b.Fatal(err)
+	}
+
+	for _, size := range []int{8, 32, 64} {
+		b.Run(fmt.Sprintf("%dMiB", size), func(b *testing.B) {
+			idb, err := database.Open(dbType, path, blockDataNet,
+				Options{BlockCacheSize: size << 20})
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer idb.Close()
+			ldb := idb.(*db).cache.ldb
+			readCacheTestData(b, ldb, keys)
+			before := cacheReadBytes(b, ldb)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				readCacheTestData(b, ldb, keys)
+			}
+			b.StopTimer()
+			read := cacheReadBytes(b, ldb) - before
+			b.ReportMetric(float64(read)/float64(b.N), "read-B/pass")
+		})
+	}
 }

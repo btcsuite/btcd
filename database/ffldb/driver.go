@@ -18,49 +18,58 @@ const (
 	dbType = "ffldb"
 )
 
-// parseArgs parses the arguments from the database Open/Create methods.
-func parseArgs(funcName string, args ...interface{}) (string, wire.BitcoinNet, error) {
-	if len(args) != 2 {
-		return "", 0, fmt.Errorf("invalid arguments to %s.%s -- "+
-			"expected database path and block network", dbType,
-			funcName)
+// Options configures the ffldb driver. It can be passed as an optional third
+// argument to database.Open and database.Create.
+type Options struct {
+	// BlockCacheSize is the LevelDB block cache capacity in bytes. Zero
+	// selects LevelDB's default. It is independent of the UTXO cache.
+	BlockCacheSize int
+}
+
+// openDriver validates the driver arguments and opens or creates the database.
+func openDriver(funcName string, create bool, args ...interface{}) (database.DB, error) {
+	if len(args) != 2 && len(args) != 3 {
+		return nil, fmt.Errorf("invalid arguments to %s.%s -- expected "+
+			"database path, block network and optional ffldb.Options",
+			dbType, funcName)
 	}
 
 	dbPath, ok := args[0].(string)
 	if !ok {
-		return "", 0, fmt.Errorf("first argument to %s.%s is invalid -- "+
+		return nil, fmt.Errorf("first argument to %s.%s is invalid -- "+
 			"expected database path string", dbType, funcName)
 	}
 
 	network, ok := args[1].(wire.BitcoinNet)
 	if !ok {
-		return "", 0, fmt.Errorf("second argument to %s.%s is invalid -- "+
+		return nil, fmt.Errorf("second argument to %s.%s is invalid -- "+
 			"expected block network", dbType, funcName)
 	}
 
-	return dbPath, network, nil
+	var opts Options
+	if len(args) == 3 {
+		opts, ok = args[2].(Options)
+		if !ok {
+			return nil, fmt.Errorf("third argument to %s.%s is "+
+				"invalid -- expected ffldb.Options", dbType,
+				funcName)
+		}
+		if opts.BlockCacheSize < 0 {
+			return nil, fmt.Errorf("block cache size must be non-negative")
+		}
+	}
+
+	return openDB(dbPath, network, create, opts)
 }
 
-// openDBDriver is the callback provided during driver registration that opens
-// an existing database for use.
+// openDBDriver opens an existing database for use.
 func openDBDriver(args ...interface{}) (database.DB, error) {
-	dbPath, network, err := parseArgs("Open", args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return openDB(dbPath, network, false)
+	return openDriver("Open", false, args...)
 }
 
-// createDBDriver is the callback provided during driver registration that
-// creates, initializes, and opens a database for use.
+// createDBDriver creates and opens a new database.
 func createDBDriver(args ...interface{}) (database.DB, error) {
-	dbPath, network, err := parseArgs("Create", args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return openDB(dbPath, network, true)
+	return openDriver("Create", true, args...)
 }
 
 // useLogger is the callback provided during driver registration that sets the
