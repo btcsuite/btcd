@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -29,7 +30,6 @@ import (
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/database"
-	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/internal/socks"
 	"github.com/btcsuite/btcd/mempool"
 	"github.com/btcsuite/btcd/peer"
@@ -134,6 +134,7 @@ type config struct {
 	MemoryProfile        string        `long:"memprofile" description:"Write memory profile to the specified file"`
 	TraceProfile         string        `long:"traceprofile" description:"Write execution trace to the specified file"`
 	DataDir              string        `short:"b" long:"datadir" description:"Directory to store data"`
+	DbBlockCacheSizeMiB  uint          `long:"dbblockcachesize" description:"LevelDB read cache size in MiB for ffldb (0 uses the LevelDB default)"`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`
 	DebugLevel           string        `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	DropAddrIndex        bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
@@ -309,6 +310,18 @@ func parseAndSetDebugLevels(debugLevel string) error {
 		setLogLevel(subsysID, logLevel)
 	}
 
+	return nil
+}
+
+// validateDbBlockCacheSize ensures the byte capacity fits LevelDB's int.
+func validateDbBlockCacheSize(dbType string, sizeMiB uint) error {
+	const maxSizeMiB = math.MaxInt >> 20
+	switch {
+	case sizeMiB > maxSizeMiB:
+		return fmt.Errorf("dbblockcachesize exceeds %d MiB", maxSizeMiB)
+	case sizeMiB != 0 && dbType != "ffldb":
+		return fmt.Errorf("dbblockcachesize requires ffldb")
+	}
 	return nil
 }
 
@@ -705,6 +718,12 @@ func loadConfig() (*config, []string, error) {
 		str := "%s: The specified database type [%v] is invalid -- " +
 			"supported types %v"
 		err := fmt.Errorf(str, funcName, cfg.DbType, knownDbTypes)
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, usageMessage)
+		return nil, nil, err
+	}
+
+	if err := validateDbBlockCacheSize(cfg.DbType, cfg.DbBlockCacheSizeMiB); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)
 		return nil, nil, err

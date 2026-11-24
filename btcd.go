@@ -18,6 +18,7 @@ import (
 
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
+	"github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/limits"
 	"github.com/btcsuite/btcd/ossec"
 )
@@ -389,7 +390,13 @@ func loadBlockDB() (database.DB, error) {
 	removeRegressionDB(dbPath)
 
 	btcdLog.Infof("Loading block database from '%s'", dbPath)
-	db, err := database.Open(cfg.DbType, dbPath, activeNetParams.Net)
+	args := []interface{}{dbPath, activeNetParams.Net}
+	if cfg.DbBlockCacheSizeMiB != 0 {
+		args = append(args, ffldb.Options{
+			BlockCacheSize: int(cfg.DbBlockCacheSizeMiB) << 20,
+		})
+	}
+	db, err := database.Open(cfg.DbType, args...)
 	if err != nil {
 		// Return the error if it's not because the database doesn't
 		// exist.
@@ -404,7 +411,7 @@ func loadBlockDB() (database.DB, error) {
 		if err != nil {
 			return nil, err
 		}
-		db, err = database.Create(cfg.DbType, dbPath, activeNetParams.Net)
+		db, err = database.Create(cfg.DbType, args...)
 		if err != nil {
 			return nil, err
 		}

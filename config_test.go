@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -111,5 +112,25 @@ func TestCreateDefaultConfigFile(t *testing.T) {
 
 	if !rpcpassRegexp.Match(content) {
 		t.Error("Could not find rpcpass in generated default config file.")
+	}
+}
+
+func TestValidateDbBlockCacheSize(t *testing.T) {
+	const limit = math.MaxInt >> 20
+	for _, test := range []struct {
+		dbType  string
+		sizeMiB uint
+		wantErr bool
+	}{
+		{"ffldb", 0, false},
+		{"ffldb", limit, false},
+		{"ffldb", limit + 1, true},
+		{"memdb", 0, false},
+		{"memdb", 1, true},
+	} {
+		err := validateDbBlockCacheSize(test.dbType, test.sizeMiB)
+		if (err != nil) != test.wantErr {
+			t.Errorf("dbtype=%s size=%d MiB: %v", test.dbType, test.sizeMiB, err)
+		}
 	}
 }
