@@ -97,110 +97,256 @@ func TestAddr(t *testing.T) {
 	}
 }
 
-// TestAddrWire tests the MsgAddr wire encode and decode for various numbers
-// of addresses and protocol versions.
-func TestAddrWire(t *testing.T) {
-	// A couple of NetAddresses to use for testing.
-	na := &NetAddress{
-		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  SFNodeNetwork,
-		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
-	}
-	na2 := &NetAddress{
-		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  SFNodeNetwork,
-		IP:        net.ParseIP("192.168.0.1"),
-		Port:      8334,
+// TestAddrEncode checks that encoding an addr message produces the expected
+// serialized output with different protocol versions, and numbers of addresses.
+func TestAddrEncode(t *testing.T) {
+	t.Parallel()
+
+	pver := ProtocolVersion
+	enc := BaseEncoding
+
+	ts := time.Unix(0x00000001, 0)
+	tsStr := "01000000"
+
+	sf := SFNodeNetwork
+	sfStr := "0100000000000000"
+
+	port := uint16(0x0001)
+	portStr := "0001"
+
+	// ipv4 host.
+	ipv4HostStr := "000000000000000000000000" + "00000001"
+	ipv4Host := mustHex(ipv4HostStr)
+
+	// ipv6 v4 mapped host.
+	ipv6v4HostStr := "00000000000000000000FFFF00000001"
+	ipv6v4Host := mustHex(ipv6v4HostStr)
+
+	// ipv6 host.
+	ipv6HostStr := "20010DB8000000000000000000000001"
+	ipv6Host := mustHex(ipv6HostStr)
+
+	// ipv6 onionCat torv2 host.
+	onionCatPrefix := "FD87D87EEB43"
+	ipv6OnionCatHostStr := onionCatPrefix + "00000000000000000001"
+	ipv6OnionCatHost := mustHex(ipv6OnionCatHostStr)
+
+	addresses0 := []*NetAddress{
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv4Host,
+			Port:      port,
+		},
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv6v4Host,
+			Port:      port,
+		},
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv6Host,
+			Port:      port,
+		},
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv6OnionCatHost,
+			Port:      port,
+		},
 	}
 
-	// Empty address message.
-	noAddr := NewMsgAddr()
-	noAddrEncoded := []byte{
-		0x00, // Varint for number of addresses
+	msgEncoded0 := mustHexAppend(
+		"03", // addr count
+
+		tsStr,
+		sfStr,
+		ipv4HostStr,
+		portStr,
+
+		tsStr,
+		sfStr,
+		ipv6v4HostStr,
+		portStr,
+
+		tsStr,
+		sfStr,
+		ipv6HostStr,
+		portStr,
+
+		// onionCat torv2 must be skipped (BIP-0155).
+	)
+
+	tests := []struct {
+		name        string
+		msg         *MsgAddr
+		wantEncoded []byte
+		pver        uint32
+	}{
+		{
+			"latest protocol version with no addresses",
+			&MsgAddr{},
+			mustHex("00"), // length of zero.
+			pver,
+		},
+		{
+			"skip encoding torv2 addr between multiple addresses",
+			&MsgAddr{AddrList: addresses0},
+			msgEncoded0,
+			pver,
+		},
+		{
+			"protocol version MultipleAddressVersion-1 with no " +
+				"addresses",
+			&MsgAddr{},
+			mustHex("00"), // length of zero.
+			MultipleAddressVersion - 1,
+		},
 	}
 
-	// Address message with multiple addresses.
-	multiAddr := NewMsgAddr()
-	multiAddr.AddAddresses(na, na2)
-	multiAddrEncoded := []byte{
-		0x02,                   // Varint for number of addresses
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
-		0x20, 0x8d, // Port 8333 in big-endian
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
-		0x20, 0x8e, // Port 8334 in big-endian
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var buf bytes.Buffer
 
+			err := test.msg.BtcEncode(&buf, test.pver, enc)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+
+			if !bytes.Equal(test.wantEncoded, buf.Bytes()) {
+				t.Fatalf("bad encoding; \nwant: %x\n got: %x",
+					test.wantEncoded, buf.Bytes())
+			}
+		})
+	}
+}
+
+// TestAddrDecode checks that decoding an addr message from the wire results
+// in the expected parsed data, with different protocol versions, and numbers of
+// addresses.
+func TestAddrDecode(t *testing.T) {
+	t.Parallel()
+
+	pver := ProtocolVersion
+	enc := BaseEncoding
+
+	ts := time.Unix(0x00000001, 0)
+	tsStr := "01000000"
+
+	sf := SFNodeNetwork
+	sfStr := "0100000000000000"
+
+	port := uint16(0x0001)
+	portStr := "0001"
+
+	// ipv4 host.
+	ipv4HostStr := "000000000000000000000000" + "00000001"
+	ipv4Host := mustHex(ipv4HostStr)
+
+	// ipv6 v4 mapped host.
+	ipv6v4HostStr := "00000000000000000000FFFF00000001"
+	ipv6v4Host := mustHex(ipv6v4HostStr)
+
+	// ipv6 host.
+	ipv6HostStr := "20010DB8000000000000000000000001"
+	ipv6Host := mustHex(ipv6HostStr)
+
+	// ipv6 onionCat torv2 host.
+	onionCatPrefix := "FD87D87EEB43"
+	ipv6OnionCatHostStr := onionCatPrefix + "00000000000000000001"
+
+	msgEncoded0 := mustHexAppend(
+		"04", // addr count
+
+		tsStr,
+		sfStr,
+		ipv4HostStr,
+		portStr,
+
+		tsStr,
+		sfStr,
+		ipv6v4HostStr,
+		portStr,
+
+		tsStr,
+		sfStr,
+		ipv6HostStr,
+		portStr,
+
+		tsStr,
+		sfStr,
+		ipv6OnionCatHostStr,
+		portStr,
+	)
+
+	addresses0 := []*NetAddress{
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv4Host,
+			Port:      port,
+		},
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv6v4Host,
+			Port:      port,
+		},
+		{
+			Timestamp: ts,
+			Services:  sf,
+			IP:        ipv6Host,
+			Port:      port,
+		},
+
+		// torv2 addresses must be skipped (BIP-0155).
 	}
 
 	tests := []struct {
-		in   *MsgAddr        // Message to encode
-		out  *MsgAddr        // Expected decoded message
-		buf  []byte          // Wire encoding
-		pver uint32          // Protocol version for wire encoding
-		enc  MessageEncoding // Message encoding format
+		name    string
+		encoded []byte
+		wantMsg *MsgAddr
+		pver    uint32
 	}{
-		// Latest protocol version with no addresses.
 		{
-			noAddr,
-			noAddr,
-			noAddrEncoded,
-			ProtocolVersion,
-			BaseEncoding,
+			"latest protocol version with no addresses",
+			mustHex("00"), // zero addresses.
+			&MsgAddr{AddrList: []*NetAddress{}},
+			pver,
 		},
-
-		// Latest protocol version with multiple addresses.
 		{
-			multiAddr,
-			multiAddr,
-			multiAddrEncoded,
-			ProtocolVersion,
-			BaseEncoding,
+			"skip decoding torv2 addr between multiple addresses",
+			msgEncoded0,
+			&MsgAddr{AddrList: addresses0},
+			pver,
 		},
-
-		// Protocol version MultipleAddressVersion-1 with no addresses.
 		{
-			noAddr,
-			noAddr,
-			noAddrEncoded,
+			"protocol version MultipleAddressVersion-1 with no " +
+				"addresses",
+			mustHex("00"), // zero addresses.
+			&MsgAddr{AddrList: []*NetAddress{}},
 			MultipleAddressVersion - 1,
-			BaseEncoding,
 		},
 	}
 
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire format.
-		var buf bytes.Buffer
-		err := test.in.BtcEncode(&buf, test.pver, test.enc)
-		if err != nil {
-			t.Errorf("BtcEncode #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("BtcEncode #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var msg MsgAddr
+			err := msg.BtcDecode(
+				bytes.NewReader(test.encoded), test.pver, enc,
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
 
-		// Decode the message from wire format.
-		var msg MsgAddr
-		rbuf := bytes.NewReader(test.buf)
-		err = msg.BtcDecode(rbuf, test.pver, test.enc)
-		if err != nil {
-			t.Errorf("BtcDecode #%d error %v", i, err)
-			continue
-		}
-		if !reflect.DeepEqual(&msg, test.out) {
-			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
-				spew.Sdump(msg), spew.Sdump(test.out))
-			continue
-		}
+			if !reflect.DeepEqual(test.wantMsg, &msg) {
+				t.Fatalf("unexpected msg: \nwant:\n%s\ngot:"+
+					"\n%s", spew.Sdump(test.wantMsg),
+					spew.Sdump(&msg))
+			}
+		})
 	}
 }
 

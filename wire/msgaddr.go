@@ -83,6 +83,10 @@ func (msg *MsgAddr) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) err
 		if err != nil {
 			return err
 		}
+		// Tor v2 is retired and must not be relayed.
+		if isOnionCatTor(na.IP) {
+			continue
+		}
 		msg.AddAddress(na)
 	}
 	return nil
@@ -93,7 +97,12 @@ func (msg *MsgAddr) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) err
 func (msg *MsgAddr) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 	// Protocol versions before MultipleAddressVersion only allowed 1 address
 	// per message.
-	count := len(msg.AddrList)
+	count := 0
+	for _, na := range msg.AddrList {
+		if !isOnionCatTor(na.IP) {
+			count++
+		}
+	}
 	if pver < MultipleAddressVersion && count > 1 {
 		str := fmt.Sprintf("too many addresses for message of "+
 			"protocol version %v [count %v, max 1]", pver, count)
@@ -112,6 +121,9 @@ func (msg *MsgAddr) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) err
 	}
 
 	for _, na := range msg.AddrList {
+		if isOnionCatTor(na.IP) {
+			continue
+		}
 		err = writeNetAddress(w, pver, na, true)
 		if err != nil {
 			return err
