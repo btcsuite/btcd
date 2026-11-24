@@ -30,7 +30,7 @@ var (
 	// maximum size for an unknown networkID.
 	ErrInvalidAddressSize = fmt.Errorf("invalid address size")
 
-	// ErrSkippedNetworkID is returned when the cjdns, i2p, or unknown
+	// ErrSkippedNetworkID is returned when the cjdns, i2p, torv2, or unknown
 	// networks are encountered during decoding. btcd does not support i2p
 	// or cjdns addresses. In the case of an unknown networkID, this is so
 	// that a future BIP reserving a new networkID does not cause older
@@ -300,7 +300,9 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 		return err
 	}
 
-	if !isKnownNetworkID(netID) {
+	// BIP-155 says torv2 addresses MUST be ignored on receive, so they are
+	// handled the same way as an unknown networkID, whatever their size.
+	if !isKnownNetworkID(netID) || networkID(netID) == torv2 {
 		// In the case of an unknown networkID, we'll read the address
 		// size and error with ErrInvalidAddressSize if it's greater
 		// than maxAddrV2Size. If the address size is within the valid
@@ -371,23 +373,6 @@ func readNetAddressV2(r io.Reader, pver uint32, na *NetAddressV2) error {
 		if isIPv4Mapped(addr.addr[:]) {
 			return ErrSkippedNetworkID
 		}
-	case torv2:
-		addr := &torv2Addr{}
-		addr.netID = torv2
-		if decodedSize != uint64(torv2Size) {
-			return ErrInvalidAddressSize
-		}
-
-		if err := readElement(r, &addr.addr); err != nil {
-			return err
-		}
-
-		na.Port, err = binarySerializer.Uint16(r, bigEndian)
-		if err != nil {
-			return err
-		}
-
-		na.Addr = addr
 	case torv3:
 		addr := &torv3Addr{}
 		addr.netID = torv3
