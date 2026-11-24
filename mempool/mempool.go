@@ -517,6 +517,26 @@ func (mp *TxPool) RemoveTransaction(tx *btcutil.Tx, removeRedeemers bool) {
 	mp.mtx.Unlock()
 }
 
+// RemoveNonFinalTransactions removes transactions that are no longer final at
+// the current chain tip, along with any transactions that depend on them. A
+// disconnected block can lower either the next block height or median time past.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) RemoveNonFinalTransactions() {
+	mp.mtx.Lock()
+	defer mp.mtx.Unlock()
+
+	nextHeight := mp.cfg.BestHeight() + 1
+	medianTimePast := mp.cfg.MedianTimePast()
+	for _, txDesc := range mp.pool {
+		if !blockchain.IsFinalizedTransaction(
+			txDesc.Tx, nextHeight, medianTimePast,
+		) {
+			mp.removeTransaction(txDesc.Tx, true)
+		}
+	}
+}
+
 // RemoveDoubleSpends removes all transactions which spend outputs spent by the
 // passed transaction from the memory pool.  Removing those transactions then
 // leads to removing all transactions which rely on them, recursively.  This is
