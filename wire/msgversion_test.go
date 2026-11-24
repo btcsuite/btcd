@@ -364,6 +364,21 @@ func TestVersionWireErrors(t *testing.T) {
 	}
 }
 
+// TestVersionTruncatedSenderFields checks that the sender address and nonce
+// are either both omitted or both present, as required by Bitcoin Core.
+func TestVersionTruncatedSenderFields(t *testing.T) {
+	for end := 47; end < 80; end++ {
+		var msg MsgVersion
+		err := msg.BtcDecode(
+			bytes.NewBuffer(baseVersionEncoded[:end]),
+			ProtocolVersion, BaseEncoding,
+		)
+		if err == nil {
+			t.Errorf("accepted version truncated at byte %d", end)
+		}
+	}
+}
+
 // TestVersionOptionalFields performs tests to ensure that an encoded version
 // messages that omit optional fields are handled correctly.
 func TestVersionOptionalFields(t *testing.T) {
@@ -392,9 +407,6 @@ func TestVersionOptionalFields(t *testing.T) {
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
-	addrMeVersionEncoded := make([]byte, len(baseVersionEncoded)-29)
-	copy(addrMeVersionEncoded, baseVersionEncoded)
-
 	// nonceVersion is a version message that contains all fields through
 	// the Nonce field.
 	nonceVersion := addrMeVersion
@@ -425,12 +437,6 @@ func TestVersionOptionalFields(t *testing.T) {
 		{
 			&onlyRequiredVersion,
 			onlyRequiredVersionEncoded,
-			ProtocolVersion,
-			BaseEncoding,
-		},
-		{
-			&addrMeVersion,
-			addrMeVersionEncoded,
 			ProtocolVersion,
 			BaseEncoding,
 		},

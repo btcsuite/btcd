@@ -94,16 +94,14 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) 
 		return err
 	}
 
-	// Protocol versions >= 106 added a from address, nonce, and user agent
-	// field and they are only considered present if there are bytes
-	// remaining in the message.
+	// Protocol versions >= 106 added a from address, nonce, and user agent.
+	// The from address and nonce must occur together if any bytes remain;
+	// the user agent may still be omitted.
 	if buf.Len() > 0 {
 		err = readNetAddress(buf, pver, &msg.AddrMe, false)
 		if err != nil {
 			return err
 		}
-	}
-	if buf.Len() > 0 {
 		err = readElement(buf, &msg.Nonce)
 		if err != nil {
 			return err
