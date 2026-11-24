@@ -60,6 +60,13 @@ func Extract(p *Packet) (*wire.MsgTx, error) {
 				return nil, err
 			}
 
+			// Each witness item requires at least 1 byte for its
+			// length prefix, so witCount cannot exceed the
+			// remaining unread bytes in witnessReader.
+			if witCount > uint64(witnessReader.Len()) {
+				return nil, ErrInvalidPsbtFormat
+			}
+
 			// Allocate one slot per witness item, then read each
 			// varint-prefixed item from the witness value. The value
 			// must contain exactly this one stack, so the exhaustion

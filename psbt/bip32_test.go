@@ -1,8 +1,13 @@
 package psbt
 
 import (
+	"bytes"
+	"encoding/binary"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,4 +76,64 @@ func TestReadBip32Derivation(t *testing.T) {
 			require.Equal(t, tt.expectPath, path)
 		})
 	}
+}
+
+// makeTestExtendedKey builds a serialized 78-byte BIP-32 extended public key
+// with the requested depth for testing ReadXPub path-length validation.
+func makeTestExtendedKey(t *testing.T, depth uint8) []byte {
+	t.Helper()
+
+	privKey, err := btcec.NewPrivateKey()
+	require.NoError(t, err)
+
+	chainCode := bytes.Repeat([]byte{0x11}, 32)
+	parentFP := []byte{0xaa, 0xbb, 0xcc, 0xdd}
+	childNum := []byte{0x00, 0x00, 0x00, 0x01}
+
+	extKey := hdkeychain.NewExtendedKey(
+		chaincfg.MainNetParams.HDPublicKeyID[:],
+		privKey.PubKey().SerializeCompressed(),
+		chainCode,
+		parentFP,
+		depth,
+		binary.BigEndian.Uint32(childNum),
+		false,
+	)
+
+	// DecodeExtendedKey expects the 78-byte binary BIP-32 serialization
+	// (version + depth + parentFP + childNum + chainCode + 33-byte pubkey).
+	raw := make([]byte, 0, 78)
+	raw = append(raw, chaincfg.MainNetParams.HDPublicKeyID[:]...)
+	raw = append(raw, depth)
+	raw = append(raw, parentFP...)
+	raw = append(raw, childNum...)
+	raw = append(raw, chainCode...)
+	raw = append(raw, privKey.PubKey().SerializeCompressed()...)
+
+	parsed, err := DecodeExtendedKey(raw)
+	require.NoError(t, err)
+	require.Equal(t, extKey.Depth(), parsed.Depth())
+
+	return raw
+}
+
+// TestReadXPubDepthOverflow verifies that ReadXPub does not overflow uint8
+// when computing expected path length for extended keys with Depth() >= 63.
+func TestReadXPubDepthOverflow(t *testing.T) {
+	const depth = 63
+	keyData := makeTestExtendedKey(t, depth)
+
+	// Positive control: a depth-63 key requires 4 * (63 + 1) = 256 bytes
+	// (4-byte master fingerprint plus 63 uint32 path elements).
+	validPath := make([]byte, 4*(depth+1))
+	xpub, err := ReadXPub(keyData, validPath)
+	require.NoError(t, err)
+	require.NotNil(t, xpub)
+	require.Len(t, xpub.Bip32Path, depth)
+
+	// Regression check: a 0-byte path must be rejected even though
+	// uint8(4 * (63 + 1)) wraps around to 0.
+	xpub, err = ReadXPub(keyData, []byte{})
+	require.ErrorIs(t, err, ErrInvalidPsbtFormat)
+	require.Nil(t, xpub)
 }
