@@ -1122,6 +1122,25 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		peer.UpdateLastAnnouncedBlock(&invVects[lastBlock].Hash)
 	}
 
+	// Learn about announced blocks during IBD without fetching unverified
+	// blocks. Another peer can supply headers while the sync peer stalls.
+	if sm.ibdMode && lastBlock != -1 {
+		iv := invVects[lastBlock]
+		haveInv, err := sm.haveInventory(iv)
+		if err != nil {
+			log.Warnf("Unable to check announced block: %v", err)
+			return
+		}
+		if !haveInv {
+			bestHash, _ := sm.chain.BestHeader()
+			locator := sm.chain.BlockLocatorFromHash(&bestHash)
+			err := peer.PushGetHeadersMsg(locator, &iv.Hash)
+			if err != nil {
+				log.Warnf("Unable to request announced headers: %v", err)
+			}
+		}
+	}
+
 	// Ignore invs from peers that aren't the sync peer if we are not
 	// current. Helps prevent fetching a mass of orphans. When syncPeer
 	// is nil, accept invs from any peer.
