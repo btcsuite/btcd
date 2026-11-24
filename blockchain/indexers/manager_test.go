@@ -9,9 +9,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcutil/v2"
+	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/database"
 	_ "github.com/btcsuite/btcd/database/ffldb"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 )
 
 type bucketBase struct {
@@ -169,5 +174,321 @@ func TestDropIndexDeleteBucketError(t *testing.T) {
 	err := dropIndex(db, idxKey, "test index", nil)
 	if !errors.Is(err, testErr) {
 		t.Fatalf("unexpected error: got %v, want %v", err, testErr)
+	}
+}
+
+// countBlockReadsDB wraps a database and counts the block reads its View
+// transactions make with FetchBlock.
+type countBlockReadsDB struct {
+	database.DB
+	blockReads int
+}
+
+// countBlockReadsTx wraps a database transaction and counts its block reads
+// with FetchBlock in db.blockReads.
+type countBlockReadsTx struct {
+	database.Tx
+	db *countBlockReadsDB
+}
+
+// View invokes the view function with a transaction that counts its block
+// reads.
+//
+// This is part of the database.DB interface.
+func (db *countBlockReadsDB) View(fn func(database.Tx) error) error {
+	return db.DB.View(func(dbTx database.Tx) error {
+		return fn(&countBlockReadsTx{Tx: dbTx, db: db})
+	})
+}
+
+// FetchBlock counts the read and passes the call to the wrapped transaction.
+//
+// This is part of the database.Tx interface.
+func (tx *countBlockReadsTx) FetchBlock(hash *chainhash.Hash) ([]byte, error) {
+	tx.db.blockReads++
+	return tx.Tx.FetchBlock(hash)
+}
+
+// TestManagerCatchUpBlockReads ensures Manager.Init catches up the transaction
+// and address indexes to the chain tip with ordinary catchup, reading each
+// missing block once, when the address index needs no fast build.  The
+// address index needs none when it has no data directory or is already
+// initialized.
+func TestManagerCatchUpBlockReads(t *testing.T) {
+	const target = 10
+	tests := []struct {
+		name      string
+		tipHeight int32
+		dataDir   bool
+	}{
+		{name: "no_data_dir", tipHeight: -1},
+		{name: "index_behind_tip", tipHeight: 0, dataDir: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 1. Make a chain through block 10 and empty indexes.
+			c := setupAddrIndexTestChain(t, target)
+			db := &countBlockReadsDB{DB: c.db}
+			txIdx := NewTxIndex(db)
+			idx := NewAddrIndex(db, &chaincfg.MainNetParams)
+			if test.dataDir {
+				idx = NewAddrIndexWithDataDir(
+					db, &chaincfg.MainNetParams, c.rootDir,
+				)
+			}
+			manager := NewManager(db, []Indexer{txIdx, idx})
+			require.NoError(t, manager.createIndexes())
+
+			// 2. Fill both indexes through tipHeight.
+			c.connect(t, txIdx, 0, test.tipHeight)
+			c.connect(t, idx, 0, test.tipHeight)
+
+			// 3. Reopen the chain on the counting DB.
+			chain, err := blockchain.New(&blockchain.Config{
+				DB: db, ChainParams: &chaincfg.MainNetParams,
+				TimeSource: blockchain.NewMedianTime(),
+			})
+			require.NoError(t, err)
+
+			// 4. Run Init, not counting chain setup's reads.
+			db.blockReads = 0
+			require.NoError(t, manager.Init(chain, nil))
+
+			// 5. Check that both index tips are at the chain tip.
+			best := chain.BestSnapshot()
+			for _, key := range [][]byte{txIndexKey, addrIndexKey} {
+				var (
+					hash   *chainhash.Hash
+					height int32
+				)
+				err := db.View(func(dbTx database.Tx) error {
+					var err error
+					hash, height, err = dbFetchIndexerTip(
+						dbTx, key,
+					)
+					return err
+				})
+				require.NoError(t, err)
+				require.Equal(t, int32(target), height)
+				require.Equal(t, best.Hash, *hash)
+			}
+
+			// 6. Check that each missing block is read only once.
+			wantReads := int(target - test.tipHeight)
+			require.Equal(t, wantReads, db.blockReads,
+				"ordinary catchup should read each block once")
+		})
+	}
+}
+
+// catchUpTestIndex is an index that counts the blocks connected to it.
+type catchUpTestIndex struct {
+	key       []byte
+	connected int
+}
+
+// Key returns the key of the index.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Key() []byte {
+	return idx.key
+}
+
+// Name returns the key of the index as its name.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Name() string {
+	return string(idx.key)
+}
+
+// Create does nothing.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Create(database.Tx) error {
+	return nil
+}
+
+// Init does nothing.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) Init() error {
+	return nil
+}
+
+// ConnectBlock counts the block.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) ConnectBlock(database.Tx, *btcutil.Block,
+	[]blockchain.SpentTxOut) error {
+
+	idx.connected++
+	return nil
+}
+
+// DisconnectBlock does nothing.
+//
+// This is part of the Indexer interface.
+func (idx *catchUpTestIndex) DisconnectBlock(database.Tx, *btcutil.Block,
+	[]blockchain.SpentTxOut) error {
+
+	return nil
+}
+
+// newManagerTestChain returns a database with a chain that holds only the
+// genesis block.
+func newManagerTestChain(t *testing.T) (database.DB, *blockchain.BlockChain) {
+	t.Helper()
+	db, err := database.Create(
+		"ffldb", filepath.Join(t.TempDir(), "db"), wire.MainNet,
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	chain, err := blockchain.New(&blockchain.Config{
+		DB: db, ChainParams: &chaincfg.MainNetParams,
+		TimeSource: blockchain.NewMedianTime(),
+	})
+	require.NoError(t, err)
+	return db, chain
+}
+
+// fetchTestIndexTips returns the tip heights of the indexes with the passed
+// keys.
+func fetchTestIndexTips(db database.DB, keys ...[]byte) ([]int32, error) {
+	heights := make([]int32, len(keys))
+	err := db.View(func(dbTx database.Tx) error {
+		for i, key := range keys {
+			_, height, err := dbFetchIndexerTip(dbTx, key)
+			if err != nil {
+				return err
+			}
+			heights[i] = height
+		}
+		return nil
+	})
+	return heights, err
+}
+
+// TestManagerCatchUp ensures Manager.Init creates the tip of a missing index
+// and connects the genesis block only to that index, not to an index whose
+// tip is already the genesis block.
+func TestManagerCatchUp(t *testing.T) {
+	// 1. Make a genesis-only chain and set one index tip to the chain tip.
+	db, chain := newManagerTestChain(t)
+	caughtUp := &catchUpTestIndex{key: []byte("caughtup")}
+	behind := &catchUpTestIndex{key: []byte("behind")}
+	best := chain.BestSnapshot()
+	err := db.Update(func(dbTx database.Tx) error {
+		meta := dbTx.Metadata()
+		_, err := meta.CreateBucket(indexTipsBucketName)
+		if err != nil {
+			return err
+		}
+		return dbPutIndexerTip(
+			dbTx, caughtUp.key, &best.Hash, best.Height,
+		)
+	})
+	require.NoError(t, err)
+
+	// 2. Run Init.  The index that is behind comes first, so the lowest
+	// tip is not the tip of the last index.
+	manager := NewManager(db, []Indexer{behind, caughtUp})
+	require.NoError(t, manager.Init(chain, nil))
+
+	// 3. Check that only the index that was behind had a block connected.
+	require.Zero(t, caughtUp.connected)
+	require.Equal(t, 1, behind.connected)
+
+	// 4. Check that both index tips are at the chain tip height.
+	tips, err := fetchTestIndexTips(db, caughtUp.key, behind.key)
+	require.NoError(t, err)
+	require.Equal(t, []int32{best.Height, best.Height}, tips)
+}
+
+// fastBuildTestIndex is a FastBuilder that records the tips of other indexes
+// when FastBuild runs and sets its own tip to the chain tip.
+type fastBuildTestIndex struct {
+	catchUpTestIndex
+	db       database.DB
+	needed   bool
+	observed [][]byte
+	tips     []int32
+}
+
+// NeedsFastBuild returns needed.
+//
+// This is part of the FastBuilder interface.
+func (idx *fastBuildTestIndex) NeedsFastBuild(
+	*blockchain.BlockChain) (bool, error) {
+
+	return idx.needed, nil
+}
+
+// FastBuild records the tips of the observed indexes and sets its own tip to
+// the chain tip.
+//
+// This is part of the FastBuilder interface.
+func (idx *fastBuildTestIndex) FastBuild(chain *blockchain.BlockChain,
+	interrupt <-chan struct{}) error {
+
+	tips, err := fetchTestIndexTips(idx.db, idx.observed...)
+	if err != nil {
+		return err
+	}
+	idx.tips = tips
+
+	best := chain.BestSnapshot()
+	return idx.db.Update(func(dbTx database.Tx) error {
+		return dbPutIndexerTip(dbTx, idx.key, &best.Hash, best.Height)
+	})
+}
+
+// TestManagerFastBuild ensures that when a FastBuilder needs a fast build,
+// Manager.Init calls FastBuild after it catches up the earlier index and while
+// the later index is still uninitialized.  In that case Init connects the
+// genesis block to the earlier and later indexes but not to the FastBuilder.
+// When no fast build is needed, Init does not call FastBuild and connects the
+// genesis block to all three indexes.
+func TestManagerFastBuild(t *testing.T) {
+	// wantTips holds the earlier and later tips FastBuild sees, or nil when
+	// FastBuild does not run.  Height 0 is the chain tip, which is the
+	// genesis block, and a height of -1 marks an uninitialized index.
+	tests := []struct {
+		name          string
+		needed        bool
+		wantTips      []int32
+		wantConnected int
+	}{
+		{name: "build_not_needed", wantConnected: 1},
+		{name: "build_needed", needed: true, wantTips: []int32{0, -1}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// 1. Make a genesis-only chain and three indexes.
+			db, chain := newManagerTestChain(t)
+			earlier := &catchUpTestIndex{key: []byte("earlier")}
+			later := &catchUpTestIndex{key: []byte("later")}
+			builder := &fastBuildTestIndex{
+				catchUpTestIndex: catchUpTestIndex{
+					key: []byte("builder"),
+				},
+				db:       db,
+				needed:   test.needed,
+				observed: [][]byte{earlier.key, later.key},
+			}
+
+			// 2. Run Init with the builder in the middle.
+			indexes := []Indexer{earlier, builder, later}
+			manager := NewManager(db, indexes)
+			require.NoError(t, manager.Init(chain, nil))
+
+			// 3. Check the earlier and later tips FastBuild saw.
+			require.Equal(t, test.wantTips, builder.tips,
+				"earlier and later tips during FastBuild")
+
+			// 4. Check the blocks connected to each index.
+			require.Equal(t, test.wantConnected, builder.connected)
+			require.Equal(t, 1, earlier.connected)
+			require.Equal(t, 1, later.connected)
+		})
 	}
 }

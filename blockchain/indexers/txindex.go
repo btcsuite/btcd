@@ -482,6 +482,31 @@ func DropTxIndex(db database.DB, interrupt <-chan struct{}) error {
 	return dropIndex(db, txIndexKey, txIndexName, interrupt)
 }
 
+// DropTxIndexWithDataDir drops the transaction index and removes any dependent
+// address fast-build staging under dataDir.
+func DropTxIndexWithDataDir(db database.DB, dataDir string,
+	interrupt <-chan struct{}) error {
+
+	_, buildExists, err := addrIndexBuildDirExists(dataDir)
+	if err != nil {
+		return err
+	}
+	// Fail before changing the index when the database cannot flush, since
+	// staging is only removed after the drop is flushed.
+	if buildExists {
+		if _, err := addrBuildFlusher(db); err != nil {
+			return err
+		}
+	}
+	if err := DropTxIndex(db, interrupt); err != nil {
+		return err
+	}
+	if !buildExists {
+		return removeAddrIndexBuildDeleteDir(dataDir)
+	}
+	return removeAddrIndexBuildStaging(db, dataDir)
+}
+
 // TxIndexInitialized returns true if the tx index has been created previously.
 func TxIndexInitialized(db database.DB) bool {
 	var exists bool
