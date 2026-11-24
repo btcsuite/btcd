@@ -6,7 +6,6 @@ package wire
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -709,37 +708,36 @@ func TestVarBytesOverflowErrors(t *testing.T) {
 
 }
 
-// TestRandomUint64 exercises the randomness of the random number generator on
-// the system by ensuring the probability of the generated numbers.  If the RNG
-// is evenly distributed as a proper cryptographic RNG should be, there really
-// should only be 1 number < 2^56 in 2^8 tries for a 64-bit number.  However,
-// use a higher number of 5 to really ensure the test doesn't fail unless the
-// RNG is just horrendous.
+// TestRandomUint64 checks that the OS random source can produce a nonce.
 func TestRandomUint64(t *testing.T) {
-	tries := 1 << 8              // 2^8
-	watermark := uint64(1 << 56) // 2^56
-	maxHits := 5
-	badRNG := "The random number generator on this system is clearly " +
-		"terrible since we got %d values less than %d in %d runs " +
-		"when only %d was expected"
+	// The OS random source may return any uint64, including zero.
+	if _, err := RandomUint64(); err != nil {
+		t.Fatalf("RandomUint64: %v", err)
+	}
+}
 
-	numHits := 0
-	for i := 0; i < tries; i++ {
-		nonce, err := RandomUint64()
-		if err != nil {
-			t.Errorf("RandomUint64 iteration %d failed - err %v",
-				i, err)
-			return
-		}
-		if nonce < watermark {
-			numHits++
-		}
-		if numHits > maxHits {
-			str := fmt.Sprintf(badRNG, numHits, watermark, tries, maxHits)
-			t.Errorf("Random Uint64 iteration %d failed - %v %v", i,
-				str, numHits)
-			return
-		}
+// TestRandomUint64Reader checks that every input byte contributes to the nonce
+// without making probabilistic claims about the operating system's entropy.
+func TestRandomUint64Reader(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []byte
+		want  uint64
+	}{
+		{"zero", []byte{0, 0, 0, 0, 0, 0, 0, 0}, 0},
+		{"maximum", []byte{255, 255, 255, 255, 255, 255, 255, 255}, ^uint64(0)},
+		{"ordered bytes", []byte{1, 2, 3, 4, 5, 6, 7, 8}, 0x0102030405060708},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := randomUint64(bytes.NewReader(test.input))
+			if err != nil {
+				t.Fatalf("randomUint64: %v", err)
+			}
+			if got != test.want {
+				t.Errorf("randomUint64: got %d, want %d", got, test.want)
+			}
+		})
 	}
 }
 
