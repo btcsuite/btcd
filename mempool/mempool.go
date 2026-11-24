@@ -1476,6 +1476,16 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
 		return nil, err
 	}
 
+	// Absolute lock times must be satisfied even on networks that accept
+	// non-standard transactions, since otherwise the transaction cannot
+	// be included in the next block.
+	if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
+		medianTimePast) {
+
+		return nil, txRuleError(wire.RejectNonstandard,
+			"transaction is not finalized")
+	}
+
 	// Don't allow non-standard transactions or non-standard inputs if the
 	// network parameters forbid their acceptance.
 	err = mp.validateStandardness(
