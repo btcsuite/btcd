@@ -456,3 +456,27 @@ func TestNewFromSignedTx(t *testing.T) {
 		t.Fatalf("witness not extracted correctly")
 	}
 }
+
+// TestAssertNoNilElements tests that the assertNoNilElements returns an error
+// when a slice element is nil.
+func TestAssertNoNilElements(t *testing.T) {
+	someString := "foo"
+	require.NoError(t, assertNoNilElements([]*string{&someString}))
+	require.NoError(t, assertNoNilElements([]*string{}))
+
+	type testType struct {
+		field string
+	}
+	require.Error(t, assertNoNilElements([]*testType{
+		nil,
+		{
+			field: "asdf",
+		},
+	}))
+	require.Error(t, assertNoNilElements([]*testType{
+		{
+			field: "asdf",
+		},
+		nil,
+	}))
+}
