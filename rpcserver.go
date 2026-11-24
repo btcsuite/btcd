@@ -4290,6 +4290,12 @@ func createMarshalledReply(rpcVersion btcjson.RPCVersion, id interface{}, result
 // processRequest determines the incoming request type (single or batched),
 // parses it and returns a marshalled response.
 func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, closeChan <-chan struct{}) []byte {
+	quirks := cfg.RPCQuirks && request.Jsonrpc == ""
+	rpcVersion := request.Jsonrpc
+	if quirks {
+		rpcVersion = btcjson.RpcVersion1
+	}
+
 	var result interface{}
 	var err error
 	var jsonErr *btcjson.RPCError
@@ -4307,7 +4313,7 @@ func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, close
 				Code:    btcjson.ErrRPCInvalidRequest.Code,
 				Message: "Invalid request: malformed",
 			}
-			msg, err := createMarshalledReply(request.Jsonrpc, request.ID, result, jsonErr)
+			msg, err := createMarshalledReply(rpcVersion, request.ID, result, jsonErr)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal reply: %v", err)
 				return nil
@@ -4315,9 +4321,10 @@ func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, close
 			return msg
 		}
 
-		// Valid requests with no ID (notifications) must not have a response
-		// per the JSON-RPC spec.
-		if request.ID == nil {
+		// Requests without an ID are notifications and must not receive
+		// a response per the JSON-RPC spec. RPC quirks permit replies
+		// for unversioned requests.
+		if request.ID == nil && !quirks {
 			return nil
 		}
 
@@ -4343,7 +4350,7 @@ func (s *rpcServer) processRequest(request *btcjson.Request, isAdmin bool, close
 	}
 
 	// Marshal the response.
-	msg, err := createMarshalledReply(request.Jsonrpc, request.ID, result, jsonErr)
+	msg, err := createMarshalledReply(rpcVersion, request.ID, result, jsonErr)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal reply: %v", err)
 		return nil
