@@ -11,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/wire/v2"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBadPC sets the pc to a deliberately bad result then confirms that Step
@@ -76,6 +77,93 @@ func TestBadPC(t *testing.T) {
 		if err == nil {
 			t.Errorf("DisasmPC with invalid pc (%v) succeeds!", test)
 		}
+	}
+}
+
+// TestScriptVerifyMinimalIfAll verifies that the opt-in flag applies MINIMALIF
+// to legacy P2SH execution without changing the handling of conditionals in
+// inactive branches.
+func TestScriptVerifyMinimalIfAll(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		redeemScript []byte
+		expectError  bool
+	}{
+		{
+			name: "minimal true",
+			redeemScript: []byte{
+				OP_1, OP_IF, OP_TRUE, OP_ENDIF,
+			},
+		},
+		{
+			name: "computed non-minimal condition",
+			redeemScript: []byte{
+				OP_1, OP_1, OP_ADD, OP_IF, OP_TRUE,
+				OP_ELSE, OP_TRUE, OP_ENDIF,
+			},
+			expectError: true,
+		},
+		{
+			name: "conditional in inactive branch",
+			redeemScript: []byte{
+				OP_0, OP_IF, OP_2, OP_IF, OP_TRUE,
+				OP_ENDIF, OP_ENDIF, OP_TRUE,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// A P2SH spend exercises legacy execution while keeping
+			// the unlocking script push-only under the standard
+			// flags.
+			pkScript, err := NewScriptBuilder().
+				AddOp(OP_HASH160).
+				AddData(hash160(tc.redeemScript)).
+				AddOp(OP_EQUAL).
+				Script()
+			require.NoError(t, err)
+
+			sigScript, err := NewScriptBuilder().
+				AddData(tc.redeemScript).
+				Script()
+			require.NoError(t, err)
+
+			tx := wire.NewMsgTx(2)
+			tx.AddTxIn(&wire.TxIn{SignatureScript: sigScript})
+			tx.AddTxOut(&wire.TxOut{PkScript: []byte{OP_RETURN}})
+
+			// Standard policy intentionally limits MINIMALIF to
+			// witness execution, so every legacy spend remains
+			// valid until the application opts into the broader
+			// rule.
+			vm, err := NewEngine(
+				pkScript, tx, 0, StandardVerifyFlags, nil, nil,
+				0, nil,
+			)
+			require.NoError(t, err)
+			require.NoError(t, vm.Execute())
+
+			vm, err = NewEngine(
+				pkScript, tx, 0,
+				StandardVerifyFlags|ScriptVerifyMinimalIfAll,
+				nil, nil, 0, nil,
+			)
+			require.NoError(t, err)
+
+			err = vm.Execute()
+			if tc.expectError {
+				require.True(t, IsErrorCode(err, ErrMinimalIf))
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
 	}
 }
 

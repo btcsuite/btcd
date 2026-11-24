@@ -15,6 +15,102 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
+const (
+	// maxWitnessItems is the maximum number of witness items allowed in a
+	// witness stack (and also the maximum length of a stack item).
+	maxWitnessItems = 4_000_000
+)
+
+var (
+	// ErrMoreDataAvailable is returned when more data is present after
+	// parsing an input.
+	ErrMoreDataAvailable = errors.New(
+		"more data present after parsing input",
+	)
+
+	// ErrWitnessTooLarge is returned when a raw witness payload exceeds
+	// maxWitnessItems.
+	ErrWitnessTooLarge = errors.New("witness payload too large")
+)
+
+// ParseTxWitness parses the raw witness bytes into a wire.TxWitness. This
+// function rejects trailing data that isn't part of the expected encoding.
+func ParseTxWitness(rawWitness []byte) (wire.TxWitness, error) {
+	if len(rawWitness) > maxWitnessItems {
+		return nil, fmt.Errorf("%w [size %d, max %d]",
+			ErrWitnessTooLarge, len(rawWitness), maxWitnessItems)
+	}
+
+	var (
+		buf    [8]byte
+		reader = bytes.NewReader(rawWitness)
+	)
+	witCount, err := wire.ReadVarIntBuf(reader, 0, buf[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// Prevent memory exhaustion via a huge witness item count. The upfront
+	// make([][]byte, witCount) allocates ~24 bytes per entry on 64-bit.
+	if witCount > maxWitnessItems {
+		return nil, fmt.Errorf("too many witness items "+
+			"[count %d, max %d]", witCount, maxWitnessItems)
+	}
+
+	// It is theoretically possible (and likely consensus valid in a
+	// non-taproot context before MAX_STACK size was introduced) to create
+	// a witness stack of maxWitnessItems/2 empty items. But to avoid a
+	// trivial memory allocation of maxWitnessItems elements with a single
+	// varInt claiming maxWitnessItems number of items without providing
+	// them, we pre-allocate with a much smaller size. This doesn't prevent
+	// a TX to actually contain maxWitnessItems empty items, but they
+	// actually need to be encoded fully. Which means the raw witness would
+	// be very long and noticeable by the user. So this simply prevents a
+	// ~96MB memory allocation (on a 64bit system) for a seemingly harmless
+	// and short encoded witness.
+	allocCount := min(witCount, txscript.MaxStackSize)
+
+	// Then for witCount number of stack items, each item has a varint
+	// length prefix, followed by the witness item itself.
+	witness := make([][]byte, 0, allocCount)
+	for range witCount {
+		count, err := wire.ReadVarIntBuf(reader, 0, buf[:])
+		if err != nil {
+			return nil, err
+		}
+
+		// Enforce the per-item size cap.
+		if count > maxWitnessItems {
+			return nil, fmt.Errorf("witness item too large "+
+				"[count %d, max %d]", count, maxWitnessItems)
+		}
+
+		// Validate against the remaining input length BEFORE
+		// allocating. Without this, an attacker claiming a large item
+		// but providing no data still triggers a full-size allocation.
+		if int64(count) > int64(reader.Len()) {
+			return nil, fmt.Errorf("witness item length %d "+
+				"exceeds remaining input %d", count,
+				reader.Len())
+		}
+
+		item := make([]byte, count)
+		if _, err := io.ReadFull(reader, item); err != nil {
+			return nil, err
+		}
+
+		witness = append(witness, item)
+	}
+
+	// If we didn't fully read all the data, this probably isn't a proper
+	// witness stack.
+	if reader.Len() > 0 {
+		return nil, ErrMoreDataAvailable
+	}
+
+	return witness, nil
+}
+
 // WriteTxWitness is a utility function due to non-exported witness
 // serialization (writeTxWitness encodes the bitcoin protocol encoding for a
 // transaction input's witness into w).
