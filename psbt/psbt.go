@@ -217,7 +217,7 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if GlobalType(keyCode) != UnsignedTxType || keyData != nil {
+	if keyCode != int(UnsignedTxType) || keyData != nil {
 		return nil, ErrInvalidPsbtFormat
 	}
 
@@ -261,8 +261,10 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			return nil, err
 		}
 
-		switch GlobalType(keyint) {
-		case XPubType:
+		// GlobalType is a uint8, so compare the key type as an int to
+		// keep multi-byte key types from truncating into a known type.
+		switch {
+		case keyint == int(XPubType):
 			xPub, err := ReadXPub(keydata, value)
 			if err != nil {
 				return nil, err
@@ -270,7 +272,9 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 
 			// Duplicate keys are not allowed
 			for _, x := range xPubSlice {
-				if bytes.Equal(x.ExtendedKey, keyData) {
+				if bytes.Equal(
+					x.ExtendedKey, xPub.ExtendedKey,
+				) {
 					return nil, ErrDuplicateKey
 				}
 			}
@@ -278,13 +282,19 @@ func NewFromRawBytes(r io.Reader, b64 bool) (*Packet, error) {
 			xPubSlice = append(xPubSlice, *xPub)
 
 		default:
-			keyintanddata := []byte{byte(keyint)}
-			keyintanddata = append(keyintanddata, keydata...)
-
 			newUnknown := &Unknown{
-				Key:   keyintanddata,
+				Key:   unknownKey(keyint, keydata),
 				Value: value,
 			}
+
+			// Duplicate key+keyData are not allowed, whatever
+			// the value.
+			for _, x := range unknownSlice {
+				if bytes.Equal(x.Key, newUnknown.Key) {
+					return nil, ErrDuplicateKey
+				}
+			}
+
 			unknownSlice = append(unknownSlice, newUnknown)
 		}
 	}

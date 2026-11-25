@@ -208,6 +208,20 @@ func serializeKVpair(w io.Writer, key []byte, value []byte) error {
 	return wire.WriteVarBytes(w, 0, value)
 }
 
+// unknownKey returns the raw key of an unknown key-value pair: the key type
+// as a compact size integer followed by the key data. Writing the key type
+// back with its full encoding keeps a multi-byte key type from being
+// re-read as a different, known type.
+func unknownKey(keyType int, keyData []byte) []byte {
+	var b bytes.Buffer
+
+	// Writing to a bytes.Buffer cannot fail.
+	_ = wire.WriteVarInt(&b, 0, uint64(keyType))
+	b.Write(keyData)
+
+	return b.Bytes()
+}
+
 // serializeKVPairWithType writes out to the passed writer a type coupled with
 // a key.
 func serializeKVPairWithType(w io.Writer, kt uint8, keydata []byte,
