@@ -171,6 +171,28 @@ func NewFundRawTransactionCmd(serializedTx []byte, opts FundRawTransactionOpts, 
 	}
 }
 
+// GenerateBlockCmd defines the generateblock JSON-RPC command.
+type GenerateBlockCmd struct {
+	Output       string
+	Transactions []string
+	Submit       *bool `jsonrpcdefault:"true"`
+}
+
+// NewGenerateBlockCmd returns a generateblock command. A nil transaction list
+// requests a block containing only the coinbase transaction.
+func NewGenerateBlockCmd(output string, transactions []string,
+	submit *bool) *GenerateBlockCmd {
+
+	if transactions == nil {
+		transactions = []string{}
+	}
+	return &GenerateBlockCmd{
+		Output:       output,
+		Transactions: transactions,
+		Submit:       submit,
+	}
+}
+
 // GetAddedNodeInfoCmd defines the getaddednodeinfo JSON-RPC command.
 type GetAddedNodeInfoCmd struct {
 	DNS  bool
@@ -1111,6 +1133,7 @@ func init() {
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
 	MustRegisterCmd("deriveaddresses", (*DeriveAddressesCmd)(nil), flags)
 	MustRegisterCmd("fundrawtransaction", (*FundRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("generateblock", (*GenerateBlockCmd)(nil), flags)
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)
 	MustRegisterCmd("getbestblockhash", (*GetBestBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)

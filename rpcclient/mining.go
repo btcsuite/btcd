@@ -113,6 +113,40 @@ func (c *Client) GenerateToAddress(numBlocks int64,
 	return c.GenerateToAddressAsync(numBlocks, address, maxTries).Receive()
 }
 
+// FutureGenerateBlockResult delivers the result of GenerateBlockAsync.
+type FutureGenerateBlockResult chan *Response
+
+// Receive waits for the generated block hash and optional serialized block.
+func (r FutureGenerateBlockResult) Receive() (*btcjson.GenerateBlockResult, error) {
+	res, err := ReceiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var result btcjson.GenerateBlockResult
+	if err := json.Unmarshal(res, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GenerateBlockAsync is the non-blocking version of GenerateBlock.
+func (c *Client) GenerateBlockAsync(output string, transactions []string,
+	submit *bool) FutureGenerateBlockResult {
+
+	return c.SendCmd(btcjson.NewGenerateBlockCmd(output, transactions, submit))
+}
+
+// GenerateBlock asks Bitcoin Core to mine one block paying an address or
+// descriptor. Transactions are mempool txids or serialized transaction hex, in
+// block order. A nil submit uses the server default. Set submit to false to
+// return the serialized block without submitting it.
+func (c *Client) GenerateBlock(output string, transactions []string,
+	submit *bool) (*btcjson.GenerateBlockResult, error) {
+
+	return c.GenerateBlockAsync(output, transactions, submit).Receive()
+}
+
 // FutureGetGenerateResult is a future promise to deliver the result of a
 // GetGenerateAsync RPC invocation (or an applicable error).
 type FutureGetGenerateResult chan *Response
