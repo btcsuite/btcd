@@ -108,6 +108,36 @@ func BenchmarkSigVerify(b *testing.B) {
 	testOk = ok
 }
 
+var PubSink btcec.PublicKey
+
+func BenchmarkParsePubKey(b *testing.B) {
+	pubs := "d2e670a19c6d753d1a6d8b20bd045df8a08fb162cf508956c31268c6d81ffdab"
+	pubb := hexToBytes(pubs)
+	var pub btcec.PublicKey
+
+	for b.Loop() {
+		pub2, _ := ParsePubKey(pubb)
+		pub = *pub2
+	}
+
+	PubSink = pub
+}
+
+var SigSink Signature
+
+func BenchmarkParseSignature(b *testing.B) {
+	sigS := "7289004e8052d8bc317e4f308d20b35c0236a39314fb1a47ff7ca7e79199bb9500fd1a5fb87677119280b73fb7d281e88bddc94ba7fbfd12d06cae944f4f9e5f"
+	sigB := hexToBytes(sigS)
+	var sig Signature
+
+	for b.Loop() {
+		sig2, _ := ParseSignature(sigB)
+		sig = *sig2
+	}
+
+	SigSink = sig
+}
+
 // Used to ensure the compiler doesn't optimize away the benchmark.
 var (
 	testSig *Signature

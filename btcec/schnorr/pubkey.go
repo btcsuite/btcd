@@ -17,18 +17,17 @@ const (
 	PubKeyBytesLen = 32
 )
 
-// ParsePubKey parses a public key for a koblitz curve from a bytestring into a
-// btcec.Publickey, verifying that it is valid. It only supports public keys in
-// the BIP-340 32-byte format.
-func ParsePubKey(pubKeyStr []byte) (*btcec.PublicKey, error) {
+// parsePubKey is here because without it ParsePubKey is not inlined, which
+// causes allocations because it returns a pointer to [btcec.PublicKey].
+func parsePubKey(pub *btcec.PublicKey, pubKeyStr []byte) error {
 	if pubKeyStr == nil {
 		err := fmt.Errorf("nil pubkey byte string")
-		return nil, err
+		return err
 	}
 	if len(pubKeyStr) != PubKeyBytesLen {
 		err := fmt.Errorf("bad pubkey byte string size (want %v, have %v)",
 			PubKeyBytesLen, len(pubKeyStr))
-		return nil, err
+		return err
 	}
 
 	// We'll manually prepend the compressed byte so we can re-use the
@@ -37,7 +36,23 @@ func ParsePubKey(pubKeyStr []byte) (*btcec.PublicKey, error) {
 	keyCompressed[0] = secp.PubKeyFormatCompressedEven
 	copy(keyCompressed[1:], pubKeyStr)
 
-	return btcec.ParsePubKey(keyCompressed[:])
+	pub2, err := btcec.ParsePubKey(keyCompressed[:])
+	if err != nil {
+		return err
+	}
+	*pub = *pub2
+	return nil
+}
+
+// ParsePubKey parses a public key for a koblitz curve from a bytestring into a
+// btcec.Publickey, verifying that it is valid. It only supports public keys in
+// the BIP-340 32-byte format.
+func ParsePubKey(pubKeyStr []byte) (*btcec.PublicKey, error) {
+	pub := new(btcec.PublicKey)
+	if err := parsePubKey(pub, pubKeyStr); err != nil {
+		return nil, err
+	}
+	return pub, nil
 }
 
 // SerializePubKey serializes a public key as specified by BIP 340. Public keys
@@ -46,4 +61,10 @@ func ParsePubKey(pubKeyStr []byte) (*btcec.PublicKey, error) {
 func SerializePubKey(pub *btcec.PublicKey) []byte {
 	pBytes := pub.SerializeCompressed()
 	return pBytes[1:]
+}
+
+func serializePubKey32(out32 []byte, pub *btcec.PublicKey) {
+	var point secp.JacobianPoint
+	pub.AsJacobian(&point)
+	copy(out32, point.X.Bytes()[:])
 }

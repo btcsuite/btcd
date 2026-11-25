@@ -822,6 +822,26 @@ func TestVerifyLowS(t *testing.T) {
 			sig:     hexToBytes("404502200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
 			wantErr: errNoHeaderMagic,
 		},
+		{
+			name:    "Excessively padded R",
+			sig:     hexToBytes("30460221000d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errExcessivelyPaddedR,
+		},
+		{
+			name:    "Excessively padded S",
+			sig:     hexToBytes("304602200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f0222000085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errExcessivelyPaddedS,
+		},
+		{
+			name:    "Negative R",
+			sig:     hexToBytes("304502208d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f02210085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errNegativeR,
+		},
+		{
+			name:    "Negative S",
+			sig:     hexToBytes("304402200d309104bc47fecb3e23fadbabb26d3495ae1b48c1b14e8886b3f4f1c8ab122f022085d04c97c30f69063b820a139cf17473d8e89ed587f7fa669e78175f798431fc"),
+			wantErr: errNegativeS,
+		},
 	}
 
 	for _, test := range signatureTests {
