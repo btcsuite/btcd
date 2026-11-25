@@ -60,6 +60,11 @@ const (
 	// plaintext and ciphertext when using chachapoly1305. The ciphertext
 	// is larger because of the authentication tag.
 	chachapoly1305Expansion = 16
+
+	// receiveBufferSize bounds the initial allocation for a packet body, so
+	// that a decrypted length field alone cannot reserve up to
+	// maxContentLen bytes before the body has arrived.
+	receiveBufferSize = 4096
 )
 
 var (
@@ -938,7 +943,7 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 		log.Tracef("Receiving %d bytes for encrypted packet body",
 			numBytes)
 
-		aeadCiphertext, _, err := p.Receive(numBytes)
+		aeadCiphertext, err := p.receiveStaged(numBytes)
 		if err != nil {
 			log.Errorf("Failed to receive encrypted "+
 				"packet body: %v", err)
@@ -974,6 +979,23 @@ func (p *Peer) V2ReceivePacket(aad []byte) ([]byte, error) {
 		log.Debugf("Ignore bit set, discarding packet "+
 			"(content_len=%d)", contentsLen)
 	}
+}
+
+// receiveStaged receives numBytes bytes from the underlying connection,
+// growing the buffer as bytes arrive instead of allocating numBytes up front.
+func (p *Peer) receiveStaged(numBytes int) ([]byte, error) {
+	var buf bytes.Buffer
+	buf.Grow(min(numBytes, receiveBufferSize))
+
+	n, err := io.CopyN(&buf, p.rw, int64(numBytes))
+	if err == io.EOF && n > 0 {
+		err = io.ErrUnexpectedEOF
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
 
 // ReceivedPrefix returns the transport-classification bytes already received.
