@@ -444,4 +444,14 @@ func TestTxOutCompressionErrors(t *testing.T) {
 			"did not return expected error type - got %T, want "+
 			"errDeserialize", err)
 	}
+
+	// A compressed txout with a script size that does not fit in an int
+	// must error instead of panicking.
+	compressedTxOut = hexToBytes("30a6c1b889df8a8598fa3030")
+	_, _, _, err = decodeCompressedTxOut(compressedTxOut)
+	if !isDeserializeErr(err) {
+		t.Fatalf("decodeCompressedTxOut with oversized compressed "+
+			"script did not return expected error type - got %T, "+
+			"want errDeserialize", err)
+	}
 }
