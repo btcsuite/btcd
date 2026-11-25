@@ -322,7 +322,7 @@ func newPoolHarness(chainParams *chaincfg.Params) (*poolHarness, []spendableOutp
 				FreeTxRelayLimit:     15.0,
 				MaxOrphanTxs:         5,
 				MaxOrphanTxSize:      1000,
-				MaxSigOpCostPerTx:    blockchain.MaxBlockSigOpsCost / 4,
+				MaxSigOpCostPerTx:    DefaultMaxSigOpCostPerTx,
 				MinRelayTxFee:        1000, // 1 Satoshi per byte
 				MaxTxVersion:         1,
 			},
@@ -1849,6 +1849,74 @@ func TestRBF(t *testing.T) {
 		})
 		if !success {
 			break
+		}
+	}
+}
+
+// TestSigOpCostLimit ensures the default per-transaction sigop cost limit
+// matches Bitcoin Core's MAX_STANDARD_TX_SIGOPS_COST (16000). Each bare 1-of-1
+// multisig output counts 20 legacy sigops, so a cost of 80.
+func TestSigOpCostLimit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		numOutputs int
+		accepted   bool
+	}{
+		{name: "at the limit", numOutputs: 200, accepted: true},
+		{name: "one output over the limit", numOutputs: 201},
+	}
+
+	for _, test := range tests {
+		harness, outputs, err := newPoolHarness(&chaincfg.MainNetParams)
+		if err != nil {
+			t.Fatalf("unable to create test pool: %v", err)
+		}
+
+		pubKey := harness.signKey.PubKey().SerializeCompressed()
+		multisig, err := txscript.NewScriptBuilder().
+			AddOp(txscript.OP_1).AddData(pubKey).
+			AddOp(txscript.OP_1).AddOp(txscript.OP_CHECKMULTISIG).
+			Script()
+		if err != nil {
+			t.Fatalf("unable to build multisig script: %v", err)
+		}
+
+		tx := wire.NewMsgTx(wire.TxVersion)
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: outputs[0].outPoint,
+			Sequence:         wire.MaxTxInSequenceNum,
+		})
+		for i := 0; i < test.numOutputs; i++ {
+			tx.AddTxOut(&wire.TxOut{
+				PkScript: multisig,
+				Value:    100000,
+			})
+		}
+		sigScript, err := txscript.SignatureScript(tx, 0,
+			harness.payScript, txscript.SigHashAll, harness.signKey,
+			true)
+		if err != nil {
+			t.Fatalf("unable to sign transaction: %v", err)
+		}
+		tx.TxIn[0].SignatureScript = sigScript
+
+		_, err = harness.txPool.ProcessTransaction(
+			btcutil.NewTx(tx), false, false, 0,
+		)
+		if test.accepted && err != nil {
+			t.Fatalf("%s: transaction rejected: %v", test.name, err)
+		}
+		if !test.accepted {
+			if err == nil {
+				t.Fatalf("%s: transaction accepted", test.name)
+			}
+			const want = "sigop cost is too high"
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("%s: unexpected error: %v",
+					test.name, err)
+			}
 		}
 	}
 }
