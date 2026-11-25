@@ -445,6 +445,10 @@ func parseExpectedResult(expected string) ([]ErrorCode, error) {
 		return []ErrorCode{ErrEarlyReturn}, nil
 	case "VERIFY":
 		return []ErrorCode{ErrVerify}, nil
+	case "CHECKSIGVERIFY":
+		return []ErrorCode{ErrCheckSigVerify}, nil
+	case "CHECKMULTISIGVERIFY":
+		return []ErrorCode{ErrCheckMultiSigVerify}, nil
 	case "INVALID_STACK_OPERATION", "INVALID_ALTSTACK_OPERATION":
 		return []ErrorCode{ErrInvalidStackOperation}, nil
 	case "DISABLED_OPCODE":
