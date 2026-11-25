@@ -7,6 +7,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -59,6 +60,8 @@ var (
 	// the version of the spend journal currently in the database.
 	spendJournalVersionKeyName = []byte("spendjournalversion")
 
+	spendJournalStatsKeyName = []byte("spendjournalstats")
+
 	// spendJournalBucketName is the name of the db bucket used to house
 	// transactions outputs that are spent in each block.
 	spendJournalBucketName = []byte("spendjournal")
@@ -74,6 +77,10 @@ var (
 	// byteOrder is the preferred byte order used for serializing numeric
 	// fields for storage in the database.
 	byteOrder = binary.LittleEndian
+)
+
+var (
+	errMissingSpendJournalStats = errors.New("missing spend journal stats")
 )
 
 // errNotInMainChain signifies that a block hash or height that is not in the
@@ -508,6 +515,256 @@ func dbPruneSpendJournalEntry(dbTx database.Tx, blockHashes []chainhash.Hash) er
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// spendJournalStats is the internal control structure used for depth pruning of
+// the spend journal.
+type spendJournalStats struct {
+	pruneDepth int32
+	nextHeight int32
+}
+
+// deserialize reads data into s.
+func (s *spendJournalStats) deserialize(data []byte) error {
+	if len(data) != 8 {
+		return fmt.Errorf("bad spend journal stats len")
+	}
+
+	s.pruneDepth = int32(byteOrder.Uint32(data[:4]))
+	s.nextHeight = int32(byteOrder.Uint32(data[4:8]))
+
+	return nil
+}
+
+// serialize appends the serialization of s into buf and returns the serialized
+// spendJournalStats.
+func (s *spendJournalStats) serialize(buf []byte) []byte {
+	buf = byteOrder.AppendUint32(buf, uint32(s.pruneDepth))
+	return byteOrder.AppendUint32(buf, uint32(s.nextHeight))
+}
+
+// dbFetchSpendJournalStats returns the spendJournalStats from DB, or error in
+// case the entry does not exists.
+func dbFetchSpendJournalStats(dbTx database.Tx) (spendJournalStats, error) {
+	var zr spendJournalStats
+	serialized := dbTx.Metadata().Get(spendJournalStatsKeyName)
+	if serialized == nil {
+		return zr, errMissingSpendJournalStats
+	}
+
+	var stats spendJournalStats
+	err := stats.deserialize(serialized)
+	if err != nil {
+		return zr, err
+	}
+
+	return stats, nil
+}
+
+// DBSpendJournalPruneDepth returns the previously configured spend journal
+// prune depth, or 0 if spend journal pruning was never enabled.
+func DBSpendJournalPruneDepth(dbTx database.Tx) (int32, error) {
+	stats, err := dbFetchSpendJournalStats(dbTx)
+	if err != nil && errors.Is(err, errMissingSpendJournalStats) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return stats.pruneDepth, nil
+}
+
+// dbPutSpendJournalStats stores the spend journal stats into the database.
+func dbPutSpendJournalStats(dbTx database.Tx, stats spendJournalStats) error {
+	return dbTx.Metadata().Put(
+		spendJournalStatsKeyName, stats.serialize(nil),
+	)
+}
+
+// dbInitSpendJournalStats updates the spend journal stats pruneDepth if it
+// exists in the DB, otherwise, the spend journal will be scanned to initialize
+// spend journal stats nextHeight with the height of the lowest spend journal
+// block height and the passed pruneDepth.
+func dbInitSpendJournalStats(dbTx database.Tx,
+	interrupt <-chan struct{}, pruneDepth int32) error {
+
+	initialized := true
+	stats, err := dbFetchSpendJournalStats(dbTx)
+	if err != nil && errors.Is(err, errMissingSpendJournalStats) {
+		initialized = false
+	} else if err != nil {
+		return err
+	}
+
+	// Update the stored prune depth if the node was started with a
+	// different --prunespendjournal flag. By storing this config in the
+	// database, --prunespendjournal can be passed only once, which improves
+	// the UX, as next initializations may omit the flag.
+	if initialized && pruneDepth != stats.pruneDepth {
+		stats.pruneDepth = pruneDepth
+
+		return dbPutSpendJournalStats(dbTx, stats)
+	}
+
+	// Find the lowest block height in the spend journal.
+	spendCursor := dbTx.Metadata().Bucket(spendJournalBucketName).Cursor()
+	var height int32
+	{
+		ok := spendCursor.First()
+		if !ok {
+			return dbPutSpendJournalStats(
+				dbTx, spendJournalStats{
+					pruneDepth: pruneDepth,
+					nextHeight: height,
+				},
+			)
+		}
+		hash := spendCursor.Key()
+		if len(hash) != 32 {
+			return fmt.Errorf("bad hash length: %d", len(hash))
+		}
+		bHeight, err := dbFetchHeightByHash(
+			dbTx, (*chainhash.Hash)(hash),
+		)
+		if err != nil {
+			return err
+		}
+
+		height = bHeight
+	}
+	ok := spendCursor.Next()
+	for ; ok; ok = spendCursor.Next() {
+		select {
+		case <-interrupt:
+			return errInterruptRequested
+		default:
+		}
+
+		hash := spendCursor.Key()
+		if len(hash) != 32 {
+			return fmt.Errorf("bad hash length: %d", len(hash))
+		}
+		bHeight, err := dbFetchHeightByHash(
+			dbTx, (*chainhash.Hash)(hash),
+		)
+		if err != nil {
+			return err
+		}
+		height = min(height, bHeight)
+	}
+
+	return dbPutSpendJournalStats(
+		dbTx, spendJournalStats{
+			pruneDepth: pruneDepth, nextHeight: height,
+		},
+	)
+}
+
+// dbPruneSpendJournalDepthSlow prunes the spend journal depth to the passed
+// spend journal prune depth.
+//
+// NOTE: this procedure uses several internal transactions to avoid reaching
+// database transaction size limit.
+func dbPruneSpendJournalDepthSlow(db database.DB, pruneDepth,
+	spendJournalHeight, bestHeight int32, interrupt <-chan struct{}) error {
+
+	const maxBatch = 100000
+
+	totalEntries := bestHeight - spendJournalHeight
+	if totalEntries <= pruneDepth {
+		return nil
+	}
+
+	toDelete := totalEntries - pruneDepth
+	hSize := min(toDelete, maxBatch)
+	hashes := make([]chainhash.Hash, 0, hSize)
+
+	// loop while deleted entries is less than entries to delete.
+	var deleted int32
+	for deleted < toDelete {
+		err := db.Update(func(tx database.Tx) error {
+			hashes = hashes[:0]
+			var i int32
+			for i < maxBatch && deleted < toDelete {
+				select {
+				case <-interrupt:
+					return errInterruptRequested
+				default:
+				}
+
+				hash, err := dbFetchHashByHeight(
+					tx, spendJournalHeight+i,
+				)
+				if err != nil {
+					return err
+				}
+				hashes = append(hashes, *hash)
+
+				i++
+				deleted++
+			}
+
+			err := dbPruneSpendJournalEntry(tx, hashes)
+			if err != nil {
+				return err
+			}
+
+			spendJournalHeight += int32(len(hashes))
+			err = dbPutSpendJournalStats(
+				tx, spendJournalStats{
+					nextHeight: spendJournalHeight,
+				},
+			)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// dbPruneSpendJournalDepth prunes the spend journal depth to the passed spend
+// journal prune depth.
+func dbPruneSpendJournalDepth(dbTx database.Tx, pruneDepth,
+	bestHeight int32) error {
+
+	stats, err := dbFetchSpendJournalStats(dbTx)
+	if err != nil {
+		return err
+	}
+	totalEntries := bestHeight - stats.nextHeight
+	if totalEntries <= pruneDepth {
+		return nil
+	}
+
+	toDelete := totalEntries - pruneDepth
+	hashes := make([]chainhash.Hash, 0, toDelete)
+	for i := range toDelete {
+		hash, err := dbFetchHashByHeight(dbTx, stats.nextHeight+i)
+		if err != nil {
+			return err
+		}
+		hashes = append(hashes, *hash)
+	}
+	err = dbPruneSpendJournalEntry(dbTx, hashes)
+	if err != nil {
+		return err
+	}
+
+	stats.nextHeight += toDelete
+	err = dbPutSpendJournalStats(dbTx, stats)
+	if err != nil {
+		return err
 	}
 
 	return nil

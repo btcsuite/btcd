@@ -3080,6 +3080,12 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		btcdLog.Infof("Prune set to %d MiB", cfg.Prune)
 	}
 
+	// Log that spend journal pruning is enabled.
+	if cfg.PruneSpendJournal != 0 {
+		btcdLog.Infof("Spend journal pruning enabled with depth of %d",
+			cfg.PruneSpendJournal)
+	}
+
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
@@ -3092,6 +3098,7 @@ func newServer(listenAddrs, agentBlacklist, agentWhitelist []string,
 		IndexManager:     indexManager,
 		HashCache:        s.hashCache,
 		Prune:            cfg.Prune * 1024 * 1024,
+		PruneSpendJ:      cfg.PruneSpendJournal,
 		UtxoCacheMaxSize: uint64(cfg.UtxoCacheMaxSizeMiB) * 1024 * 1024,
 	})
 	if err != nil {

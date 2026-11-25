@@ -16,6 +16,7 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/limits"
@@ -36,6 +37,76 @@ var (
 // winServiceMain is only invoked on Windows.  It detects when btcd is running
 // as a service and reacts accordingly.
 var winServiceMain func() (bool, error)
+
+// checkSpendJournalPruneConstraints verifies spend journal pruning contraints
+// if the spend journal pruning is enabled or was enabled in the past.
+func checkSpendJournalPruneConstraints(db database.DB) error {
+	// Spend journal depth pruning will only be enabled with disabled and
+	// non initialized cfindex, txindex and addrindex, as this simplifies
+	// the implementation because otherwise we would have to re-create the
+	// spend journal to rebuild dropped indexes.
+	var sjPrune bool
+	if d := cfg.PruneSpendJournal; d != 0 && d < spendJournalPruneMinDepth {
+		return fmt.Errorf("--prunespendjournal min depth is %d, "+
+			"current is %d", spendJournalPruneMinDepth, d)
+	}
+	if cfg.PruneSpendJournal != 0 {
+		sjPrune = true
+	}
+	// If prunespendjournal is 0 but previously the spend journal has been
+	// pruned, load the prune depth from the database, enable the spend
+	// journal pruning and set the config spend journal prune depth.
+	if !sjPrune {
+		err := db.View(func(tx database.Tx) error {
+			d, err := blockchain.DBSpendJournalPruneDepth(tx)
+			if err != nil {
+				return err
+			}
+			sjPrune = d != 0
+			cfg.PruneSpendJournal = d
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if !sjPrune {
+		return nil
+	}
+
+	// Disable cfindex when spend journal pruning is enabled, we do it here
+	// because otherwise the user would be required to pass --nocfilters
+	// every time.
+	cfg.NoCFilters = true
+
+	if cfg.TxIndex {
+		return fmt.Errorf("spend journal pruning and txindex can " +
+			"not be enabled at the same time")
+	}
+	if cfg.AddrIndex {
+		return fmt.Errorf("spend journal pruning and addrindex can " +
+			"not be enabled at the same time")
+	}
+
+	if indexers.CfIndexInitialized(db) {
+		return fmt.Errorf("spend journal pruning was enabled but " +
+			"cfindex is initialized, please drop cfindex with " +
+			"--dropcfindex")
+	}
+	if indexers.TxIndexInitialized(db) {
+		return fmt.Errorf("spend journal pruning was enabled but " +
+			"txindex is initialized, please drop txindex with " +
+			"--droptxindex")
+	}
+	if indexers.AddrIndexInitialized(db) {
+		return fmt.Errorf("spend journal pruning was enabled but " +
+			"addrindex is initialized, please drop addrindex " +
+			"with --dropaddrindex")
+	}
+
+	return nil
+}
 
 // btcdMain is the real main function for btcd.  It is necessary to work around
 // the fact that deferred functions do not run when os.Exit() is called.  The
@@ -168,6 +239,12 @@ func btcdMain(serverChan chan<- *server) error {
 		}
 
 		return nil
+	}
+
+	err = checkSpendJournalPruneConstraints(db)
+	if err != nil {
+		btcdLog.Errorf("%v", err)
+		return err
 	}
 
 	// Check if the database had previously been pruned.  If it had been, it's

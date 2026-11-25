@@ -119,6 +119,10 @@ type BlockChain struct {
 	// is pruned.
 	pruneTarget uint64
 
+	// pruneSpendJDepth is the block depth of spend journal entries to
+	// keep. Zero means disabled spend journal pruning.
+	pruneSpendJDepth int32
+
 	// These fields are related to the memory block index.  They both have
 	// their own locks, however they are often also protected by the chain
 	// lock to help prevent logic races when blocks are being processed.
@@ -674,6 +678,17 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
 		if err != nil {
 			return err
+		}
+
+		// Prune the spend journal depth if spend journal pruning is
+		// enabled.
+		if b.pruneSpendJDepth != 0 {
+			err = dbPruneSpendJournalDepth(
+				dbTx, b.pruneSpendJDepth, block.Height(),
+			)
+			if err != nil {
+				return err
+			}
 		}
 
 		// Allow the index manager to call each of the currently active
@@ -2117,6 +2132,43 @@ func (b *BlockChain) ReconsiderBlock(hash *chainhash.Hash) error {
 	return b.reorganizeChain(detachNodes, attachNodes)
 }
 
+// setupSpendJournalPruning initializes internal journal pruning control
+// structures and prunes the spend journal if needed.
+func (b *BlockChain) setupSpendJournalPruning(interrupt <-chan struct{}) error {
+	// If spend journal pruning is disabled, we have nothing to do here.
+	if b.pruneSpendJDepth == 0 {
+		return nil
+	}
+
+	log.Info("Executing the initial spend journal pruning, the first " +
+		"initialization after enabling or changing the journal prune " +
+		"depth may take a long time.")
+
+	var stats spendJournalStats
+	err := b.db.Update(func(tx database.Tx) error {
+		err := dbInitSpendJournalStats(
+			tx, interrupt, b.pruneSpendJDepth,
+		)
+		if err != nil {
+			return err
+		}
+		stats, err = dbFetchSpendJournalStats(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	bestHeight := b.bestChain.height()
+	return dbPruneSpendJournalDepthSlow(
+		b.db, b.pruneSpendJDepth, stats.nextHeight, bestHeight,
+		interrupt,
+	)
+}
+
 // IndexManager provides a generic interface that the is called when blocks are
 // connected and disconnected to and from the tip of the main chain for the
 // purpose of supporting optional indexes.
@@ -2213,6 +2265,11 @@ type Config struct {
 	// will target for with block files.  Prune at 0 specifies that no
 	// blocks will be deleted.
 	Prune uint64
+
+	// PruneSpendJ specifies the target block depth of spend journal
+	// entries to keep. A value of zero means that spend journal pruning is
+	// disabled.
+	PruneSpendJ int32
 }
 
 // New returns a BlockChain instance using the provided configuration details.
@@ -2271,6 +2328,7 @@ func New(config *Config) (*BlockChain, error) {
 		warningCaches:       newThresholdCaches(vbNumBits),
 		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
 		pruneTarget:         config.Prune,
+		pruneSpendJDepth:    config.PruneSpendJ,
 	}
 
 	// Ensure all the deployments are synchronized with our clock if
@@ -2322,6 +2380,11 @@ func New(config *Config) (*BlockChain, error) {
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
 		bestNode.height, bestNode.hash, b.stateSnapshot.TotalTxns,
 		bestNode.workSum)
+
+	// Setup spend journal pruning.
+	if err := b.setupSpendJournalPruning(config.Interrupt); err != nil {
+		return nil, err
+	}
 
 	return &b, nil
 }
