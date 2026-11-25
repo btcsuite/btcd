@@ -3,17 +3,22 @@ package rpcclient
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -888,4 +893,273 @@ func TestDialStalledErrorBody(t *testing.T) {
 		require.ErrorIs(t, err, ErrInvalidAuth)
 		require.Equal(t, defaultHTTPTimeout, time.Since(start))
 	})
+}
+
+// TestWSReconnectWaitsForPriorInHandler verifies that automatic websocket
+// reconnection waits for the previous connection's wsInHandler callback to
+// finish before dialing and activating the replacement socket.
+func TestWSReconnectWaitsForPriorInHandler(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback websocket server that sends one blockconnected
+	// notification on the first connection and answers getblockcount on
+	// the replacement connection.
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	conn2Accepted := make(chan struct{})
+	var connsMu sync.Mutex
+	var serverConns []*websocket.Conn
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			connsMu.Lock()
+			serverConns = append(serverConns, conn)
+			connsMu.Unlock()
+
+			idx := connCount.Add(1)
+			if idx == 1 {
+				ntfn := btcjson.NewBlockConnectedNtfn(
+					chainhash.Hash{1}.String(), 1, 1000,
+				)
+				raw, err := btcjson.MarshalCmd(
+					btcjson.RpcVersion1, nil, ntfn,
+				)
+				if err == nil {
+					_ = conn.WriteMessage(
+						websocket.TextMessage, raw,
+					)
+				}
+				for {
+					_, _, err := conn.ReadMessage()
+					if err != nil {
+						return
+					}
+				}
+			}
+
+			if idx == 2 {
+				close(conn2Accepted)
+			}
+
+			// Serve JSON-RPC requests on the reconnected socket.
+			for {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				var req btcjson.Request
+				err = json.Unmarshal(msg, &req)
+				if err != nil {
+					return
+				}
+				reply, err := btcjson.MarshalResponse(
+					btcjson.RpcVersion1, req.ID,
+					int64(42), nil,
+				)
+				if err != nil {
+					return
+				}
+				if err := conn.WriteMessage(
+					websocket.TextMessage, reply,
+				); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(func() {
+		connsMu.Lock()
+		for _, conn := range serverConns {
+			_ = conn.Close()
+		}
+		connsMu.Unlock()
+		srv.Close()
+	})
+
+	inCallback := make(chan struct{})
+	releaseCallback := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() {
+		releaseOnce.Do(func() {
+			close(releaseCallback)
+		})
+	}
+	var callbackOnce sync.Once
+	handlers := &NotificationHandlers{
+		OnBlockConnected: func(*chainhash.Hash, int32, time.Time) {
+			callbackOnce.Do(func() {
+				close(inCallback)
+				<-releaseCallback
+			})
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		release()
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: wait until socket 1's wsInHandler is paused inside the
+	// notification callback, trigger disconnect, verify reconnect does
+	// not dial socket 2 until the callback returns, then release it.
+	select {
+	case <-inCallback:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 1 callback")
+	}
+
+	client.Disconnect()
+
+	select {
+	case <-conn2Accepted:
+		require.FailNow(
+			t, "reconnect accepted socket 2 before prior "+
+				"wsInHandler exited",
+		)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	release()
+
+	// Assert: socket 2 connects once socket 1's wsInHandler finishes and
+	// serves RPC requests cleanly.
+	select {
+	case <-conn2Accepted:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 2 reconnect")
+	}
+
+	count, err := client.GetBlockCount()
+	require.NoError(t, err)
+	require.Equal(t, int64(42), count)
+}
+
+// TestWSReconnectShutdownDuringDialClosesNewConn verifies that shutting down
+// the client while wsReconnectHandler is dialing closes the newly dialed
+// connection without invoking OnClientConnected or leaking goroutines.
+func TestWSReconnectShutdownDuringDialClosesNewConn(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback server that holds the second websocket upgrade
+	// until the test calls Shutdown.
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	upgrade2Started := make(chan struct{})
+	releaseUpgrade2 := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseUpgrade := func() {
+		releaseOnce.Do(func() {
+			close(releaseUpgrade2)
+		})
+	}
+	conn2Closed := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			idx := connCount.Add(1)
+			if idx == 2 {
+				close(upgrade2Started)
+				<-releaseUpgrade2
+			}
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			if idx == 2 {
+				defer close(conn2Closed)
+			}
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(func() {
+		releaseUpgrade()
+		srv.Close()
+	})
+
+	var connectedCount atomic.Int32
+	conn1Ready := make(chan struct{})
+	handlers := &NotificationHandlers{
+		OnClientConnected: func() {
+			if connectedCount.Add(1) == 1 {
+				close(conn1Ready)
+			}
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		releaseUpgrade()
+		client.WaitForShutdown()
+	})
+
+	select {
+	case <-conn1Ready:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 1 connect")
+	}
+
+	// Act: disconnect socket 1, wait for socket 2's dial to reach the
+	// server, initiate Shutdown, then release the held upgrade.
+	client.Disconnect()
+
+	select {
+	case <-upgrade2Started:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 2 dial")
+	}
+
+	client.Shutdown()
+	releaseUpgrade()
+
+	// Assert: WaitForShutdown returns cleanly, the newly dialed socket 2
+	// is closed by the client, and OnClientConnected never fires again.
+	waitDone := make(chan struct{})
+	go func() {
+		client.WaitForShutdown()
+		close(waitDone)
+	}()
+
+	select {
+	case <-waitDone:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for client shutdown")
+	}
+
+	select {
+	case <-conn2Closed:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "expected socket 2 to be closed on shutdown")
+	}
+
+	require.Equal(t, int32(1), connectedCount.Load())
 }

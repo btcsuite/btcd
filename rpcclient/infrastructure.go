@@ -186,6 +186,11 @@ type Client struct {
 	disconnect      chan struct{}
 	shutdown        chan struct{}
 	wg              sync.WaitGroup
+
+	// connWG tracks the active websocket connection's wsInHandler and
+	// wsOutHandler goroutines so wsReconnectHandler waits for them to exit
+	// before starting handlers for a reconnected socket.
+	connWG sync.WaitGroup
 }
 
 // NextID returns the next id to be used when sending a JSON-RPC message.  This
@@ -481,9 +486,9 @@ func (c *Client) shouldLogReadError(err error) bool {
 	return true
 }
 
-// wsInHandler handles all incoming messages for the websocket connection
-// associated with the client.  It must be run as a goroutine.
-func (c *Client) wsInHandler() {
+// wsInHandler handles all incoming messages for the passed websocket
+// connection.  It must be run as a goroutine.
+func (c *Client) wsInHandler(wsConn *websocket.Conn) {
 out:
 	for {
 		// Break out of the loop once the shutdown channel has been
@@ -495,7 +500,7 @@ out:
 		default:
 		}
 
-		_, msg, err := c.wsConn.ReadMessage()
+		_, msg, err := wsConn.ReadMessage()
 		if err != nil {
 			// Log the error if it's not due to disconnecting.
 			if c.shouldLogReadError(err) {
@@ -507,8 +512,10 @@ out:
 		c.handleMessage(msg)
 	}
 
-	// Ensure the connection is closed.
+	// Ensure the connection is closed before releasing connWG so
+	// wsReconnectHandler cannot activate a new connection first.
 	c.Disconnect()
+	c.connWG.Done()
 	c.wg.Done()
 	log.Tracef("RPC client input handler done for %s", c.config.Host)
 }
@@ -523,23 +530,26 @@ func (c *Client) disconnectChan() <-chan struct{} {
 	return ch
 }
 
-// wsOutHandler handles all outgoing messages for the websocket connection.  It
-// uses a buffered channel to serialize output messages while allowing the
-// sender to continue running asynchronously.  It must be run as a goroutine.
-func (c *Client) wsOutHandler() {
+// wsOutHandler handles all outgoing messages for the passed websocket
+// connection.  It uses a buffered channel to serialize output messages while
+// allowing the sender to continue running asynchronously.  It must be run as a
+// goroutine.
+func (c *Client) wsOutHandler(wsConn *websocket.Conn,
+	disconnect <-chan struct{}) {
+
 out:
 	for {
 		// Send any messages ready for send until the client is
-		// disconnected closed.
+		// disconnected.
 		select {
 		case msg := <-c.sendChan:
-			err := c.wsConn.WriteMessage(websocket.TextMessage, msg)
+			err := wsConn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
 				c.Disconnect()
 				break out
 			}
 
-		case <-c.disconnectChan():
+		case <-disconnect:
 			break out
 		}
 	}
@@ -554,6 +564,7 @@ cleanup:
 			break cleanup
 		}
 	}
+	c.connWG.Done()
 	c.wg.Done()
 	log.Tracef("RPC client output handler done for %s", c.config.Host)
 }
@@ -706,9 +717,13 @@ func (c *Client) wsReconnectHandler() {
 out:
 	for {
 		select {
-		case <-c.disconnect:
-			// On disconnect, fallthrough to reestablish the
-			// connection.
+		case <-c.disconnectChan():
+			// Wait for the previous connection's input and output
+			// handlers to exit before reconnecting so stale
+			// notification callbacks cannot run after the new
+			// socket starts and the old output handler cannot
+			// drain messages queued for the new socket.
+			c.connWG.Wait()
 
 		case <-c.shutdown:
 			break out
@@ -751,19 +766,24 @@ out:
 			c.backendVersion = nil
 			c.backendVersionMu.Unlock()
 
-			// Reset the connection state and signal the reconnect
-			// has happened.
+			// Reset the connection state and start the new
+			// connection's handlers atomically under c.mtx while
+			// honoring any concurrent shutdown.
 			c.mtx.Lock()
+			select {
+			case <-c.shutdown:
+				c.mtx.Unlock()
+				_ = wsConn.Close()
+				break out
+			default:
+			}
 			c.wsConn = wsConn
 			c.retryCount = 0
 
 			c.disconnect = make(chan struct{})
 			c.disconnected = false
-			c.mtx.Unlock()
-
-			// Start processing input and output for the
-			// new connection.
 			c.start()
+			c.mtx.Unlock()
 
 			// Reissue pending requests in another goroutine since
 			// the send can block.
@@ -1235,7 +1255,10 @@ func (c *Client) start() {
 			cancel(ErrClientShutdown)
 		}()
 	} else {
+		wsConn := c.wsConn
+		disconnect := c.disconnect
 		c.wg.Add(3)
+		c.connWG.Add(2)
 		go func() {
 			if c.ntfnHandlers != nil {
 				if c.ntfnHandlers.OnClientConnected != nil {
@@ -1244,8 +1267,8 @@ func (c *Client) start() {
 			}
 			c.wg.Done()
 		}()
-		go c.wsInHandler()
-		go c.wsOutHandler()
+		go c.wsInHandler(wsConn)
+		go c.wsOutHandler(wsConn, disconnect)
 	}
 }
 
