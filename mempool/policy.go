@@ -173,6 +173,23 @@ func checkInputsStandardWithView(tx *btcutil.Tx, utxoView utxoView) error {
 	return nil
 }
 
+// isValidPubKeySize returns whether the passed data has the size implied by
+// its public key header byte. This matches CPubKey::ValidSize in Bitcoin Core:
+// only the header and length are checked, not that the point is on the curve.
+func isValidPubKeySize(pubKey []byte) bool {
+	if len(pubKey) == 0 {
+		return false
+	}
+	switch pubKey[0] {
+	case 0x02, 0x03:
+		return len(pubKey) == 33
+	case 0x04, 0x06, 0x07:
+		return len(pubKey) == 65
+	default:
+		return false
+	}
+}
+
 // checkPkScriptStandard performs a series of checks on a transaction output
 // script (public key script) to ensure it is a "standard" public key script.
 // A standard public key script is one that is a recognized form, and for
@@ -213,6 +230,23 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 				"signatures which is more than the available "+
 				"%d public keys", numSigs, numPubKeys)
 			return txRuleError(wire.RejectNonstandard, str)
+		}
+
+		// Every public key must be a data push with a valid public key
+		// size, as in Bitcoin Core's Solver. Otherwise the output can
+		// never be spent and only bloats the UTXO set.
+		pushes, err := txscript.PushedData(pkScript)
+		if err != nil || len(pushes) != numPubKeys {
+			str := "multi-signature script with non-push " +
+				"public keys"
+			return txRuleError(wire.RejectNonstandard, str)
+		}
+		for _, pubKey := range pushes {
+			if !isValidPubKeySize(pubKey) {
+				str := fmt.Sprintf("multi-signature script "+
+					"with invalid public key %x", pubKey)
+				return txRuleError(wire.RejectNonstandard, str)
+			}
 		}
 
 	case txscript.NonStandardTy:

@@ -108,6 +108,12 @@ func TestCheckPkScriptStandard(t *testing.T) {
 		}
 		pubKeys = append(pubKeys, pk.PubKey().SerializeCompressed())
 	}
+	pk, err := btcec.NewPrivateKey()
+	if err != nil {
+		t.Fatalf("TestCheckPkScriptStandard NewPrivateKey failed: %v",
+			err)
+	}
+	uncompressed := pk.PubKey().SerializeUncompressed()
 
 	tests := []struct {
 		name       string // test description.
@@ -184,6 +190,65 @@ func TestCheckPkScriptStandard(t *testing.T) {
 			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
 				AddData(pubKeys[0]).AddData(pubKeys[1]),
 			false,
+		},
+		{
+			"20-byte push as key",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddData(make([]byte, 20)).
+				AddOp(txscript.OP_1).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			false,
+		},
+		{
+			"valid key and 520-byte push",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddData(pubKeys[0]).AddData(make([]byte, 520)).
+				AddOp(txscript.OP_2).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			false,
+		},
+		{
+			"non-push opcode as key",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddOp(txscript.OP_DUP).
+				AddOp(txscript.OP_1).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			false,
+		},
+		{
+			"33-byte key with 0x05 header",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddData(append([]byte{0x05},
+					pubKeys[0][1:]...)).
+				AddOp(txscript.OP_1).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			false,
+		},
+		{
+			"compressed header with 65 bytes",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddData(append([]byte{0x02},
+					make([]byte, 64)...)).
+				AddOp(txscript.OP_1).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			false,
+		},
+		{
+			"uncompressed key",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddData(uncompressed).
+				AddOp(txscript.OP_1).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			true,
+		},
+		{
+			"hybrid key size",
+			txscript.NewScriptBuilder().AddOp(txscript.OP_1).
+				AddData(append([]byte{0x06},
+					uncompressed[1:]...)).
+				AddOp(txscript.OP_1).
+				AddOp(txscript.OP_CHECKMULTISIG),
+			true,
 		},
 	}
 
