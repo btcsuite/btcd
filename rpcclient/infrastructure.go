@@ -1749,9 +1749,20 @@ func (c *Client) BackendVersion() (BackendVersion, error) {
 			err)
 	}
 
-	// Parse the bitcoind version and cache it.
-	log.Debugf("Detected bitcoind version: %v", networkInfo.SubVersion)
-	version := parseBitcoindVersion(networkInfo.SubVersion)
+	// Parse the bitcoind version and cache it. A backend that is not
+	// bitcoind but implements its RPC interface names itself in the
+	// subversion, so its version is read from the numeric field instead.
+	var version BitcoindVersion
+	if strings.HasPrefix(networkInfo.SubVersion, bitcoindVersionPrefix) {
+		log.Debugf("Detected bitcoind version: %v",
+			networkInfo.SubVersion)
+		version = parseBitcoindVersion(networkInfo.SubVersion)
+	} else {
+		log.Debugf("Detected bitcoind-compatible backend %v, "+
+			"version %v", networkInfo.SubVersion,
+			networkInfo.Version)
+		version = parseBitcoindNumericVersion(networkInfo.Version)
+	}
 	c.backendVersion = &version
 
 	return c.backendVersion, nil
