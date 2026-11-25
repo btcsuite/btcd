@@ -267,6 +267,40 @@ func TestChainSvrCmds(t *testing.T) {
 			},
 		},
 		{
+			name: "generateblock",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("generateblock", "raw(51)", "[]")
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGenerateBlockCmd("raw(51)", nil, nil)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"generateblock",` +
+				`"params":["raw(51)",[]],"id":1}`,
+			unmarshalled: &btcjson.GenerateBlockCmd{
+				Output:       "raw(51)",
+				Transactions: []string{},
+				Submit:       btcjson.Bool(true),
+			},
+		},
+		{
+			name: "generateblock without submission",
+			newCmd: func() (interface{}, error) {
+				return btcjson.NewCmd("generateblock", "raw(51)", `["aa","bb"]`, false)
+			},
+			staticCmd: func() interface{} {
+				return btcjson.NewGenerateBlockCmd(
+					"raw(51)", []string{"aa", "bb"}, btcjson.Bool(false),
+				)
+			},
+			marshalled: `{"jsonrpc":"1.0","method":"generateblock",` +
+				`"params":["raw(51)",["aa","bb"],false],"id":1}`,
+			unmarshalled: &btcjson.GenerateBlockCmd{
+				Output:       "raw(51)",
+				Transactions: []string{"aa", "bb"},
+				Submit:       btcjson.Bool(false),
+			},
+		},
+		{
 			name: "getaddednodeinfo",
 			newCmd: func() (interface{}, error) {
 				return btcjson.NewCmd("getaddednodeinfo", true)

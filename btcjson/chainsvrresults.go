@@ -16,6 +16,13 @@ import (
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
+// GenerateBlockResult models the result of generateblock. Hex contains the
+// serialized block when the caller requests it without submitting it.
+type GenerateBlockResult struct {
+	Hash string `json:"hash"`
+	Hex  string `json:"hex,omitempty"`
+}
+
 // GetBlockHeaderVerboseResult models the data from the getblockheader command when
 // the verbose flag is set.  When the verbose flag is not set, getblockheader
 // returns a hex-encoded string.
