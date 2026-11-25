@@ -381,6 +381,32 @@ func GenNonces(options ...NonceGenOption) (*Nonces, error) {
 	return &nonces, nil
 }
 
+// parsePubNonceHalf parses one 33-byte half of a signer's public nonce. As
+// with BIP 327's cpoint, only a valid compressed point is accepted: the point
+// at infinity is not a valid public nonce.
+func parsePubNonceHalf(b []byte) (btcec.JacobianPoint, error) {
+	var nonceJ btcec.JacobianPoint
+
+	noncePk, err := btcec.ParsePubKey(b)
+	if err != nil {
+		return nonceJ, err
+	}
+	noncePk.AsJacobian(&nonceJ)
+
+	return nonceJ, nil
+}
+
+// parseAggNonceHalf parses one 33-byte half of an aggregate nonce. As with
+// BIP 327's cpoint_ext, the point at infinity is only accepted when encoded
+// as 33 zero bytes; any other encoding must be a valid compressed point.
+func parseAggNonceHalf(b []byte) (btcec.JacobianPoint, error) {
+	if bytes.Equal(b, make([]byte, btcec.PubKeyBytesLenCompressed)) {
+		return infinityPoint, nil
+	}
+
+	return parsePubNonceHalf(b)
+}
+
 // AggregateNonces aggregates the set of a pair of public nonces for each party
 // into a single aggregated nonces to be used for multi-signing.
 func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error) {
@@ -398,7 +424,7 @@ func AggregateNonces(pubNonces [][PubNonceSize]byte) ([PubNonceSize]byte, error)
 			// decode.
 			var nonceJ btcec.JacobianPoint
 
-			nonceJ, err := btcec.ParseJacobian(slicer(pubNonceBytes))
+			nonceJ, err := parsePubNonceHalf(slicer(pubNonceBytes))
 			if err != nil {
 				return btcec.JacobianPoint{}, err
 			}
