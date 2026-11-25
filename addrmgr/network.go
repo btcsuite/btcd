@@ -264,12 +264,21 @@ func IsValid(na *wire.NetAddress) bool {
 // in any reserved ranges.
 func IsRoutable(na *wire.NetAddressV2) bool {
 	if na.IsTorV3() {
-		// na is a torv3 address, return true.
 		return true
 	}
 
-	// Else na can be represented as a legacy NetAddress since i2p and
-	// cjdns are unsupported.
+	if na.IsI2P() {
+		return false
+	}
+
+	if na.IsCJDNS() {
+		return false
+	}
+
+	if na.IsYggdrasil() {
+		return false
+	}
+
 	lna := na.ToLegacy()
 	return IsValid(lna) && !(IsRFC1918(lna) || IsRFC2544(lna) ||
 		IsRFC3927(lna) || IsRFC4862(lna) || IsRFC3849(lna) ||
