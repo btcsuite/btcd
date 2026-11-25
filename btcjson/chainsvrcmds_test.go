@@ -1217,7 +1217,7 @@ func TestChainSvrCmds(t *testing.T) {
 				Verbose:     btcjson.Int(0),
 				Skip:        btcjson.Int(5),
 				Count:       btcjson.Int(10),
-				VinExtra:    nil,
+				VinExtra:    btcjson.Int(0),
 				Reverse:     btcjson.Bool(true),
 				FilterAddrs: &[]string{"1Address"},
 			},

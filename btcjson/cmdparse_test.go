@@ -591,3 +591,63 @@ func TestUnmarshalCmdErrors(t *testing.T) {
 		}
 	}
 }
+
+// TestUnmarshalCmdNullOptional ensures that an explicit JSON null for an
+// optional parameter is treated the same as omitting it, so the parameter
+// receives its default value instead of nil.
+func TestUnmarshalCmdNullOptional(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		method string
+		params string
+		want   interface{}
+	}{
+		{
+			name:   "verifychain all null",
+			method: "verifychain",
+			params: `[null, null]`,
+			want: btcjson.NewVerifyChainCmd(
+				btcjson.Int32(3), btcjson.Int32(288),
+			),
+		},
+		{
+			name:   "verifychain null depth",
+			method: "verifychain",
+			params: `[4, null]`,
+			want: btcjson.NewVerifyChainCmd(
+				btcjson.Int32(4), btcjson.Int32(288),
+			),
+		},
+		{
+			name:   "getblock null verbosity",
+			method: "getblock",
+			params: `["123", null]`,
+			want:   btcjson.NewGetBlockCmd("123", btcjson.Int(1)),
+		},
+	}
+
+	for _, test := range tests {
+		var params []json.RawMessage
+		if err := json.Unmarshal([]byte(test.params), &params); err != nil {
+			t.Fatalf("%s: bad test params: %v", test.name, err)
+		}
+		request := btcjson.Request{
+			Jsonrpc: btcjson.RpcVersion1,
+			Method:  test.method,
+			Params:  params,
+		}
+		cmd, err := btcjson.UnmarshalCmd(&request)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+		if !reflect.DeepEqual(cmd, test.want) {
+			got, _ := json.Marshal(cmd)
+			want, _ := json.Marshal(test.want)
+			t.Errorf("%s: mismatched command - got %s, want %s",
+				test.name, got, want)
+		}
+	}
+}

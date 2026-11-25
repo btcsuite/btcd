@@ -111,8 +111,8 @@ func TestWalletSvrCmds(t *testing.T) {
 			marshalled: `{"jsonrpc":"1.0","method":"createwallet","params":["mywallet",null,null,"secret"],"id":1}`,
 			unmarshalled: &btcjson.CreateWalletCmd{
 				WalletName:         "mywallet",
-				DisablePrivateKeys: nil,
-				Blank:              nil,
+				DisablePrivateKeys: btcjson.Bool(false),
+				Blank:              btcjson.Bool(false),
 				Passphrase:         btcjson.String("secret"),
 				AvoidReuse:         btcjson.Bool(false),
 			},
