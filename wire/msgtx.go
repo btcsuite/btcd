@@ -433,6 +433,12 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error
 	return err
 }
 
+// btcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// This is part of the Message interface implementation.
+// See Deserialize for decoding transactions stored to disk, such as in a
+// database, as opposed to decoding transactions from the wire.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func (msg *MsgTx) btcDecode(r io.Reader, pver uint32, enc MessageEncoding,
 	buf []byte, ar *scriptArena) error {
 
@@ -749,6 +755,12 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error
 	return err
 }
 
+// btcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// This is part of the Message interface implementation.
+// See Serialize for encoding transactions to be stored to disk, such as in a
+// database, as opposed to encoding transactions for the wire.
+//
+// NOTE: buf length MUST be at least 8.
 func (msg *MsgTx) btcEncode(w io.Writer, pver uint32, enc MessageEncoding,
 	buf []byte) error {
 
@@ -1093,6 +1105,8 @@ func readTxInBuf(r io.Reader, pver uint32, version int32, ti *TxIn,
 // writeTxInBuf encodes ti to the bitcoin protocol encoding for a transaction
 // input (TxIn) to w.  The buf parameter is the scratch buffer used for
 // serializing small values.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeTxInBuf(w io.Writer, pver uint32, version int32, ti *TxIn,
 	buf []byte) error {
 
@@ -1139,6 +1153,8 @@ func ReadTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // readTxOutBuf reads the next sequence of bytes from r as a transaction output
 // (TxOut).  The buf parameter is the scratch buffer used for serializing
 // small values.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func readTxOutBuf(r io.Reader, pver uint32, version int32, to *TxOut,
 	buf []byte, ar *scriptArena) error {
 
@@ -1173,6 +1189,8 @@ func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 //
 // NOTE: This function is exported in order to allow txscript to compute the
 // new sighashes for witness transactions (BIP0143).
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
 	buf []byte) error {
 
@@ -1188,6 +1206,8 @@ func WriteTxOutBuf(w io.Writer, pver uint32, version int32, to *TxOut,
 // writeTxWitnessBuf encodes the bitcoin protocol encoding for a transaction
 // input's witness into to w.  The buf parameter is the scratch buffer used
 // for serializing small values.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeTxWitnessBuf(w io.Writer, pver uint32, version int32, wit [][]byte,
 	buf []byte) error {
 

@@ -120,11 +120,7 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readBlockHeaderBuf(r io.Reader, pver uint32, bh *BlockHeader,
 	buf []byte) error {
 
@@ -175,11 +171,7 @@ func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 // encoding block headers to be stored to disk, such as in a database, as
 // opposed to encoding for the wire.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeBlockHeaderBuf(w io.Writer, pver uint32, bh *BlockHeader,
 	buf []byte) error {
 

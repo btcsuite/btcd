@@ -623,7 +623,7 @@ func ReadVarInt(r io.Reader, pver uint32) (uint64, error) {
 // ReadVarIntBuf reads a variable length integer from r using a preallocated
 // scratch buffer and returns it as a uint64.
 //
-// NOTE: buf MUST at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func ReadVarIntBuf(r io.Reader, pver uint32, buf []byte) (uint64, error) {
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
 		return 0, err
@@ -694,7 +694,7 @@ func WriteVarInt(w io.Writer, pver uint32, val uint64) error {
 // WriteVarIntBuf serializes val to w using a variable number of bytes depending
 // on its value using a preallocated scratch buffer.
 //
-// NOTE: buf MUST at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func WriteVarIntBuf(w io.Writer, pver uint32, val uint64, buf []byte) error {
 	switch {
 	case val < 0xfd:
@@ -881,10 +881,9 @@ func WriteVarBytes(w io.Writer, pver uint32, bytes []byte) error {
 }
 
 // WriteVarBytesBuf serializes a variable length byte array to w as a varInt
-// containing the number of bytes, followed by the bytes themselves. If b is
-// non-nil, the provided buffer will be used for serializing small values.
-// Otherwise a buffer will be drawn from the binarySerializer's pool and return
-// when the method finishes.
+// containing the number of bytes, followed by the bytes themselves.
+//
+// NOTE: buf MUST be at least an 8-byte slice.
 func WriteVarBytesBuf(w io.Writer, pver uint32, bytes, buf []byte) error {
 	slen := uint64(len(bytes))
 

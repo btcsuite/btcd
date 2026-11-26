@@ -105,11 +105,7 @@ func readNetAddress(r io.Reader, pver uint32, na *NetAddress, ts bool) error {
 // protocol version and whether or not the timestamp is included per ts.  Some
 // messages like version do not include the timestamp.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func readNetAddressBuf(r io.Reader, pver uint32, na *NetAddress, ts bool,
 	buf []byte) error {
 
@@ -169,11 +165,7 @@ func writeNetAddress(w io.Writer, pver uint32, na *NetAddress, ts bool) error {
 // version and whether or not the timestamp is included per ts.  Some messages
 // like version do not include the timestamp.
 //
-// If b is non-nil, the provided buffer will be used for serializing small
-// values.  Otherwise a buffer will be drawn from the binarySerializer's pool
-// and return when the method finishes.
-//
-// NOTE: b MUST either be nil or at least an 8-byte slice.
+// NOTE: buf MUST be at least an 8-byte slice.
 func writeNetAddressBuf(w io.Writer, pver uint32, na *NetAddress, ts bool, buf []byte) error {
 	// NOTE: The bitcoin protocol uses a uint32 for the timestamp so it will
 	// stop working somewhere around 2106.  Also timestamp wasn't added until
