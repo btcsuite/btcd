@@ -67,3 +67,8 @@ retract (
 	v0.13.0-beta2
 	v0.13.0-beta
 )
+
+replace (
+	github.com/btcsuite/btcd/btcutil/v2 => ./btcutil
+	github.com/btcsuite/btcd/wire/v2 => ./wire
+)

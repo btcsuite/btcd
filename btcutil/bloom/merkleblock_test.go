@@ -8,10 +8,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/btcutil/v2/bloom"
 	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
 )
 
@@ -70,5 +72,126 @@ func TestMerkleBlock3(t *testing.T) {
 		t.Errorf("TestMerkleBlock3 failed merkle block comparison: "+
 			"got %v want %v", got.Bytes(), want)
 		return
+	}
+}
+
+// testMerkleProofBlock returns a block with numTx distinct transactions and a
+// valid merkle root.
+func testMerkleProofBlock(numTx int) *btcutil.Block {
+	txs := make([]*wire.MsgTx, 0, numTx)
+	utilTxs := make([]*btcutil.Tx, 0, numTx)
+	for i := 0; i < numTx; i++ {
+		tx := &wire.MsgTx{
+			Version: 1,
+			TxIn: []*wire.TxIn{{
+				PreviousOutPoint: wire.OutPoint{Index: wire.MaxPrevOutIndex},
+				SignatureScript:  []byte{byte(i + 1)},
+				Sequence:         wire.MaxTxInSequenceNum,
+			}},
+			TxOut: []*wire.TxOut{{
+				Value:    int64(i + 1),
+				PkScript: []byte{txscript.OP_TRUE},
+			}},
+		}
+		txs = append(txs, tx)
+		utilTxs = append(utilTxs, btcutil.NewTx(tx))
+	}
+
+	block := btcutil.NewBlock(&wire.MsgBlock{
+		Header: wire.BlockHeader{
+			Version:   1,
+			Timestamp: time.Unix(1700000000, 0),
+			Bits:      0x1d00ffff,
+		},
+		Transactions: txs,
+	})
+	block.MsgBlock().Header.MerkleRoot = testMerkleRoot(utilTxs)
+	return block
+}
+
+// testMerkleRoot calculates the merkle root of the passed transactions.
+func testMerkleRoot(txs []*btcutil.Tx) chainhash.Hash {
+	level := make([]chainhash.Hash, 0, len(txs))
+	for _, tx := range txs {
+		level = append(level, *tx.Hash())
+	}
+
+	for len(level) > 1 {
+		if len(level)%2 != 0 {
+			level = append(level, level[len(level)-1])
+		}
+
+		next := make([]chainhash.Hash, 0, len(level)/2)
+		for i := 0; i < len(level); i += 2 {
+			next = append(next, bloom.HashMerkleBranches(&level[i], &level[i+1]))
+		}
+		level = next
+	}
+
+	return level[0]
+}
+
+// TestNewMerkleBlockFromTxHashes checks that NewMerkleBlockFromTxHashes builds
+// a proof matching exactly the requested transactions, in block order.
+func TestNewMerkleBlockFromTxHashes(t *testing.T) {
+	t.Parallel()
+
+	block := testMerkleProofBlock(5)
+	txHashes := []*chainhash.Hash{
+		block.Transactions()[3].Hash(),
+		block.Transactions()[1].Hash(),
+	}
+
+	merkleBlock, matchedIndices, err := bloom.NewMerkleBlockFromTxHashes(block, txHashes)
+	if err != nil {
+		t.Fatalf("NewMerkleBlockFromTxHashes: unexpected error: %v", err)
+	}
+	if len(matchedIndices) != 2 || matchedIndices[0] != 1 || matchedIndices[1] != 3 {
+		t.Fatalf("NewMerkleBlockFromTxHashes: unexpected matched indices %v", matchedIndices)
+	}
+
+	matches, err := merkleBlock.ExtractMatches()
+	if err != nil {
+		t.Fatalf("ExtractMatches: unexpected error: %v", err)
+	}
+	wantMatches := []chainhash.Hash{
+		*block.Transactions()[1].Hash(),
+		*block.Transactions()[3].Hash(),
+	}
+	if len(matches) != len(wantMatches) {
+		t.Fatalf("ExtractMatches: unexpected match count %d", len(matches))
+	}
+	for i := range matches {
+		if matches[i] != wantMatches[i] {
+			t.Fatalf("ExtractMatches: unexpected matches %v", matches)
+		}
+	}
+}
+
+// TestNewMerkleBlockFromTxHashesMissingTx checks that NewMerkleBlockFromTxHashes
+// returns an error when a requested transaction is not in the block.
+func TestNewMerkleBlockFromTxHashesMissingTx(t *testing.T) {
+	t.Parallel()
+
+	block := testMerkleProofBlock(3)
+	missingHash := chainhash.DoubleHashH([]byte("missing"))
+
+	_, _, err := bloom.NewMerkleBlockFromTxHashes(block, []*chainhash.Hash{&missingHash})
+	if err == nil {
+		t.Fatal("NewMerkleBlockFromTxHashes: expected error")
+	}
+}
+
+// TestNewMerkleBlockFromTxHashesRejectsDuplicateTx checks that
+// NewMerkleBlockFromTxHashes returns an error for duplicate transaction hashes.
+func TestNewMerkleBlockFromTxHashesRejectsDuplicateTx(t *testing.T) {
+	t.Parallel()
+
+	block := testMerkleProofBlock(2)
+	txHash := block.Transactions()[0].Hash()
+
+	_, _, err := bloom.NewMerkleBlockFromTxHashes(block, []*chainhash.Hash{txHash, txHash})
+	if err == nil {
+		t.Fatal("NewMerkleBlockFromTxHashes: expected duplicate transaction error")
 	}
 }
