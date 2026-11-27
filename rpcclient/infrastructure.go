@@ -632,10 +632,19 @@ func (c *Client) reregisterNtfns() error {
 	// filtered block notifications.  Use reload=false so any concurrent
 	// additive LoadTxFilter call on the new socket is preserved while an
 	// uninitialized server filter is created fresh.
-	if stateCopy.txFilterLoaded {
+	hasReconnectFilter := len(stateCopy.reconnectTxFilterAddrs) > 0 ||
+		len(stateCopy.reconnectTxFilterOutPoints) > 0
+	if stateCopy.txFilterLoaded || hasReconnectFilter {
+		for addr := range stateCopy.reconnectTxFilterAddrs {
+			stateCopy.txFilterAddrs[addr] = struct{}{}
+		}
 		addresses := make([]string, 0, len(stateCopy.txFilterAddrs))
 		for addr := range stateCopy.txFilterAddrs {
 			addresses = append(addresses, addr)
+		}
+
+		for op := range stateCopy.reconnectTxFilterOutPoints {
+			stateCopy.txFilterOutPoints[op] = struct{}{}
 		}
 		outpoints := make(
 			[]btcjson.OutPoint, 0, len(stateCopy.txFilterOutPoints),
@@ -643,6 +652,7 @@ func (c *Client) reregisterNtfns() error {
 		for op := range stateCopy.txFilterOutPoints {
 			outpoints = append(outpoints, op)
 		}
+
 		log.Debugf("Reregistering [loadtxfilter] addresses=%d "+
 			"outpoints=%d", len(addresses), len(outpoints))
 		err := c.loadTxFilterInternal(
@@ -1156,6 +1166,13 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) SendCmd(cmd interface{}) chan *Response {
+	return c.sendCmd(cmd, true)
+}
+
+// sendCmd marshals and sends cmd, omitting jReq.cmd when trackNtfnState is
+// false so reconnect reregistration does not merge transient reconnect state
+// back into durable notificationState.
+func (c *Client) sendCmd(cmd interface{}, trackNtfnState bool) chan *Response {
 	rpcVersion := btcjson.RpcVersion1
 	if c.batch {
 		rpcVersion = btcjson.RpcVersion2
@@ -1173,12 +1190,17 @@ func (c *Client) SendCmd(cmd interface{}) chan *Response {
 		return newFutureError(err)
 	}
 
+	var trackedCmd interface{}
+	if trackNtfnState {
+		trackedCmd = cmd
+	}
+
 	// Generate the request and send it along with a channel to respond on.
 	responseChan := make(chan *Response, 1)
 	jReq := &jsonRequest{
 		id:             id,
 		method:         method,
-		cmd:            cmd,
+		cmd:            trackedCmd,
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
 	}
