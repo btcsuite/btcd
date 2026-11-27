@@ -655,10 +655,8 @@ func (c *Client) reregisterNtfns() error {
 
 		log.Debugf("Reregistering [loadtxfilter] addresses=%d "+
 			"outpoints=%d", len(addresses), len(outpoints))
-		err := c.loadTxFilterInternal(
-			false, addresses, outpoints,
-		).Receive()
-		if err != nil {
+		cmd := btcjson.NewLoadTxFilterCmd(false, addresses, outpoints)
+		if _, err := ReceiveFuture(c.sendCmd(cmd, false)); err != nil {
 			return err
 		}
 	}
@@ -865,7 +863,7 @@ out:
 			disconnect := make(chan struct{})
 			c.disconnect = disconnect
 			c.disconnected = false
-			c.startWithNotify(false)
+			c.start(false)
 			c.wg.Add(1)
 			c.mtx.Unlock()
 
@@ -1336,17 +1334,10 @@ func (c *Client) Shutdown() {
 	c.doDisconnect()
 }
 
-// start begins processing input and output messages and invokes
-// OnClientConnected for the initial connection.
-func (c *Client) start() {
-	c.startWithNotify(true)
-}
-
-// startWithNotify begins processing input and output messages.  When
-// notifyConnected is true, OnClientConnected is launched asynchronously; on
-// automatic reconnects, resendRequests invokes OnClientConnected after
-// reregisterNtfns completes.
-func (c *Client) startWithNotify(notifyConnected bool) {
+// start begins processing input and output messages.  When notifyConnected is
+// true, OnClientConnected is launched asynchronously; on automatic reconnects,
+// resendRequests invokes OnClientConnected after reregisterNtfns completes.
+func (c *Client) start(notifyConnected bool) {
 	log.Tracef("Starting RPC client %s", c.config.Host)
 
 	// Start the I/O processing handlers depending on whether the client is
@@ -1748,7 +1739,7 @@ func New(config *ConnConfig, ntfnHandlers *NotificationHandlers) (*Client, error
 		log.Infof("Established connection to RPC server %s",
 			config.Host)
 		close(connEstablished)
-		client.start()
+		client.start(true)
 		if !client.config.HTTPPostMode && !client.config.DisableAutoReconnect {
 			client.wg.Add(1)
 			go client.wsReconnectHandler()
@@ -1826,7 +1817,7 @@ func (c *Client) Connect(tries int) error {
 			c.config.Host)
 		c.wsConn = wsConn
 		close(c.connEstablished)
-		c.start()
+		c.start(true)
 		if !c.config.DisableAutoReconnect {
 			c.wg.Add(1)
 			go c.wsReconnectHandler()

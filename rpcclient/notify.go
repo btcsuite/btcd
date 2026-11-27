@@ -120,11 +120,12 @@ type NotificationHandlers struct {
 	OnClientConnected func()
 
 	// OnClientDisconnected is invoked synchronously when an established
-	// websocket connection disconnects, after all in-flight notification
-	// callbacks for that connection have completed and before automatic
-	// reconnect dials or activates a replacement connection.  Like other
-	// synchronous notification handlers, it must not make blocking calls
-	// on the client instance.
+	// websocket connection disconnects, after all synchronous wsInHandler
+	// notification callbacks for that connection have completed (while an
+	// async OnClientConnected callback may still overlap) and before
+	// automatic reconnect dials or activates a replacement connection.
+	// Like other synchronous notification handlers, it must not make
+	// blocking calls on the client instance.
 	OnClientDisconnected func()
 
 	// OnBlockConnected is invoked when a block is connected to the longest
@@ -1358,23 +1359,6 @@ func (r FutureLoadTxFilterResult) Receive() error {
 	return err
 }
 
-// loadTxFilterInternal is the same as LoadTxFilterAsync except it accepts
-// already-encoded address strings and JSON outpoints so the client can
-// recreate the tracked transaction filter state on reconnect.
-func (c *Client) loadTxFilterInternal(reload bool, addresses []string,
-	outpoints []btcjson.OutPoint) FutureLoadTxFilterResult {
-
-	if c.config.HTTPPostMode {
-		return newFutureError(ErrWebsocketsRequired)
-	}
-	if c.ntfnHandlers == nil {
-		return newNilFutureResult()
-	}
-
-	cmd := btcjson.NewLoadTxFilterCmd(reload, addresses, outpoints)
-	return c.sendCmd(cmd, false)
-}
-
 // LoadTxFilterAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
@@ -1415,15 +1399,21 @@ func (c *Client) LoadTxFilter(reload bool, addresses []address.Address,
 }
 
 // SetReconnectTxFilter replaces the client's transient reconnect transaction
-// filter snapshot without modifying durable LoadTxFilter state.  During
-// automatic reconnect reregistration, reregisterNtfns unions this snapshot
-// with tracked LoadTxFilter entries and replays them via loadtxfilter ahead
-// of previously registered notifyblocks and pre-disconnect queued requests.
-// Passing empty slices clears the transient snapshot so retired watches are
-// not replayed on later reconnects.  SetReconnectTxFilter does not send a
-// network request and is safe to call from OnClientDisconnected.
+// filter snapshot without modifying durable LoadTxFilter state.  This requires
+// a client configured with non-nil NotificationHandlers; on a handlerless
+// client, SetReconnectTxFilter is a no-op because reconnect reregistration is
+// skipped.  During automatic reconnect reregistration, reregisterNtfns unions
+// this snapshot with tracked LoadTxFilter entries and replays them via
+// loadtxfilter ahead of previously registered notifyblocks and resent pending
+// requests.  Passing empty slices clears the transient snapshot so retired
+// watches are not replayed on later reconnects.  SetReconnectTxFilter does not
+// send a network request and is safe to call from OnClientDisconnected.
 func (c *Client) SetReconnectTxFilter(addresses []address.Address,
 	outPoints []wire.OutPoint) {
+
+	if c.ntfnHandlers == nil {
+		return
+	}
 
 	addrs := make(map[string]struct{}, len(addresses))
 	for _, addr := range addresses {
@@ -1439,9 +1429,7 @@ func (c *Client) SetReconnectTxFilter(addresses []address.Address,
 	}
 
 	c.ntfnStateLock.Lock()
-	if c.ntfnState != nil {
-		c.ntfnState.reconnectTxFilterAddrs = addrs
-		c.ntfnState.reconnectTxFilterOutPoints = ops
-	}
+	c.ntfnState.reconnectTxFilterAddrs = addrs
+	c.ntfnState.reconnectTxFilterOutPoints = ops
 	c.ntfnStateLock.Unlock()
 }
