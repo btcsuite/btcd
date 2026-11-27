@@ -310,6 +310,19 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 		for _, addr := range bcmd.Addresses {
 			c.ntfnState.notifyReceived[addr] = struct{}{}
 		}
+
+	case *btcjson.LoadTxFilterCmd:
+		c.ntfnState.txFilterLoaded = true
+		if bcmd.Reload {
+			clear(c.ntfnState.txFilterAddrs)
+			clear(c.ntfnState.txFilterOutPoints)
+		}
+		for _, addr := range bcmd.Addresses {
+			c.ntfnState.txFilterAddrs[addr] = struct{}{}
+		}
+		for _, op := range bcmd.OutPoints {
+			c.ntfnState.txFilterOutPoints[op] = struct{}{}
+		}
 	}
 }
 
@@ -614,6 +627,32 @@ func (c *Client) reregisterNtfns() error {
 	stateCopy := c.ntfnState.Copy()
 	c.ntfnStateLock.Unlock()
 
+	// Reregister loadtxfilter before notifyblocks so the server restores
+	// the client's transaction filter before emitting post-reconnect
+	// filtered block notifications.  Use reload=false so any concurrent
+	// additive LoadTxFilter call on the new socket is preserved while an
+	// uninitialized server filter is created fresh.
+	if stateCopy.txFilterLoaded {
+		addresses := make([]string, 0, len(stateCopy.txFilterAddrs))
+		for addr := range stateCopy.txFilterAddrs {
+			addresses = append(addresses, addr)
+		}
+		outpoints := make(
+			[]btcjson.OutPoint, 0, len(stateCopy.txFilterOutPoints),
+		)
+		for op := range stateCopy.txFilterOutPoints {
+			outpoints = append(outpoints, op)
+		}
+		log.Debugf("Reregistering [loadtxfilter] addresses=%d "+
+			"outpoints=%d", len(addresses), len(outpoints))
+		err := c.loadTxFilterInternal(
+			false, addresses, outpoints,
+		).Receive()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Reregister notifyblocks if needed.
 	if stateCopy.notifyBlocks {
 		log.Debugf("Reregistering [notifyblocks]")
@@ -670,9 +709,12 @@ var ignoreResends = map[string]struct{}{
 }
 
 // resendRequests resends any requests that had not completed when the client
-// disconnected.  It is intended to be called once the client has reconnected as
-// a separate goroutine.
-func (c *Client) resendRequests() {
+// disconnected and then invokes OnClientConnected for the reconnected socket.
+// It is intended to be called once the client has reconnected as a separate
+// goroutine tracked by c.wg.
+func (c *Client) resendRequests(disconnect <-chan struct{}) {
+	defer c.wg.Done()
+
 	// Set the notification state back up.  If anything goes wrong,
 	// disconnect the client.
 	if err := c.reregisterNtfns(); err != nil {
@@ -705,15 +747,33 @@ func (c *Client) resendRequests() {
 	c.requestLock.Unlock()
 
 	for _, jReq := range resendReqs {
-		// Stop resending commands if the client disconnected again
-		// since the next reconnect will handle them.
-		if c.Disconnected() {
+		// Stop resending commands if this connection disconnected or
+		// the client is shutting down.
+		select {
+		case <-disconnect:
 			return
+		case <-c.shutdown:
+			return
+		default:
 		}
 
 		log.Tracef("Sending command [%s] with id %d", jReq.method,
 			jReq.id)
 		c.sendMessage(jReq.marshalledJSON)
+	}
+
+	// Notify OnClientConnected only if this connection is still active and
+	// shutdown has not started.
+	select {
+	case <-disconnect:
+		return
+	case <-c.shutdown:
+		return
+	default:
+	}
+
+	if c.ntfnHandlers != nil && c.ntfnHandlers.OnClientConnected != nil {
+		c.ntfnHandlers.OnClientConnected()
 	}
 }
 
@@ -792,14 +852,16 @@ out:
 			c.wsConn = wsConn
 			c.retryCount = 0
 
-			c.disconnect = make(chan struct{})
+			disconnect := make(chan struct{})
+			c.disconnect = disconnect
 			c.disconnected = false
-			c.start()
+			c.startWithNotify(false)
+			c.wg.Add(1)
 			c.mtx.Unlock()
 
-			// Reissue pending requests in another goroutine since
-			// the send can block.
-			go c.resendRequests()
+			// Reissue pending requests and invoke OnClientConnected
+			// once notification state has been restored.
+			go c.resendRequests(disconnect)
 
 			// Break out of the reconnect loop back to wait for
 			// disconnect again.
@@ -1252,8 +1314,17 @@ func (c *Client) Shutdown() {
 	c.doDisconnect()
 }
 
-// start begins processing input and output messages.
+// start begins processing input and output messages and invokes
+// OnClientConnected for the initial connection.
 func (c *Client) start() {
+	c.startWithNotify(true)
+}
+
+// startWithNotify begins processing input and output messages.  When
+// notifyConnected is true, OnClientConnected is launched asynchronously; on
+// automatic reconnects, resendRequests invokes OnClientConnected after
+// reregisterNtfns completes.
+func (c *Client) startWithNotify(notifyConnected bool) {
 	log.Tracef("Starting RPC client %s", c.config.Host)
 
 	// Start the I/O processing handlers depending on whether the client is
@@ -1271,16 +1342,19 @@ func (c *Client) start() {
 		disconnect := c.disconnect
 		var remaining atomic.Int32
 		remaining.Store(2)
-		c.wg.Add(3)
+		c.wg.Add(2)
 		c.connWG.Add(2)
-		go func() {
-			if c.ntfnHandlers != nil {
-				if c.ntfnHandlers.OnClientConnected != nil {
-					c.ntfnHandlers.OnClientConnected()
+		if notifyConnected {
+			c.wg.Add(1)
+			go func() {
+				if c.ntfnHandlers != nil {
+					if c.ntfnHandlers.OnClientConnected != nil {
+						c.ntfnHandlers.OnClientConnected()
+					}
 				}
-			}
-			c.wg.Done()
-		}()
+				c.wg.Done()
+			}()
+		}
 		go c.wsInHandler(wsConn, &remaining)
 		go c.wsOutHandler(wsConn, disconnect, &remaining)
 	}

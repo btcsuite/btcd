@@ -38,6 +38,9 @@ type notificationState struct {
 	notifyNewTxVerbose bool
 	notifyReceived     map[string]struct{}
 	notifySpent        map[btcjson.OutPoint]struct{}
+	txFilterLoaded     bool
+	txFilterAddrs      map[string]struct{}
+	txFilterOutPoints  map[btcjson.OutPoint]struct{}
 }
 
 // Copy returns a deep copy of the receiver.
@@ -54,6 +57,15 @@ func (s *notificationState) Copy() *notificationState {
 	for op := range s.notifySpent {
 		stateCopy.notifySpent[op] = struct{}{}
 	}
+	stateCopy.txFilterLoaded = s.txFilterLoaded
+	stateCopy.txFilterAddrs = make(map[string]struct{})
+	for addr := range s.txFilterAddrs {
+		stateCopy.txFilterAddrs[addr] = struct{}{}
+	}
+	stateCopy.txFilterOutPoints = make(map[btcjson.OutPoint]struct{})
+	for op := range s.txFilterOutPoints {
+		stateCopy.txFilterOutPoints[op] = struct{}{}
+	}
 
 	return &stateCopy
 }
@@ -61,8 +73,10 @@ func (s *notificationState) Copy() *notificationState {
 // newNotificationState returns a new notification state ready to be populated.
 func newNotificationState() *notificationState {
 	return &notificationState{
-		notifyReceived: make(map[string]struct{}),
-		notifySpent:    make(map[btcjson.OutPoint]struct{}),
+		notifyReceived:    make(map[string]struct{}),
+		notifySpent:       make(map[btcjson.OutPoint]struct{}),
+		txFilterAddrs:     make(map[string]struct{}),
+		txFilterOutPoints: make(map[btcjson.OutPoint]struct{}),
 	}
 }
 
@@ -87,8 +101,10 @@ func newNilFutureResult() chan *Response {
 // situation.
 type NotificationHandlers struct {
 	// OnClientConnected is invoked when the client connects or reconnects
-	// to the RPC server.  This callback is run async with the rest of the
-	// notification handlers, and is safe for blocking client requests.
+	// to the RPC server.  On automatic reconnect, it runs after tracked
+	// notifications have been re-registered and pending requests reissued.
+	// This callback is run async with the rest of the notification
+	// handlers, and is safe for blocking client requests.
 	OnClientConnected func()
 
 	// OnClientDisconnected is invoked synchronously when an established
@@ -1328,6 +1344,23 @@ type FutureLoadTxFilterResult chan *Response
 func (r FutureLoadTxFilterResult) Receive() error {
 	_, err := ReceiveFuture(r)
 	return err
+}
+
+// loadTxFilterInternal is the same as LoadTxFilterAsync except it accepts
+// already-encoded address strings and JSON outpoints so the client can
+// recreate the tracked transaction filter state on reconnect.
+func (c *Client) loadTxFilterInternal(reload bool, addresses []string,
+	outpoints []btcjson.OutPoint) FutureLoadTxFilterResult {
+
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := btcjson.NewLoadTxFilterCmd(reload, addresses, outpoints)
+	return c.SendCmd(cmd)
 }
 
 // LoadTxFilterAsync returns an instance of a type that can be used to

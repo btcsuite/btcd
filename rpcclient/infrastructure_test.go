@@ -17,8 +17,11 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/btcsuite/btcd/address/v2"
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 	"github.com/btcsuite/btcd/chainhash/v2"
+	"github.com/btcsuite/btcd/wire/v2"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1472,4 +1475,275 @@ func TestWSOnClientDisconnectedOnShutdown(t *testing.T) {
 	// Assert: OnClientDisconnected ran exactly once prior to shutdown
 	// completion.
 	require.Equal(t, int32(1), disconnectCount.Load())
+}
+
+// TestWSReconnectReplaysLoadTxFilterBeforeNotifyBlocks verifies that automatic
+// reconnect replays accumulated LoadTxFilter watches (with reload=false) before
+// NotifyBlocks, and invokes OnClientConnected only after reregistration finishes.
+func TestWSReconnectReplaysLoadTxFilterBeforeNotifyBlocks(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback server that records the exact RPC sequence on
+	// socket 2 and answers loadtxfilter and notifyblocks requests.
+	addr1, err := address.NewAddressWitnessPubKeyHash(
+		make([]byte, 20), &chaincfg.RegressionNetParams,
+	)
+	require.NoError(t, err)
+	hash2 := make([]byte, 20)
+	hash2[0] = 1
+	addr2, err := address.NewAddressWitnessPubKeyHash(
+		hash2, &chaincfg.RegressionNetParams,
+	)
+	require.NoError(t, err)
+	op1 := wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}
+	op2 := wire.OutPoint{Hash: chainhash.Hash{2}, Index: 1}
+
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	var eventsMu sync.Mutex
+	var conn2Methods []string
+	var replayedReload bool
+	var replayedAddrs []string
+	var replayedOutPoints []btcjson.OutPoint
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+
+			idx := connCount.Add(1)
+			for {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				var req btcjson.Request
+				if err := json.Unmarshal(msg, &req); err != nil {
+					return
+				}
+				if idx == 2 {
+					eventsMu.Lock()
+					conn2Methods = append(conn2Methods, req.Method)
+					if req.Method == "loadtxfilter" {
+						cmd, err := btcjson.UnmarshalCmd(&req)
+						if err == nil {
+							ltf := cmd.(*btcjson.LoadTxFilterCmd)
+							replayedReload = ltf.Reload
+							replayedAddrs = append(
+								[]string(nil), ltf.Addresses...,
+							)
+							replayedOutPoints = append(
+								[]btcjson.OutPoint(nil),
+								ltf.OutPoints...,
+							)
+						}
+					}
+					eventsMu.Unlock()
+				}
+				raw, err := btcjson.MarshalResponse(
+					btcjson.RpcVersion1, req.ID, nil, nil,
+				)
+				if err != nil {
+					return
+				}
+				if err := conn.WriteMessage(
+					websocket.TextMessage, raw,
+				); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(srv.Close)
+
+	var connectCount atomic.Int32
+	conn2Connected := make(chan struct{})
+	var methodsAtConnect []string
+	handlers := &NotificationHandlers{
+		OnClientConnected: func() {
+			if connectCount.Add(1) == 2 {
+				eventsMu.Lock()
+				methodsAtConnect = append(
+					[]string(nil), conn2Methods...,
+				)
+				eventsMu.Unlock()
+				close(conn2Connected)
+			}
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: register LoadTxFilter (reload then additive) and NotifyBlocks,
+	// disconnect socket 1, and wait for socket 2 OnClientConnected.
+	require.NoError(t, client.LoadTxFilter(
+		true, []address.Address{addr1}, []wire.OutPoint{op1},
+	))
+	require.NoError(t, client.LoadTxFilter(
+		false, []address.Address{addr2}, []wire.OutPoint{op2},
+	))
+	require.NoError(t, client.NotifyBlocks())
+
+	client.Disconnect()
+
+	select {
+	case <-conn2Connected:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 2 connect")
+	}
+
+	// Assert: loadtxfilter ran before notifyblocks and both completed
+	// before OnClientConnected, carrying all accumulated watches with
+	// reload=false.
+	require.Equal(t, []string{"loadtxfilter", "notifyblocks"}, methodsAtConnect)
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	require.False(t, replayedReload)
+	require.ElementsMatch(t, []string{
+		addr1.EncodeAddress(),
+		addr2.EncodeAddress(),
+	}, replayedAddrs)
+	require.ElementsMatch(t, []btcjson.OutPoint{
+		newOutPointFromWire(&op1),
+		newOutPointFromWire(&op2),
+	}, replayedOutPoints)
+}
+
+// TestWSReconnectLoadTxFilterReloadClearsPriorState verifies that a subsequent
+// LoadTxFilter(reload=true, ...) replaces tracked filter state so reconnect
+// replays only the reloaded watches.
+func TestWSReconnectLoadTxFilterReloadClearsPriorState(t *testing.T) {
+	t.Parallel()
+
+	// Arrange two distinct addresses and a loopback server capturing the
+	// replayed loadtxfilter command on socket 2.
+	addr1, err := address.NewAddressWitnessPubKeyHash(
+		make([]byte, 20), &chaincfg.RegressionNetParams,
+	)
+	require.NoError(t, err)
+	hash2 := make([]byte, 20)
+	hash2[0] = 2
+	addr2, err := address.NewAddressWitnessPubKeyHash(
+		hash2, &chaincfg.RegressionNetParams,
+	)
+	require.NoError(t, err)
+	op1 := wire.OutPoint{Hash: chainhash.Hash{9}, Index: 3}
+
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	var mu sync.Mutex
+	var replayedAddrs []string
+	var replayedOutPoints []btcjson.OutPoint
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+
+			idx := connCount.Add(1)
+			for {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				var req btcjson.Request
+				if err := json.Unmarshal(msg, &req); err != nil {
+					return
+				}
+				if idx == 2 && req.Method == "loadtxfilter" {
+					cmd, err := btcjson.UnmarshalCmd(&req)
+					if err == nil {
+						ltf := cmd.(*btcjson.LoadTxFilterCmd)
+						mu.Lock()
+						replayedAddrs = append(
+							[]string(nil), ltf.Addresses...,
+						)
+						replayedOutPoints = append(
+							[]btcjson.OutPoint(nil),
+							ltf.OutPoints...,
+						)
+						mu.Unlock()
+					}
+				}
+				raw, err := btcjson.MarshalResponse(
+					btcjson.RpcVersion1, req.ID, nil, nil,
+				)
+				if err != nil {
+					return
+				}
+				if err := conn.WriteMessage(
+					websocket.TextMessage, raw,
+				); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(srv.Close)
+
+	var connectCount atomic.Int32
+	conn2Connected := make(chan struct{})
+	handlers := &NotificationHandlers{
+		OnClientConnected: func() {
+			if connectCount.Add(1) == 2 {
+				close(conn2Connected)
+			}
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: load addr1+op1, reload with only addr2, then reconnect.
+	require.NoError(t, client.LoadTxFilter(
+		true, []address.Address{addr1}, []wire.OutPoint{op1},
+	))
+	require.NoError(t, client.LoadTxFilter(
+		true, []address.Address{addr2}, nil,
+	))
+
+	client.Disconnect()
+
+	select {
+	case <-conn2Connected:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 2 connect")
+	}
+
+	// Assert: only addr2 and no outpoints were replayed on reconnect.
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, []string{addr2.EncodeAddress()}, replayedAddrs)
+	require.Empty(t, replayedOutPoints)
 }
