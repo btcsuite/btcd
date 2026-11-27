@@ -486,9 +486,23 @@ func (c *Client) shouldLogReadError(err error) bool {
 	return true
 }
 
+// finishWSHandler marks one per-connection websocket handler as exited.  The
+// final handler for the connection invokes OnClientDisconnected synchronously
+// before releasing connWG so wsReconnectHandler cannot dial or activate a
+// replacement connection until the disconnect callback completes.
+func (c *Client) finishWSHandler(remaining *atomic.Int32) {
+	if remaining.Add(-1) == 0 && c.ntfnHandlers != nil &&
+		c.ntfnHandlers.OnClientDisconnected != nil {
+
+		c.ntfnHandlers.OnClientDisconnected()
+	}
+	c.connWG.Done()
+	c.wg.Done()
+}
+
 // wsInHandler handles all incoming messages for the passed websocket
 // connection.  It must be run as a goroutine.
-func (c *Client) wsInHandler(wsConn *websocket.Conn) {
+func (c *Client) wsInHandler(wsConn *websocket.Conn, remaining *atomic.Int32) {
 out:
 	for {
 		// Break out of the loop once the shutdown channel has been
@@ -515,8 +529,7 @@ out:
 	// Ensure the connection is closed before releasing connWG so
 	// wsReconnectHandler cannot activate a new connection first.
 	c.Disconnect()
-	c.connWG.Done()
-	c.wg.Done()
+	c.finishWSHandler(remaining)
 	log.Tracef("RPC client input handler done for %s", c.config.Host)
 }
 
@@ -535,7 +548,7 @@ func (c *Client) disconnectChan() <-chan struct{} {
 // allowing the sender to continue running asynchronously.  It must be run as a
 // goroutine.
 func (c *Client) wsOutHandler(wsConn *websocket.Conn,
-	disconnect <-chan struct{}) {
+	disconnect <-chan struct{}, remaining *atomic.Int32) {
 
 out:
 	for {
@@ -564,8 +577,7 @@ cleanup:
 			break cleanup
 		}
 	}
-	c.connWG.Done()
-	c.wg.Done()
+	c.finishWSHandler(remaining)
 	log.Tracef("RPC client output handler done for %s", c.config.Host)
 }
 
@@ -1257,6 +1269,8 @@ func (c *Client) start() {
 	} else {
 		wsConn := c.wsConn
 		disconnect := c.disconnect
+		var remaining atomic.Int32
+		remaining.Store(2)
 		c.wg.Add(3)
 		c.connWG.Add(2)
 		go func() {
@@ -1267,8 +1281,8 @@ func (c *Client) start() {
 			}
 			c.wg.Done()
 		}()
-		go c.wsInHandler(wsConn)
-		go c.wsOutHandler(wsConn, disconnect)
+		go c.wsInHandler(wsConn, &remaining)
+		go c.wsOutHandler(wsConn, disconnect, &remaining)
 	}
 }
 

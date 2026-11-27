@@ -1163,3 +1163,313 @@ func TestWSReconnectShutdownDuringDialClosesNewConn(t *testing.T) {
 
 	require.Equal(t, int32(1), connectedCount.Load())
 }
+
+// TestWSOnClientDisconnectedBeforeReconnect verifies that OnClientDisconnected
+// runs after prior socket notification callbacks finish and before automatic
+// reconnect dials or activates the replacement connection.
+func TestWSOnClientDisconnectedBeforeReconnect(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback server that sends one blockconnected notification
+	// on socket 1 and tracks when socket 2 connects.
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	conn2Accepted := make(chan struct{})
+	var connsMu sync.Mutex
+	var serverConns []*websocket.Conn
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			connsMu.Lock()
+			serverConns = append(serverConns, conn)
+			connsMu.Unlock()
+
+			idx := connCount.Add(1)
+			if idx == 1 {
+				ntfn := btcjson.NewBlockConnectedNtfn(
+					chainhash.Hash{2}.String(), 1, 1000,
+				)
+				raw, err := btcjson.MarshalCmd(
+					btcjson.RpcVersion1, nil, ntfn,
+				)
+				if err == nil {
+					_ = conn.WriteMessage(
+						websocket.TextMessage, raw,
+					)
+				}
+			}
+			if idx == 2 {
+				close(conn2Accepted)
+			}
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(func() {
+		connsMu.Lock()
+		for _, conn := range serverConns {
+			_ = conn.Close()
+		}
+		connsMu.Unlock()
+		srv.Close()
+	})
+
+	var eventsMu sync.Mutex
+	var events []string
+	recordEvent := func(ev string) {
+		eventsMu.Lock()
+		events = append(events, ev)
+		eventsMu.Unlock()
+	}
+
+	inBlock := make(chan struct{})
+	releaseBlock := make(chan struct{})
+	var releaseBlockOnce sync.Once
+	unblockBlock := func() {
+		releaseBlockOnce.Do(func() {
+			close(releaseBlock)
+		})
+	}
+
+	inDisconnect := make(chan struct{})
+	releaseDisconnect := make(chan struct{})
+	var releaseDisconnectOnce sync.Once
+	unblockDisconnect := func() {
+		releaseDisconnectOnce.Do(func() {
+			close(releaseDisconnect)
+		})
+	}
+
+	var blockOnce sync.Once
+	var disconnectOnce sync.Once
+	var connectCount atomic.Int32
+	conn2Connected := make(chan struct{})
+
+	handlers := &NotificationHandlers{
+		OnClientConnected: func() {
+			idx := connectCount.Add(1)
+			if idx == 2 {
+				recordEvent("connected-2")
+				close(conn2Connected)
+			}
+		},
+		OnBlockConnected: func(*chainhash.Hash, int32, time.Time) {
+			blockOnce.Do(func() {
+				close(inBlock)
+				<-releaseBlock
+				recordEvent("block-1-done")
+			})
+		},
+		OnClientDisconnected: func() {
+			disconnectOnce.Do(func() {
+				recordEvent("disconnected-1-start")
+				close(inDisconnect)
+				<-releaseDisconnect
+				recordEvent("disconnected-1-done")
+			})
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		unblockBlock()
+		unblockDisconnect()
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: pause socket 1 inside OnBlockConnected, trigger Disconnect,
+	// verify OnClientDisconnected waits for OnBlockConnected, then verify
+	// socket 2 waits for OnClientDisconnected before connecting.
+	select {
+	case <-inBlock:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for block callback")
+	}
+
+	client.Disconnect()
+
+	select {
+	case <-inDisconnect:
+		require.FailNow(
+			t, "OnClientDisconnected fired before "+
+				"OnBlockConnected returned",
+		)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	unblockBlock()
+
+	select {
+	case <-inDisconnect:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for OnClientDisconnected")
+	}
+
+	select {
+	case <-conn2Accepted:
+		require.FailNow(
+			t, "socket 2 connected before OnClientDisconnected "+
+				"returned",
+		)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	unblockDisconnect()
+
+	select {
+	case <-conn2Connected:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 2 connect")
+	}
+
+	// Assert: callbacks executed in strict happens-before order.
+	eventsMu.Lock()
+	got := append([]string(nil), events...)
+	eventsMu.Unlock()
+	require.Equal(t, []string{
+		"block-1-done",
+		"disconnected-1-start",
+		"disconnected-1-done",
+		"connected-2",
+	}, got)
+}
+
+// TestWSOnClientDisconnectedDisableAutoReconnect verifies that
+// OnClientDisconnected fires once when a connection drops with
+// DisableAutoReconnect enabled.
+func TestWSOnClientDisconnectedDisableAutoReconnect(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a server that closes socket 1 on signal.
+	upgrader := websocket.Upgrader{}
+	closeConn := make(chan struct{})
+	var closeOnce sync.Once
+	triggerClose := func() {
+		closeOnce.Do(func() {
+			close(closeConn)
+		})
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			<-closeConn
+			_ = conn.Close()
+		},
+	))
+	t.Cleanup(func() {
+		triggerClose()
+		srv.Close()
+	})
+
+	var disconnectCount atomic.Int32
+	disconnected := make(chan struct{})
+	handlers := &NotificationHandlers{
+		OnClientDisconnected: func() {
+			if disconnectCount.Add(1) == 1 {
+				close(disconnected)
+			}
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:                 host,
+		Endpoint:             "ws",
+		User:                 "user",
+		Pass:                 "pass",
+		DisableTLS:           true,
+		DisableAutoReconnect: true,
+		HTTPPostMode:         false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: close the server side of the websocket and wait for shutdown.
+	triggerClose()
+
+	select {
+	case <-disconnected:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for OnClientDisconnected")
+	}
+
+	client.WaitForShutdown()
+
+	// Assert: OnClientDisconnected fired exactly once.
+	require.Equal(t, int32(1), disconnectCount.Load())
+}
+
+// TestWSOnClientDisconnectedOnShutdown verifies that OnClientDisconnected fires
+// once before WaitForShutdown returns on explicit client Shutdown.
+func TestWSOnClientDisconnectedOnShutdown(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback websocket server.
+	upgrader := websocket.Upgrader{}
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(srv.Close)
+
+	var disconnectCount atomic.Int32
+	handlers := &NotificationHandlers{
+		OnClientDisconnected: func() {
+			disconnectCount.Add(1)
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+
+	// Act: shut down the client and wait for all handlers to finish.
+	client.Shutdown()
+	client.WaitForShutdown()
+
+	// Assert: OnClientDisconnected ran exactly once prior to shutdown
+	// completion.
+	require.Equal(t, int32(1), disconnectCount.Load())
+}

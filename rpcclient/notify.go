@@ -91,6 +91,14 @@ type NotificationHandlers struct {
 	// notification handlers, and is safe for blocking client requests.
 	OnClientConnected func()
 
+	// OnClientDisconnected is invoked synchronously when an established
+	// websocket connection disconnects, after all in-flight notification
+	// callbacks for that connection have completed and before automatic
+	// reconnect dials or activates a replacement connection.  Like other
+	// synchronous notification handlers, it must not make blocking calls
+	// on the client instance.
+	OnClientDisconnected func()
+
 	// OnBlockConnected is invoked when a block is connected to the longest
 	// (best) chain.  It will only be invoked if a preceding call to
 	// NotifyBlocks has been made to register for the notification and the
