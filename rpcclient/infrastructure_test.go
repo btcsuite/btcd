@@ -1903,3 +1903,128 @@ func TestWSReconnectSetReconnectTxFilterInOnClientDisconnected(t *testing.T) {
 	require.Equal(t, []string{addr1.EncodeAddress()}, replayedAddrs[3])
 	require.Empty(t, replayedOutPoints[3])
 }
+
+// TestWSReconnectRejectedLoadTxFilterNotReplayed verifies that a server-
+// rejected LoadTxFilter RPC is not recorded in notificationState, so a
+// subsequent reconnect does not replay the rejected command into a disconnect
+// churn loop.
+func TestWSReconnectRejectedLoadTxFilterNotReplayed(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback server that rejects loadtxfilter with a JSON-RPC
+	// error and records all methods received on socket 2.
+	addr1, err := address.NewAddressWitnessPubKeyHash(
+		make([]byte, 20), &chaincfg.RegressionNetParams,
+	)
+	require.NoError(t, err)
+
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	var eventsMu sync.Mutex
+	var conn2Methods []string
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+
+			idx := connCount.Add(1)
+			for {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				var req btcjson.Request
+				err = json.Unmarshal(msg, &req)
+				if err != nil {
+					return
+				}
+				if idx >= 2 {
+					eventsMu.Lock()
+					conn2Methods = append(
+						conn2Methods, req.Method,
+					)
+					eventsMu.Unlock()
+				}
+
+				var result any
+				var rpcErr *btcjson.RPCError
+				switch req.Method {
+				case "loadtxfilter":
+					rpcErr = &btcjson.RPCError{
+						Code:    -32601,
+						Message: "Method not found",
+					}
+				case "getblockcount":
+					result = int64(77)
+				}
+
+				raw, err := btcjson.MarshalResponse(
+					btcjson.RpcVersion1, req.ID,
+					result, rpcErr,
+				)
+				if err != nil {
+					return
+				}
+				if err := conn.WriteMessage(
+					websocket.TextMessage, raw,
+				); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(srv.Close)
+
+	var connectCount atomic.Int32
+	conn2Connected := make(chan struct{})
+	handlers := &NotificationHandlers{
+		OnClientConnected: func() {
+			if connectCount.Add(1) == 2 {
+				close(conn2Connected)
+			}
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err := New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: issue a LoadTxFilter that the server rejects, then reconnect
+	// and issue a regular RPC on socket 2.
+	err = client.LoadTxFilter(false, []address.Address{addr1}, nil)
+	require.Error(t, err)
+
+	client.Disconnect()
+
+	select {
+	case <-conn2Connected:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 2 connect")
+	}
+
+	count, err := client.GetBlockCount()
+	require.NoError(t, err)
+	require.Equal(t, int64(77), count)
+
+	// Assert: loadtxfilter was not replayed on socket 2 and the client
+	// stayed connected on socket 2 without churning.
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	require.NotContains(t, conn2Methods, "loadtxfilter")
+	require.Equal(t, int32(2), connCount.Load())
+}
