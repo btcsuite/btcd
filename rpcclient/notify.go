@@ -33,11 +33,16 @@ var (
 // registered notification so the state can be automatically re-established on
 // reconnect.
 type notificationState struct {
-	notifyBlocks       bool
-	notifyNewTx        bool
-	notifyNewTxVerbose bool
-	notifyReceived     map[string]struct{}
-	notifySpent        map[btcjson.OutPoint]struct{}
+	notifyBlocks               bool
+	notifyNewTx                bool
+	notifyNewTxVerbose         bool
+	notifyReceived             map[string]struct{}
+	notifySpent                map[btcjson.OutPoint]struct{}
+	txFilterLoaded             bool
+	txFilterAddrs              map[string]struct{}
+	txFilterOutPoints          map[btcjson.OutPoint]struct{}
+	reconnectTxFilterAddrs     map[string]struct{}
+	reconnectTxFilterOutPoints map[btcjson.OutPoint]struct{}
 }
 
 // Copy returns a deep copy of the receiver.
@@ -54,6 +59,23 @@ func (s *notificationState) Copy() *notificationState {
 	for op := range s.notifySpent {
 		stateCopy.notifySpent[op] = struct{}{}
 	}
+	stateCopy.txFilterLoaded = s.txFilterLoaded
+	stateCopy.txFilterAddrs = make(map[string]struct{})
+	for addr := range s.txFilterAddrs {
+		stateCopy.txFilterAddrs[addr] = struct{}{}
+	}
+	stateCopy.txFilterOutPoints = make(map[btcjson.OutPoint]struct{})
+	for op := range s.txFilterOutPoints {
+		stateCopy.txFilterOutPoints[op] = struct{}{}
+	}
+	stateCopy.reconnectTxFilterAddrs = make(map[string]struct{})
+	for addr := range s.reconnectTxFilterAddrs {
+		stateCopy.reconnectTxFilterAddrs[addr] = struct{}{}
+	}
+	stateCopy.reconnectTxFilterOutPoints = make(map[btcjson.OutPoint]struct{})
+	for op := range s.reconnectTxFilterOutPoints {
+		stateCopy.reconnectTxFilterOutPoints[op] = struct{}{}
+	}
 
 	return &stateCopy
 }
@@ -61,8 +83,12 @@ func (s *notificationState) Copy() *notificationState {
 // newNotificationState returns a new notification state ready to be populated.
 func newNotificationState() *notificationState {
 	return &notificationState{
-		notifyReceived: make(map[string]struct{}),
-		notifySpent:    make(map[btcjson.OutPoint]struct{}),
+		notifyReceived:             make(map[string]struct{}),
+		notifySpent:                make(map[btcjson.OutPoint]struct{}),
+		txFilterAddrs:              make(map[string]struct{}),
+		txFilterOutPoints:          make(map[btcjson.OutPoint]struct{}),
+		reconnectTxFilterAddrs:     make(map[string]struct{}),
+		reconnectTxFilterOutPoints: make(map[btcjson.OutPoint]struct{}),
 	}
 }
 
@@ -87,9 +113,20 @@ func newNilFutureResult() chan *Response {
 // situation.
 type NotificationHandlers struct {
 	// OnClientConnected is invoked when the client connects or reconnects
-	// to the RPC server.  This callback is run async with the rest of the
-	// notification handlers, and is safe for blocking client requests.
+	// to the RPC server.  On automatic reconnect, it runs after tracked
+	// notifications have been re-registered and pending requests reissued.
+	// This callback is run async with the rest of the notification
+	// handlers, and is safe for blocking client requests.
 	OnClientConnected func()
+
+	// OnClientDisconnected is invoked synchronously when an established
+	// websocket connection disconnects, after all synchronous wsInHandler
+	// notification callbacks for that connection have completed (while an
+	// async OnClientConnected callback may still overlap) and before
+	// automatic reconnect dials or activates a replacement connection.
+	// Like other synchronous notification handlers, it must not make
+	// blocking calls on the client instance.
+	OnClientDisconnected func()
 
 	// OnBlockConnected is invoked when a block is connected to the longest
 	// (best) chain.  It will only be invoked if a preceding call to
@@ -1359,4 +1396,40 @@ func (c *Client) LoadTxFilter(reload bool, addresses []address.Address,
 	outPoints []wire.OutPoint) error {
 
 	return c.LoadTxFilterAsync(reload, addresses, outPoints).Receive()
+}
+
+// SetReconnectTxFilter replaces the client's transient reconnect transaction
+// filter snapshot without modifying durable LoadTxFilter state.  This requires
+// a client configured with non-nil NotificationHandlers; on a handlerless
+// client, SetReconnectTxFilter is a no-op because reconnect reregistration is
+// skipped.  During automatic reconnect reregistration, reregisterNtfns unions
+// this snapshot with tracked LoadTxFilter entries and replays them via
+// loadtxfilter ahead of previously registered notifyblocks and resent pending
+// requests.  Passing empty slices clears the transient snapshot so retired
+// watches are not replayed on later reconnects.  SetReconnectTxFilter does not
+// send a network request and is safe to call from OnClientDisconnected.
+func (c *Client) SetReconnectTxFilter(addresses []address.Address,
+	outPoints []wire.OutPoint) {
+
+	if c.ntfnHandlers == nil {
+		return
+	}
+
+	addrs := make(map[string]struct{}, len(addresses))
+	for _, addr := range addresses {
+		if addr == nil {
+			continue
+		}
+		addrs[addr.EncodeAddress()] = struct{}{}
+	}
+
+	ops := make(map[btcjson.OutPoint]struct{}, len(outPoints))
+	for i := range outPoints {
+		ops[newOutPointFromWire(&outPoints[i])] = struct{}{}
+	}
+
+	c.ntfnStateLock.Lock()
+	c.ntfnState.reconnectTxFilterAddrs = addrs
+	c.ntfnState.reconnectTxFilterOutPoints = ops
+	c.ntfnStateLock.Unlock()
 }
