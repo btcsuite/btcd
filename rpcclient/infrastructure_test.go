@@ -1905,3 +1905,172 @@ func TestWSReconnectRejectedLoadTxFilterNotReplayed(t *testing.T) {
 	require.NotContains(t, conn2Methods, "loadtxfilter")
 	require.Equal(t, int32(2), connCount.Load())
 }
+
+// TestWSReconnectInterruptedLoadTxFilterNotResent verifies that when a
+// replacement socket drops mid-loadtxfilter during reregisterNtfns and the
+// caller clears SetReconnectTxFilter before the next reconnect, the abandoned
+// loadtxfilter request is neither resent after notifyblocks nor allowed to
+// disconnect the newer socket.
+func TestWSReconnectInterruptedLoadTxFilterNotResent(t *testing.T) {
+	t.Parallel()
+
+	// Arrange a loopback server where socket 2 drops immediately after
+	// reading the replayed loadtxfilter without replying, and socket 3
+	// records every method and answers normally.
+	addr1, err := address.NewAddressWitnessPubKeyHash(
+		make([]byte, 20), &chaincfg.RegressionNetParams,
+	)
+	require.NoError(t, err)
+	opAuto := wire.OutPoint{Hash: chainhash.Hash{8}, Index: 1}
+
+	upgrader := websocket.Upgrader{}
+	var connCount atomic.Int32
+	var eventsMu sync.Mutex
+	var conn3Methods []string
+	var conn3Addrs []string
+	var conn3OutPoints []btcjson.OutPoint
+
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+
+			idx := connCount.Add(1)
+			for {
+				_, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				var req btcjson.Request
+				err = json.Unmarshal(msg, &req)
+				if err != nil {
+					return
+				}
+				if idx == 2 && req.Method == "loadtxfilter" {
+					// Drop socket 2 before replying.
+					return
+				}
+				if idx >= 3 {
+					eventsMu.Lock()
+					conn3Methods = append(
+						conn3Methods, req.Method,
+					)
+					if req.Method == "loadtxfilter" {
+						cmd, err := btcjson.UnmarshalCmd(
+							&req,
+						)
+						if err == nil {
+							ltf, ok := cmd.(*btcjson.LoadTxFilterCmd)
+							if ok {
+								conn3Addrs = append(
+									conn3Addrs,
+									ltf.Addresses...,
+								)
+								conn3OutPoints = append(
+									conn3OutPoints,
+									ltf.OutPoints...,
+								)
+							}
+						}
+					}
+					eventsMu.Unlock()
+				}
+
+				var result any
+				if req.Method == "getblockcount" {
+					result = int64(99)
+				}
+				raw, err := btcjson.MarshalResponse(
+					btcjson.RpcVersion1, req.ID,
+					result, nil,
+				)
+				if err != nil {
+					return
+				}
+				if err := conn.WriteMessage(
+					websocket.TextMessage, raw,
+				); err != nil {
+					return
+				}
+			}
+		},
+	))
+	t.Cleanup(srv.Close)
+
+	var client *Client
+	var disconnectCount atomic.Int32
+	var connectCount atomic.Int32
+	conn3Connected := make(chan struct{})
+	var methodsAtConnect []string
+	handlers := &NotificationHandlers{
+		OnClientDisconnected: func() {
+			if disconnectCount.Add(1) == 1 {
+				client.SetReconnectTxFilter(
+					nil, []wire.OutPoint{opAuto},
+				)
+			} else {
+				client.SetReconnectTxFilter(nil, nil)
+			}
+		},
+		OnClientConnected: func() {
+			if connectCount.Add(1) == 2 {
+				eventsMu.Lock()
+				methodsAtConnect = append(
+					[]string(nil), conn3Methods...,
+				)
+				eventsMu.Unlock()
+				close(conn3Connected)
+			}
+		},
+	}
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	client, err = New(&ConnConfig{
+		Host:         host,
+		Endpoint:     "ws",
+		User:         "user",
+		Pass:         "pass",
+		DisableTLS:   true,
+		HTTPPostMode: false,
+	}, handlers)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Shutdown()
+		client.WaitForShutdown()
+	})
+
+	// Act: load addr1 and NotifyBlocks on socket 1, then disconnect so
+	// socket 2 drops mid-loadtxfilter and socket 3 connects after
+	// SetReconnectTxFilter(nil, nil) clears opAuto.
+	require.NoError(t, client.LoadTxFilter(
+		false, []address.Address{addr1}, nil,
+	))
+	require.NoError(t, client.NotifyBlocks())
+
+	client.Disconnect()
+
+	select {
+	case <-conn3Connected:
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "timed out waiting for socket 3 connect")
+	}
+
+	count, err := client.GetBlockCount()
+	require.NoError(t, err)
+	require.Equal(t, int64(99), count)
+
+	// Assert: socket 3 replayed only loadtxfilter then notifyblocks with
+	// no stale resend of socket 2's loadtxfilter, opAuto stayed cleared,
+	// and socket 3 was not disconnected by socket 2's abandoned goroutine.
+	require.Equal(
+		t, []string{"loadtxfilter", "notifyblocks"}, methodsAtConnect,
+	)
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	require.Equal(t, []string{addr1.EncodeAddress()}, conn3Addrs)
+	require.Empty(t, conn3OutPoints)
+	require.Equal(t, int32(3), connCount.Load())
+}

@@ -112,6 +112,7 @@ type jsonRequest struct {
 	cmd            interface{}
 	marshalledJSON []byte
 	responseChan   chan *Response
+	noResend       bool
 }
 
 // Client represents a Bitcoin RPC client which allows easy access to the
@@ -609,7 +610,7 @@ func (c *Client) sendMessage(marshalledJSON []byte) {
 // reregisterNtfns creates and sends commands needed to re-establish the current
 // notification state associated with the client.  It should only be called on
 // on reconnect by the resendRequests function.
-func (c *Client) reregisterNtfns() error {
+func (c *Client) reregisterNtfns(disconnect <-chan struct{}) error {
 	// Nothing to do if the caller is not interested in notifications.
 	if c.ntfnHandlers == nil {
 		return nil
@@ -656,7 +657,7 @@ func (c *Client) reregisterNtfns() error {
 		log.Debugf("Reregistering [loadtxfilter] addresses=%d "+
 			"outpoints=%d", len(addresses), len(outpoints))
 		cmd := btcjson.NewLoadTxFilterCmd(false, addresses, outpoints)
-		if _, err := ReceiveFuture(c.sendCmd(cmd, false)); err != nil {
+		if err := c.sendReconnectCmd(cmd, disconnect); err != nil {
 			return err
 		}
 	}
@@ -723,9 +724,16 @@ var ignoreResends = map[string]struct{}{
 func (c *Client) resendRequests(disconnect <-chan struct{}) {
 	defer c.wg.Done()
 
-	// Set the notification state back up.  If anything goes wrong,
-	// disconnect the client.
-	if err := c.reregisterNtfns(); err != nil {
+	// Set the notification state back up.  If anything goes wrong while
+	// this connection is still active, disconnect the client to retry.
+	if err := c.reregisterNtfns(disconnect); err != nil {
+		select {
+		case <-disconnect:
+			return
+		case <-c.shutdown:
+			return
+		default:
+		}
 		log.Warnf("Unable to re-establish notification state: %v", err)
 		c.Disconnect()
 		return
@@ -742,7 +750,7 @@ func (c *Client) resendRequests(disconnect <-chan struct{}) {
 		nextElem = e.Next()
 
 		jReq := e.Value.(*jsonRequest)
-		if _, ok := ignoreResends[jReq.method]; ok {
+		if _, ok := ignoreResends[jReq.method]; ok || jReq.noResend {
 			// If a request is not sent on reconnect, remove it
 			// from the request structures, since no reply is
 			// expected.
@@ -1164,13 +1172,6 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // future.  It handles both websocket and HTTP POST mode depending on the
 // configuration of the client.
 func (c *Client) SendCmd(cmd interface{}) chan *Response {
-	return c.sendCmd(cmd, true)
-}
-
-// sendCmd marshals and sends cmd, omitting jReq.cmd when trackNtfnState is
-// false so reconnect reregistration does not merge transient reconnect state
-// back into durable notificationState.
-func (c *Client) sendCmd(cmd interface{}, trackNtfnState bool) chan *Response {
 	rpcVersion := btcjson.RpcVersion1
 	if c.batch {
 		rpcVersion = btcjson.RpcVersion2
@@ -1188,17 +1189,12 @@ func (c *Client) sendCmd(cmd interface{}, trackNtfnState bool) chan *Response {
 		return newFutureError(err)
 	}
 
-	var trackedCmd interface{}
-	if trackNtfnState {
-		trackedCmd = cmd
-	}
-
 	// Generate the request and send it along with a channel to respond on.
 	responseChan := make(chan *Response, 1)
 	jReq := &jsonRequest{
 		id:             id,
 		method:         method,
-		cmd:            trackedCmd,
+		cmd:            cmd,
 		marshalledJSON: marshalledJSON,
 		responseChan:   responseChan,
 	}
@@ -1206,6 +1202,58 @@ func (c *Client) sendCmd(cmd interface{}, trackNtfnState bool) chan *Response {
 	c.sendRequest(jReq)
 
 	return responseChan
+}
+
+// sendReconnectCmd sends an internal reconnect reregistration command that is
+// neither tracked in notificationState nor resent on a later reconnect.  If
+// disconnect or c.shutdown closes before the reply arrives, it removes the
+// abandoned request and returns immediately.
+func (c *Client) sendReconnectCmd(cmd interface{},
+	disconnect <-chan struct{}) error {
+
+	select {
+	case <-disconnect:
+		return ErrClientDisconnect
+	case <-c.shutdown:
+		return ErrClientShutdown
+	default:
+	}
+
+	rpcVersion := btcjson.RpcVersion1
+	if c.batch {
+		rpcVersion = btcjson.RpcVersion2
+	}
+	method, err := btcjson.CmdMethod(cmd)
+	if err != nil {
+		return err
+	}
+
+	id := c.NextID()
+	marshalledJSON, err := btcjson.MarshalCmd(rpcVersion, id, cmd)
+	if err != nil {
+		return err
+	}
+
+	responseChan := make(chan *Response, 1)
+	jReq := &jsonRequest{
+		id:             id,
+		method:         method,
+		marshalledJSON: marshalledJSON,
+		responseChan:   responseChan,
+		noResend:       true,
+	}
+	c.sendRequest(jReq)
+
+	select {
+	case resp := <-responseChan:
+		return resp.err
+	case <-disconnect:
+		c.removeRequest(id)
+		return ErrClientDisconnect
+	case <-c.shutdown:
+		c.removeRequest(id)
+		return ErrClientShutdown
+	}
 }
 
 // sendCmdAndWait sends the passed command to the associated server, waits
